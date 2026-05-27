@@ -558,19 +558,13 @@ function createMessageBubble(content, profilePicUrl) {
         bubble.appendChild(span);
     }
     
-    // Determinar si es solo emoji o texto
-    const isOnlyEmoji = /[\u1F600-\u1F6FF]/.test(content);
     span.textContent = content;
-    
-    // Aplicar estilos según el tipo de contenido
-    if (isOnlyEmoji) {
-        span.style.fontSize = '13px';
-        bubble.style.background = 'rgba(255, 255, 255, 0.2)';
-    } else {
-        span.style.fontSize = '24px';
-        bubble.style.background = 'rgba(98, 54, 255, 0.7)';
-    }
-    
+    span.style.fontSize = '';
+    span.className = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(content)
+        ? 'emoji-message'
+        : 'text-message';
+    bubble.style.background = '';
+
     return bubble;
 }
 
@@ -609,6 +603,35 @@ function scrollToBottom() {
     debouncedScroll();
 }
 
+function getMessageText(messageData) {
+    if (!messageData) return '';
+    if (typeof messageData === 'string') return messageData;
+    return messageData.message ?? '';
+}
+
+function getLastChatMessageId() {
+    const numericIds = messagesDisplayed
+        .map((id) => parseInt(id, 10))
+        .filter((id) => !Number.isNaN(id) && id > 0);
+    return numericIds.length ? Math.max(...numericIds) : 0;
+}
+
+function processIncomingChatMessages(data) {
+    if (!data) return;
+
+    const list = Array.isArray(data.messages)
+        ? data.messages
+        : (data.status === 'success' && data.message ? [data.message] : []);
+
+    list.forEach((row) => {
+        const id = parseInt(row.id, 10);
+        const text = getMessageText(row);
+        if (!text) return;
+        if (!Number.isNaN(id) && id > 0 && messagesDisplayed.includes(id)) return;
+        displayMessage({ message: text, id: Number.isNaN(id) ? Date.now() : id }, row.image || data.image);
+    });
+}
+
 // Función mejorada para mostrar mensajes estilo redes sociales
 function displayMessage(messageData, imageUrl) {
     const display = $id("message-display");
@@ -617,16 +640,18 @@ function displayMessage(messageData, imageUrl) {
     limitMessages();
     
     const bubble = createMessageBubble(
-        messageData.message || messageData, 
+        getMessageText(messageData),
         imageUrl || imagePath || 'default-avatar.png'
     );
     
     // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
     display.insertBefore(bubble, display.firstChild);
     
-    // Guardar ID del mensaje si existe
     if (messageData.id) {
-        messagesDisplayed.push(messageData.id);
+        const msgId = parseInt(messageData.id, 10);
+        if (!Number.isNaN(msgId) && !messagesDisplayed.includes(msgId)) {
+            messagesDisplayed.push(msgId);
+        }
     }
     
     // Programar eliminación automática
@@ -648,6 +673,14 @@ function sendMessage(content, id) {
         .done((data) => {
             if (data.status === 'success') {
                 $('#message-send-new').val('');
+                if (data.id) {
+                    const tempIndex = messagesDisplayed.indexOf(messageId);
+                    if (tempIndex >= 0) {
+                        messagesDisplayed[tempIndex] = data.id;
+                    } else {
+                        messagesDisplayed.push(data.id);
+                    }
+                }
             }
         })
         .fail(() => {
@@ -669,20 +702,16 @@ function sendMessageText() {
     }
 }
 
-// Polling optimizado de mensajes mejorado
+// Polling de chat (mensajes de jugadores en la partida activa)
 function pollMessagesOptimized() {
     return new Promise((resolve) => {
-        $.get(site_url + 'playings/messageGet')
+        $.get(site_url + 'playings/messageGet', { after_id: getLastChatMessageId() })
             .done((data) => {
                 if (data.status === 'stop') {
                     messagePoller.stop();
                     return resolve(data);
                 }
-                
-                if (data.status === 'success' && data.message && 
-                    !messagesDisplayed.includes(data.message.id)) {
-                    displayMessage(data.message, data.image);
-                }
+                processIncomingChatMessages(data);
                 resolve(data);
             })
             .fail((error) => {
@@ -1292,41 +1321,53 @@ function setupEvents() {
         }
     });
 
-    // Toggle de mensajes mejorado
+    function setChatPanelOpen(open) {
+        const messageContainer = $id("message-display-container");
+        const toggleBtn = $id("toggle-messages-btn");
+        if (!messageContainer) {
+            return;
+        }
+        messageContainer.style.display = open ? "flex" : "none";
+        messageContainer.classList.toggle("is-open", open);
+        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("chat-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+    }
+
+    function isChatPanelOpen() {
+        const messageContainer = $id("message-display-container");
+        return messageContainer && messageContainer.style.display === "flex";
+    }
+
     const toggleBtn = $id("toggle-messages-btn");
     if (toggleBtn) {
         toggleBtn.addEventListener("click", function(event) {
-            const messageContainer = $id("message-display-container");
-            if (messageContainer) {
-                const isVisible = messageContainer.style.display === "flex";
-                messageContainer.style.display = isVisible ? "none" : "flex";
-                
-                // Actualizar icono del botón si existe
-                const icon = toggleBtn.querySelector('i');
-                if (icon) {
-                    icon.className = isVisible ? 'fa fa-comments' : 'fa fa-times';
-                }
-            }
+            setChatPanelOpen(!isChatPanelOpen());
             event.stopPropagation();
         });
     }
 
-    // Click fuera para cerrar mensajes
+    const closeChatBtn = $id("message-display-close");
+    if (closeChatBtn) {
+        closeChatBtn.addEventListener("click", function(event) {
+            setChatPanelOpen(false);
+            event.stopPropagation();
+        });
+    }
+
     document.addEventListener("click", function(event) {
         const messageContainer = $id("message-display-container");
         const toggleButton = $id("toggle-messages-btn");
-        
-        if (messageContainer && toggleButton && 
-            messageContainer.style.display === "flex" && 
-            !messageContainer.contains(event.target) && 
-            !toggleButton.contains(event.target)) {
-            messageContainer.style.display = "none";
-            
-            // Actualizar icono del botón
-            const icon = toggleButton.querySelector('i');
-            if (icon) {
-                icon.className = 'fa fa-comments';
-            }
+        const closeButton = $id("message-display-close");
+
+        if (messageContainer && toggleButton &&
+            isChatPanelOpen() &&
+            !messageContainer.contains(event.target) &&
+            !toggleButton.contains(event.target) &&
+            !(closeButton && closeButton.contains(event.target))) {
+            setChatPanelOpen(false);
         }
     });
 

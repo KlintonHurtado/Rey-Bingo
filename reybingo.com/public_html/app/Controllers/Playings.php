@@ -21,7 +21,7 @@ use CodeIgniter\Controller;
 
 class Playings extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet']);
         session();
     }
     
@@ -119,7 +119,7 @@ class Playings extends Controller {
 
         $contacts = $modelContacts->findAll();
 
-        $user = $modelUsers->find(session()->get('id'));
+        $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
@@ -164,8 +164,16 @@ class Playings extends Controller {
         $user = $modelUsers->find(session()->get('id'));
         $lastGame = $modelGames->orderBy('created_at', 'DESC')->first();
 
+        if (!$lastGame) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'No hay ninguna partida de bingo creada en el sistema para poder reclamar cartones.'
+            ]);
+        }
+
         $credit = $cartons * $lastGame['price'];
-        $modelUsers->update($user['id'], ['roulette' => 1, 'wallet' => $user['wallet'] + $credit]);
+        wallet_credit_withdrawable($user['id'], $credit);
+        $modelUsers->update($user['id'], ['roulette' => 1]);
 
         $data = [
             'user'    => session()->get('id'),
@@ -298,7 +306,8 @@ class Playings extends Controller {
         $totalCost = $totalSelectedCartons * $game['price'];
 
         // Verificar saldo suficiente
-        if ($user['wallet'] < $totalCost) {
+        $user = wallet_service()->normalizeUser($user);
+        if (! wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('insufficient wallet balance')
@@ -354,9 +363,9 @@ class Playings extends Controller {
                 }
             }
 
-            // Descontar del wallet del usuario
-            $newWalletBalance = $user['wallet'] - $totalCost;
-            $modelUsers->update($userId, ['wallet' => $newWalletBalance]);
+            if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+                throw new \Exception(translate('insufficient wallet balance'));
+            }
 
             // Completar transacción
             $db->transComplete();
@@ -365,13 +374,15 @@ class Playings extends Controller {
                 throw new \Exception('Transaction failed');
             }
 
+            $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+
             return $this->response->setJSON([
                 'success' => true,
                 'message' => translate('cartons assigned successfully'),
                 'redirect_url' => base_url('playing'),
                 'cartons_assigned' => $totalSelectedCartons,
                 'total_cost' => $totalCost,
-                'new_balance' => $newWalletBalance,
+                'new_balance' => wallet_total($userAfter),
                 'carton_ids' => $savedCartonIds
             ]);
 
@@ -681,7 +692,12 @@ class Playings extends Controller {
             return redirect()->to('/play');
         }
 
-        $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->countAllResults();
+        $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+
+        $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
+        $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
+        $gameIsFinished = ($totalNumbersGenerated >= 75)
+            || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
     
         $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
     
@@ -769,7 +785,7 @@ class Playings extends Controller {
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
+            'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'gameIsFinished' => $gameIsFinished, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
         ];
     
         if ($this->request->isAJAX()) {
@@ -875,7 +891,7 @@ class Playings extends Controller {
             return $this->response->setJSON($response);
         }*/
 
-        if ($toGenerate * $game['price'] > $user['wallet']) {
+        if ($toGenerate * $game['price'] > wallet_total(wallet_service()->normalizeUser($user))) {
             $response = [
                 'success' => false,
                 'errors' => [
@@ -1005,7 +1021,7 @@ class Playings extends Controller {
             
                 $modelNumbersCartons->insertBatch($numbersData);
 
-                $modelUsers->update($user['id'], ['wallet' => $user['wallet'] - ($toGenerate * $game['price'])]);
+                wallet_deduct_purchase($user['id'], $toGenerate * $game['price']);
             }        
                 
             $response = [
@@ -1154,7 +1170,8 @@ class Playings extends Controller {
 
         $totalCost = $totalSelectedCartons * $game['price'];
 
-        if ($user['wallet'] < $totalCost) {
+        $user = wallet_service()->normalizeUser($user);
+        if (! wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => ['wallet' => translate('insufficient wallet balance')]
@@ -1190,8 +1207,9 @@ class Playings extends Controller {
                     ]);
                 }
 
-                $newWalletBalance = $user['wallet'] - $totalCost;
-                $modelUsers->update($userId, ['wallet' => $newWalletBalance]);
+                if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+                    throw new \Exception(translate('insufficient wallet balance'));
+                }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();
 
@@ -1201,13 +1219,15 @@ class Playings extends Controller {
                     throw new \Exception('Transaction failed');
                 }
 
+                $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+
                 return $this->response->setJSON([
                     'success' => true,
                     'message' => translate('cartons assigned successfully'),
                     'redirect' => site_url('/playing'),
                     'cartons_assigned' => $totalSelectedCartons,
                     'total_cost' => $totalCost,
-                    'new_balance' => $newWalletBalance
+                    'new_balance' => wallet_total($userAfter)
                 ]);
 
             } catch (\Exception $e) {
@@ -1351,7 +1371,8 @@ class Playings extends Controller {
 
         $totalCost = $totalSelectedCartons * $game['price'];
 
-        if ($user['wallet'] < $totalCost) {
+        $user = wallet_service()->normalizeUser($user);
+        if (! wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => ['wallet' => translate('insufficient wallet balance')]
@@ -1387,8 +1408,9 @@ class Playings extends Controller {
                     ]);
                 }
 
-                $newWalletBalance = $user['wallet'] - $totalCost;
-                $modelUsers->update($userId, ['wallet' => $newWalletBalance]);
+                if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+                    throw new \Exception(translate('insufficient wallet balance'));
+                }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();
 
@@ -1398,13 +1420,15 @@ class Playings extends Controller {
                     throw new \Exception('Transaction failed');
                 }
 
+                $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+
                 return $this->response->setJSON([
                     'success' => true,
                     'message' => translate('cartons assigned successfully'),
                     'redirect' => site_url('/playing'),
                     'cartons_assigned' => $totalSelectedCartons,
                     'total_cost' => $totalCost,
-                    'new_balance' => $newWalletBalance
+                    'new_balance' => wallet_total($userAfter)
                 ]);
 
             } catch (\Exception $e) {
@@ -1777,6 +1801,11 @@ class Playings extends Controller {
         $game = $modelGames->find(session()->get('game_id'));
         $data['game'] = $game;
 
+        $modelCartons = new CartonsModel();
+        $cartonsSold = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+        $accumulated = $cartonsSold * $game['price'];
+        $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+
         $sings = $modelSings->where('game', $game['id'])->findAll();
 
         $singsByModality = [];
@@ -1787,7 +1816,7 @@ class Playings extends Controller {
         foreach ($sings as &$sing) {
             $user = $modelUsers->find($sing['user']);
             $modality = $modelModalities->find($sing['modality']);
-            $award = $modelAwards->where('game', $game['id'])->where('modality', $sing['modality'])->first();
+            $award = $modelAwards->where('game', $game['id'])->where('modality', $sing['modality'])->where('status', 1)->first();
 
             $sing['user_name'] = $user ? $user['firstname'] . ' ' . $user['lastname'] : translate('user not found');
             $sing['modality_name'] = $modality ? translate($modality['name']) : translate('modality not found');
@@ -1795,7 +1824,12 @@ class Playings extends Controller {
             $singsCount = count($singsByModality[$sing['modality']]);
 
             if ($award) {
-                $sing['award_amount'] = number_format($award['amount'] / $singsCount, 2);
+                if ($game['award'] == 2) {
+                    $prize = (float) $award['amount'];
+                } else {
+                    $prize = $gameAccumulated * (float) $award['amount'] / 100;
+                }
+                $sing['award_amount'] = number_format($prize / max(1, $singsCount), 2);
             } else {
                 $sing['award_amount'] = translate('amount not available');
             }
@@ -1831,18 +1865,19 @@ class Playings extends Controller {
             'status' => 1
         ];
     
-        $modelMessages->insert($data);      
-        
-        return $this->response->setJSON(['status' => 'success', 'message' => translate('message sent')]);
+        $insertId = $modelMessages->insert($data, true);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'message' => translate('message sent'),
+            'id' => $insertId,
+        ]);
     }
 
     public function messageGet() {
         $modelMessages = new MessagesModel();
         $modelUsers = new UsersModel();
-        $modelBoards = new BoardsModel();
         $modelGames = new GamesModel();
-        $modelSings = new SingsModel();
-        $modelAwards = new AwardsModel();
 
         $game = $modelGames->find(session()->get('game_id'));
         if (!$game) {
@@ -1851,18 +1886,48 @@ class Playings extends Controller {
             ]);
         }
 
-        $lastMessage = $modelMessages->where('user !=', session()->get('id'))->orderBy('created_at', 'DESC')->first();
-        if (!$lastMessage) {
+        $afterId = (int) ($this->request->getGet('after_id') ?? 0);
+        $currentUserId = session()->get('id');
+
+        $builder = $modelMessages
+            ->where('game', $game['id'])
+            ->where('user !=', $currentUserId);
+
+        if ($afterId > 0) {
+            $builder->where('id >', $afterId);
+        }
+
+        $rows = $builder->orderBy('id', 'ASC')->limit(30)->findAll();
+
+        if (empty($rows)) {
             return $this->response->setJSON([
-                'status' => 'error', 'message' => translate('no message found')
+                'status' => 'empty',
+                'messages' => [],
             ]);
         }
 
-        $user = $modelUsers->find($lastMessage['user']);
-        $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
+        $messages = [];
+        foreach ($rows as $row) {
+            $user = $modelUsers->find($row['user']);
+            $messages[] = [
+                'id' => (int) $row['id'],
+                'message' => $row['message'],
+                'user' => (int) $row['user'],
+                'game' => (int) $row['game'],
+                'created_at' => $row['created_at'] ?? null,
+                'image' => !empty($user['image'])
+                    ? site_url('uploads/users/' . $user['image'])
+                    : site_url('assets/img/avatar.jpg'),
+            ];
+        }
+
+        $last = $messages[count($messages) - 1];
 
         return $this->response->setJSON([
-            'status' => 'success', 'message' => $lastMessage, 'image' => $imagePath
+            'status' => 'success',
+            'messages' => $messages,
+            'message' => $last,
+            'image' => $last['image'],
         ]);
     }
 

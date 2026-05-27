@@ -9,7 +9,7 @@ class UsersModel extends Model {
     protected $primaryKey = 'id'; // Llave primaria
 
     // Campos permitidos para insert/update
-    protected $allowedFields = ['code', 'group', 'wallet', 'document', 'firstname', 'lastname', 'username', 'password', 'email', 'phone', 'bank', 'account', 'remember_token', 'created_at', 'updated_at', 'sounds', 'narration', 'autodial', 'image', 'verification_token', 'verified_email', 'restore_code', 'restore_token', 'referred_code', 'status', 'deleted', 'roulette'];
+    protected $allowedFields = ['code', 'group', 'wallet', 'wallet_recharge', 'wallet_withdraw', 'wallet_bonus', 'kyc_status', 'kyc_front', 'kyc_back', 'kyc_observations', 'document', 'firstname', 'lastname', 'username', 'password', 'email', 'phone', 'bank', 'account', 'remember_token', 'created_at', 'updated_at', 'sounds', 'narration', 'autodial', 'image', 'verification_token', 'verified_email', 'restore_code', 'restore_token', 'referred_code', 'status', 'deleted', 'roulette'];
 
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;

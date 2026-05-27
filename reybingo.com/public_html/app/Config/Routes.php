@@ -135,7 +135,9 @@ $routes->get('password', 'Users::password');
 $routes->post('users/passwordSubmit', 'Users::passwordSubmit');
 $routes->post('users/profileStepSubmit', 'Users::profileStepSubmit');
 $routes->get('users/userNotifications', 'Users::userNotifications');
+$routes->get('users/exportRequiredFields', 'Users::exportRequiredFields');
 $routes->post('users/markNotificationRead', 'Users::markNotificationRead');
+$routes->post('users/testNotification', 'Users::testNotification');
 $routes->get('users/referralsGet', 'Users::referralsGet');
 $routes->get('users/referralCode', 'Users::referralCode');
 
@@ -166,6 +168,12 @@ $routes->get('payments/requestGet/(:segment)/(:num)', 'Payments::requestGet/$1/$
 $routes->get('payments/modalVoucher/(:num)', 'Payments::modalVoucher/$1');
 
 $routes->get('payments/show', 'Payments::show');
+$routes->post('payments/webhook/(:segment)', 'PaymentWebhook::gateway/$1');
+
+$routes->get('kyc', 'Kyc::index');
+$routes->post('kyc/submit', 'Kyc::submit');
+$routes->get('kycAdmin', 'KycAdmin::index');
+$routes->post('kycAdmin/review/(:num)', 'KycAdmin::review/$1');
 
 $routes->get('bingo', 'Bingo::index');
 $routes->get('bingo/generate-number', 'Bingo::generateNumber');

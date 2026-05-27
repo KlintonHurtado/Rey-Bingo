@@ -93,6 +93,19 @@
                                 <small id="email-error" class="text-danger d-none"></small>
                             </div>
 
+                            <div class="col-md-12 mb-1">
+                                <label for="address_line" class="form-label">Dirección</label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="address_line" placeholder="Calle, avenida, edificio..." autocomplete="off" value="<?= esc($user['address_line'] ?? ''); ?>">
+                            </div>
+                            <div class="col-md-6 mb-1">
+                                <label for="city" class="form-label">Ciudad</label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="city" id="city" placeholder="Ciudad" autocomplete="off" value="<?= esc($user['city'] ?? ''); ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="state" class="form-label">Estado / Provincia</label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="state" id="state" placeholder="Estado" autocomplete="off" value="<?= esc($user['state'] ?? ''); ?>">
+                            </div>
+
                             <div class="col-md-12">
                                 <button type="submit" class="btn btn-small btn-primary d-block w-50 btn-bingo" id="profile-button"><?= translate('update'); ?></button>
                             </div>
@@ -104,6 +117,8 @@
                     <div class="text-center">
                         <?= translate('do you want to update your password?'); ?> <br /> <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" href="<?= site_url('password'); ?>"><?= translate('change here'); ?></a>
                     </div>
+
+                    <?= view('users/kyc_content', ['user' => $user]); ?>
                 </div>
             </div>
         </div>

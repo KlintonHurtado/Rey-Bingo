@@ -741,5 +741,6 @@
     "total accumulated in games": "Total accumulated in games",
     "total gaming winnings": "Total gaming winnings",
     "paste": "Paste",
-    "voucher": "Voucher"
+    "voucher": "Voucher",
+    "error processing payment": "Error processing payment"
 }

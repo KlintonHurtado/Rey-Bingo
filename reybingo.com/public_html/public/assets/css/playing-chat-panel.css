@@ -1,0 +1,10 @@
+/**
+ * Solo pantalla jugador /playing — no aplica al admin /board
+ */
+.container-section--playing .message-display-container .emoji-slider,
+.container-section--playing .message-display-container .message-bubble-slider {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+}

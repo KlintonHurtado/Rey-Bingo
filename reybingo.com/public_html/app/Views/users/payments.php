@@ -7,9 +7,12 @@
                 <i class="fa-duotone fa-solid fa-wallet"></i>
                 <?php if (session()->get('group') == 1) : ?>
                     <?= translate('deposits, retires, payments and transfers'); ?>
-                <?php else : ?>
+                <?php else :
+                    $user = wallet_service()->normalizeUser($user);
+                    $walletTotal = wallet_total($user);
+                    ?>
                     <?= translate('my wallet'); ?> <?= systemGet('currency'); ?>
-                    <span class="available-wallet"><?= $user['wallet']; ?></span>
+                    <span class="available-wallet"><?= number_format($walletTotal, 2); ?></span>
                 <?php endif; ?>
             </h6>
             <button type="button" class="btn-close me-1" data-bs-dismiss="modal" aria-label="close">
@@ -33,11 +36,7 @@
                             <i class="fa-duotone fa-arrow-up-from-bracket"></i> <?= translate('retire'); ?>
                         </button>
                     <?php endif; ?>
-                    <?php if (systemGet('activateTransfer') == 1) : ?>
-                        <button type="button" class="btn btn-primary btn-bingo inline" onclick="transferGet();">
-                            <i class="fa-duotone fa-solid fa-money-bill-transfer"></i> <?= translate('P2P'); ?>
-                        </button>
-                    <?php endif; ?>
+                    <?php /* P2P oculto para jugadores */ ?>
                     <?php if (session()->get('group') == 0) : ?>
                         <button type="button" class="btn btn-primary btn-bingo inline" onclick="settingswalletGet();">
                             <i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('my bank'); ?>
@@ -46,6 +45,38 @@
                 </div>
 
                 <hr class="my-2">
+
+                <?php
+                    $user = wallet_service()->normalizeUser($user);
+                    $walletTotal = wallet_total($user);
+                ?>
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <div class="card bingo-bg-success text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small><?= translate('deposit'); ?></small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_recharge'], 2); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card bingo-bg-primary text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small><?= translate('retire'); ?></small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_withdraw'], 2); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card bingo-bg-warning text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small>Bono</small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_bonus'], 2); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-center small mb-2">Total: <strong><?= systemGet('currency'); ?> <?= number_format($walletTotal, 2); ?></strong></p>
             <?php endif; ?>
 
             <!-- TARJETAS DE ESTADÍSTICAS -->
@@ -89,6 +120,35 @@
                                     <span id="stat-payments"><?= number_format($statistics['payments']['count']); ?></span> 
                                     <span><?= translate('payments'); ?></span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <?php if (session()->get('group') == 1 && !empty($adminKpis)) : ?>
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-4">
+                        <div class="card bingo-bg-primary text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small>Acreditación manual</small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['manual_credits'] ?? 0, 2); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="card bingo-bg-danger text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small>Gasto de usuarios</small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['user_spend'] ?? 0, 2); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="card bingo-bg-success text-white m-0">
+                            <div class="card-body text-center p-2">
+                                <small>Total de premios</small>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['total_prizes'] ?? 0, 2); ?></div>
                             </div>
                         </div>
                     </div>

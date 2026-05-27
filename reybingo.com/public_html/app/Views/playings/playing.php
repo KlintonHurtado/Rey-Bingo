@@ -1,5 +1,413 @@
 <link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?<?= md5(date("Hms")); ?>">
-<div class="container-section">
+<style>
+    .ball-slide-in { animation: ballSlideIn 0.45s ease-out; }
+    @keyframes ballSlideIn {
+        from { opacity: 0; transform: translateX(-12px) scale(0.85); }
+        to { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    /* Layout playing: header + cartones a pantalla completa; chat y modalidades flotantes */
+    .container-section.container-section--playing {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding-bottom: 0 !important;
+        overflow: hidden !important;
+    }
+    .container-section--playing > .top-section {
+        flex: 0 0 auto !important;
+    }
+    .container-section--playing .center-section.center-section--playing {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        overflow: hidden !important;
+        width: 100% !important;
+        font-size: inherit;
+        font-weight: inherit;
+    }
+    .container-section--playing .cartons-section.cartons-section--playing {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        padding: 10px 10px calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    /* Modalidades: mismo patrón flotante que el chat */
+    .btn-modalities {
+        position: fixed;
+        left: calc(10px + env(safe-area-inset-left, 0px));
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, #ffc107, #e6a800);
+        color: #4a2d9e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1055;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        border: none;
+        transition: transform 0.3s ease;
+    }
+    .btn-modalities:hover {
+        transform: scale(1.08);
+    }
+    body .btn-chat {
+        left: auto !important;
+        right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    body.modalities-panel-open .btn-modalities,
+    body.chat-panel-open .btn-chat {
+        z-index: 1058 !important;
+    }
+    .modalities-display-container {
+        display: none;
+        flex-direction: column;
+        position: fixed;
+        bottom: 15px;
+        left: 0;
+        width: 330px;
+        max-width: 100%;
+        background: linear-gradient(180deg, rgba(24, 10, 84, 0.22) 0%, rgba(33, 16, 95, 0.72) 28%, rgba(55, 29, 146, 0.96) 100%);
+        border: none;
+        box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.35);
+        border-radius: 16px 16px 0 0;
+        z-index: 1054;
+        height: min(48vh, 420px);
+        max-height: min(48vh, 420px);
+        justify-content: space-between;
+        overflow: hidden;
+    }
+    .modalities-display-container.is-open {
+        display: flex;
+    }
+    .modalities-display-container__toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        padding: 8px 10px 4px;
+    }
+    .modalities-display-meta {
+        min-width: 0;
+    }
+    .modalities-display-meta h6 {
+        margin: 0;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.1;
+    }
+    .modalities-display-meta .modalities-display__hint {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.68rem;
+        color: rgba(255, 255, 255, 0.8);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .modalities-display-close {
+        width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.25);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+        flex-shrink: 0;
+        transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .modalities-display-close:hover {
+        background: rgba(255, 255, 255, 0.4);
+        transform: scale(1.05);
+    }
+    .modalities-display {
+        flex-grow: 1;
+        min-height: 0;
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 10px 10px;
+        scrollbar-width: thin;
+    }
+    .modalities-display::-webkit-scrollbar {
+        height: 6px;
+    }
+    .modalities-display::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.45);
+        border-radius: 4px;
+    }
+    .modalities-display .container-cartons-modalities {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 0.85rem !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
+        width: max-content !important;
+        min-width: 100% !important;
+        margin: 0 !important;
+        padding: 4px 2px 8px !important;
+        grid-template-columns: none !important;
+    }
+    .modalities-display .container-cartons-modalities--solo {
+        justify-content: center;
+    }
+    .modalities-display .border-carton {
+        flex: 0 0 auto !important;
+        min-width: 132px !important;
+        background: #ffffff !important;
+        border: 2px solid #6236ff !important;
+        border-radius: 14px !important;
+        padding: 8px 10px 10px !important;
+        box-shadow: 0 4px 14px rgba(98, 54, 255, 0.2) !important;
+    }
+    .modalities-display .border-carton.modality-won {
+        border-color: #28a745;
+        box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.35);
+    }
+    .modalities-display .border-carton .modality-name {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+    .modalities-display .border-carton .modality-prize {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #6236ff;
+        text-align: center;
+        margin-top: 6px;
+    }
+    .modalities-display .carton {
+        width: 112px;
+        margin: 0 auto;
+    }
+    @media (max-width: 700px) {
+        .container-section--playing > .top-section {
+            flex-shrink: 0 !important;
+        }
+        .container-section--playing .top-section.live {
+            max-height: 210px !important;
+        }
+        .container-section--playing .center-section.center-section--playing {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+        }
+        .container-section--playing .cartons-section.cartons-section--playing {
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 0 10px 6px !important;
+            height: auto !important;
+            max-height: none !important;
+        }
+        .container-section--playing .content-cartons.one-carton {
+            margin-top: -22px !important;
+        }
+        .container-section--playing .content-cartons {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
+            justify-items: center !important;
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+        }
+        .container-section--playing .content-cartons.two-cartons {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+        }
+        .container-section--playing .content-cartons.three-cartons,
+        .container-section--playing .content-cartons.four-cartons,
+        .container-section--playing .content-cartons.many-cartons {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+        }
+        .container-section--playing .bingo-border-carton {
+            width: 100% !important;
+            max-width: min(360px, 100%) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding: 8px 10px 10px !important;
+            background-color: rgba(255, 255, 255, 0.92) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+        }
+        .container-section--playing .content-cartons.one-carton .bingo-border-carton {
+            width: fit-content !important;
+            max-width: min(320px, 94vw) !important;
+            padding: 10px 12px 12px !important;
+        }
+        .container-section--playing .content-cartons.one-carton .bingo-carton {
+            width: auto !important;
+            max-width: 100% !important;
+            gap: 5px 5px !important;
+            padding: 6px 8px !important;
+        }
+        .container-section--playing .bingo-carton-number,
+        .container-section--playing .bingo-carton-header {
+            width: clamp(34px, 9.5vw, 44px) !important;
+            height: clamp(34px, 9.5vw, 44px) !important;
+            font-size: clamp(0.85rem, 3.2vw, 1.05rem) !important;
+        }
+        .container-section--playing .content-cartons.one-carton .bingo-carton-number,
+        .container-section--playing .content-cartons.one-carton .bingo-carton-header {
+            width: clamp(48px, 11.8vw, 61px) !important;
+            height: clamp(42px, 10.2vw, 52px) !important;
+            font-size: clamp(0.85rem, 3.1vw, 1.05rem) !important;
+            border-radius: 8px !important;
+        }
+        .container-section--playing .content-cartons.one-carton .bingo-carton-number.data-position-13,
+        .container-section--playing .content-cartons.one-carton .bingo-carton-number.modality {
+            font-size: clamp(1rem, 3.6vw, 1.25rem) !important;
+        }
+        .modalities-display-container {
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            bottom: 0 !important;
+            height: min(48vh, 400px) !important;
+            max-height: min(48vh, 400px) !important;
+            background: linear-gradient(180deg, rgba(24, 10, 84, 0.22) 0%, rgba(33, 16, 95, 0.72) 28%, rgba(55, 29, 146, 0.96) 100%) !important;
+            border: none !important;
+            box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.35) !important;
+            border-radius: 16px 16px 0 0 !important;
+            z-index: 1054 !important;
+            justify-content: space-between !important;
+        }
+        .modalities-display-container .modalities-display {
+            flex-grow: 1 !important;
+            width: 100% !important;
+            height: calc(100% - 52px) !important;
+            margin: 0 !important;
+            padding: 2px 10px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+        }
+        .modalities-display .container-cartons-modalities {
+            width: 100% !important;
+            min-width: 100% !important;
+            justify-content: center !important;
+            gap: 0.75rem !important;
+        }
+        .modalities-display .container-cartons-modalities--solo .border-carton {
+            min-width: min(260px, 92vw) !important;
+            max-width: 92vw !important;
+            width: 92vw !important;
+        }
+        .modalities-display .border-carton {
+            min-width: 140px !important;
+        }
+        .modalities-display .carton {
+            width: min(130px, 100%) !important;
+            max-width: 130px !important;
+        }
+        .message-display-container {
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+            height: min(52vh, 430px) !important;
+            max-height: min(52vh, 430px) !important;
+            background: linear-gradient(180deg, rgba(24, 10, 84, 0.2) 0%, rgba(32, 15, 92, 0.65) 22%, rgba(55, 29, 146, 0.94) 100%) !important;
+            border: none !important;
+            box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.35) !important;
+            border-radius: 16px 16px 0 0 !important;
+            z-index: 1054 !important;
+            justify-content: space-between !important;
+            padding-top: 36px !important;
+        }
+        .message-display-container .message-display-container__toolbar {
+            position: absolute !important;
+            top: 2px !important;
+            right: 4px !important;
+            z-index: 2 !important;
+            padding: 0 !important;
+        }
+        .message-display-container .message-display {
+            flex-grow: 1 !important;
+            min-height: 120px !important;
+            width: 100% !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 10px 6px !important;
+            background: transparent !important;
+            gap: 6px !important;
+        }
+        .message-display-container .message-bubble {
+            margin-bottom: 0 !important;
+            padding: 8px 10px !important;
+            border-radius: 16px !important;
+            max-width: 92% !important;
+        }
+        .message-display-container .message-bubble span {
+            font-size: 0.9rem !important;
+            line-height: 1.25 !important;
+        }
+        /* En móvil el avatar recarga mucho visualmente */
+        .message-display-container .message-bubble .profile-pic {
+            display: none !important;
+        }
+        .message-display-container .emoji-message-panel {
+            flex-shrink: 0 !important;
+            width: 100% !important;
+            padding: 6px 10px calc(22px + env(safe-area-inset-bottom, 0px)) !important;
+            background: linear-gradient(180deg, rgba(98, 54, 255, 0.12) 0%, rgba(98, 54, 255, 0.85) 35%) !important;
+            border-radius: 14px 14px 0 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+        }
+        .message-display-container .emoji-slider,
+        .message-display-container .message-bubble-slider {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            gap: 6px !important;
+            padding: 4px 2px !important;
+            -webkit-overflow-scrolling: touch;
+        }
+        .message-display-container .emoji-btn,
+        .message-display-container .message-btn {
+            font-size: 0.82rem !important;
+            line-height: 1.15 !important;
+        }
+        .message-display-container .emoji-btn {
+            width: 38px !important;
+            height: 38px !important;
+            min-width: 38px !important;
+            border-radius: 12px !important;
+        }
+        .message-display-container .message-btn {
+            padding: 6px 10px !important;
+            border-radius: 999px !important;
+        }
+        .message-display-container .emoji-message-panel .input-group {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+    }
+</style>
+<div class="container-section container-section--playing">
     <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
         <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 
@@ -54,7 +462,6 @@
         <?php endif; ?>
         
         <div class="last-numbers">
-            <button class="btn btn-small btn-cells size-40" onclick="modalitiesGet();"><i class="fa-duotone fa-solid fa-table-cells"></i></button>
             <span id="last-five-numbers">
                 <?php foreach ($fourNumbers as $number): ?>
                     <?php $class = in_array($number, $fourNumbers) ? $getClass($number) : ''; ?>
@@ -63,7 +470,6 @@
                     </div>
                 <?php endforeach; ?>
             </span>
-            <button class="btn btn-small btn-board size-40" onclick="boardGet();"><i class="fa-duotone fa-solid fa-chess-board"></i></button>
         </div>
 
         <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
@@ -71,9 +477,24 @@
             <h6 class="text-white text-center next-game mb-1 text-uppercase" style="font-size: 0.8rem;"></h6><span class="cursor"></span>
         <?php endif; ?>
     </div>
-    <div class="center-section">
-        <div class="cartons-section">
-            <div class="content-cartons">
+    <div class="center-section center-section--playing">
+        <div class="cartons-section cartons-section--playing">
+            <?php
+                $playingCartonCount = isset($cartons) ? count($cartons) : 0;
+                $playingCartonsGridClass = 'content-cartons';
+                if ($playingCartonCount === 1) {
+                    $playingCartonsGridClass .= ' one-carton';
+                } elseif ($playingCartonCount === 2) {
+                    $playingCartonsGridClass .= ' two-cartons';
+                } elseif ($playingCartonCount === 3) {
+                    $playingCartonsGridClass .= ' three-cartons';
+                } elseif ($playingCartonCount === 4) {
+                    $playingCartonsGridClass .= ' four-cartons';
+                } elseif ($playingCartonCount > 4) {
+                    $playingCartonsGridClass .= ' many-cartons';
+                }
+            ?>
+            <div class="<?= $playingCartonsGridClass; ?>">
                 <?php if (isset($cartons) && count($cartons) > 0): ?>
                     <?php foreach ($cartons as $cartonData): ?>
                         <?php
@@ -132,15 +553,64 @@
     </div>
 </div>
 
+<?php if (!empty($modalities)): ?>
+    <button type="button" class="btn btn-small btn-modalities" id="toggle-modalities-btn" aria-label="<?= translate('modalities'); ?>" aria-expanded="false">
+        <i class="fa-duotone fa-solid fa-chess-board"></i>
+    </button>
+    <div class="modalities-display-container" id="playing-modalities-panel" role="region" aria-label="<?= translate('modalities'); ?>" aria-hidden="true">
+        <div class="modalities-display-container__toolbar">
+            <div class="modalities-display-meta">
+                <h6><i class="fa-duotone fa-solid fa-chess-board"></i> <?= translate('modalities'); ?></h6>
+                <span class="modalities-display__hint"><?= count($modalities); ?> <?= count($modalities) === 1 ? 'modalidad' : 'modalidades'; ?> · desliza →</span>
+            </div>
+            <button type="button" class="modalities-display-close" id="modalities-panel-close" aria-label="<?= translate('close'); ?>">
+                <i class="fa-duotone fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modalities-display">
+            <div class="container-cartons-modalities<?= count($modalities) === 1 ? ' container-cartons-modalities--solo' : '' ?>">
+                <?php foreach ($modalities as $modality): ?>
+                    <?php $isSing = in_array($modality['id'], $singsModalities); $positions = explode(',', $modality['positions']); ?>
+                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
+                        <span class="modality-name"><?= translate($modality['name']); ?></span>
+                        <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                            <div class="card-letter B"><span>B</span></div>
+                            <div class="card-letter I"><span>I</span></div>
+                            <div class="card-letter N"><span>N</span></div>
+                            <div class="card-letter G"><span>G</span></div>
+                            <div class="card-letter O"><span>O</span></div>
+                            <?php for ($i = 1; $i <= 25; $i++): ?>
+                                <?php $isMarked = in_array($i, $positions); $showStar = ($isSing && $isMarked) || $i == 13; ?>
+                                <?php if ($i == 13): ?>
+                                    <div class="card-number" data-position="13">⭐️</div>
+                                <?php else: ?>
+                                    <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+                        </div>
+                        <?php if ($game['award'] == 2) : ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                        <?php else: ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <button class="btn btn-small btn-chat" id="toggle-messages-btn"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
 
-<div class="bottom-section">
-    <button class="btn btn-small btn-bingooo" onclick="singBingo();">BINGO!</button>
-</div>
-
-<div class="message-display-container" id="message-display-container">
-    <div class="message-display" id="message-display"></div>
+<div class="message-display-container" id="message-display-container" aria-hidden="true">
+    <div class="message-display-container__toolbar">
+        <button type="button" class="message-display-close" id="message-display-close" aria-label="<?= translate('close'); ?>">
+            <i class="fa-duotone fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="message-display" id="message-display" aria-live="polite"></div>
     <div class="emoji-message-panel">
+        <div class="chat-quick-box">
         <div class="emoji-slider">
             <button type="button" class="emoji-btn" onclick="sendEmoji('😊', 1)">😊</button>
             <button type="button" class="emoji-btn" onclick="sendEmoji('😢', 2)">😢</button>
@@ -171,69 +641,10 @@
             <button type="button" class="message-btn" onclick="sendMessage('<?= translate('good luck!'); ?> 🤑', 24)"><?= translate('good luck!'); ?> 🤑</button>
             <button type="button" class="message-btn" onclick="sendMessage('<?= translate('im missing a number'); ?> 🤩', 25)"><?= translate('im missing a number'); ?> 🤩</button>
         </div>
-
-        <div class="input-group">
-            <input type="text" class="form-control form-control-chat message-input" name="message-send-new" id="message-send-new" placeholder="<?= translate('write a message'); ?>..." autofocus autocomplete="off" maxlength="50">
-            <button type="button" id="message-button" class="btn btn-small btn-primary btn-send" onclick="sendMessageText()"><i class="fa-duotone fa-solid fa-paper-plane-top"></i></button>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalModalities" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered max-w-30 max-w-90-xs">
-        <div class="modal-content">
-            <div class="modal-header text-center">
-                <h6 class="modal-title ps-2"><i class="fa-duotone fa-solid fa-chess-board"></i> <?= translate('modalities'); ?></h6>
-                <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body pt-0 text-center">
-                <?php if (!empty($modalities)): ?>
-                    <?php
-                        $count = count($modalities);
-                        $columns = $count >= 3 ? 3 : $count;
-                        $gridStyle = "grid-template-columns: repeat($columns, 1fr); width: 110px;";
-                    ?>
-                    <div class="container-cartons-modalities" style="<?= $gridStyle; ?>">
-                        <?php foreach ($modalities as $modality): ?>
-                            <?php
-                                $isSing = in_array($modality['id'], $singsModalities);
-                                $positions = explode(',', $modality['positions']);
-                            ?>
-                            <div class="border-carton">
-                                <small style="font-size: .7rem"><?= translate($modality['name']); ?></small>
-                                <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
-                                    <div class="card-letter B"><span>B</span></div>
-                                    <div class="card-letter I"><span>I</span></div>
-                                    <div class="card-letter N"><span>N</span></div>
-                                    <div class="card-letter G"><span>G</span></div>
-                                    <div class="card-letter O"><span>O</span></div>
-                                    <?php for ($i = 1; $i <= 25; $i++): ?>
-                                        <?php
-                                            $isMarked = in_array($i, $positions);
-                                            $showStar = $isSing && $isMarked || $i == 13;
-                                        ?>
-                                        <?php if ($i == 13): ?>
-                                            <div class="card-number" data-position="13" >⭐️</div>
-                                        <?php else: ?>
-                                            <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                        <?php endif; ?>
-                                    <?php endfor; ?>
-                                </div>
-                                <?php if ($game['award'] == 2) : ?>
-                                    <small style="font-size: .8rem" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></small>
-                                <?php else: ?>
-                                    <small style="font-size: .8rem" id="modality-amount-<?= $modality['id']; ?>"></small>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <p><?= translate('there are no modalities available'); ?></p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="modal fade" id="modalBoard" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered max-w-45 max-w-50-xs mx-auto">
@@ -339,14 +750,22 @@
     window.timeBallGet = singBall.split('-')[0];
     //window.timeBallLast = singBall.split('-')[1];
     window.timeBallLast = 2500;
-    window.totalNumbersGenerated = "<?= $totalNumbersGenerated; ?>";
+    window.totalNumbersGenerated = <?= (int) ($totalNumbersGenerated ?? 0); ?>;
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
     window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
+    window.gameIsFinished = <?= !empty($gameIsFinished) ? 'true' : 'false' ?>;
+    window.allowGameUnload = window.gameIsFinished;
+
+    function canLeaveGameWithoutWarning() {
+        return window.allowGameUnload === true
+            || window.gameIsFinished === true
+            || (typeof window.BingoApp !== 'undefined' && window.BingoApp.isGameFinished);
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         let exitUrl = null;
-        let allowUnload = false;
+        let allowUnload = window.allowGameUnload === true;
         let reloadAttempted = false;
 
         // Detectar actividad del usuario
@@ -357,18 +776,22 @@
         
         // Botones de salida - Mostrar modal al hacer clic
         $('.btn-home, .btn-exit, .btn-back').on('click', function(e) {
+            if (canLeaveGameWithoutWarning()) {
+                return true;
+            }
             e.preventDefault();
             exitUrl = $(this).attr('href') || $(this).data('href');
-            $('#modalExit').modal('show');
+            if (typeof showBsModal === 'function') showBsModal('#modalExit');
         });
 
         // Confirmar salida desde el modal
         $('#confirmExit').on('click', function(e) {
             e.preventDefault();
-            $('#modalExit').modal('hide');
+            if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
             
             // Permitir la salida/recarga
             allowUnload = true;
+            window.allowGameUnload = true;
             
             if (reloadAttempted) {
                 // Si fue un intento de recarga, recargar la página
@@ -387,7 +810,7 @@
 
         // Cancelar salida
         $('#cancelExit').on('click', function() {
-            $('#modalExit').modal('hide');
+            if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
             exitUrl = null;
             reloadAttempted = false;
             allowUnload = false;
@@ -396,8 +819,12 @@
         // Interceptar botón atrás del navegador
         history.pushState(null, null, location.href);
         window.onpopstate = function () {
+            if (canLeaveGameWithoutWarning()) {
+                history.back();
+                return;
+            }
             history.pushState(null, null, location.href);
-            $('#modalExit').modal('show');
+            if (typeof showBsModal === 'function') showBsModal('#modalExit');
         };
         
         // Interceptar F5/Ctrl+R
@@ -408,12 +835,16 @@
                 (e.ctrlKey && e.key.toLowerCase() === 'r') ||
                 (isMac && e.metaKey && e.key.toLowerCase() === 'r');
                 
-            if (refreshCombo && !allowUnload) {
+            if (refreshCombo && !allowUnload && !canLeaveGameWithoutWarning()) {
                 e.preventDefault();
                 reloadAttempted = true;
-                $('#modalExit').modal('show');
+                if (typeof showBsModal === 'function') showBsModal('#modalExit');
             }
         });
+
+        if (window.gameIsFinished && typeof showGameFinalized === 'function') {
+            showGameFinalized();
+        }
     });
 
     <?php if ($game['type'] == 4): ?>

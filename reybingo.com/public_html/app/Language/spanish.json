@@ -740,5 +740,6 @@
     "voucher": "Comprobante",
     "voucher of payment": "Comprobante de pago",
     "paste": "Pegar",
-    "balance": "Saldo"
+    "balance": "Saldo",
+    "error processing payment": "Error processing payment"
 }

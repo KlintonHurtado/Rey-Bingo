@@ -467,7 +467,10 @@ class Users extends Controller {
             'document' => $this->request->getPost('document'),
             'username' => $this->request->getPost('username'),
             'phone' => $this->request->getPost('phone'),
-            'email' => $this->request->getPost('email')
+            'email' => $this->request->getPost('email'),
+            'address_line' => $this->request->getPost('address_line'),
+            'city' => $this->request->getPost('city'),
+            'state' => $this->request->getPost('state'),
         ];
 
         $profileImage = $this->request->getPost('image');
@@ -642,6 +645,57 @@ class Users extends Controller {
         }
 
         return view('users/referrals', $data);
+    }
+
+    public function exportRequiredFields()
+    {
+        if (!session()->get('logged_in') || session()->get('group') != 1) {
+            return redirect()->to('/signin');
+        }
+
+        $model = new UsersModel();
+        $users = $model->where('group', 0)->orderBy('id', 'DESC')->findAll();
+
+        $filename = 'users-required-fields-' . date('Ymd-His') . '.csv';
+        $headers = [
+            'ID', 'Codigo', 'Nombres', 'Apellidos', 'Usuario',
+            'Documento', 'Telefono', 'Email', 'Direccion', 'Ciudad', 'Estado',
+            'Saldo total', 'Saldo recarga', 'Saldo retiro', 'Saldo bono', 'KYC'
+        ];
+
+        $fh = fopen('php://temp', 'w+');
+        fputcsv($fh, $headers);
+
+        foreach ($users as $user) {
+            $user = wallet_service()->normalizeUser($user);
+            fputcsv($fh, [
+                $user['id'] ?? '',
+                $user['code'] ?? '',
+                $user['firstname'] ?? '',
+                $user['lastname'] ?? '',
+                $user['username'] ?? '',
+                $user['document'] ?? '',
+                $user['phone'] ?? '',
+                $user['email'] ?? '',
+                $user['address_line'] ?? '',
+                $user['city'] ?? '',
+                $user['state'] ?? '',
+                wallet_total($user),
+                $user['wallet_recharge'] ?? 0,
+                $user['wallet_withdraw'] ?? 0,
+                $user['wallet_bonus'] ?? 0,
+                $user['kyc_status'] ?? 'pending',
+            ]);
+        }
+
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setBody($csv);
     }
 
     public function userNotifications() {
@@ -942,6 +996,32 @@ class Users extends Controller {
 
     private function formatStatusTransfer($status) {
         return '<span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('approved') . '</span>';
+    }
+
+    /**
+     * Crear notificación de prueba (solo entorno development).
+     */
+    public function testNotification() {
+        if (ENVIRONMENT !== 'development') {
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'No disponible']);
+        }
+
+        if (!$this->request->isAJAX() || !session()->get('logged_in')) {
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'No autorizado']);
+        }
+
+        $modelNotifications = new NotificationsModel();
+        $userId = (int) session()->get('id');
+
+        $id = $modelNotifications->insert([
+            'user'    => $userId,
+            'type'    => 'info',
+            'title'   => 'Notificación de prueba',
+            'message' => 'Desliza hacia la derecha para cerrar. Si ves esto, el sistema funciona.',
+            'status'  => 0,
+        ]);
+
+        return $this->response->setJSON(['ok' => true, 'id' => $id]);
     }
 
     // Método para marcar notificación como leída

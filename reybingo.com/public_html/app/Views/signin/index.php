@@ -6,6 +6,7 @@
                     <div class="text-center">
                         <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo" alt="img">
                         <h5 class="mb-0 p-2"><?= translate('login'); ?></h5>
+                        <p class="small text-muted mb-0">Acceso oficial: <strong><?= esc(parse_url(base_url(), PHP_URL_HOST) ?: base_url()); ?></strong></p>
                     </div>
             
                     <?php echo form_open(site_url() . 'signin/signinSubmit', array('enctype' => 'multipart/form-data', 'id' => 'signin-form'));?>

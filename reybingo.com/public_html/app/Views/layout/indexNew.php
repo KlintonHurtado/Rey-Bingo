@@ -431,6 +431,7 @@
     </style>
 </head>
 <body class="bg-gradient-bingo">
+<?= view('layout/_layout_user_bootstrap') ?>
     <div class="preloader">
         <div class="canvas">
             <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid" alt="img" style="width: 250px;">
@@ -467,8 +468,12 @@
                                 </a>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" href="<?= site_url('profile'); ?>"><i class="fa-duotone fa-solid fa-user me-2"></i>Mi perfil</a></li>
-                                    <li><a class="dropdown-item" href="<?= site_url('password'); ?>"><i class="fa-duotone fa-solid fa-user me-2"></i>Cambiar contraseña</a></li>
+                                    <li><a class="dropdown-item" href="<?= site_url('kyc'); ?>"><i class="fa-duotone fa-solid fa-id-card me-2"></i>Verificación KYC</a></li>
+                                    <li><a class="dropdown-item" href="<?= site_url('password'); ?>"><i class="fa-duotone fa-solid fa-lock me-2"></i>Cambiar contraseña</a></li>
                                     <li><a class="dropdown-item" onclick="paymentsGet();" href="javascript:void(0);"><i class="fa-duotone fa-solid fa-wallet me-2"></i>Mi Billetera</a></li>
+                                    <?php if (session()->get('group') == 1) : ?>
+                                    <li><a class="dropdown-item" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check me-2"></i>Revisión KYC</a></li>
+                                    <?php endif; ?>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-sign-out-alt me-2"></i>Cerrar Sesión</a></li>
                                 </ul>
@@ -504,8 +509,14 @@
                             <li class="nav-item">
                                 <a class="nav-link" onclick="retireGet();" href="javascript:void(0);"><i class="fa-duotone fa-arrow-up-from-bracket me-2"></i><?= translate('retire'); ?></a>
                             </li>
+                            <?php /* P2P oculto en menú jugador */ ?>
                             <li class="nav-item">
-                                <a class="nav-link" onclick="transferGet();" href="javascript:void(0);"><i class="fa-duotone fa-solid fa-money-bill-transfer me-2"></i><?= translate('P2P'); ?></a>
+                                <a class="nav-link" href="<?= site_url('kyc'); ?>"><i class="fa-duotone fa-solid fa-id-card me-2"></i>Verificación KYC</a>
+                            </li>
+                        <?php endif; ?>
+                        <?php if (session()->get('group') == 1) : ?>
+                            <li class="nav-item">
+                                <a class="nav-link" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check me-2"></i>Revisión KYC</a>
                             </li>
                         <?php endif; ?>
                     </ul>
@@ -1073,6 +1084,7 @@
 
     <div id="confetti-container"></div>
     
+    <script src="<?= asset_url('js/in-app-notifications.js') ?>"></script>
     <script type="text/javascript">
         var site_url = "<?= site_url(); ?>";
         var currency = "<?= systemGet('currency'); ?>";
@@ -1102,7 +1114,8 @@
                 displayTime: 15000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
-                markReadUrl: '/users/markNotificationRead'
+                markReadUrl: '/users/markNotificationRead',
+                testUrl: '/users/testNotification'
             };
 
             // Función para inicializar el audio con compatibilidad iOS/Android
@@ -1206,7 +1219,7 @@
                 }
             }
 
-            async function loadNotifications() {
+            window.loadNotifications = async function loadNotifications() {
                 try {
                     const response = await fetch(notificationConfig.apiUrl);
                     const data = await response.json();
@@ -1281,48 +1294,51 @@
                 }
             }
 
-            function showNotification(notification) {
+            window.showNotification = function showNotification(notification) {
                 const container = document.getElementById('notificationsContainer');
+                if (!container) {
+                    return;
+                }
+
+                if (notification.id && container.querySelector(`[data-notification-id="${notification.id}"]`)) {
+                    return;
+                }
                 
-                // Limitar el número de notificaciones visibles a 5
                 while (container.children.length >= notificationConfig.maxNotifications) {
                     const oldestNotification = container.firstChild;
                     if (oldestNotification) {
-                        oldestNotification.classList.add('hide');
-                        setTimeout(() => {
-                            if (oldestNotification.parentNode) {
-                                oldestNotification.remove();
-                            }
-                        }, 300);
+                        hideNotification(oldestNotification);
                     } else {
                         break;
                     }
                 }
                 
-                // Crear elemento de notificación
                 const notificationEl = document.createElement('div');
                 notificationEl.className = `notification notification-${notification.type || 'default'}`;
+                if (notification.id) {
+                    notificationEl.dataset.notificationId = notification.id;
+                }
                 notificationEl.innerHTML = `
                     <div class="notification-header">
                         <h6 class="notification-title">${notification.title}</h6>
                     </div>
                     <div class="notification-message">${notification.message}</div>
-                    <button class="notification-close" onclick="closeNotification(this)" aria-label="Cerrar notificación">×</button>
+                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
                 `;
                 
                 container.appendChild(notificationEl);
                 
-                // Mostrar notificación con animación
                 setTimeout(() => {
                     notificationEl.classList.add('show');
                 }, 100);
+
+                attachNotificationSwipeDismiss(notificationEl, hideNotification);
                 
-                // Ocultar automáticamente después del tiempo configurado
-                setTimeout(() => {
+                notificationEl._autoHideTimer = setTimeout(() => {
                     hideNotification(notificationEl);
                 }, notificationConfig.displayTime);
-            }
+            };
 
             // Función para habilitar audio en iOS (llamar en interacción del usuario)
             function enableAudioForIOS() {
@@ -1876,20 +1892,19 @@
             }
 
             function hideNotification(notificationEl) {
-                if (notificationEl && notificationEl.parentNode) {
-                    notificationEl.classList.add('hide');
-                    setTimeout(() => {
-                        if (notificationEl.parentNode) {
-                            notificationEl.remove();
-                        }
-                    }, 300);
+                if (!notificationEl || !notificationEl.parentNode) {
+                    return;
                 }
-            }
-
-            // Función para cerrar notificación manualmente
-            function closeNotification(button) {
-                const notification = button.parentNode;
-                hideNotification(notification);
+                if (notificationEl._autoHideTimer) {
+                    clearTimeout(notificationEl._autoHideTimer);
+                    notificationEl._autoHideTimer = null;
+                }
+                notificationEl.classList.add('hide');
+                setTimeout(() => {
+                    if (notificationEl.parentNode) {
+                        notificationEl.remove();
+                    }
+                }, 300);
             }
 
             // Función para marcar notificación como leída
@@ -2724,5 +2739,8 @@
             }
         }
     </script>
+    <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
+    <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
+    <?php endif; ?>
 </body>
 </html>

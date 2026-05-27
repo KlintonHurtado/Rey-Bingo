@@ -16,6 +16,13 @@
                         ✅ Cuando alguien se registra con tu enlace y realiza la recarga mínima en nuestro sistema, recibirás tu recompensa de <strong><?= systemGet('rateReferrals') * 100 ?>%</strong> por referido.<br>
                         ✅ Cuantas más personas invites, más comisiones acumularás, las ganancias se acreditan directamente a tu billetera.
                     </small>
+
+                    <div class="mt-2 p-2 rounded" style="background: rgba(98,54,255,0.12);">
+                        <strong>Punto de venta / afiliado</strong>
+                        <p class="small mb-1">Tu enlace para vender en tienda o compartir:</p>
+                        <input type="text" class="form-control form-control-sm form-bingo mb-1" id="affiliate-link" readonly value="<?= site_url('signup/' . ($user['referred_code'] ?? $user['code'])); ?>">
+                        <button type="button" class="btn btn-primary btn-bingo btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('affiliate-link').value);">Copiar enlace</button>
+                    </div>
         
                     <?php if (!empty($lastGame)): ?>
                         <a href="https://api.whatsapp.com/send?text=🎉 ¡Regístrate en <?= APP_NAME; ?> 🎱 y participa en la ruleta de premios! 

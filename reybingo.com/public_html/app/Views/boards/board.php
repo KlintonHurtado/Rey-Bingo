@@ -39,8 +39,86 @@
         top: auto !important;
         left: auto !important;
     }
+
+    /* Admin /board: chat clásico (burbujas + sliders horizontales) */
+    .board-admin-chat.message-display-container {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        justify-content: space-between !important;
+    }
+    .board-admin-chat .message-display {
+        flex-grow: 1 !important;
+        width: 100% !important;
+        height: calc(100% - 150px) !important;
+        margin: 0 !important;
+        padding: 0 10px !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+    }
+    .board-admin-chat .message-bubble {
+        margin-bottom: 6px !important;
+        background: rgba(98, 54, 255, 0.7) !important;
+    }
+    .board-admin-chat .message-bubble span.emoji-message {
+        font-size: 1.5rem !important;
+    }
+    .board-admin-chat .message-bubble span.text-message {
+        font-size: 0.8rem !important;
+        color: #fff !important;
+    }
+    .board-admin-chat .emoji-slider,
+    .board-admin-chat .message-bubble-slider {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 4px !important;
+        grid-template-columns: none !important;
+    }
+    .board-admin-chat .emoji-btn {
+        width: 30px !important;
+        height: 30px !important;
+        margin: 3px 0 !important;
+        border-radius: 50% !important;
+        font-size: 18px !important;
+        flex: 0 0 auto !important;
+    }
+    .board-admin-chat .message-btn {
+        width: auto !important;
+        min-height: auto !important;
+        padding: 6px 12px !important;
+        margin: 3px 0 !important;
+        border-radius: 50px !important;
+        font-size: 13px !important;
+        white-space: nowrap !important;
+        flex: 0 0 auto !important;
+    }
+    .board-admin-chat .emoji-message-panel .input-group {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+    @media (max-width: 700px) {
+        .board-admin-chat.message-display-container {
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+            height: min(50vh, 420px) !important;
+            max-height: min(50vh, 420px) !important;
+            z-index: 1054 !important;
+        }
+        body .btn-chat {
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+            z-index: 1055 !important;
+        }
+    }
 </style>
-<div class="container-section">
+<div class="container-section container-section--board-admin">
     <div class="top-section">
         <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 
@@ -193,8 +271,13 @@
     <?php endif; ?>
 </div>
 
-<div class="message-display-container" id="message-display-container">
-    <div class="message-display" id="message-display"></div>
+<div class="message-display-container board-admin-chat" id="message-display-container" aria-hidden="true">
+    <div class="message-display-container__toolbar">
+        <button type="button" class="message-display-close" id="message-display-close" aria-label="Cerrar">
+            <i class="fa-duotone fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="message-display" id="message-display" aria-live="polite"></div>
     <div class="emoji-message-panel">
         <div class="emoji-slider">
             <button type="button" class="emoji-btn" onclick="sendEmoji('😊', 1)">😊</button>
@@ -381,7 +464,7 @@
                 
                 // Mostrar el modal en lugar del diálogo nativo
                 setTimeout(() => {
-                    $('#modalExit').modal('show');
+                    if (typeof showBsModal === 'function') showBsModal('#modalExit');
                 }, 10);
                 
                 // Prevenir la recarga
@@ -400,13 +483,13 @@
         $('.btn-home, .btn-exit, .btn-back').on('click', function(e) {
             e.preventDefault();
             exitUrl = $(this).attr('href') || $(this).data('href');
-            $('#modalExit').modal('show');
+            if (typeof showBsModal === 'function') showBsModal('#modalExit');
         });
 
         // Confirmar salida
         $('#confirmExit').on('click', function(e) {
             e.preventDefault();
-            $('#modalExit').modal('hide');
+            if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
             
             // Permitir la salida/recarga
             allowUnload = true;
@@ -428,7 +511,7 @@
 
         // Cancelar salida
         $('#cancelExit').on('click', function() {
-            $('#modalExit').modal('hide');
+            if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
             exitUrl = null;
             reloadAttempted = false;
             allowUnload = false;
@@ -438,7 +521,7 @@
         history.pushState(null, null, location.href);
         window.onpopstate = function () {
             history.pushState(null, null, location.href);
-            $('#modalExit').modal('show');
+            if (typeof showBsModal === 'function') showBsModal('#modalExit');
         };
         
         // Interceptar F5/Ctrl+R
@@ -452,7 +535,7 @@
             if (refreshCombo && !allowUnload) {
                 e.preventDefault();
                 reloadAttempted = true;
-                $('#modalExit').modal('show');
+                if (typeof showBsModal === 'function') showBsModal('#modalExit');
             }
         });
     });

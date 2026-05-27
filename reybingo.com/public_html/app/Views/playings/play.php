@@ -29,6 +29,30 @@
 
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
 
+<style>
+    .next-game {
+        background: rgba(9, 8, 39, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 12px;
+        padding: 6px 10px;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.25);
+    }
+    .favorite-game-btn {
+        border: 0;
+        background: rgba(255, 255, 255, 0.24);
+        color: #fff;
+        border-radius: 999px;
+        width: 32px;
+        height: 32px;
+        font-size: 0.95rem;
+    }
+    .favorite-game-btn.is-favorite {
+        background: rgba(255, 193, 7, 0.95);
+        color: #522f00;
+    }
+</style>
+
 <div class="container">
     <div class="row d-flex justify-content-center">
         <div class="<?php if (systemGet('activateRoomCards') != 1) : ?>col-md-5 col-xl-5<?php endif; ?>">
@@ -40,6 +64,22 @@
                         <?php endif; ?>
                         <h5 class="mb-0 p-2 hidden"><?= translate('hello'); ?>, <?= session()->get('firstname'); ?>!</h5>
                         <h6 class="text-white text-center next-game mt-2 text-uppercase"></h6>
+                        <?php
+                            $user = wallet_service()->normalizeUser($user);
+                            $walletTotal = wallet_total($user);
+                        ?>
+                        <div class="card m-2 p-2 text-center" style="background: rgba(255,255,255,0.92); border-radius: 12px;">
+                            <small class="text-muted d-block">Saldo total</small>
+                            <strong><?= systemGet('currency'); ?> <?= number_format($walletTotal, 2); ?></strong>
+                            <div class="d-flex justify-content-center gap-2 mt-1 flex-wrap" style="font-size: 0.75rem;">
+                                <span>Recarga: <?= number_format($user['wallet_recharge'], 2); ?></span>
+                                <span>Retiro: <?= number_format($user['wallet_withdraw'], 2); ?></span>
+                                <span>Bono: <?= number_format($user['wallet_bonus'], 2); ?></span>
+                            </div>
+                            <?php if (systemGet('activateRoulette') == 1 && ($user['roulette'] ?? 1) == 0) : ?>
+                                <button type="button" class="btn btn-primary btn-bingo btn-sm mt-2" onclick="var m=document.getElementById('modalactivateRoulette'); if(m){ new bootstrap.Modal(m).show(); }">Girar ruleta</button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <?php if (systemGet('activateRoomCards') != 1) : ?>
                         <?php if (systemGet('generateCartons') >= 1) : ?>
@@ -110,6 +150,14 @@
                         <?php endif; ?>
                     <?php else : ?>
                         <div class="play-section p-2">
+                            <?php if (!empty($games)) : ?>
+                                <div class="mb-2 px-1">
+                                    <input type="search" id="play-games-search" class="form-control form-control-lg form-bingo" placeholder="Buscar sala o partida..." autocomplete="off">
+                                </div>
+                                <div class="mb-2 px-1">
+                                    <input type="number" id="play-min-start-filter" class="form-control form-control-lg form-bingo" min="0" step="0.01" placeholder="Mínimo de inicio (precio cartón)">
+                                </div>
+                            <?php endif; ?>
                             <?php if (count($games) <= 1): ?>
                                 <style>
                                     .play-cards {
@@ -131,8 +179,11 @@
                                         }
                                     ?>
                                     <?php foreach ($games as $index => $game): ?>
-                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>">
+                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
+                                            <div class="text-end p-1 pb-0">
+                                                <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">☆</button>
+                                            </div>
                                             <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
                                             <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
                                             <div class="card-body p-1">
@@ -352,6 +403,56 @@
             });
         <?php endif; ?>
     <?php endif; ?>
+
+    function applyGameFiltersAndFavorites() {
+        const q = (document.getElementById('play-games-search')?.value || '').trim().toLowerCase();
+        const minStart = parseFloat(document.getElementById('play-min-start-filter')?.value || '0') || 0;
+        const favorites = JSON.parse(localStorage.getItem('favoriteGames') || '[]');
+
+        const cards = Array.from(document.querySelectorAll('.play-cards .card[data-search-text]'));
+        cards.forEach(function(card) {
+            const text = (card.getAttribute('data-search-text') || '').toLowerCase();
+            const price = parseFloat(card.getAttribute('data-price') || '0') || 0;
+            const visible = (!q || text.includes(q)) && (price >= minStart);
+            card.style.display = visible ? '' : 'none';
+        });
+
+        cards.sort(function(a, b) {
+            const aFav = favorites.includes(parseInt(a.getAttribute('data-game-id') || '0', 10));
+            const bFav = favorites.includes(parseInt(b.getAttribute('data-game-id') || '0', 10));
+            if (aFav === bFav) return 0;
+            return aFav ? -1 : 1;
+        });
+
+        const container = document.querySelector('.play-cards');
+        if (container) {
+            cards.forEach(function(card) { container.appendChild(card); });
+        }
+
+        document.querySelectorAll('[data-favorite-game]').forEach(function(btn) {
+            const gameId = parseInt(btn.getAttribute('data-favorite-game') || '0', 10);
+            const isFavorite = favorites.includes(gameId);
+            btn.classList.toggle('is-favorite', isFavorite);
+            btn.textContent = isFavorite ? '★' : '☆';
+        });
+    }
+
+    document.getElementById('play-games-search')?.addEventListener('input', applyGameFiltersAndFavorites);
+    document.getElementById('play-min-start-filter')?.addEventListener('input', applyGameFiltersAndFavorites);
+    document.querySelectorAll('[data-favorite-game]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const gameId = parseInt(this.getAttribute('data-favorite-game') || '0', 10);
+            let favorites = JSON.parse(localStorage.getItem('favoriteGames') || '[]');
+            if (favorites.includes(gameId)) {
+                favorites = favorites.filter(function(id) { return id !== gameId; });
+            } else {
+                favorites.push(gameId);
+            }
+            localStorage.setItem('favoriteGames', JSON.stringify(favorites));
+            applyGameFiltersAndFavorites();
+        });
+    });
+    applyGameFiltersAndFavorites();
 </script>
 
 <script src="<?= site_url('assets/js/play.js'); ?>?<?= md5(date("Hms")); ?>"></script>

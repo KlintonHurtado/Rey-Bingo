@@ -46,6 +46,7 @@
 </head>
 
 <body>
+<?= view('layout/_layout_user_bootstrap') ?>
 
     <!-- loader -->
     <div id="loader">
@@ -905,6 +906,7 @@
 
     <div id="confetti-container"></div>
     
+    <script src="<?= asset_url('js/in-app-notifications.js') ?>"></script>
     <script type="text/javascript">
         var site_url = "<?= site_url(); ?>";
         var currency = "<?= systemGet('currency'); ?>";
@@ -934,7 +936,8 @@
                 displayTime: 15000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
-                markReadUrl: '/users/markNotificationRead'
+                markReadUrl: '/users/markNotificationRead',
+                testUrl: '/users/testNotification'
             };
 
             // Función para inicializar el audio con compatibilidad iOS/Android
@@ -1038,7 +1041,7 @@
                 }
             }
 
-            async function loadNotifications() {
+            window.loadNotifications = async function loadNotifications() {
                 try {
                     const response = await fetch(notificationConfig.apiUrl);
                     const data = await response.json();
@@ -1113,48 +1116,51 @@
                 }
             }
 
-            function showNotification(notification) {
+            window.showNotification = function showNotification(notification) {
                 const container = document.getElementById('notificationsContainer');
+                if (!container) {
+                    return;
+                }
+
+                if (notification.id && container.querySelector(`[data-notification-id="${notification.id}"]`)) {
+                    return;
+                }
                 
-                // Limitar el número de notificaciones visibles a 5
                 while (container.children.length >= notificationConfig.maxNotifications) {
                     const oldestNotification = container.firstChild;
                     if (oldestNotification) {
-                        oldestNotification.classList.add('hide');
-                        setTimeout(() => {
-                            if (oldestNotification.parentNode) {
-                                oldestNotification.remove();
-                            }
-                        }, 300);
+                        hideNotification(oldestNotification);
                     } else {
                         break;
                     }
                 }
                 
-                // Crear elemento de notificación
                 const notificationEl = document.createElement('div');
                 notificationEl.className = `notification notification-${notification.type || 'default'}`;
+                if (notification.id) {
+                    notificationEl.dataset.notificationId = notification.id;
+                }
                 notificationEl.innerHTML = `
                     <div class="notification-header">
                         <h6 class="notification-title">${notification.title}</h6>
                     </div>
                     <div class="notification-message">${notification.message}</div>
-                    <button class="notification-close" onclick="closeNotification(this)" aria-label="Cerrar notificación">×</button>
+                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
                 `;
                 
                 container.appendChild(notificationEl);
                 
-                // Mostrar notificación con animación
                 setTimeout(() => {
                     notificationEl.classList.add('show');
                 }, 100);
+
+                attachNotificationSwipeDismiss(notificationEl, hideNotification);
                 
-                // Ocultar automáticamente después del tiempo configurado
-                setTimeout(() => {
+                notificationEl._autoHideTimer = setTimeout(() => {
                     hideNotification(notificationEl);
                 }, notificationConfig.displayTime);
-            }
+            };
 
             // Función para habilitar audio en iOS (llamar en interacción del usuario)
             function enableAudioForIOS() {
@@ -1708,20 +1714,19 @@
             }
 
             function hideNotification(notificationEl) {
-                if (notificationEl && notificationEl.parentNode) {
-                    notificationEl.classList.add('hide');
-                    setTimeout(() => {
-                        if (notificationEl.parentNode) {
-                            notificationEl.remove();
-                        }
-                    }, 300);
+                if (!notificationEl || !notificationEl.parentNode) {
+                    return;
                 }
-            }
-
-            // Función para cerrar notificación manualmente
-            function closeNotification(button) {
-                const notification = button.parentNode;
-                hideNotification(notification);
+                if (notificationEl._autoHideTimer) {
+                    clearTimeout(notificationEl._autoHideTimer);
+                    notificationEl._autoHideTimer = null;
+                }
+                notificationEl.classList.add('hide');
+                setTimeout(() => {
+                    if (notificationEl.parentNode) {
+                        notificationEl.remove();
+                    }
+                }, 300);
             }
 
             // Función para marcar notificación como leída
@@ -2314,5 +2319,8 @@
     <script src="<?= asset_url('js/toastify.js') ?>"></script>
     <script src="<?= asset_url('js/sweetalert.js') ?>"></script>
     <script src="assetsNew/js/base.js"></script>
+    <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
+    <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
+    <?php endif; ?>
 </body>
 </html>

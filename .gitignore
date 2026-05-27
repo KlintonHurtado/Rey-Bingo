@@ -5,3 +5,21 @@
 
 # Archivos comprimidos grandes (límite GitHub: 100 MB)
 *.zip
+
+# CodeIgniter 4 - carpeta writable (logs, cache, sesiones, uploads)
+reybingo.com/public_html/writable/logs/
+reybingo.com/public_html/writable/cache/
+reybingo.com/public_html/writable/session/
+reybingo.com/public_html/writable/uploads/
+reybingo.com/public_html/writable/debugbar/
+
+# Dependencias de Composer (se instalan con composer install)
+reybingo.com/public_html/vendor/
+
+# Node modules (si aplica)
+node_modules/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini

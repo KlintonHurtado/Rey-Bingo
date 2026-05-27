@@ -202,18 +202,41 @@ var App = function() {
     };
 }();
 
+function resolveModalEl(target) {
+    if (!target) return null;
+    if (typeof target === 'string') return document.querySelector(target);
+    if (target.jquery) return target[0];
+    return target;
+}
+
+function showBsModal(target) {
+    const el = resolveModalEl(target);
+    if (!el || typeof bootstrap === 'undefined') return null;
+    return bootstrap.Modal.getOrCreateInstance(el).show();
+}
+
+function hideBsModal(target) {
+    const el = resolveModalEl(target);
+    if (!el || typeof bootstrap === 'undefined') return;
+    const instance = bootstrap.Modal.getInstance(el);
+    if (instance) instance.hide();
+}
+
+window.showBsModal = showBsModal;
+window.hideBsModal = hideBsModal;
+
 function modalitiesGet() {
-    $('#modalModalities').modal('show');
+    showBsModal('#modalModalities');
 }
 
 function boardGet() {
-    $('#modalBoard').modal('show');
+    showBsModal('#modalBoard');
 }
 
 function generateCartonsGet(game) {
     if(game != '') {
         $("#modalAvailableCartons").load(site_url + 'playings/generateCartonsGet/' + game, function() {
-            $('#modalAvailableCartons').modal('show');
+            showBsModal('#modalAvailableCartons');
         });
     } else {
         Toastify({
@@ -230,7 +253,7 @@ function generateCartonsGet(game) {
 function availableCartonsRoomGet(game) {
     if(game != '') {
         $("#modalAvailableCartons").load(site_url + 'playings/availableCartonsGet/' + game, function() {
-            $('#modalAvailableCartons').modal('show');
+            showBsModal('#modalAvailableCartons');
         });
     } else {
         Toastify({
@@ -246,99 +269,103 @@ function availableCartonsRoomGet(game) {
 
 function gamesGet() {
     $("#modalGames").load(site_url + 'games/gamesGet', function() {
-        $('#modalGames').modal('show');
+        showBsModal('#modalGames');
     });
 }
 
 function referralsGet() {
     $("#modalReferrals").load(site_url + 'users/referralsGet', function() {
-        $('#modalReferrals').modal('show');
+        showBsModal('#modalReferrals');
     });
 }
 
 function awardsGet() {
     $("#modalAwards").load(site_url + 'boards/awardsGet', function() {
-        $('#modalAwards').modal('show');
+        showBsModal('#modalAwards');
         $('#game-finalized').hide();
     });
 }
 
 function awardsGameGet() {
     $("#modalAwards").load(site_url + 'boards/awardsGameGet', function() {
-        $('#modalAwards').modal('show');
+        showBsModal('#modalAwards');
         $('#game-finalized').hide();
     });
 }
 
 function gameAdd() {
     $("#modalAddgame").load(site_url + 'games/add', function() {
-        $('#modalAddgame').modal('show');
+        showBsModal('#modalAddgame');
     });
 }
 
 function modalityAdd() {
     $("#modalAddmodality").load(site_url + 'games/addmodality', function() {
-        $('#modalAddmodality').modal('show');
+        showBsModal('#modalAddmodality');
     });
 }
 
 function statisticsView() {
     $("#modalStatistics").load(site_url + 'games/statisticsView', function() {
-        $('#modalStatistics').modal('show');
+        showBsModal('#modalStatistics');
     });
 }
 
 function playersGet() {
     $("#modalPlayers").load(site_url + 'boards/playersGet', function() {
-        $('#modalPlayers').modal('show');
+        showBsModal('#modalPlayers');
     });
 }
 
 function paymentsGet() {
-    $("#modalPayments").load(site_url + 'payments/paymentsGet', function() {
-        $('#modalPayments').modal('show');
+    $("#modalPayments").load(site_url + 'payments/paymentsGet', function(response, status) {
+        if (status === 'error') {
+            console.error('No se pudo cargar la billetera (payments/paymentsGet)');
+            return;
+        }
+        showBsModal('#modalPayments');
     });
 }
 
 function requestGet(type, id) {
     $("#modalRequest").load(site_url + 'payments/requestGet/' + type + '/' + id, function() {
-        $('#modalRequest').modal('show');
+        showBsModal('#modalRequest');
     });
 }
 
 function modalVoucher(id) {
     $("#modalVoucher").load(site_url + 'payments/modalVoucher/' + id, function() {
-        $('#modalVoucher').modal('show');
+        showBsModal('#modalVoucher');
     });
 }
 
 function depositGet() {
     $("#modalDeposit").load(site_url + 'payments/depositGet', function() {
-        $('#modalDeposit').modal('show');
+        showBsModal('#modalDeposit');
     });
 }
 
 function retireGet() {
     $("#modalRetire").load(site_url + 'payments/retireGet', function() {
-        $('#modalRetire').modal('show');
+        showBsModal('#modalRetire');
     });
 }
 
 function transferGet() {
     $("#modalTransfer").load(site_url + 'payments/transferGet', function() {
-        $('#modalTransfer').modal('show');
+        showBsModal('#modalTransfer');
     });
 }
 
 function settingswalletGet() {
     $("#modalSettings").load(site_url + 'payments/settingswalletGet', function() {
-        $('#modalSettings').modal('show');
+        showBsModal('#modalSettings');
     });
 }
 
 function settingsGet() {
     $("#modalSettings").load(site_url + 'home/settingsGet', function() {
-        $('#modalSettings').modal('show');
+        showBsModal('#modalSettings');
     });
 }
 
@@ -348,7 +375,7 @@ function bankGet() {
         $('#bank-id').val('');
         $('#bank-modal-title').html('<i class="fa-duotone fa-solid fa-building-columns"></i> ' + __['add']);
         $('#bank-button').text(__['add']);
-        $('#modalBank').modal('show');
+        showBsModal('#modalBank');
     });
 }
 

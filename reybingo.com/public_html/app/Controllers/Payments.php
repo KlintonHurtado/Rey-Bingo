@@ -19,7 +19,7 @@ use CodeIgniter\Controller;
 
 class Payments extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet']);
         session();
     }
 
@@ -78,7 +78,11 @@ class Payments extends Controller {
         $filters = $this->getFilters();
         
         // Obtener usuario actual
-        $data['user'] = $modelUsers->find(session()->get('id'));
+        $userRow = $modelUsers->find(session()->get('id'));
+        if (!$userRow) {
+            return $this->response->setStatusCode(401)->setBody(translate('user not found'));
+        }
+        $data['user'] = wallet_service()->normalizeUser($userRow);
         $data['filters'] = $filters;
         
         // Cargar usuarios para el filtro (solo para admin)
@@ -94,6 +98,7 @@ class Payments extends Controller {
         
         // Calcular estadísticas
         $data['statistics'] = $this->calculateStatistics($filteredTransactions);
+        $data['adminKpis'] = $this->getAdminKpis();
         
         // Paginación
         $perPage = $filters['per_page'] ?? 15;
@@ -125,6 +130,7 @@ class Payments extends Controller {
                 'payments' => $payments,
                 'statistics' => $statistics,
                 'pagination' => $pagination,
+                'adminKpis' => $this->getAdminKpis(),
                 'total' => count($filteredTransactions)
             ]);
         } catch (\Exception $e) {
@@ -413,6 +419,27 @@ class Payments extends Controller {
             'has_next' => $currentPage < $totalPages,
             'previous_page' => $currentPage > 1 ? $currentPage - 1 : null,
             'next_page' => $currentPage < $totalPages ? $currentPage + 1 : null
+        ];
+    }
+
+    private function getAdminKpis(): array
+    {
+        if (session()->get('group') != 1) {
+            return [
+                'manual_credits' => 0,
+                'user_spend' => 0,
+                'total_prizes' => 0,
+            ];
+        }
+
+        $modelDeposits = new DepositsModel();
+        $modelPayments = new PaymentsModel();
+        $modelAwards = new AwardsModel();
+
+        return [
+            'manual_credits' => round((float) ($modelDeposits->selectSum('amount')->where('status', 2)->get()->getRow()->amount ?? 0), 2),
+            'user_spend' => round((float) ($modelPayments->selectSum('amount')->where('status', 2)->get()->getRow()->amount ?? 0), 2),
+            'total_prizes' => round((float) ($modelAwards->selectSum('amount')->where('status', 1)->get()->getRow()->amount ?? 0), 2),
         ];
     }
 
@@ -783,7 +810,7 @@ class Payments extends Controller {
         $modelNotifications = new NotificationsModel();
 
         if ($isAdmin && $selectedUser) {
-            $modelUsers->update($depositUserId, ['wallet' => $user['wallet'] + $data['amount']]);
+            wallet_credit_recharge($depositUserId, (float) $data['amount']);
 
             $deposits = $modelDeposits->where('user', $depositUserId)->countAllResults();
 
@@ -793,7 +820,7 @@ class Payments extends Controller {
                 $reward = $data['amount'] * systemGet('rateReferrals');
 
                 $userReferred = $modelUsers->find($userReferrer['id_referred']);
-                $modelUsers->update($userReferrer['id_referred'], ['wallet' => $userReferred['wallet'] + $reward]);
+                wallet_credit_withdrawable($userReferrer['id_referred'], (float) $reward);
 
                 $modelReferrals->update($userReferrer['id'], ['amount' => $reward, 'status' => 2]);
 
@@ -1018,13 +1045,23 @@ class Payments extends Controller {
 
         $modelUsers = new UsersModel();
 
-        $user = $modelUsers->find(session()->get('id'));
+        $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
 
-        if ($this->request->getPost('retire-amount') > $user['wallet']) {
+        if (! wallet_kyc_allows_withdraw($user)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'retire-amount' => 'Debe completar la verificación KYC antes de retirar. Visite /kyc',
+                ],
+            ]);
+        }
+
+        $withdrawable = wallet_withdrawable($user);
+        if ($this->request->getPost('retire-amount') > $withdrawable) {
             $response = [
                 'success' => false,
                 'errors' => [
-                    'retire-amount' => translate('the amount cannot exceed what is available') . ': ' . systemGet('currency') . ' ' . $user['wallet']
+                    'retire-amount' => translate('the amount cannot exceed what is available') . ': ' . systemGet('currency') . ' ' . number_format($withdrawable, 2)
                 ]
             ];
             return $this->response->setJSON($response);
@@ -1393,7 +1430,7 @@ class Payments extends Controller {
 
             if ($action === 'approve') {
                 if ($deposit['status'] === '1' || $deposit['status'] === '0') {
-                    $modelUsers->update($deposit['user'], ['wallet' => $user['wallet'] + $deposit['amount']]);
+                    wallet_credit_recharge($deposit['user'], (float) $deposit['amount']);
 
                     $modelDeposits->update($id, ['status' => 2, 'observation' => $observation]);
 
@@ -1405,7 +1442,7 @@ class Payments extends Controller {
                         $reward = $deposit['amount'] * systemGet('rateReferrals');
 
                         $userReferred = $modelUsers->find($userReferrer['id_referred']);
-                        $modelUsers->update($userReferrer['id_referred'], ['wallet' => $userReferred['wallet'] + $reward]);
+                        wallet_credit_withdrawable($userReferrer['id_referred'], (float) $reward);
 
                         $modelReferrals->update($userReferrer['id'], ['amount' => $reward, 'status' => 2]);
 
@@ -1480,14 +1517,14 @@ class Payments extends Controller {
                 return $this->response->setJSON(['success' => false, 'error' => translate('retire not found')]);
             }
 
-            $user = $modelUsers->find($retire['user']);
+            $user = wallet_service()->normalizeUser($modelUsers->find($retire['user']));
             if (!$user) {
                 return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
             }
 
             if ($action === 'approve') {
                 if ($retire['status'] === '1' || $retire['status'] === '0') {
-                    if ($user['wallet'] <= $retire['amount']) {
+                    if (wallet_withdrawable($user) < $retire['amount']) {
                         $modelNotifications = new NotificationsModel();
 
                         $currentUserId = session()->get('id');
@@ -1508,7 +1545,9 @@ class Payments extends Controller {
                         return $this->response->setJSON(['refuse' => true, 'error' => translate('the amount available in the user wallet is less than the amount to be retire')]);
                     }
 
-                    $modelUsers->update($retire['user'], ['wallet' => $user['wallet'] - $retire['amount']]);
+                    if (! wallet_deduct_withdrawable($retire['user'], (float) $retire['amount'])) {
+                        return $this->response->setJSON(['refuse' => true, 'error' => translate('the amount available in the user wallet is less than the amount to be retire')]);
+                    }
                 }
 
                 $modelRetires->update($id, ['status' => 2, 'observation' => $observation]);
@@ -1612,7 +1651,7 @@ class Payments extends Controller {
 
         if ($action === 'pay') {
             if ($sing['status'] === '1') {
-                $modelUsers->update($sing['user'], ['wallet' => $user['wallet'] + $awardPerSing]);
+                wallet_credit_withdrawable($sing['user'], (float) $awardPerSing);
             }
             $modelSings->update($id, ['status' => 2]);
 

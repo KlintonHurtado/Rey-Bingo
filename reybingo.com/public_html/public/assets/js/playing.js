@@ -418,19 +418,13 @@ function createMessageBubble(content, profilePicUrl) {
         bubble.appendChild(span);
     }
     
-    // Determinar si es solo emoji o texto
-    const isOnlyEmoji = /[\u1F600-\u1F6FF]/.test(content);
     span.textContent = content;
-    
-    // Aplicar estilos según el tipo de contenido
-    if (isOnlyEmoji) {
-        span.style.fontSize = '13px';
-        bubble.style.background = 'rgba(255, 255, 255, 0.2)';
-    } else {
-        span.style.fontSize = '24px';
-        bubble.style.background = 'rgba(98, 54, 255, 0.7)';
-    }
-    
+    span.style.fontSize = '';
+    span.className = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(content)
+        ? 'emoji-message'
+        : 'text-message';
+    bubble.style.background = '';
+
     return bubble;
 }
 
@@ -469,24 +463,55 @@ function scrollToBottom() {
     debouncedScroll();
 }
 
+function getMessageText(messageData) {
+    if (!messageData) return '';
+    if (typeof messageData === 'string') return messageData;
+    return messageData.message ?? '';
+}
+
+function getLastChatMessageId() {
+    const numericIds = messagesDisplayed
+        .map((id) => parseInt(id, 10))
+        .filter((id) => !Number.isNaN(id) && id > 0);
+    return numericIds.length ? Math.max(...numericIds) : 0;
+}
+
+function processIncomingChatMessages(data) {
+    if (!data) return;
+
+    const list = Array.isArray(data.messages)
+        ? data.messages
+        : (data.status === 'success' && data.message ? [data.message] : []);
+
+    list.forEach((row) => {
+        const id = parseInt(row.id, 10);
+        const text = getMessageText(row);
+        if (!text) return;
+        if (!Number.isNaN(id) && id > 0 && messagesDisplayed.includes(id)) return;
+        displayMessage({ message: text, id: Number.isNaN(id) ? Date.now() : id }, row.image || data.image);
+    });
+}
+
 // Función mejorada para mostrar mensajes estilo redes sociales
 function displayMessage(messageData, imageUrl) {
     const display = $id("message-display");
     if (!display) return;
     
     limitMessages();
-    
+
     const bubble = createMessageBubble(
-        messageData.message || messageData, 
+        getMessageText(messageData),
         imageUrl || imagePath || 'default-avatar.png'
     );
     
     // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
     display.insertBefore(bubble, display.firstChild);
     
-    // Guardar ID del mensaje si existe
     if (messageData.id) {
-        messagesDisplayed.push(messageData.id);
+        const msgId = parseInt(messageData.id, 10);
+        if (!Number.isNaN(msgId) && !messagesDisplayed.includes(msgId)) {
+            messagesDisplayed.push(msgId);
+        }
     }
     
     // Programar eliminación automática
@@ -508,6 +533,14 @@ function sendMessage(content, id) {
         .done((data) => {
             if (data.status === 'success') {
                 $('#message-send-new').val('');
+                if (data.id) {
+                    const tempIndex = messagesDisplayed.indexOf(messageId);
+                    if (tempIndex >= 0) {
+                        messagesDisplayed[tempIndex] = data.id;
+                    } else {
+                        messagesDisplayed.push(data.id);
+                    }
+                }
             }
         })
         .fail(() => {
@@ -523,40 +556,111 @@ function sendEmoji(content, id) {
 // Función para enviar mensaje desde el campo de texto
 function sendMessageText() {
     const inputField = $id('message-send-new');
-    if (inputField && inputField.value.trim()) {
-        sendMessage(inputField.value);
-        inputField.value = '';
+    if (!inputField) return;
+    const raw = inputField.value || '';
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+
+    // No permitir emoticones/pictogramas al escribir. Las reacciones se envían con los botones.
+    let emojiRegex = null;
+    try {
+        emojiRegex = /\p{Extended_Pictographic}/u;
+    } catch (e) {
+        // Fallback para navegadores sin soporte de propiedades unicode.
+        emojiRegex = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
     }
+
+    const sanitized = trimmed.replace(emojiRegex, '').trim();
+    if (!sanitized) {
+        inputField.value = '';
+        return;
+    }
+
+    sendMessage(sanitized);
+    inputField.value = '';
 }
 
-// Polling optimizado de mensajes mejorado
+// ==========================================
+// AUTO-BINGO: si el jugador completa cartón lleno
+// ==========================================
+let lastAutoSingBall = null;
+let autoSingInFlight = false;
+
+function getLastBoardNumber() {
+    const el = document.querySelector('#last-number span');
+    if (!el) return null;
+    const val = parseInt((el.textContent || '').trim(), 10);
+    return Number.isNaN(val) ? null : val;
+}
+
+function isFullCardMarked(cartonEl) {
+    if (!cartonEl) return false;
+    const cells = Array.from(cartonEl.querySelectorAll('.bingo-carton-number'));
+    if (cells.length < 24) return false;
+    return cells.every((cell) => {
+        // Centro estrella y/o marcado
+        if (cell.classList.contains('modality') || cell.classList.contains('data-position-13')) return true;
+        return cell.classList.contains('marked');
+    });
+}
+
+function autoSingIfComplete() {
+    if (autoSingInFlight) return;
+    // Solo cuando el juego ya arrancó
+    const total = parseInt(window.totalNumbersGenerated || '0', 10);
+    if (Number.isNaN(total) || total <= 0) return;
+
+    const lastBall = getLastBoardNumber();
+    if (!lastBall) return;
+    if (lastAutoSingBall === lastBall) return;
+
+    const cartons = Array.from(document.querySelectorAll('.bingo-carton'));
+    if (!cartons.length) return;
+
+    const anyFull = cartons.some(isFullCardMarked);
+    if (!anyFull) return;
+
+    autoSingInFlight = true;
+    $.post(site_url + 'playings/singBingo', {})
+        .done((data) => {
+            if (data && data.status === 'success') {
+                // Esto actualiza ganador + slider + marca modalidad en panel
+                showCountdown(data, () => {});
+            }
+            lastAutoSingBall = lastBall;
+        })
+        .fail(() => {
+            // Si falla, permitimos reintentar con la misma bola solo si cambia
+            lastAutoSingBall = lastBall;
+        })
+        .always(() => {
+            autoSingInFlight = false;
+        });
+}
+
+// Polling de chat (mensajes de otros jugadores / admin en la misma partida)
 function pollMessagesOptimized() {
     return new Promise((resolve) => {
-        $.get(site_url + 'playings/messageGet')
+        $.get(site_url + 'playings/messageGet', { after_id: getLastChatMessageId() })
             .done((data) => {
-                if (data.status === 'pause') {
-                    // Hay un bingo que notificar - primero mostrar/marcar el número si viene en la respuesta
-                    if (data.number) {
-                        
-                    }
-
-                    // Pausar el polling
-                    intervalManager.clear('lastNumber');
-
-                    // Marcar que hay un bingo en progreso
-                    bingoInProgress = true;
-
-                    // Si ya hay un bingo mostrándose, agregar este a la cola
-                    const countdownContainer = $id('countdown-container');
-                    if (countdownContainer && countdownContainer.style.display === 'block') {
-                        simultaneousBingos.push(data);
-                    } else {
-                        showCountdown(data, startAutomaticLast);
-                    }
+                if (data.status === 'stop') {
+                    messagePoller.stop();
+                    return resolve(data);
                 }
+                processIncomingChatMessages(data);
+                resolve(data);
+            })
+            .fail((error) => {
+                console.warn('Error en polling de mensajes:', error);
+                resolve({ status: 'error' });
             });
     });
 }
+
+// Ejecutar auto-sing periódicamente (sin spamear)
+setInterval(() => {
+    try { autoSingIfComplete(); } catch (e) {}
+}, 1500);
 
 // ==========================================
 // FUNCIONES PRINCIPALES (mantenidas del código original)
@@ -696,13 +800,13 @@ function handleNewNumber(newNumber, totalNumbersGenerated) {
                 lastNumbers.push(newNumber);
                 if (lastNumbers.length > 5) lastNumbers.shift();
                 
-                const latestUncurrent = lastNumbers.slice(0, -1);
                 const container = $("#last-five-numbers");
                 if (container.length) {
-                    container.empty();
-                    latestUncurrent.forEach(num => {
-                        container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
-                    });
+                    const newBall = $(`<div class="bingo-ball ${getColumnClass(newNumber)} size-40 ball-slide-in"><span>${newNumber}</span></div>`);
+                    container.prepend(newBall);
+                    while (container.children().length > 5) {
+                        container.children().last().remove();
+                    }
                 }
             }, 1000);
             
@@ -782,6 +886,17 @@ function stopAutomaticLast() {
 function showGameFinalized() {
     if (isGameFinishedShown) return;
     isGameFinishedShown = true;
+    window.gameIsFinished = true;
+    window.allowGameUnload = true;
+
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan) {
+        if (winners.length > 0) {
+            startWinnerSlider();
+        } else {
+            nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+        }
+    }
     
     const container = $id('game-finalized');
     const text = $id('finalized');
@@ -856,7 +971,7 @@ const updateGameAccumulated = throttle(() => {
                         }
                     });
                 }
-            } else {
+            } else if (data.status === 'completed') {
                 accumulatedEl.text(currency + ' ' + data.gameAccumulated);
 
                 if (data.modalities && data.modalities.length > 0) {
@@ -868,6 +983,10 @@ const updateGameAccumulated = throttle(() => {
                     });
                 }
 
+                stopUpdateGameAccumulated();
+                showGameFinalized();
+            } else {
+                accumulatedEl.text(currency + ' ' + data.gameAccumulated);
                 stopUpdateGameAccumulated();
             }
         })
@@ -1139,41 +1258,116 @@ function setupEvents() {
         }
     });
 
-    // Toggle de mensajes mejorado
-    const toggleBtn = $id("toggle-messages-btn");
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", function(event) {
-            const messageContainer = $id("message-display-container");
-            if (messageContainer) {
-                const isVisible = messageContainer.style.display === "flex";
-                messageContainer.style.display = isVisible ? "none" : "flex";
-                
-                // Actualizar icono del botón si existe
-                const icon = toggleBtn.querySelector('i');
-                if (icon) {
-                    icon.className = isVisible ? 'fa fa-comments' : 'fa fa-times';
-                }
-            }
+    function setModalitiesPanelOpen(open) {
+        const panel = $id("playing-modalities-panel");
+        const toggleBtn = $id("toggle-modalities-btn");
+        if (!panel) {
+            return;
+        }
+        panel.style.display = open ? "flex" : "none";
+        panel.classList.toggle("is-open", open);
+        panel.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("modalities-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        if (open && isChatPanelOpen()) {
+            setChatPanelOpen(false);
+        }
+    }
+
+    function isModalitiesPanelOpen() {
+        const panel = $id("playing-modalities-panel");
+        return panel && panel.classList.contains("is-open");
+    }
+
+    function setChatPanelOpen(open) {
+        const messageContainer = $id("message-display-container");
+        const toggleBtn = $id("toggle-messages-btn");
+        if (!messageContainer) {
+            return;
+        }
+        messageContainer.style.display = open ? "flex" : "none";
+        messageContainer.classList.toggle("is-open", open);
+        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("chat-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        if (open && isModalitiesPanelOpen()) {
+            setModalitiesPanelOpen(false);
+        }
+    }
+
+    function isChatPanelOpen() {
+        const messageContainer = $id("message-display-container");
+        return messageContainer && messageContainer.style.display === "flex";
+    }
+
+    function initModalitiesPanel() {
+        const panel = $id("playing-modalities-panel");
+        if (!panel) {
+            return;
+        }
+        setModalitiesPanelOpen(false);
+    }
+
+    initModalitiesPanel();
+
+    const modalitiesToggleBtn = $id("toggle-modalities-btn");
+    if (modalitiesToggleBtn) {
+        modalitiesToggleBtn.addEventListener("click", function(event) {
+            setModalitiesPanelOpen(!isModalitiesPanelOpen());
             event.stopPropagation();
         });
     }
 
-    // Click fuera para cerrar mensajes
+    const closeModalitiesBtn = $id("modalities-panel-close");
+    if (closeModalitiesBtn) {
+        closeModalitiesBtn.addEventListener("click", function(event) {
+            setModalitiesPanelOpen(false);
+            event.stopPropagation();
+        });
+    }
+
+    const toggleBtn = $id("toggle-messages-btn");
+    if (toggleBtn) {
+        toggleBtn.addEventListener("click", function(event) {
+            setChatPanelOpen(!isChatPanelOpen());
+            event.stopPropagation();
+        });
+    }
+
+    const closeChatBtn = $id("message-display-close");
+    if (closeChatBtn) {
+        closeChatBtn.addEventListener("click", function(event) {
+            setChatPanelOpen(false);
+            event.stopPropagation();
+        });
+    }
+
     document.addEventListener("click", function(event) {
         const messageContainer = $id("message-display-container");
         const toggleButton = $id("toggle-messages-btn");
-        
-        if (messageContainer && toggleButton && 
-            messageContainer.style.display === "flex" && 
-            !messageContainer.contains(event.target) && 
-            !toggleButton.contains(event.target)) {
-            messageContainer.style.display = "none";
-            
-            // Actualizar icono del botón
-            const icon = toggleButton.querySelector('i');
-            if (icon) {
-                icon.className = 'fa fa-comments';
-            }
+        const closeButton = $id("message-display-close");
+        const modalitiesPanel = $id("playing-modalities-panel");
+        const modalitiesToggle = $id("toggle-modalities-btn");
+        const closeModalities = $id("modalities-panel-close");
+
+        if (messageContainer && toggleButton &&
+            isChatPanelOpen() &&
+            !messageContainer.contains(event.target) &&
+            !toggleButton.contains(event.target) &&
+            !(closeButton && closeButton.contains(event.target))) {
+            setChatPanelOpen(false);
+        }
+
+        if (modalitiesPanel && modalitiesToggle &&
+            isModalitiesPanelOpen() &&
+            !modalitiesPanel.contains(event.target) &&
+            !modalitiesToggle.contains(event.target) &&
+            !(closeModalities && closeModalities.contains(event.target))) {
+            setModalitiesPanelOpen(false);
         }
     });
 
@@ -1279,7 +1473,13 @@ function setupGameCountdown() {
         if (timeDiff <= 0) {
             clearInterval(intervalNextGame);
 
-            if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
+            if (window.gameIsFinished || isGameFinishedShown) {
+                if (winners.length > 0) {
+                    startWinnerSlider();
+                } else {
+                    nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+                }
+            } else if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
                 if (winners.length > 0) {
                     startWinnerSlider();
                 } else {
@@ -1318,7 +1518,13 @@ function setupGameCountdown() {
         updateCountdown();
         intervalNextGame = setInterval(updateCountdown, 1000);
     } else {
-        if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
+        if (window.gameIsFinished || isGameFinishedShown) {
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+            }
+        } else if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
             if (winners.length > 0) {
                 startWinnerSlider();
             } else {
@@ -1617,8 +1823,10 @@ function initializeApp() {
     intervalManager.set('gameAccumulated', updateGameAccumulated, CONFIG.ACCUMULATED_COUNT_INTERVAL);
     updateGameAccumulated();
     
-    // Iniciar último número si es necesario
-    if (typeof timeBallLast !== 'undefined') {
+    // Si el juego ya terminó (recarga de página), no seguir sacando bolas
+    if (window.gameIsFinished) {
+        showGameFinalized();
+    } else if (typeof timeBallLast !== 'undefined') {
         startAutomaticLast();
     }
     
