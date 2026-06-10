@@ -69,18 +69,6 @@
                     <?= form_close(); ?>
                 <?php endif; ?>
             <?php else : ?>
-                <?php if (count($games) <= 1): ?>
-                    <style>
-                        .play-cards {
-                            grid-template-columns: repeat(1, 1fr) !important;
-                        }
-
-                        .play-cards .card {
-                            width: 70%;
-                            margin: auto;
-                        }
-                    </style>
-                <?php endif; ?>
                 <div class="play-cards">
                     <?php if (!empty($games)) : ?>
                         <?php

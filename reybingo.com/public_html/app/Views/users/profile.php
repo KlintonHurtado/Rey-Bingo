@@ -25,9 +25,10 @@
 
 <?php if (session()->get('group') == 1) : ?>
     <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
+    <a class="btn btn-small btn-kyc-admin" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check"></i></a>
 <?php endif; ?>
 
-<div class="container">
+<div class="container" style="padding-bottom: 120px; max-height: 100dvh; overflow-y: auto;">
     <div class="row d-flex justify-content-center">
         <div class="col-md-5 col-xl-5">
             <div class="row">

@@ -5,6 +5,7 @@ const CONFIG = {
     MAX_MESSAGES: 50,        // Aumentado para el nuevo sistema
     MAX_CONFETTI: 100,
     BASE_POLL_INTERVAL: 2000,
+    CHAT_POLL_INTERVAL: 600,
     MAX_POLL_INTERVAL: 10000,
     USER_COUNT_INTERVAL: 2500,
     ACCUMULATED_COUNT_INTERVAL: 2500,
@@ -26,6 +27,9 @@ let narrationAudio;
 let soundWinner;
 let isGameFinishedShown = false;
 let messagesDisplayed = [];
+let lastChatPollId = 0;
+let pendingOutgoingMessageIds = new Set();
+let chatSendInFlight = false;
 let intervalNextGame;
 let winners = [];
 let winnerIndex = 0;
@@ -173,8 +177,8 @@ class SmartPoller {
         try {
             const result = await callback();
             
-            // Reset interval on success
-            if (result && result.status === 'success') {
+            // Reset interval on success or empty poll
+            if (result && (result.status === 'success' || result.status === 'empty')) {
                 this.currentInterval = this.baseInterval;
                 this.consecutiveErrors = 0;
             }
@@ -332,7 +336,7 @@ const intervalManager = new IntervalManager();
 const domCache = new DOMCache();
 const messagePool = new MessagePool();
 const audioManager = new AudioManager();
-const messagePoller = new SmartPoller(CONFIG.BASE_POLL_INTERVAL);
+const messagePoller = new SmartPoller(CONFIG.CHAT_POLL_INTERVAL);
 const confettiManager = new CanvasConfetti();
 
 // ==========================================
@@ -398,9 +402,16 @@ function setupCartonLayout() {
 // ==========================================
 
 // Función para crear burbujas de mensaje estilo redes sociales
-function createMessageBubble(content, profilePicUrl) {
+function createMessageBubble(content, profilePicUrl, isOwn = false) {
     const bubble = messagePool.get();
     bubble.style.display = "flex";
+    
+    // Configurar alineación
+    if (isOwn) {
+        bubble.classList.add("own-message");
+    } else {
+        bubble.classList.remove("own-message");
+    }
     
     // Reutilizar o crear imagen de perfil
     let img = bubble.querySelector('.profile-pic');
@@ -420,9 +431,11 @@ function createMessageBubble(content, profilePicUrl) {
     
     span.textContent = content;
     span.style.fontSize = '';
-    span.className = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(content)
-        ? 'emoji-message'
-        : 'text-message';
+    
+    // Check if the content is only emojis (no alphanumeric or standard punctuation characters)
+    const trimmed = content.trim();
+    const isOnlyEmoji = !/[\p{L}\p{N}¡!¿?.,;]/u.test(trimmed) && trimmed.length <= 8;
+    span.className = isOnlyEmoji ? 'emoji-message' : 'text-message';
     bubble.style.background = '';
 
     return bubble;
@@ -466,14 +479,65 @@ function scrollToBottom() {
 function getMessageText(messageData) {
     if (!messageData) return '';
     if (typeof messageData === 'string') return messageData;
-    return messageData.message ?? '';
+    return messageData.message || messageData.text || '';
+}
+
+function getCurrentUserId() {
+    if (typeof window.currentUserId !== 'undefined' && window.currentUserId !== null && window.currentUserId !== '') {
+        return parseInt(window.currentUserId, 10) || 0;
+    }
+
+    if (typeof USER_ID !== 'undefined' && USER_ID !== null && USER_ID !== '') {
+        return parseInt(USER_ID, 10) || 0;
+    }
+
+    return 0;
+}
+
+function isOwnBingoEvent(data) {
+    if (!data) {
+        return false;
+    }
+
+    if (data.isOwnBingo === true) {
+        return true;
+    }
+
+    const winnerUserId = parseInt(data.winnerUserId, 10);
+    const currentUserId = getCurrentUserId();
+
+    return winnerUserId > 0 && currentUserId > 0 && winnerUserId === currentUserId;
+}
+
+function applyNumberGetMeta(data) {
+    if (!data) {
+        return;
+    }
+
+    if (typeof data.currentUserId !== 'undefined' && data.currentUserId !== null && data.currentUserId !== '') {
+        window.currentUserId = parseInt(data.currentUserId, 10) || window.currentUserId;
+    }
+
+    if (typeof data.gameHasWinner !== 'undefined') {
+        window.gameHasWinner = !!data.gameHasWinner;
+    }
+}
+
+function registerChatMessageId(messageId) {
+    const parsed = parseInt(messageId, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+        return;
+    }
+
+    lastChatPollId = Math.max(lastChatPollId, parsed);
+
+    if (!messagesDisplayed.includes(parsed)) {
+        messagesDisplayed.push(parsed);
+    }
 }
 
 function getLastChatMessageId() {
-    const numericIds = messagesDisplayed
-        .map((id) => parseInt(id, 10))
-        .filter((id) => !Number.isNaN(id) && id > 0);
-    return numericIds.length ? Math.max(...numericIds) : 0;
+    return lastChatPollId;
 }
 
 function processIncomingChatMessages(data) {
@@ -483,17 +547,42 @@ function processIncomingChatMessages(data) {
         ? data.messages
         : (data.status === 'success' && data.message ? [data.message] : []);
 
+    const currentUserId = getCurrentUserId();
+
     list.forEach((row) => {
         const id = parseInt(row.id, 10);
         const text = getMessageText(row);
         if (!text) return;
-        if (!Number.isNaN(id) && id > 0 && messagesDisplayed.includes(id)) return;
-        displayMessage({ message: text, id: Number.isNaN(id) ? Date.now() : id }, row.image || data.image);
+
+        if (!Number.isNaN(id) && id > 0) {
+            if (messagesDisplayed.includes(id)) {
+                return;
+            }
+
+            if (pendingOutgoingMessageIds.has(id)) {
+                pendingOutgoingMessageIds.delete(id);
+                registerChatMessageId(id);
+                return;
+            }
+
+            registerChatMessageId(id);
+        }
+
+        const rowUserId = parseInt(row.user, 10);
+        const isOwn = !Number.isNaN(rowUserId) && rowUserId > 0
+            ? rowUserId === currentUserId
+            : false;
+
+        displayMessage(
+            { message: text, id: Number.isNaN(id) || id <= 0 ? undefined : id },
+            row.image || data.image,
+            isOwn
+        );
     });
 }
 
 // Función mejorada para mostrar mensajes estilo redes sociales
-function displayMessage(messageData, imageUrl) {
+function displayMessage(messageData, imageUrl, isOwn = false) {
     const display = $id("message-display");
     if (!display) return;
     
@@ -501,7 +590,8 @@ function displayMessage(messageData, imageUrl) {
 
     const bubble = createMessageBubble(
         getMessageText(messageData),
-        imageUrl || imagePath || 'default-avatar.png'
+        imageUrl || imagePath || 'default-avatar.png',
+        isOwn
     );
     
     // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
@@ -509,8 +599,8 @@ function displayMessage(messageData, imageUrl) {
     
     if (messageData.id) {
         const msgId = parseInt(messageData.id, 10);
-        if (!Number.isNaN(msgId) && !messagesDisplayed.includes(msgId)) {
-            messagesDisplayed.push(msgId);
+        if (!Number.isNaN(msgId) && msgId > 0) {
+            registerChatMessageId(msgId);
         }
     }
     
@@ -521,30 +611,33 @@ function displayMessage(messageData, imageUrl) {
 // Función mejorada para enviar mensajes
 function sendMessage(content, id) {
     if (!content || !content.trim()) return;
-    
+    if (chatSendInFlight) return;
+
     const trimmedContent = content.trim();
-    const messageId = id || Date.now();
-    
-    // Mostrar mensaje inmediatamente en la interfaz
-    displayMessage({ message: trimmedContent, id: messageId }, imagePath);
-    
-    // Enviar al servidor
+    chatSendInFlight = true;
+
+    const inputField = $('#message-send-new');
+    if (inputField.length) {
+        inputField.val('');
+    }
+
+    displayMessage({ message: trimmedContent }, imagePath, true);
+
     $.post(site_url + 'playings/messageSubmit', { message: trimmedContent })
         .done((data) => {
             if (data.status === 'success') {
-                $('#message-send-new').val('');
-                if (data.id) {
-                    const tempIndex = messagesDisplayed.indexOf(messageId);
-                    if (tempIndex >= 0) {
-                        messagesDisplayed[tempIndex] = data.id;
-                    } else {
-                        messagesDisplayed.push(data.id);
-                    }
+                const msgId = parseInt(data.id, 10);
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    pendingOutgoingMessageIds.add(msgId);
+                    registerChatMessageId(msgId);
                 }
             }
         })
         .fail(() => {
             console.warn('Error al enviar mensaje');
+        })
+        .always(() => {
+            chatSendInFlight = false;
         });
 }
 
@@ -555,7 +648,11 @@ function sendEmoji(content, id) {
 
 // Función para enviar mensaje desde el campo de texto
 function sendMessageText() {
-    return;
+    const input = document.getElementById('message-send-new');
+    if (!input) return;
+    const content = input.value;
+    if (content.trim() === '') return;
+    sendMessage(content);
 }
 
 // ==========================================
@@ -563,53 +660,253 @@ function sendMessageText() {
 // ==========================================
 let lastAutoSingBall = null;
 let autoSingInFlight = false;
+let ballRevealTimer = null;
+let ballRevealAfterTimer = null;
+let ballRevealSequence = 0;
+let pendingMarkNumber = null;
+let pendingMarkSequence = 0;
+let autoMarkedNumbers = new Set();
+let autoSingCheckTimer = null;
 
 function getLastBoardNumber() {
     const el = document.querySelector('#last-number span');
-    if (!el) return null;
-    const val = parseInt((el.textContent || '').trim(), 10);
-    return Number.isNaN(val) ? null : val;
+    if (el) {
+        const val = parseInt((el.textContent || '').trim(), 10);
+        if (!Number.isNaN(val)) {
+            return val;
+        }
+    }
+
+    if (numbersgenerated.length) {
+        return numbersgenerated[numbersgenerated.length - 1];
+    }
+
+    if (Array.isArray(lastNumbers) && lastNumbers.length) {
+        return lastNumbers[lastNumbers.length - 1];
+    }
+
+    return null;
 }
 
-function isFullCardMarked(cartonEl) {
+function isCardWinningPattern(cartonEl) {
     if (!cartonEl) return false;
     const cells = Array.from(cartonEl.querySelectorAll('.bingo-carton-number'));
     if (cells.length < 24) return false;
-    return cells.every((cell) => {
-        // Centro estrella y/o marcado
-        if (cell.classList.contains('modality') || cell.classList.contains('data-position-13')) return true;
-        return cell.classList.contains('marked');
+
+    // Obtener las posiciones marcadas en este cartón
+    const markedPositions = new Set();
+    cells.forEach(cell => {
+        if (cell.classList.contains('modality') || cell.classList.contains('data-position-13') || cell.classList.contains('marked')) {
+            const pos = parseInt(cell.getAttribute('data-position'), 10);
+            if (!Number.isNaN(pos)) {
+                markedPositions.add(pos);
+            }
+        }
+    });
+    // Agregar la posición del medio por defecto
+    markedPositions.add(13);
+
+    const lastBall = getLastBoardNumber();
+
+    // Comprobar contra las modalidades activas
+    if (window.activeModalities && window.activeModalities.length > 0) {
+        return window.activeModalities.some(modality => {
+            if (!modality.positions) return false;
+            const requiredPositions = modality.positions.split(',').map(Number);
+            if (!requiredPositions.every(pos => markedPositions.has(pos))) {
+                return false;
+            }
+
+            if (window.singBingoOnlyLastBall === true && lastBall) {
+                const lastBallCell = cartonEl.querySelector(`.bingo-carton-number.number-${lastBall}`);
+                if (!lastBallCell || !lastBallCell.classList.contains('marked')) {
+                    return false;
+                }
+
+                const lastBallPos = parseInt(lastBallCell.getAttribute('data-position'), 10);
+                if (!requiredPositions.includes(lastBallPos)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    // Fallback: requerir cartón lleno (25 posiciones) si no hay modalidades definidas
+    return markedPositions.size >= 25;
+}
+
+function registerWinner(player, modality) {
+    if (!player) {
+        return;
+    }
+
+    mergeWinnersFromServer([{ player: player, modality: modality || '' }]);
+}
+
+function buildWinnersFinalText() {
+    const finishedLabel = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+
+    if (!winners.length) {
+        return finishedLabel;
+    }
+
+    if (winners.length === 1) {
+        return `${finishedLabel}<br><br><strong>🎉 ${winners[0].player}</strong><br>${winners[0].modality}`;
+    }
+
+    const lines = winners.map(function(w) {
+        return `🎉 ${w.player} — ${w.modality}`;
+    }).join('<br>');
+
+    return `${finishedLabel}<br><br>${lines}`;
+}
+
+function fetchWinnersBeforeFinalize(callback) {
+    $.get(site_url + 'playings/winnersGet')
+        .done(function(data) {
+            if (data && data.status === 'success' && Array.isArray(data.winners)) {
+                mergeWinnersFromServer(data.winners);
+            }
+        })
+        .always(function() {
+            if (typeof callback === 'function') {
+                callback();
+            }
+        });
+}
+
+function handleBingoSuccess(data, resumeCallback) {
+    if (!data || data.status !== 'success') {
+        return;
+    }
+
+    window.gameHasWinner = true;
+
+    registerWinner(data.player, data.modality);
+
+    if (Array.isArray(data.winners) && data.winners.length) {
+        mergeWinnersFromServer(data.winners);
+    }
+
+    bingoInProgress = true;
+    intervalManager.clear('lastNumber');
+
+    if (typeof sendEmoji === 'function') {
+        sendEmoji('🥳', 21);
+    }
+
+    const cartonElement = document.getElementById(`carton-${data.carton}`);
+    if (cartonElement && Array.isArray(data.numbers)) {
+        data.numbers.forEach((num) => {
+            const numberElement = cartonElement.querySelector(`.bingo-carton-number.number-${num}`);
+            if (numberElement) {
+                numberElement.classList.add('carton-sing');
+            }
+        });
+    }
+
+    const afterCountdown = function() {
+        if (data.gameCompleted) {
+            showGameFinalized();
+            return;
+        }
+
+        if (typeof resumeCallback === 'function') {
+            resumeCallback();
+        } else {
+            startAutomaticLast();
+        }
+    };
+
+    showCountdown({
+        player: data.player,
+        modality: data.modality,
+        modalityId: data.modalityId,
+        image: data.image
+    }, afterCountdown);
+}
+
+function mergeWinnersFromServer(serverWinners) {
+    if (!Array.isArray(serverWinners)) {
+        return;
+    }
+
+    serverWinners.forEach(function(winner) {
+        const player = winner.player || '';
+        const modality = winner.modality || '';
+
+        if (!player) {
+            return;
+        }
+
+        if (!winners.some(function(existing) {
+            return existing.player === player && existing.modality === modality;
+        })) {
+            winners.push({ player: player, modality: modality });
+        }
     });
 }
 
+function scheduleAutoSingCheck(delay) {
+    if (!isAutoMarkEnabled()) {
+        return;
+    }
+
+    if (autoSingCheckTimer) {
+        clearTimeout(autoSingCheckTimer);
+    }
+
+    autoSingCheckTimer = setTimeout(function() {
+        autoSingCheckTimer = null;
+        autoSingIfComplete();
+    }, typeof delay === 'number' ? delay : 450);
+}
+
 function autoSingIfComplete() {
-    if (autoSingInFlight) return;
-    // Solo cuando el juego ya arrancó
-    const total = parseInt(window.totalNumbersGenerated || '0', 10);
-    if (Number.isNaN(total) || total <= 0) return;
+    if (autoSingInFlight || bingoInProgress || window.gameIsFinished || window.gameHasWinner) {
+        return;
+    }
+
+    if (!isAutoMarkEnabled()) {
+        return;
+    }
+
+    if (!numbersgenerated.length) {
+        return;
+    }
 
     const lastBall = getLastBoardNumber();
-    if (!lastBall) return;
-    if (lastAutoSingBall === lastBall) return;
+    if (!lastBall) {
+        return;
+    }
+
+    if (lastAutoSingBall === lastBall) {
+        return;
+    }
 
     const cartons = Array.from(document.querySelectorAll('.bingo-carton'));
-    if (!cartons.length) return;
+    if (!cartons.length) {
+        return;
+    }
 
-    const anyFull = cartons.some(isFullCardMarked);
-    if (!anyFull) return;
+    const anyFull = cartons.some(isCardWinningPattern);
+    if (!anyFull) {
+        return;
+    }
 
     autoSingInFlight = true;
     $.post(site_url + 'playings/singBingo', {})
         .done((data) => {
             if (data && data.status === 'success') {
-                // Esto actualiza ganador + slider + marca modalidad en panel
-                showCountdown(data, () => {});
+                lastAutoSingBall = lastBall;
+                handleBingoSuccess(data, startAutomaticLast);
+            } else if (data && data.gameHasWinner) {
+                window.gameHasWinner = true;
+            } else if (data && data.message) {
+                console.warn('autoSingIfComplete:', data.message);
             }
-            lastAutoSingBall = lastBall;
-        })
-        .fail(() => {
-            // Si falla, permitimos reintentar con la misma bola solo si cambia
-            lastAutoSingBall = lastBall;
         })
         .always(() => {
             autoSingInFlight = false;
@@ -652,6 +949,485 @@ function getColumnClass(number) {
     return 'O';
 }
 
+function isAutoMarkEnabled() {
+    return window.autoMarkEnabled === true;
+}
+
+function disableManualClickForNumber(number) {
+    if (!isAutoMarkEnabled()) {
+        return;
+    }
+
+    $(".number-" + number).each(function() {
+        this.removeAttribute('onclick');
+    });
+}
+
+function applyAutoMarkPreferenceFromServer(autodial) {
+    if (typeof autodial === 'undefined' || autodial === null) {
+        return;
+    }
+
+    window.autoMarkEnabled = parseInt(autodial, 10) === 1;
+
+    const btn = $('#btn-auto-mark');
+    if (btn.length) {
+        if (window.autoMarkEnabled) {
+            btn.html('<i class="fa-duotone fa-solid fa-binary-circle-check"></i>');
+        } else {
+            btn.html('<i class="fa-duotone fa-solid fa-binary-slash"></i>');
+        }
+    }
+}
+
+function rememberDrawnNumber(number) {
+    const parsed = parseInt(number, 10);
+    if (!parsed) {
+        return;
+    }
+
+    if (!Array.isArray(window.drawnNumbers)) {
+        window.drawnNumbers = [];
+    }
+
+    if (!window.drawnNumbers.includes(parsed)) {
+        window.drawnNumbers.push(parsed);
+    }
+
+    if (!numbersgenerated.includes(parsed)) {
+        numbersgenerated.push(parsed);
+    }
+}
+
+function parseBallNumber(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getCurrentMainBallNumber() {
+    const el = document.querySelector('#last-number span');
+    if (!el) {
+        return null;
+    }
+
+    return parseBallNumber(el.textContent);
+}
+
+function updateMainBall(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const lastNumberEl = $('#last-number');
+    if (!lastNumberEl.length) {
+        return;
+    }
+
+    lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
+        .removeClass()
+        .addClass(`bingo-ball ${getColumnClass(parsed)} size-100`);
+}
+
+function getHistoryBallSizeClass() {
+    return document.querySelector('.top-section.live') ? 'size-40' : 'size-40';
+}
+
+function renderBallHistory() {
+    const container = $("#last-five-numbers");
+    if (!container.length) {
+        return;
+    }
+
+    const ordered = (window.drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        container.empty();
+        return;
+    }
+
+    const history = ordered.length > 1
+        ? ordered.slice(Math.max(0, ordered.length - 5), -1)
+        : [];
+
+    container.empty();
+    history.slice(-4).forEach(function(num) {
+        container.append(`<div class="bingo-ball ${getColumnClass(num)} ${getHistoryBallSizeClass()}"><span>${num}</span></div>`);
+    });
+}
+
+function reconcileBallDisplay(orderedNumbers) {
+    const ordered = (orderedNumbers || window.drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        return;
+    }
+
+    window.drawnNumbers = ordered.slice();
+    lastNumbers = ordered.slice(-5);
+    updateMainBall(ordered[ordered.length - 1]);
+    renderBallHistory();
+    ordered.forEach(markBoardNumber);
+}
+
+function registerDrawnNumber(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed || numbersgenerated.includes(parsed)) {
+        return false;
+    }
+
+    numbersgenerated.push(parsed);
+    rememberDrawnNumber(parsed);
+
+    if (isAutoMarkEnabled()) {
+        disableManualClickForNumber(parsed);
+    }
+
+    return true;
+}
+
+function seedAutoMarkedNumbers() {
+    autoMarkedNumbers.clear();
+    $('.bingo-carton-number.marked').each(function() {
+        const match = (this.className || '').match(/\bnumber-(\d+)\b/);
+        if (match) {
+            autoMarkedNumbers.add(parseInt(match[1], 10));
+        }
+    });
+}
+
+function flushPendingMark() {
+    if (pendingMarkNumber === null) {
+        return false;
+    }
+
+    const num = pendingMarkNumber;
+    pendingMarkNumber = null;
+    pendingMarkSequence = 0;
+    applyMarksForNumber(num);
+
+    if (isAutoMarkEnabled()) {
+        scheduleAutoSingCheck();
+    }
+
+    return true;
+}
+
+function clearBallRevealTimers(flushPending) {
+    if (flushPending !== false) {
+        flushPendingMark();
+    }
+
+    if (ballRevealTimer) {
+        clearTimeout(ballRevealTimer);
+        ballRevealTimer = null;
+    }
+
+    if (ballRevealAfterTimer) {
+        clearTimeout(ballRevealAfterTimer);
+        ballRevealAfterTimer = null;
+    }
+}
+
+function hasGameStarted() {
+    if (window.gameStartedLive === true) {
+        return true;
+    }
+
+    if (numbersgenerated.length > 0) {
+        return true;
+    }
+
+    if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length > 0) {
+        return true;
+    }
+
+    if ((window.totalNumbersGenerated || 0) > 0) {
+        return true;
+    }
+
+    if (typeof gameDate === 'undefined') {
+        return true;
+    }
+
+    return new Date() >= new Date(gameDate);
+}
+
+function markGameAsStartedFromServer(totalNumbersGenerated) {
+    const drawn = parseInt(totalNumbersGenerated, 10) || 0;
+    const hasDrawn = drawn > 0
+        || (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length > 0)
+        || numbersgenerated.length > 0;
+
+    if (!hasDrawn) {
+        return;
+    }
+
+    window.gameStartedLive = true;
+
+    if (intervalNextGame) {
+        clearInterval(intervalNextGame);
+        intervalNextGame = null;
+    }
+
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan && !window.gameIsFinished && !isGameFinishedShown) {
+        if (winners.length > 0) {
+            startWinnerSlider();
+        } else {
+            nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+        }
+    }
+}
+
+function applyMarksForNumber(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    if (isAutoMarkEnabled()) {
+        disableManualClickForNumber(parsed);
+    }
+
+    markBoardNumber(parsed);
+
+    if (isAutoMarkEnabled()) {
+        markCartonNumberLocally(parsed, false);
+
+        if (!autoMarkedNumbers.has(parsed)) {
+            autoMarkedNumbers.add(parsed);
+            dialNumber(parsed);
+        } else {
+            scheduleAutoSingCheck();
+        }
+    }
+}
+
+function scheduleLatestBallMarks(latestNumber, options) {
+    const parsed = parseBallNumber(latestNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const opts = options || {};
+    const shouldDelayMarks = opts.animate !== false && !bingoInProgress;
+
+    const runMarks = function() {
+        pendingMarkNumber = null;
+        pendingMarkSequence = 0;
+        applyMarksForNumber(parsed);
+
+        if (isAutoMarkEnabled()) {
+            scheduleAutoSingCheck();
+        }
+    };
+
+    flushPendingMark();
+    clearBallRevealTimers(false);
+
+    if (!shouldDelayMarks) {
+        runMarks();
+        return;
+    }
+
+    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + parsed + '.mp3');
+    }
+
+    const sequence = ++ballRevealSequence;
+    pendingMarkNumber = parsed;
+    pendingMarkSequence = sequence;
+    const ballDelay = getBallDisplayDelay();
+
+    ballRevealTimer = setTimeout(function() {
+        if (pendingMarkSequence !== sequence || pendingMarkNumber !== parsed) {
+            return;
+        }
+
+        runMarks();
+
+        ballRevealAfterTimer = setTimeout(function() {
+            const lastNumberEl = $('#last-number');
+            if (lastNumberEl.length) {
+                lastNumberEl.removeClass('move-number');
+            }
+        }, 300);
+    }, ballDelay);
+}
+
+function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
+    if (Array.isArray(drawnNumbers) && drawnNumbers.length) {
+        return drawnNumbers.map(parseBallNumber).filter(Boolean);
+    }
+
+    const ordered = numbersgenerated.slice();
+    const parsed = parseBallNumber(newNumber);
+    if (parsed && !ordered.includes(parsed)) {
+        ordered.push(parsed);
+    }
+
+    return ordered;
+}
+
+function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options) {
+    const opts = options || {};
+    const ordered = (drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        return;
+    }
+
+    const serverTotal = ordered.length;
+    const counterTotal = totalNumbersGenerated !== undefined
+        ? parseInt(totalNumbersGenerated, 10)
+        : serverTotal;
+    const ballsCount = Number.isFinite(counterTotal) && counterTotal > 0
+        ? Math.max(counterTotal, serverTotal)
+        : serverTotal;
+
+    const previous = numbersgenerated.slice();
+    const missing = ordered.filter(function(num) {
+        return !previous.includes(num);
+    });
+
+    numbersgenerated = ordered.slice();
+    window.drawnNumbers = ordered.slice();
+
+    updateBallsCounter(ballsCount);
+    reconcileBallDisplay(ordered);
+    markGameAsStartedFromServer(ballsCount);
+
+    flushPendingMark();
+    clearBallRevealTimers(false);
+
+    if (isAutoMarkEnabled()) {
+        syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
+    }
+
+    if (missing.length && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
+    }
+
+    if (opts.animate !== false && missing.length === 1 && !bingoInProgress) {
+        const lastNumberEl = $('#last-number');
+        if (lastNumberEl.length) {
+            lastNumberEl.addClass('move-number');
+            setTimeout(function() {
+                lastNumberEl.removeClass('move-number');
+            }, getBallDisplayDelay());
+        }
+    }
+
+    if (isAutoMarkEnabled()) {
+        scheduleAutoSingCheck(missing.length ? 300 : 200);
+    }
+}
+
+function getBallDisplayDelay() {
+    const parsed = parseInt(window.timeBallGet, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1500;
+}
+
+function applyMarksForDrawnNumber(number) {
+    markBoardNumber(number);
+
+    if (isAutoMarkEnabled()) {
+        dialNumber(number);
+    }
+}
+
+function markBoardNumber(number) {
+    const boardNumber = $("#board-number-" + number);
+    if (boardNumber.length) {
+        boardNumber.addClass(getColumnClass(number));
+    }
+}
+
+function markCartonNumberLocally(number, animate) {
+    const elementsNumber = $(".number-" + number);
+    if (!elementsNumber.length) {
+        return;
+    }
+
+    elementsNumber.each(function() {
+        const elementNumber = $(this);
+
+        if (elementNumber.hasClass('marked')) {
+            return;
+        }
+
+        if (animate) {
+            const originalContent = elementNumber.text();
+            elementNumber.text('⭐️').addClass('explosive-effect');
+
+            setTimeout(function() {
+                elementNumber.text(originalContent);
+                elementNumber.removeClass('explosive-effect');
+                elementNumber.addClass('marked');
+            }, 300);
+        } else {
+            elementNumber.addClass('marked');
+        }
+
+        if (isAutoMarkEnabled()) {
+            elementNumber.removeAttr('onclick');
+        }
+    });
+}
+
+function syncAutoMarkedNumbers(drawnNumbers, options) {
+    if (!isAutoMarkEnabled()) {
+        return;
+    }
+
+    const opts = options || {};
+    const numbers = Array.isArray(drawnNumbers) ? drawnNumbers : (window.drawnNumbers || []);
+    const animate = opts.animate === true;
+
+    numbers.forEach(function(number) {
+        const parsed = parseInt(number, 10);
+        if (!parsed) {
+            return;
+        }
+
+        rememberDrawnNumber(parsed);
+        markBoardNumber(parsed);
+
+        const elementsNumber = $(".number-" + parsed);
+        if (!elementsNumber.length) {
+            return;
+        }
+
+        const unmarked = elementsNumber.filter(':not(.marked)');
+        if (!unmarked.length) {
+            autoMarkedNumbers.add(parsed);
+            return;
+        }
+
+        if (opts.persist === false) {
+            markCartonNumberLocally(parsed, animate);
+            autoMarkedNumbers.add(parsed);
+            return;
+        }
+
+        if (!autoMarkedNumbers.has(parsed)) {
+            autoMarkedNumbers.add(parsed);
+            dialNumber(parsed);
+        }
+    });
+
+    if (isAutoMarkEnabled()) {
+        scheduleAutoSingCheck(animate ? 500 : 200);
+    }
+}
+
 function startWinnerSlider() {
     if (winners.length === 0) return;
 
@@ -684,11 +1460,7 @@ function showCountdown(data, callback) {
     textHe.innerHTML = `${data.modality}<br />${data.player}`;
     numberHe.style.color = 'white';
 
-    // Agregar ganador si no existe
-    if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
-        winners.push({ player: data.player, modality: data.modality });
-    }
-
+    registerWinner(data.player, data.modality);
     startWinnerSlider();
 
     // Reproducir sonido de victoria
@@ -741,9 +1513,47 @@ function showCountdown(data, callback) {
     AppcreateConfetti();
 }
 
+function showOtherPlayerBingoNotice(data, callback) {
+    if (!data) {
+        return;
+    }
+
+    window.gameHasWinner = true;
+    intervalManager.clear('lastNumber');
+
+    if (Array.isArray(data.winners)) {
+        mergeWinnersFromServer(data.winners);
+    }
+
+    if (data.player && data.modality) {
+        registerWinner(data.player, data.modality);
+    }
+
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan) {
+        nextGameSpan.textContent = `GANADOR: ${data.player} - ${data.modality}`;
+    }
+
+    startWinnerSlider();
+
+    if (data.gameCompleted || window.gameIsFinished) {
+        setTimeout(showGameFinalized, 1200);
+        return;
+    }
+
+    setTimeout(function() {
+        if (typeof callback === 'function') {
+            callback();
+        } else {
+            startAutomaticLast();
+        }
+    }, 3500);
+}
+
 function updateBallsCounter(totalNumbersGenerated) {
     const totalBalls = 75;
-    const drawn = totalNumbersGenerated;
+    const drawn = parseInt(totalNumbersGenerated, 10) || 0;
+    window.totalNumbersGenerated = drawn;
     const remaining = totalBalls - drawn;
     
     const counter = $('#balls-counter');
@@ -761,89 +1571,78 @@ function updateBallsCounter(totalNumbersGenerated) {
     }
 }
 
-function handleNewNumber(newNumber, totalNumbersGenerated) {
-    if (numbersgenerated.includes(newNumber)) return;
+function handleNewNumber(newNumber, totalNumbersGenerated, drawnNumbers) {
+    const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { animate: !bingoInProgress });
+}
 
-    updateBallsCounter(totalNumbersGenerated);
-    numbersgenerated.push(newNumber);
-     
-    if (typeof autoMarkEnabled !== 'undefined' && autoMarkEnabled) {
-        const el = $id('number-' + newNumber);
-        if (el) el.removeAttribute('onclick');
+function processNumberGetResponse(data) {
+    if (!data) {
+        return;
     }
 
-    if (!lastNumbers.includes(newNumber)) {
-        setTimeout(() => {
-            setTimeout(() => {
-                lastNumbers.push(newNumber);
-                if (lastNumbers.length > 5) lastNumbers.shift();
-                
-                const container = $("#last-five-numbers");
-                if (container.length) {
-                    const newBall = $(`<div class="bingo-ball ${getColumnClass(newNumber)} size-40 ball-slide-in"><span>${newNumber}</span></div>`);
-                    container.prepend(newBall);
-                    while (container.children().length > 5) {
-                        container.children().last().remove();
-                    }
-                }
-            }, 1000);
-            
-            const lastNumberEl = $('#last-number');
-            if (lastNumberEl.length) {
-                lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-                    .removeClass()
-                    .addClass(`bingo-ball ${getColumnClass(newNumber)} size-100`);
-            }
-        }, 1500);
+    applyNumberGetMeta(data);
+    applyAutoMarkPreferenceFromServer(data.autodial);
+
+    if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
+        syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: false });
+    } else if (data.number) {
+        handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
     }
 
-    // Reproducir narración si está activada
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
-    }
-
-    setTimeout(() => {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.removeClass("move-number");
+    if (data.status === 'pause') {
+        if (Array.isArray(data.winners)) {
+            mergeWinnersFromServer(data.winners);
         }
-    }, 1000);
 
-    // Auto-marcar si está habilitado
-    /*if (typeof autoMarkEnabled !== 'undefined' && autoMarkEnabled) {
-        autoDialNumber(newNumber);
-    }*/
+        if (data.player && data.modality) {
+            if (isOwnBingoEvent(data)) {
+                if (!bingoInProgress) {
+                    bingoInProgress = true;
+                    intervalManager.clear('lastNumber');
+                    showCountdown({
+                        player: data.player,
+                        modality: data.modality,
+                        modalityId: data.modalityId,
+                        image: data.image
+                    }, function() {
+                        if (data.gameCompleted) {
+                            showGameFinalized();
+                            return;
+                        }
+                        startAutomaticLast();
+                    });
+                }
+            } else if (!isGameFinishedShown) {
+                showOtherPlayerBingoNotice(data);
+            }
+        }
+    } else if (data.status === 'completed') {
+        if (Array.isArray(data.winners)) {
+            mergeWinnersFromServer(data.winners);
+        }
 
-    const numberEl = $("#board-number-" + newNumber);
-    if (numberEl.length) {
-        numberEl.addClass(getColumnClass(newNumber));
+        if (data.player && data.modality) {
+            registerWinner(data.player, data.modality);
+        }
+
+        window.gameHasWinner = true;
+        setTimeout(showGameFinalized, typeof timeBallGet !== 'undefined' ? timeBallGet : 1000);
     }
 }
 
 function lastNumberGet() {
-    // Si hay un bingo en progreso, no solicitar nuevos números
-    if (bingoInProgress) return;
-    
+    if (bingoInProgress || window.gameIsFinished || isGameFinishedShown) {
+        return;
+    }
+
     $.get(site_url + 'playings/numberGet')
         .done((data) => {
-            // Auto-marcar si está habilitado
-            if (typeof autoMarkEnabled !== 'undefined' && autoMarkEnabled) {
-                autoDialNumber(data.number);
+            if (!data || data.status === 'error') {
+                return;
             }
 
-            if (data.status === 'pause') {
-                // Funcionamiento normal - mostrar último número
-                handleNewNumber(data.number, data.totalNumbersGenerated);
-            } else if (data.status === 'success') {
-                // Funcionamiento normal - mostrar último número
-                handleNewNumber(data.number, data.totalNumbersGenerated);
-            } else if (data.status === 'completed') {
-                // Funcionamiento normal - mostrar último número
-                handleNewNumber(data.number, data.totalNumbersGenerated);
-                
-                // No hay notificación, ir directo a finalizar
-                setTimeout(showGameFinalized, typeof timeBallGet !== 'undefined' ? timeBallGet : 1000);
-            }
+            processNumberGetResponse(data);
         })
         .fail((xhr, status, error) => {
             console.warn('Failed to get last number:', error);
@@ -853,6 +1652,7 @@ function lastNumberGet() {
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
     if (typeof timeBallLast !== 'undefined') {
+        lastNumberGet();
         intervalManager.set('lastNumber', lastNumberGet, timeBallLast);
     }
 }
@@ -862,44 +1662,59 @@ function stopAutomaticLast() {
 }
 
 function showGameFinalized() {
-    if (isGameFinishedShown) return;
-    isGameFinishedShown = true;
-    window.gameIsFinished = true;
-    window.allowGameUnload = true;
+    if (isGameFinishedShown) {
+        return;
+    }
 
-    const nextGameSpan = document.querySelector('.next-game');
-    if (nextGameSpan) {
-        if (winners.length > 0) {
-            startWinnerSlider();
-        } else {
-            nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+    fetchWinnersBeforeFinalize(function() {
+        if (isGameFinishedShown) {
+            return;
         }
-    }
-    
-    const container = $id('game-finalized');
-    const text = $id('finalized');
-    
-    if (container && text) {
-        container.style.display = 'block';
-        text.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
-        
-        setTimeout(() => {
-            if (typeof awardsGet === 'function') {
-                awardsGet();
+
+        isGameFinishedShown = true;
+        window.gameIsFinished = true;
+        window.allowGameUnload = true;
+        bingoInProgress = false;
+
+        const countdownContainer = $id('countdown-container');
+        if (countdownContainer) {
+            countdownContainer.style.display = 'none';
+        }
+
+        const nextGameSpan = document.querySelector('.next-game');
+        if (nextGameSpan) {
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
             }
-            container.style.display = 'none';
-        }, 5000);
-    }
+        }
 
-    stopAutomaticLast();
-    stopUpdateUserCount();
-    stopUpdateGameAccumulated();
-    messagePoller.stop();
+        const container = $id('game-finalized');
+        const text = $id('finalized');
 
-    const controlsDiv = $id('controls');
-    if (controlsDiv) {
-        controlsDiv.remove();
-    }
+        if (container && text) {
+            container.style.display = 'block';
+            text.innerHTML = buildWinnersFinalText();
+
+            setTimeout(function() {
+                if (typeof awardsGet === 'function') {
+                    awardsGet();
+                }
+                container.style.display = 'none';
+            }, 5000);
+        }
+
+        stopAutomaticLast();
+        stopUpdateUserCount();
+        stopUpdateGameAccumulated();
+        messagePoller.stop();
+
+        const controlsDiv = $id('controls');
+        if (controlsDiv) {
+            controlsDiv.remove();
+        }
+    });
 }
 
 // Contador de usuarios optimizado
@@ -995,22 +1810,36 @@ function dialNumber(number) {
                 elementsNumber.each(function() {
                     const elementNumber = $(this);
 
-                    if (elementNumber.hasClass('marked')) return;
+                    if (elementNumber.hasClass('marked')) {
+                        return;
+                    }
+
+                    if (isAutoMarkEnabled()) {
+                        elementNumber.addClass('marked');
+                        elementNumber.removeAttr('onclick');
+                        return;
+                    }
 
                     const originalContent = elementNumber.text();
                     elementNumber.text('⭐️').addClass('explosive-effect');
 
                     setTimeout(function() {
-                        elementNumber.text(originalContent); 
+                        elementNumber.text(originalContent);
                         elementNumber.removeClass('explosive-effect');
-                        elementNumber.addClass('marked'); 
+                        elementNumber.addClass('marked');
                     }, 1000);
                 });
+
+                if (isAutoMarkEnabled()) {
+                    scheduleAutoSingCheck();
+                }
             } else {
+                autoMarkedNumbers.delete(number);
                 console.warn("Respuesta no exitosa:", data.message || data);
             }
         },
         error: function(xhr, status, error) {
+            autoMarkedNumbers.delete(number);
             console.error("Error en AJAX al marcar número:", number, error);
         }
     });
@@ -1085,32 +1914,13 @@ function singBingo() {
         method: 'POST',
         success: function(data) {
             if (data.status === 'success') {
-                // Marcar que hay un bingo en progreso
-                bingoInProgress = true;
-                
-                // Detener el intervalo de obtención de números
-                intervalManager.clear('lastNumber');
-
-                sendEmoji('🥳', 21);
-
-                // Marcar números ganadores en el cartón
-                const cartonElement = document.getElementById(`carton-${data.carton}`);
-                if (cartonElement && data.numbers) {
-                    data.numbers.forEach(num => {
-                        const numberElement = cartonElement.querySelector(`.bingo-carton-number.number-${num}`);
-                        if (numberElement) {
-                            numberElement.classList.add('carton-sing');
-                        }
-                    });
+                const lastBall = getLastBoardNumber();
+                if (lastBall) {
+                    lastAutoSingBall = lastBall;
                 }
-
-                // Mostrar countdown de victoria
-                showCountdown({
-                    player: data.player,
-                    modality: data.modality,
-                    modalityId: data.modalityId,
-                    image: data.image
-                }, startAutomaticLast);
+                handleBingoSuccess(data, startAutomaticLast);
+            } else if (data && data.gameHasWinner) {
+                window.gameHasWinner = true;
             }
         },
         error: function(xhr, status, error) {
@@ -1160,7 +1970,31 @@ function RemoveCheck() {
         method: 'POST',
         success: function(data) {
             if (data.status === 'success') {
-                console.log("automarked disabled successfully");
+                window.autoMarkEnabled = parseInt(data.autodial, 10) === 1;
+
+                const btn = $('#btn-auto-mark');
+                if (btn.length) {
+                    if (window.autoMarkEnabled) {
+                        btn.html('<i class="fa-duotone fa-solid fa-binary-circle-check"></i>');
+                    } else {
+                        btn.html('<i class="fa-duotone fa-solid fa-binary-slash"></i>');
+                    }
+                }
+
+                if (window.autoMarkEnabled) {
+                    if (Array.isArray(data.drawnNumbers)) {
+                        window.drawnNumbers = data.drawnNumbers;
+                    }
+                    syncAutoMarkedNumbers(window.drawnNumbers, { animate: true, persist: false });
+                    seedAutoMarkedNumbers();
+                    $(".bingo-carton-number[id^='number-']").each(function() {
+                        this.removeAttribute('onclick');
+                    });
+                } else {
+                    autoMarkedNumbers.clear();
+                    pendingMarkNumber = null;
+                    pendingMarkSequence = 0;
+                }
             } else {
                 console.log("error sending request");
             }
@@ -1175,21 +2009,17 @@ function RemoveCheck() {
 // CONFIGURACIÓN DE EVENTOS
 // ==========================================
 function setupEvents() {
-    // Eventos de mensajes mejorados
-    const messageButton = $('#message-button');
-    if (messageButton.length) {
-        messageButton.on('click', sendMessageText);
-    }
-    
+    // Eventos de mensajes (un solo handler; evitar duplicar con onclick/onkeypress en HTML)
+    const messageButton = $('#message-button, #btn-send-message-new');
+    messageButton.off('click.chatSend').on('click.chatSend', sendMessageText);
+
     const messageInput = $('#message-send-new');
-    if (messageInput.length) {
-        messageInput.on('keypress', (e) => {
-            if (e.which === 13) {
-                e.preventDefault();
-                sendMessageText();
-            }
-        });
-    }
+    messageInput.off('keydown.chatSend').on('keydown.chatSend', (e) => {
+        if (e.key === 'Enter' || e.which === 13) {
+            e.preventDefault();
+            sendMessageText();
+        }
+    });
 
     // Eventos para emojis (si tienes botones de emoji)
     $('.emoji-button').on('click', function() {
@@ -1208,21 +2038,10 @@ function setupEvents() {
         }
     });
 
-    // Control de auto-marcado
-    $('.btn-binary').on('click', function() {
-        if (typeof autoMarkEnabled !== 'undefined') {
-            autoMarkEnabled = !autoMarkEnabled;
-            $(this).html(autoMarkEnabled ? 
-                '<i class="fa-duotone fa-solid fa-binary-circle-check"></i>' : 
-                '<i class="fa-duotone fa-solid fa-binary-slash"></i>'
-            );
-        }
-    });
-
-    // Click en números del cartón
+    // Click en números del cartón (solo en modo manual)
     $(".bingo-carton-number").on('click', function() {
-        if (typeof autoMarkEnabled === 'undefined' || !autoMarkEnabled) {
-            const number = $(this).data('number'); 
+        if (!isAutoMarkEnabled()) {
+            const number = $(this).data('number') || parseInt($(this).attr('id')?.replace('number-', ''), 10);
             if (number) {
                 dialNumber(number);
             }
@@ -1454,6 +2273,15 @@ function setupGameCountdown() {
         const now = new Date();
         const timeDiff = targetDate - now;
 
+        if (hasGameStarted()) {
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+            }
+            return;
+        }
+
         if (timeDiff <= 0) {
             clearInterval(intervalNextGame);
 
@@ -1462,12 +2290,6 @@ function setupGameCountdown() {
                     startWinnerSlider();
                 } else {
                     nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
-                }
-            } else if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
-                if (winners.length > 0) {
-                    startWinnerSlider();
-                } else {
-                    nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
                 }
             } else {
                 nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
@@ -1508,7 +2330,7 @@ function setupGameCountdown() {
             } else {
                 nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
             }
-        } else if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
+        } else if (hasGameStarted()) {
             if (winners.length > 0) {
                 startWinnerSlider();
             } else {
@@ -1559,6 +2381,8 @@ class ResourceManager {
         
         // Limpiar arrays
         messagesDisplayed.length = 0;
+        lastChatPollId = 0;
+        pendingOutgoingMessageIds.clear();
         winners.length = 0;
         
         console.log('Resource cleanup completed');
@@ -1609,6 +2433,9 @@ class ResourceManager {
         
         // Resetear arrays de mensajes mostrados
         messagesDisplayed.length = 0;
+        lastChatPollId = 0;
+        pendingOutgoingMessageIds.clear();
+        pollMessagesOptimized();
     }
 }
 
@@ -1811,7 +2638,44 @@ function initializeApp() {
     // Iniciar contador de acumulado
     intervalManager.set('gameAccumulated', updateGameAccumulated, CONFIG.ACCUMULATED_COUNT_INTERVAL);
     updateGameAccumulated();
+
+    if (window.totalNumbersGenerated !== undefined) {
+        updateBallsCounter(window.totalNumbersGenerated);
+    }
     
+    if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length) {
+        numbersgenerated = window.drawnNumbers
+            .map(parseBallNumber)
+            .filter(Boolean);
+        lastNumbers = numbersgenerated.slice(-5);
+        reconcileBallDisplay(numbersgenerated);
+        markGameAsStartedFromServer(numbersgenerated.length);
+        updateBallsCounter(numbersgenerated.length);
+    } else if (Array.isArray(window.fiveNumbers) && window.fiveNumbers.length) {
+        lastNumbers = window.fiveNumbers
+            .map(parseBallNumber)
+            .filter(Boolean);
+        numbersgenerated = lastNumbers.slice();
+        reconcileBallDisplay(numbersgenerated);
+        markGameAsStartedFromServer(lastNumbers.length);
+        updateBallsCounter(lastNumbers.length);
+    }
+
+    mergeWinnersFromServer(window.winners);
+
+    if (isAutoMarkEnabled()) {
+        syncAutoMarkedNumbers(window.drawnNumbers, { animate: false, persist: false });
+        $(".bingo-carton-number[id^='number-']").each(function() {
+            if (isAutoMarkEnabled()) {
+                this.removeAttribute('onclick');
+            }
+        });
+        seedAutoMarkedNumbers();
+        scheduleAutoSingCheck(300);
+    } else {
+        seedAutoMarkedNumbers();
+    }
+
     // Si el juego ya terminó (recarga de página), no seguir sacando bolas
     if (window.gameIsFinished) {
         showGameFinalized();

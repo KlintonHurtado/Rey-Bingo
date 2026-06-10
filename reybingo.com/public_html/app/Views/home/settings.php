@@ -302,6 +302,17 @@
                             </div>
 
                             <div class="col-md-12">
+                                <h6>Abono de bienvenida</h6>
+                                <hr class="my-1">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="registrationBonus" class="form-label">Bono al registrarse</label>
+                                <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="registrationBonus" id="registrationBonus" placeholder="0.00" value="<?= esc(systemGet('registrationBonus') ?? '0'); ?>">
+                                <small class="text-muted">Se acredita como bono al registrarse. Solo puede gastarse en cartones; no es retirable ni transferible.</small>
+                                <small id="registrationBonus-error" class="text-danger d-none"></small>
+                            </div>
+
+                            <div class="col-md-12">
                                 <h6><?= translate('commission rates'); ?> (%)</h6>
                                 <hr class="my-1">
                             </div>

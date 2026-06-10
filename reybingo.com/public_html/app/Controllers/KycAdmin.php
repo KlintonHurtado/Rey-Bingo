@@ -20,7 +20,20 @@ class KycAdmin extends Controller
         $imagePath = ! empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
         $pending = $modelUsers->where('kyc_status', 'pending')
-            ->where('kyc_front IS NOT NULL', null, false)
+            ->where('kyc_front !=', '')
+            ->where('kyc_front IS NOT NULL')
+            ->orderBy('updated_at', 'DESC')
+            ->findAll();
+
+        $verified = $modelUsers->where('kyc_status', 'verified')
+            ->where('kyc_front !=', '')
+            ->where('kyc_front IS NOT NULL')
+            ->orderBy('updated_at', 'DESC')
+            ->findAll();
+
+        $rejected = $modelUsers->where('kyc_status', 'rejected')
+            ->where('kyc_front !=', '')
+            ->where('kyc_front IS NOT NULL')
             ->orderBy('updated_at', 'DESC')
             ->findAll();
 
@@ -28,9 +41,12 @@ class KycAdmin extends Controller
             'page' => [
                 'title' => 'Revisión KYC',
             ],
+            'user'       => $user,
             'validation' => \Config\Services::validation(),
             'contentPage' => view('users/kyc_admin_list', [
                 'pending'   => $pending,
+                'verified'  => $verified,
+                'rejected'  => $rejected,
                 'user'      => $user,
                 'contacts'  => $modelContacts->findAll(),
                 'imagePath' => $imagePath,

@@ -755,7 +755,7 @@ class Users extends Controller {
             }
 
             $response['games']  = $formattedGames;
-            $response['wallet'] = $user['wallet'];
+            $response['wallet'] = wallet_summary_payload($user);
         }
 
         if (session()->get('group') == 1) {

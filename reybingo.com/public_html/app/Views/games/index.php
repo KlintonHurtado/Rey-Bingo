@@ -31,7 +31,9 @@
             <div class="card mb-3">
                 <div class="collapse show">
                     <div class="card-body p-3">
-                        <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" onclick="gameAdd();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="btn btn-small btn-primary btn-modal-add text-white btn-add-new" onclick="gameAdd();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                        </div>
                         <div class="row g-2">
                             <?php $today = date('Y-m-d'); ?>
                             <div class="col-md-4">

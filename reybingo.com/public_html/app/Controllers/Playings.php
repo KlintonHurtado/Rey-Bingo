@@ -21,7 +21,7 @@ use CodeIgniter\Controller;
 
 class Playings extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'wallet']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo']);
         session();
     }
     
@@ -375,6 +375,7 @@ class Playings extends Controller {
             }
 
             $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+            $drawnNumbers = $this->syncSessionUserDrawnMarks((int) $gameId);
 
             return $this->response->setJSON([
                 'success' => true,
@@ -383,7 +384,8 @@ class Playings extends Controller {
                 'cartons_assigned' => $totalSelectedCartons,
                 'total_cost' => $totalCost,
                 'new_balance' => wallet_total($userAfter),
-                'carton_ids' => $savedCartonIds
+                'carton_ids' => $savedCartonIds,
+                'drawnNumbers' => $drawnNumbers,
             ]);
 
         } catch (\Exception $e) {
@@ -692,14 +694,16 @@ class Playings extends Controller {
             return redirect()->to('/play');
         }
 
-        $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+        $drawnNumbersOrdered = $this->getOrderedDrawnNumbers((int) $game['id']);
+        $totalNumbersGenerated = count($drawnNumbersOrdered);
+        $selectedNumbers = $drawnNumbersOrdered;
 
         $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
         $gameIsFinished = ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
     
-        $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
+        $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
     
         if (empty($cartons)) {
             return redirect()->to('/play');
@@ -713,20 +717,15 @@ class Playings extends Controller {
             $modality['amount'] = $award['amount'] ?? 0; 
         }
 
-        $selectedNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->findAll();
-        $selectedNumbers = array_column($selectedNumbers, 'number');
+        $user = $modelUsers->find(session()->get('id'));
 
-        if (!empty($selectedNumbers)) {
-            foreach ($selectedNumbers as &$selectedNumber) {
+        if (($user['autodial'] ?? 0) != 1) {
+            $modelUsers->update((int) session()->get('id'), ['autodial' => 1]);
+            $user['autodial'] = 1;
+        }
 
-                $existingNumbers = $modelNumbersCartons->getNumbersByUserAndGame(session()->get('id'), $game['id'], $selectedNumber);
-
-                if (!empty($existingNumbers)) {
-                    $ids = array_column($existingNumbers, 'id');
-
-                    $modelNumbersCartons->whereIn('id', $ids)->set(['status' => 1])->update();
-                }
-            }
+        if (! empty($drawnNumbersOrdered)) {
+            $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersOrdered);
         }
 
         $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();  
@@ -775,8 +774,6 @@ class Playings extends Controller {
                 'numbers' => $numbers
             ];
         }
-
-        $user = $modelUsers->find(session()->get('id'));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
     
@@ -1220,6 +1217,7 @@ class Playings extends Controller {
                 }
 
                 $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+                $drawnNumbers = $this->syncSessionUserDrawnMarks((int) $gameId);
 
                 return $this->response->setJSON([
                     'success' => true,
@@ -1227,7 +1225,8 @@ class Playings extends Controller {
                     'redirect' => site_url('/playing'),
                     'cartons_assigned' => $totalSelectedCartons,
                     'total_cost' => $totalCost,
-                    'new_balance' => wallet_total($userAfter)
+                    'new_balance' => wallet_total($userAfter),
+                    'drawnNumbers' => $drawnNumbers,
                 ]);
 
             } catch (\Exception $e) {
@@ -1421,6 +1420,7 @@ class Playings extends Controller {
                 }
 
                 $userAfter = wallet_service()->normalizeUser($modelUsers->find($userId));
+                $drawnNumbers = $this->syncSessionUserDrawnMarks((int) $gameId);
 
                 return $this->response->setJSON([
                     'success' => true,
@@ -1428,7 +1428,8 @@ class Playings extends Controller {
                     'redirect' => site_url('/playing'),
                     'cartons_assigned' => $totalSelectedCartons,
                     'total_cost' => $totalCost,
-                    'new_balance' => wallet_total($userAfter)
+                    'new_balance' => wallet_total($userAfter),
+                    'drawnNumbers' => $drawnNumbers,
                 ]);
 
             } catch (\Exception $e) {
@@ -1485,60 +1486,103 @@ class Playings extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
 
-        $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();  
+        if ((int) ($game['status'] ?? 0) !== 1) {
+            bingo_ensure_winners_registered((int) $game['id']);
+
+            return $this->response->setJSON([
+                'status' => 'completed',
+                'totalNumbersGenerated' => bingo_count_drawn_numbers((int) $game['id']),
+                'drawnNumbers' => $this->getOrderedDrawnNumbers((int) $game['id']),
+                'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                'message' => translate('the game is over, all the prizes have been awarded'),
+                'number' => '',
+                'player' => '',
+            ]);
+        }
+
+        $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if (!$lastNumber) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no numbers drawn yet')]);
         }
 
-        $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+        $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
+        $totalNumbersGenerated = count($drawnNumbers);
 
-        // Si salieron las 75 bolas, marcar todos los sings como notificados y retornar status completed
+        $user = $modelUsers->find(session()->get('id'));
+        if (! empty($drawnNumbers)) {
+            $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbers);
+        }
+
+        // Si salieron las 75 bolas, resolver bingos no cantados, pagar premios y finalizar
         if ($totalNumbersGenerated >= 75) {
-            $modelSings->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
-            
+            bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->getWinnersForGame((int) $game['id']);
+
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
+                'winners' => $winners,
+                'autodial' => (int) ($user['autodial'] ?? 0),
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
                 'number' => $lastNumber['number'],
-                'player' => '' // Asegurar que player esté vacío
+                'player' => ''
             ]);
         }
 
-        $currentUser = session()->get('id');
+        $currentUser = (int) session()->get('id');
+        $gameHasWinner = $modelSings->where('game', $game['id'])->countAllResults() > 0;
 
-        // Buscar todos los sings recientes que no han sido notificados al usuario actual
-        // Modificamos para obtener todos los sings pendientes, no solo el último
+        // Buscar sings pendientes de notificar a otros jugadores (no al ganador)
         $pendingSings = $modelSings->where('game', $game['id'])->orderBy('created_at', 'DESC')->findAll();
         
-        // Verificar si hay sings pendientes de notificar al usuario actual
         foreach ($pendingSings as $sing) {
             $notified = json_decode($sing['notified'] ?? '[]', true);
-            
-            // Si el usuario actual no ha sido notificado de este sing Y no es el que cantó bingo
-            if (!in_array($currentUser, $notified)) {
-                $user = $modelUsers->find($sing['user']);
-                $modality = $modelModalities->find($sing['modality']);
-                
-                $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-
-                // Agregar usuario actual a la lista de notificados
-                $notified[] = $currentUser;
-                $modelSings->update($sing['id'], ['notified' => json_encode($notified)]);
-
-                return $this->response->setJSON([
-                    'status' => 'pause',
-                    'totalNumbersGenerated' => $totalNumbersGenerated,
-                    'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
-                    'iscron' => $lastNumber['isCRON'],
-                    'number' => $lastNumber['number'],
-                    'player' => $user['firstname'] . ' ' . $user['lastname'],
-                    'modality' => translate($modality['name']),
-                    'modalityId' => $modality['id'],
-                    'image' => $imagePath
-                ]);
+            if (! is_array($notified)) {
+                $notified = [];
             }
+
+            if (in_array($currentUser, $notified, true)) {
+                continue;
+            }
+
+            // El ganador ya vio su BINGO al cantar; solo marcarlo como notificado
+            if ((int) $sing['user'] === $currentUser) {
+                $notified[] = $currentUser;
+                $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
+                continue;
+            }
+
+            $singUser = $modelUsers->find($sing['user']);
+            $modality = $modelModalities->find($sing['modality']);
+            $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
+
+            $notified[] = $currentUser;
+            $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
+
+            $game = $modelGames->find($game['id']);
+            $gameCompleted = (int) ($game['status'] ?? 0) !== 1;
+
+            return $this->response->setJSON([
+                'status' => 'pause',
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
+                'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                'autodial' => (int) ($user['autodial'] ?? 0),
+                'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
+                'iscron' => $lastNumber['isCRON'],
+                'number' => $lastNumber['number'],
+                'player' => $singUser['firstname'] . ' ' . $singUser['lastname'],
+                'modality' => translate($modality['name']),
+                'modalityId' => $modality['id'],
+                'image' => $imagePath,
+                'isOwnBingo' => false,
+                'winnerUserId' => (int) $sing['user'],
+                'gameHasWinner' => true,
+                'gameCompleted' => $gameCompleted,
+                'currentUserId' => $currentUser,
+            ]);
         }
 
         // Verificar si todos los premios han sido ganados
@@ -1546,12 +1590,18 @@ class Playings extends Controller {
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
         if ($SingsCount >= $AwardsCount) {
+            bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->getWinnersForGame((int) $game['id']);
+
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
+                'winners' => $winners,
+                'autodial' => (int) ($user['autodial'] ?? 0),
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
-                'player' => '' // Asegurar que player esté vacío
+                'player' => ''
             ]);
         }
 
@@ -1559,8 +1609,12 @@ class Playings extends Controller {
         return $this->response->setJSON([
             'status' => 'success',
             'totalNumbersGenerated' => $totalNumbersGenerated,
+            'drawnNumbers' => $drawnNumbers,
+            'autodial' => (int) ($user['autodial'] ?? 0),
             'message' => translate('last number'),
-            'number' => $lastNumber['number']
+            'number' => $lastNumber['number'],
+            'gameHasWinner' => $gameHasWinner,
+            'currentUserId' => $currentUser,
         ]);
     }
 
@@ -1582,7 +1636,7 @@ class Playings extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
     
-        $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
+        $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
     
         if (empty($cartons)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('the user does not have cards')]);
@@ -1636,12 +1690,12 @@ class Playings extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
 
-        $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
+        $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
         if (empty($cartons)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('the user does not have cards')]);
         }
 
-        $modalities = $modelModalities->getModalitiesByIds(explode(',', $game['modalities']));
+        $modalities = bingo_get_game_modalities($game);
         if (empty($modalities)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active modalities')]);
         }
@@ -1651,18 +1705,34 @@ class Playings extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('no number has been generated')]);
         }
 
-        $lastNumber = $modelNumbersCartons->getMarkedNumberByUserAndGame(session()->get('id'), $game['id'], $lastBall['number']);
-        if (!$lastNumber) {
-            return $this->response->setJSON([
-                'status' => 'error',
-                'message' => translate('you cant sing bingo, the last number is not marked on your card')
-            ]);
-        }
-
-        $drawnNumbers = $modelBoards->getNumbersByBoard($game['id']);
-        $drawnNumbersArray = array_column($drawnNumbers, 'number');
+        $drawnNumbersArray = bingo_get_ordered_drawn_numbers((int) $game['id']);
 
         $userSing = $modelUsers->find(session()->get('id'));
+
+        if (! empty($drawnNumbersArray)) {
+            $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersArray);
+        }
+
+        $lastBallOnCards = $modelNumbersCartons->getNumbersByUserAndGame(
+            session()->get('id'),
+            $game['id'],
+            $lastBall['number']
+        );
+
+        if (! empty($lastBallOnCards)) {
+            $lastNumber = $modelNumbersCartons->getMarkedNumberByUserAndGame(
+                session()->get('id'),
+                $game['id'],
+                $lastBall['number']
+            );
+
+            if (! $lastNumber) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => translate('you cant sing bingo, the last number is not marked on your card')
+                ]);
+            }
+        }
         $imagePath = !empty($userSing['image']) ? site_url('uploads/users/' . $userSing['image']) : site_url('assets/img/avatar.jpg');
 
         $lastValidNumber = end($drawnNumbersArray); 
@@ -1675,9 +1745,18 @@ class Playings extends Controller {
 
         foreach ($cartons as $carton) {
             foreach ($modalities as $modality) {
-                $requiredPositions = explode(',', $modality['positions']);
-                $matches = 0;
-                $winningNumbers = [];
+                $numberSingsLimit = bingo_get_number_sings_limit();
+                $modalityWinners = $modelSings
+                    ->where('game', $game['id'])
+                    ->where('modality', $modality['id'])
+                    ->countAllResults();
+
+                if ($modalityWinners >= $numberSingsLimit) {
+                    continue;
+                }
+
+                $requiredPositions = explode(',', (string) $modality['positions']);
+                $matchResult = null;
 
                 if ($singBingoOnlyLastBall == 1) {
                     $singLastNumber = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->first();
@@ -1694,85 +1773,98 @@ class Playings extends Controller {
                     continue; 
                 }
 
-                $markedNumbers = $modelNumbersCartons->getMarkedNumbersByCarton($carton['id']);
-                $markedNumbersArray = array_column($markedNumbers, 'number');
+                $cartonNumbers = $modelNumbersCartons
+                    ->where('carton', $carton['id'])
+                    ->orderBy('position', 'ASC')
+                    ->findAll();
+                $matchResult = $this->getModalityMatchResult($requiredPositions, $cartonNumbers, $drawnNumbersArray);
 
-                foreach ($markedNumbers as $markedNumber) {
-                    if (in_array($markedNumber['position'], $requiredPositions) && in_array($markedNumber['number'], $drawnNumbersArray)) {
-                        $matches++;
-                        $winningNumbers[] = $markedNumber['number'];
-                    }
-                }
+                if ($matchResult['complete']) {
+                    $winningNumbers = $matchResult['winningNumbers'];
 
-                if ($matches == count($requiredPositions)) {
                     if ($singBingoOnlyLastBall == 1) {
-                        if (!in_array($lastValidNumber, $winningNumbers)) {
+                        if (!in_array((int) $lastValidNumber, $winningNumbers, true)) {
                             continue; 
                         }
                     }
 
-                    $existingsings = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->countAllResults();
+                    $registered = bingo_register_sing_if_missing(
+                        (int) $game['id'],
+                        (int) session()->get('id'),
+                        (int) $carton['id'],
+                        $modality,
+                        $winningNumbers,
+                        (int) $lastBall['number'],
+                        false
+                    );
 
-                    if ($existingsings < systemGet('numberSings')) { 
-                        $data = [
-                            'user' => session()->get('id'),
+                    if (! $registered) {
+                        continue;
+                    }
+
+                    $id = $modelSings
+                        ->where('game', $game['id'])
+                        ->where('modality', $modality['id'])
+                        ->where('user', session()->get('id'))
+                        ->orderBy('id', 'DESC')
+                        ->first()['id'] ?? null;
+
+                    if (! $id) {
+                        continue;
+                    }
+
+                    $modelNotifications = new NotificationsModel();
+
+                    $currentUserId = session()->get('id');
+
+                    $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->where('user !=', $currentUserId)->groupBy('user')->findAll();
+
+                    $cartonUserIds = array_column($usersFromCartons, 'user');
+
+                    $admins = $modelUsers->select('id')->where('group', 1)->findAll();
+
+                    $adminIds = array_column($admins, 'id');
+
+                    $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
+
+                    $sings = $modelSings->where('game', $game['id'])->findAll();
+
+                    $modalitySing = $modelModalities->find($modality['id']);
+
+                    $singsByModality = [];
+                    foreach ($sings as $sing) {
+                        $singsByModality[$sing['modality']][] = $sing;
+                    }
+
+                    foreach ($allUserIds as $userId) {
+                        $notificationData = [
+                            'user' => $userId,
+                            'from' => $currentUserId,
+                            'type' => 'sing',
                             'game' => $game['id'],
-                            'carton' => $carton['id'],
                             'modality' => $modality['id'],
-                            'numbers' => implode(',', array_unique($winningNumbers)),
-                            'lastnumber' => $lastBall['number'],
-                            'status' => 1
+                            'title' => '🎉 ¡BINGO CANTADO!',
+                            'message' => $userSing['firstname'] . ' ' . $userSing['lastname'] . ' ha cantado ¡BINGO! en la modalidad ' . translate($modalitySing['name']) . '.',
                         ];
 
-                        $modelSings->insert($data);
-                        $id = $modelSings->insertID();
-
-                        $modelNotifications = new NotificationsModel();
-
-                        $currentUserId = session()->get('id');
-
-                        $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->where('user !=', $currentUserId)->groupBy('user')->findAll();
-
-                        $cartonUserIds = array_column($usersFromCartons, 'user');
-
-                        $admins = $modelUsers->select('id')->where('group', 1)->findAll();
-
-                        $adminIds = array_column($admins, 'id');
-
-                        $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
-
-                        $sings = $modelSings->where('game', $game['id'])->findAll();
-
-                        $modalitySing = $modelModalities->find($modality['id']);
-
-                        $singsByModality = [];
-                        foreach ($sings as $sing) {
-                            $singsByModality[$sing['modality']][] = $sing;
-                        }
-
-                        foreach ($allUserIds as $userId) {
-                            $notificationData = [
-                                'user' => $userId,
-                                'from' => $currentUserId,
-                                'type' => 'sing',
-                                'game' => $game['id'],
-                                'modality' => $data['modality'],
-                                'title' => '🎉 ¡BINGO CANTADO!',
-                                'message' => $userSing['firstname'] . ' ' . $userSing['lastname'] . ' ha cantado ¡BINGO! en la modalidad ' . translate($modalitySing['name']) . '.',
-                            ];
-
-                            $modelNotifications->insert($notificationData);
-                        }
-
-                        $bingoAchieved = true;
-
-                        $singUser = $modelSings->find($id);
+                        $modelNotifications->insert($notificationData);
                     }
+
+                    $bingoAchieved = true;
+
+                    $singUser = $modelSings->find($id);
                 }
             }
         }
 
         if ($bingoAchieved) {
+            $currentUserId = (int) session()->get('id');
+            $modelSings->update($singUser['id'], [
+                'status' => 1,
+                'notified' => json_encode([$currentUserId]),
+            ]);
+            $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+
             return $this->response->setJSON([
                 'status' => 'success',
                 'carton' => $singUser['carton'],
@@ -1780,11 +1872,33 @@ class Playings extends Controller {
                 'player' => $userSing['firstname'] . ' ' . $userSing['lastname'],
                 'modality' => translate($modalitySing['name']),
                 'modalityId' => $modalitySing['id'],
-                'image' => $imagePath
+                'image' => $imagePath,
+                'gameCompleted' => $gameCompleted,
+                'winners' => $gameCompleted ? $this->getWinnersForGame((int) $game['id'], true) : [],
+                'isOwnBingo' => true,
+                'winnerUserId' => $currentUserId,
+                'gameHasWinner' => true,
+            ]);
+        }
+
+        $existingWinner = $modelSings
+            ->where('game', $game['id'])
+            ->countAllResults();
+
+        if ($existingWinner > 0) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Otro jugador ya ganó este premio.',
+                'gameHasWinner' => true,
             ]);
         }
 
         return $this->response->setJSON(['status' => 'error', 'message' => translate('you cant sing bingo, the pattern is not complete')]);
+    }
+
+    public function ensureWinnersRegistered(int $gameId): void
+    {
+        bingo_ensure_winners_registered($gameId);
     }
 
     public function awardsGet() {
@@ -1797,16 +1911,23 @@ class Playings extends Controller {
         $modelUsers = new UsersModel();  
         $modelModalities = new ModalitiesModel(); 
         $modelAwards = new AwardsModel();
+        $modelCartons = new CartonsModel();
 
         $game = $modelGames->find(session()->get('game_id'));
         $data['game'] = $game;
 
-        $modelCartons = new CartonsModel();
+        if (! $game) {
+            $data['sings'] = [];
+            return view('playings/awards', $data);
+        }
+
+        $this->ensureWinnersRegistered((int) $game['id']);
+
         $cartonsSold = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
         $accumulated = $cartonsSold * $game['price'];
         $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
 
-        $sings = $modelSings->where('game', $game['id'])->findAll();
+        $sings = bingo_get_official_sings_for_game((int) $game['id'], true);
 
         $singsByModality = [];
         foreach ($sings as $sing) {
@@ -1817,7 +1938,10 @@ class Playings extends Controller {
             $user = $modelUsers->find($sing['user']);
             $modality = $modelModalities->find($sing['modality']);
             $award = $modelAwards->where('game', $game['id'])->where('modality', $sing['modality'])->where('status', 1)->first();
+            $carton = $modelCartons->where('id', $sing['carton'])->first();
 
+            $sing['serial'] = $carton ? $carton['serial'] : translate('serial not found');
+            $sing['user_code'] = $user ? $user['code'] : translate('code not found');
             $sing['user_name'] = $user ? $user['firstname'] . ' ' . $user['lastname'] : translate('user not found');
             $sing['modality_name'] = $modality ? translate($modality['name']) : translate('modality not found');
 
@@ -1834,9 +1958,11 @@ class Playings extends Controller {
                 $sing['award_amount'] = translate('amount not available');
             }
 
-            if ($sing['status'] == 1) {
+            $sing['status_raw'] = (int) ($sing['status'] ?? 0);
+
+            if ($sing['status_raw'] === 1) {
                 $sing['status'] = '<span class="badge bg-warning text-muted">' . translate('EARRING') . '</span>';
-            } elseif ($sing['status'] == 2) {
+            } elseif ($sing['status_raw'] === 2) {
                 $sing['status'] = '<span class="badge bg-success">' . translate('PAID') . '</span>';
             }
         }
@@ -1858,13 +1984,17 @@ class Playings extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
 
-        if (!in_array((int) $game['type'], [3, 4], true)) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'El chat solo está habilitado en transmisiones en vivo.']);
-        }
+        // Admin (group = 1) puede enviar cualquier mensaje; jugadores (group = 0) están restringidos
+        $isAdmin = (int) session()->get('group') === 1;
 
-        $allowedReactions = ['😊', '😢', '🤯', '😂', '😍', '🥺', '🤔', '🙄', '🧐', '😘', '😜', '😅', '😨', '😎', '🤪', '😲', '😒', '😛', '😓', '🥳'];
-        if (!in_array($message, $allowedReactions, true)) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Solo se permiten reacciones predeterminadas.']);
+        if (!$isAdmin && !in_array((int) $game['type'], [3, 4], true)) {
+            $allowedReactions = [
+                '¡Oe, me falta solo una! 😱', '¡Bravo, salió mi número! 🥳', '¡Este premio es mío! 🤑', '¡Suerte para todos! 🍀', '¡Mi Rey, Bingo! 👑',
+                '🥳', '🎉', '😎', '🍀', '🤑', '🌟', '😡', '🔥', '👑', '💵'
+            ];
+            if (!in_array($message, $allowedReactions, true)) {
+                return $this->response->setJSON(['status' => 'error', 'message' => 'Solo se permiten reacciones predeterminadas en este modo.']);
+            }
         }
     
         $data = [
@@ -1895,25 +2025,20 @@ class Playings extends Controller {
             ]);
         }
 
-        if (!in_array((int) $game['type'], [3, 4], true)) {
-            return $this->response->setJSON([
-                'status' => 'empty',
-                'messages' => [],
-            ]);
-        }
-
+        // Remove restriction so all game types can get chat messages
         $afterId = (int) ($this->request->getGet('after_id') ?? 0);
-        $currentUserId = session()->get('id');
+        $currentUserId = (int) session()->get('id');
 
         $builder = $modelMessages
             ->where('game', $game['id'])
+            ->where('status', 1)
             ->where('user !=', $currentUserId);
 
         if ($afterId > 0) {
             $builder->where('id >', $afterId);
         }
 
-        $rows = $builder->orderBy('id', 'ASC')->limit(30)->findAll();
+        $rows = $builder->orderBy('id', 'ASC')->limit(50)->findAll();
 
         if (empty($rows)) {
             return $this->response->setJSON([
@@ -1944,6 +2069,7 @@ class Playings extends Controller {
             'messages' => $messages,
             'message' => $last,
             'image' => $last['image'],
+            'currentUserId' => (int) session()->get('id'),
         ]);
     }
 
@@ -1981,17 +2107,134 @@ class Playings extends Controller {
 
     public function checkSubmit() {
         $modelUsers = new UsersModel();
+        $modelGames = new GamesModel();
+        $modelBoards = new BoardsModel();
 
         $user = $modelUsers->getUserById(session()->get('id'));
 
-        if ($user['autodial'] == 1) {
-            $data['autodial'] = 0;
-        } else {
-            $data['autodial'] = 1;
+        $newAutodial = ($user['autodial'] ?? 0) == 1 ? 0 : 1;
+
+        $modelUsers->update(session()->get('id'), ['autodial' => $newAutodial]);
+
+        $response = [
+            'status'   => 'success',
+            'autodial' => $newAutodial,
+        ];
+
+        if ($newAutodial == 1) {
+            $game = $modelGames->find(session()->get('game_id'));
+
+            if ($game) {
+                $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
+
+                if (! empty($drawnNumbers)) {
+                    $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbers);
+                }
+
+                $response['drawnNumbers'] = $drawnNumbers;
+            }
         }
 
-        $modelUsers->update(session()->get('id'), $data);     
+        return $this->response->setJSON($response);
+    }
 
-        return $this->response->setJSON(['status' => 'success']);
+    private function getOrderedDrawnNumbers(int $gameId): array
+    {
+        return bingo_get_ordered_drawn_numbers($gameId);
+    }
+
+    private function syncSessionUserDrawnMarks(int $gameId): array
+    {
+        $drawnNumbers = $this->getOrderedDrawnNumbers($gameId);
+
+        if (! empty($drawnNumbers)) {
+            $this->syncAutoDialMarks((int) session()->get('id'), $gameId, $drawnNumbers);
+        }
+
+        return $drawnNumbers;
+    }
+
+    private function syncAutoDialMarks(int $userId, int $gameId, array $drawnNumbers): void
+    {
+        bingo_sync_drawn_marks_for_user($userId, $gameId, $drawnNumbers);
+    }
+
+    private function getModalityMatchResult(array $requiredPositions, array $cartonNumbers, array $drawnNumbersArray): array
+    {
+        return bingo_get_modality_match_result($requiredPositions, $cartonNumbers, $drawnNumbersArray);
+    }
+
+    public function winnersGet()
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 0) {
+            return redirect()->to('/signin');
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find(session()->get('game_id'));
+
+        if (! $game) {
+            return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
+        }
+
+        $winners = $this->getWinnersForGame((int) $game['id'], true);
+
+        if (empty($winners)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => translate('there are no winners yet'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'winners' => $winners,
+        ]);
+    }
+
+    private function getWinnersForGame(int $gameId, bool $includePending = false): array
+    {
+        $modelUsers = new UsersModel();
+        $modelModalities = new ModalitiesModel();
+
+        $rows = bingo_get_official_sings_for_game($gameId, $includePending);
+        $winners = [];
+
+        foreach ($rows as $row) {
+            $user = $modelUsers->find($row['user']);
+            $wmodality = $modelModalities->find($row['modality']);
+
+            $winners[] = [
+                'player' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
+                'modality' => translate($wmodality['name'] ?? ''),
+                'modalityId' => (int) ($row['modality'] ?? 0),
+                'image' => ! empty($user['image'])
+                    ? site_url('uploads/users/' . $user['image'])
+                    : site_url('assets/img/avatar.jpg'),
+            ];
+        }
+
+        return $winners;
+    }
+
+    private function resolveMissedBingosForGame(int $gameId, bool $finalize = false): void
+    {
+        bingo_resolve_missed_bingos_for_game($gameId, $finalize);
+    }
+
+    private function getActivePlayingCartons(CartonsModel $modelCartons, int $userId, array $game): array
+    {
+        $cartons = $modelCartons->getCartonsByUser($userId, (int) $game['id']);
+
+        if (empty($cartons)) {
+            return [];
+        }
+
+        // En partida normal (sin transmisión en vivo) se juega con un solo cartón.
+        if (! in_array((int) ($game['type'] ?? 0), [3, 4], true)) {
+            return array_slice($cartons, 0, 1);
+        }
+
+        return $cartons;
     }
 }

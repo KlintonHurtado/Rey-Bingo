@@ -110,18 +110,6 @@
                         <?php endif; ?>
                     <?php else : ?>
                         <div class="play-section p-2">
-                            <?php if (count($games) <= 1): ?>
-                                <style>
-                                    .play-cards {
-                                        grid-template-columns: repeat(1, 1fr) !important;
-                                    }
-
-                                    .play-cards .card {
-                                        width: 70%;
-                                        margin: auto;
-                                    }
-                                </style>
-                            <?php endif; ?>
                             <div class="play-cards">
                                 <?php if (!empty($games)) : ?>
                                     <?php

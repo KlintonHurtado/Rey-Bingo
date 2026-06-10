@@ -55,28 +55,28 @@
                         <div class="card bingo-bg-success text-white m-0">
                             <div class="card-body text-center p-2">
                                 <small><?= translate('deposit'); ?></small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_recharge'], 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span class="wallet-recharge-value"><?= number_format($user['wallet_recharge'], 2); ?></span></div>
                             </div>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="card bingo-bg-primary text-white m-0">
+                        <div class="card text-white m-0" style="background: #DD3A35;">
                             <div class="card-body text-center p-2">
                                 <small><?= translate('retire'); ?></small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_withdraw'], 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span class="wallet-withdraw-value"><?= number_format($user['wallet_withdraw'], 2); ?></span></div>
                             </div>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="card bingo-bg-warning text-white m-0">
+                        <div class="card bingo-bg-bonus m-0">
                             <div class="card-body text-center p-2">
                                 <small>Bono</small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($user['wallet_bonus'], 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span class="wallet-bonus-value"><?= number_format($user['wallet_bonus'], 2); ?></span></div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <p class="text-center small mb-2">Total: <strong><?= systemGet('currency'); ?> <?= number_format($walletTotal, 2); ?></strong></p>
+                <p class="text-center small mb-2">Total: <strong><?= systemGet('currency'); ?> <span class="available-wallet wallet-total-value"><?= number_format($walletTotal, 2); ?></span></strong></p>
             <?php endif; ?>
 
             <!-- TARJETAS DE ESTADÍSTICAS -->
@@ -297,13 +297,14 @@
                                                     'deposit' => '<i class="fa-duotone fa-solid fa-arrow-down-to-line text-success"></i>',
                                                     'retire' => '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
                                                     'transfer' => '<i class="fa-duotone fa-solid fa-arrow-right-arrow-left text-info"></i>',
-                                                    'payment' => '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>'
+                                                    'payment' => '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>',
+                                                    'bonus' => '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>',
                                                 ];
 
                                                 echo $typeIcons[$payment['type']] ?? '<i class="fa-duotone fa-solid fa-circle-question"></i>';
                                             ?>
                                             <br>
-                                            <small class="text-muted"><?= translate($payment['type']); ?></small>
+                                            <small class="text-muted"><?= esc($payment['type_Tra'] ?? translate($payment['type'])); ?></small>
                                         </td>
                                         <td>
                                             <strong><?= esc($payment['reference']); ?></strong>
@@ -346,6 +347,10 @@
                                                         <?php endif; ?>
                                                     <?php endif; ?>
                                                 </div>
+                                            <?php elseif ($payment['type'] == 'bonus'): ?>
+                                                <strong class="text-bonus">
+                                                    +<?= systemGet('currency'); ?> <?= number_format($payment['amount'], 2); ?>
+                                                </strong>
                                             <?php else: ?>
                                                 <!-- Otro tipo de ingreso -->
                                                 <strong class="text-success">
@@ -719,11 +724,12 @@
                     'deposit': '<i class="fa-duotone fa-solid fa-arrow-down-to-line text-success"></i>',
                     'retire': '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
                     'transfer': '<i class="fa-duotone fa-solid fa-arrow-right-arrow-left text-info"></i>',
-                    'payment': '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>'
+                    'payment': '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>',
+                    'bonus': '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>'
                 };
 
                 const typeIcon = typeIcons[payment.type] || '<i class="fa-duotone fa-solid fa-circle-question text-warning"></i>';
-                const amountClass = payment.type === 'retire' ? 'icon-danger' : 'text-success';
+                const amountClass = payment.type === 'retire' ? 'icon-danger' : (payment.type === 'bonus' ? 'text-bonus' : 'text-success');
                 const amountSign = payment.type === 'retire' ? '-' : '+';
 
                 let row = `
@@ -791,6 +797,12 @@
                             `;
                         }
                     <?php endif; ?>
+                } else if (payment.type === 'bonus') {
+                    amountHtml = `
+                        <strong class="text-bonus">
+                            +<?= systemGet('currency'); ?> ${formatNumber(payment.amount)}
+                        </strong>
+                    `;
                 } else {
                     amountHtml = `
                         <strong class="text-success">

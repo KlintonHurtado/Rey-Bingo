@@ -59,14 +59,16 @@
     }
     .board-admin-chat .message-bubble {
         margin-bottom: 6px !important;
-        background: rgba(98, 54, 255, 0.7) !important;
+        background: #ffffff !important;
+        opacity: 0.85 !important;
+        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.15) !important;
     }
     .board-admin-chat .message-bubble span.emoji-message {
         font-size: 1.5rem !important;
     }
     .board-admin-chat .message-bubble span.text-message {
         font-size: 0.8rem !important;
-        color: #fff !important;
+        color: #303030 !important;
     }
     .board-admin-chat .emoji-slider,
     .board-admin-chat .message-bubble-slider {
@@ -310,7 +312,7 @@
 
         <div class="input-group">
             <input type="text" class="form-control form-control-chat message-input" name="message-send-new" id="message-send-new" placeholder="<?= translate('write a message'); ?>..." autofocus autocomplete="off" maxlength="50">
-            <button type="button" id="message-button" class="btn btn-small btn-primary btn-send" onclick="sendMessageText()"><i class="fa-duotone fa-solid fa-paper-plane-top"></i></button>
+            <button type="button" id="message-button" class="btn btn-small btn-primary btn-send"><i class="fa-duotone fa-solid fa-paper-plane-top"></i></button>
         </div>
     </div>
 </div>
@@ -415,9 +417,11 @@
     window.timeBallGet = singBall.split('-')[0];
     window.timeBallLast = singBall.split('-')[1];
     window.totalNumbersGenerated = "<?= $totalNumbersGenerated; ?>";
+    window.drawnNumbers = <?= json_encode($drawnNumbersOrdered ?? []) ?>;
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
     window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
+    window.currentUserId = <?= (int) session()->get('id') ?>;
 
     document.getElementById('activateAlgorithm').addEventListener('change', function() {
         let value = this.checked ? 1 : 0;

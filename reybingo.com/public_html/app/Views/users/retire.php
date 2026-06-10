@@ -120,15 +120,22 @@
                 </div>
 
                 <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="retire-button"<?= ! $kycVerified ? ' disabled' : ''; ?>><?= translate('send'); ?></button>
+                    <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="retire-button"<?= (! $kycVerified || wallet_withdrawable($user) <= 0) ? ' disabled' : ''; ?>><?= translate('send'); ?></button>
                 </div>
             <?= form_close(); ?>
 
             <hr />
 
-            <div class="text-center">
-                <?= translate('available in my wallet'); ?> <?= systemGet('currency'); ?> <span class="available-wallet"><?= $user['wallet']; ?></span>
+            <div class="text-center mb-2">
+                Disponible para retirar (Ganancias): <?= systemGet('currency'); ?> <span class="available-wallet fw-bold"><?= number_format(wallet_withdrawable($user), 2); ?></span>
             </div>
+            <?php if (wallet_withdrawable($user) <= 0): ?>
+            <div class="alert alert-info border-0 py-2 px-3 mt-1" style="border-radius:10px; font-size:0.85rem;">
+                <i class="fa-duotone fa-solid fa-circle-info me-1"></i>
+                Tu saldo de <strong>bono</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_bonus'], 2); ?>) y de <strong>recarga</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_recharge'], 2); ?>) solo sirven para comprar cartones en el juego; no se pueden retirar.
+                El saldo retirable proviene de <strong>ganancias</strong> obtenidas en las partidas.
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -395,7 +402,7 @@
             method: 'GET',
             dataType: 'json',
             success: function(response) {
-                const walletAmount = parseFloat(response.wallet);
+                const walletAmount = parseFloat(response.withdrawable ?? response.wallet?.withdraw ?? response.wallet);
                 const enteredAmount = parseFloat(amountInput.value);
 
                 if (isNaN(enteredAmount) || enteredAmount <= 0) {

@@ -655,8 +655,8 @@
                         hideNotificationIndicator();
                     }
 
-                    if (wallet !== null) {
-                        availableWallet(wallet);
+                    if (wallet !== null && typeof window.availableWallet === 'function') {
+                        window.availableWallet(wallet);
                     }
 
                     if (games !== null) {
@@ -764,11 +764,12 @@
                     'deposit': '<i class="fa-duotone fa-solid fa-arrow-down-to-line text-success"></i>',
                     'retire': '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
                     'transfer': '<i class="fa-duotone fa-solid fa-arrow-right-arrow-left text-info"></i>',
-                    'payment': '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>'
+                    'payment': '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>',
+                    'bonus': '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>'
                 };
 
                 const typeIcon = typeIcons[transaction.type] || '<i class="fa-duotone fa-solid fa-circle-question text-warning"></i>';
-                const amountClass = transaction.type === 'retire' ? 'icon-danger' : 'text-success';
+                const amountClass = transaction.type === 'retire' ? 'icon-danger' : (transaction.type === 'bonus' ? 'text-bonus' : 'text-success');
                 const amountSign = transaction.type === 'retire' ? '-' : '+';
 
                 let row = `
@@ -838,6 +839,12 @@
                             `;
                         }
                     <?php endif; ?>
+                } else if (transaction.type === 'bonus') {
+                    amountHtml = `
+                        <strong class="text-bonus">
+                            +<?= systemGet('currency'); ?> ${formatNumber(transaction.amount)}
+                        </strong>
+                    `;
                 } else {
                     amountHtml = `
                         <strong class="text-success">
@@ -930,16 +937,6 @@
                     hideNotification(notificationEl);
                 }, notificationConfig.displayTime);
             }*/
-
-            function availableWallet(wallet) {
-                const elements = document.querySelectorAll('.available-wallet');
-                elements.forEach(el => {
-                    // Solo actualizar si el valor es diferente al actual
-                    if (el.textContent !== wallet.toString()) {
-                        el.textContent = wallet;
-                    }
-                });
-            }
 
             const gameTimers = new Map();
 
@@ -1055,7 +1052,14 @@
 
             function removeGameCard(gameId) {
                 const card = document.querySelector(`.card-game-${gameId}`);
-                if (card && card.parentNode) card.parentNode.removeChild(card);
+                if (card) {
+                    const slide = card.closest('.play-room-slide');
+                    if (slide && slide.parentNode) {
+                        slide.parentNode.removeChild(slide);
+                    } else if (card.parentNode) {
+                        card.parentNode.removeChild(card);
+                    }
+                }
 
                 const t = gameTimers.get(gameId);
                 if (t) {
@@ -1098,10 +1102,27 @@
                         <div class="card-body p-1">
                             ${buttonsHtml}
                         </div>`;
-                    cardsContainer.appendChild(card);
+                    const slide = document.createElement('div');
+                    slide.className = 'play-room-slide';
+                    slide.appendChild(card);
+                    cardsContainer.appendChild(slide);
                 } else {
                     const accEl = document.getElementById(`card-accumulated-${game.id}`);
                     if (accEl) accEl.textContent = `Premio: <?= systemGet('currency'); ?> ${game.accumulated}`;
+
+                    const btnElPlay = document.getElementById(`card-button-play-${game.id}`);
+                    if (btnElPlay) {
+                        if (game.cartons >= 1) {
+                            btnElPlay.disabled = false;
+                            btnElPlay.removeAttribute('disabled');
+                            btnElPlay.classList.remove('disabled');
+                            btnElPlay.setAttribute('onclick', `gameGet(${game.id});`);
+                        } else {
+                            btnElPlay.disabled = true;
+                            btnElPlay.setAttribute('disabled', 'disabled');
+                            btnElPlay.removeAttribute('onclick');
+                        }
+                    }
                 }
 
                 ensureCountdown(game);
@@ -1258,14 +1279,25 @@
                               removeGameCard(domId);
                             }
                         });
+
+                        if (typeof window.syncPlayCardsLayout === 'function') {
+                            window.syncPlayCardsLayout();
+                        }
                     <?php endif; ?>
                 <?php endif; ?>
             }
 
             function removeGameCard(gameId) {
                 const card = document.querySelector(`.card-game-${gameId}`);
-                if (card && card.parentNode) card.parentNode.removeChild(card);
-                    const t = gameTimers.get(gameId);
+                if (card) {
+                    const slide = card.closest('.play-room-slide');
+                    if (slide && slide.parentNode) {
+                        slide.parentNode.removeChild(slide);
+                    } else if (card.parentNode) {
+                        card.parentNode.removeChild(card);
+                    }
+                }
+                const t = gameTimers.get(gameId);
                 if (t) {
                     clearInterval(t);
                     gameTimers.delete(gameId);
@@ -1892,6 +1924,27 @@
     <script src="<?= asset_url('js/app.js') ?>"></script>
     <script src="<?= asset_url('js/toastify.js') ?>"></script>
     <script src="<?= asset_url('js/sweetalert.js') ?>"></script>
+    <script>
+        (function () {
+            if (typeof Swal === 'undefined' || typeof Swal.fire !== 'function') {
+                return;
+            }
+
+            const nativeFire = Swal.fire.bind(Swal);
+            Swal.fire = function (options) {
+                const defaults = {
+                    scrollbarPadding: false,
+                    heightAuto: false
+                };
+
+                if (typeof options === 'string') {
+                    return nativeFire(options);
+                }
+
+                return nativeFire(Object.assign({}, defaults, options || {}));
+            };
+        })();
+    </script>
 
     <!-- <script src="<?= site_url('assets/js/notifications.js'); ?>"></script>-->
 

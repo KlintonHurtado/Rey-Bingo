@@ -558,18 +558,14 @@ function createMessageBubble(content, profilePicUrl) {
         bubble.appendChild(span);
     }
     
-    // Determinar si es solo emoji o texto
-    const isOnlyEmoji = /[\u1F600-\u1F6FF]/.test(content);
     span.textContent = content;
+    span.style.fontSize = '';
     
-    // Aplicar estilos según el tipo de contenido
-    if (isOnlyEmoji) {
-        span.style.fontSize = '13px';
-        bubble.style.background = 'rgba(255, 255, 255, 0.2)';
-    } else {
-        span.style.fontSize = '24px';
-        bubble.style.background = 'rgba(98, 54, 255, 0.7)';
-    }
+    // Check if the content is only emojis (no alphanumeric or standard punctuation characters)
+    const trimmed = content.trim();
+    const isOnlyEmoji = !/[\p{L}\p{N}¡!¿?.,;]/u.test(trimmed) && trimmed.length <= 8;
+    span.className = isOnlyEmoji ? 'emoji-message' : 'text-message';
+    bubble.style.background = '';
     
     return bubble;
 }
@@ -638,16 +634,19 @@ function sendMessage(content, id) {
     if (!content || !content.trim()) return;
     
     const trimmedContent = content.trim();
-    const messageId = id || Date.now();
     
-    // Mostrar mensaje inmediatamente en la interfaz
-    displayMessage({ message: trimmedContent, id: messageId }, imagePath);
+    // Mostrar mensaje inmediatamente en la interfaz sin ID local
+    // para evitar contaminar el array messagesDisplayed.
+    displayMessage({ message: trimmedContent }, imagePath);
     
     // Enviar al servidor
     $.post(site_url + 'playings/messageSubmit', { message: trimmedContent })
         .done((data) => {
             if (data.status === 'success') {
-                $('#message-send-new').val('');
+                const inputField = $('#message-send-new');
+                if (inputField.length) {
+                    inputField.val('');
+                }
             }
         })
         .fail(() => {

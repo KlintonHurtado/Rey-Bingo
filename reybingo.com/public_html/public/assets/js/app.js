@@ -280,7 +280,11 @@ function referralsGet() {
 }
 
 function awardsGet() {
-    $("#modalAwards").load(site_url + 'boards/awardsGet', function() {
+    const awardsUrl = (typeof window.playerGroup !== 'undefined' && parseInt(window.playerGroup, 10) === 0)
+        ? site_url + 'playings/awardsGet'
+        : site_url + 'boards/awardsGet';
+
+    $("#modalAwards").load(awardsUrl, function() {
         showBsModal('#modalAwards');
         $('#game-finalized').hide();
     });
@@ -317,6 +321,77 @@ function playersGet() {
     });
 }
 
+function formatWalletAmount(value) {
+    const num = parseFloat(value);
+    if (Number.isNaN(num)) {
+        return '0.00';
+    }
+    return num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function updateWalletUI(summary) {
+    if (!summary || typeof summary !== 'object') {
+        return;
+    }
+
+    const total = formatWalletAmount(summary.total);
+    const recharge = formatWalletAmount(summary.recharge);
+    const withdraw = formatWalletAmount(summary.withdraw);
+    const bonus = formatWalletAmount(summary.bonus);
+
+    document.querySelectorAll('.available-wallet, .wallet-total-value').forEach(function(el) {
+        el.textContent = total;
+    });
+    document.querySelectorAll('.wallet-recharge-value').forEach(function(el) {
+        el.textContent = recharge;
+    });
+    document.querySelectorAll('.wallet-withdraw-value').forEach(function(el) {
+        el.textContent = withdraw;
+    });
+    document.querySelectorAll('.wallet-bonus-value').forEach(function(el) {
+        el.textContent = bonus;
+    });
+}
+
+function availableWallet(wallet) {
+    if (wallet && typeof wallet === 'object') {
+        updateWalletUI(wallet);
+        return;
+    }
+
+    const total = formatWalletAmount(wallet);
+    document.querySelectorAll('.available-wallet, .wallet-total-value').forEach(function(el) {
+        el.textContent = total;
+    });
+}
+
+function refreshWalletFromServer() {
+    if (typeof site_url === 'undefined') {
+        return;
+    }
+
+    return fetch(site_url + 'payments/availablewalletGet', {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data && data.wallet) {
+                availableWallet(data.wallet);
+            }
+            return data;
+        })
+        .catch(function(error) {
+            console.error('No se pudo actualizar la billetera:', error);
+        });
+}
+
+window.formatWalletAmount = formatWalletAmount;
+window.updateWalletUI = updateWalletUI;
+window.availableWallet = availableWallet;
+window.refreshWalletFromServer = refreshWalletFromServer;
+
 function paymentsGet() {
     $("#modalPayments").load(site_url + 'payments/paymentsGet', function(response, status) {
         if (status === 'error') {
@@ -324,6 +399,7 @@ function paymentsGet() {
             return;
         }
         showBsModal('#modalPayments');
+        refreshWalletFromServer();
     });
 }
 

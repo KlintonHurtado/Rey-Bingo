@@ -35,13 +35,20 @@ class Dashboard extends Controller {
             }
         }
 
+        // Obtener datos del usuario
+        $modelUsers = new \App\Models\UsersModel();
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
+
         // Pasar los datos del usuario a la vista del Dashboard
         $data = [
             'page' => [
                 'title' => 'Inicio'
             ],
+            'user' => $user,
+            'imagePath' => $imagePath,
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('dashboard/index') // Cargar el contenido de inicio de sesión
+            'contentPage' => view('dashboard/index', ['user' => $user]) // Cargar el contenido de inicio de sesión
         ];
 
         // Manejar solicitud AJAX

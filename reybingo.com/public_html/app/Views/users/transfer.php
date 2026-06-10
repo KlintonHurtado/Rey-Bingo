@@ -38,7 +38,7 @@
             <hr />
 
             <div class="text-center">
-                <?= translate('available in my wallet'); ?> <?= systemGet('currency'); ?> <span class="available-wallet"><?= $user['wallet']; ?></span>
+                Disponible para transferir: <?= systemGet('currency'); ?> <span class="available-wallet"><?= number_format(wallet_withdrawable(wallet_service()->normalizeUser($user)), 2); ?></span>
             </div>
         </div>
     </div>
@@ -328,7 +328,7 @@
             method: 'GET',
             dataType: 'json',
             success: function(response) {
-                const walletAmount = parseFloat(response.wallet);
+                const walletAmount = parseFloat(response.withdrawable ?? response.wallet?.withdraw ?? response.wallet);
                 const enteredAmount = parseFloat(amountInput.value);
 
                 if (isNaN(enteredAmount) || enteredAmount <= 0) {

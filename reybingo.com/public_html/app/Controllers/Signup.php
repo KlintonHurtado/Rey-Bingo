@@ -155,7 +155,8 @@ class Signup extends Controller {
             'email' => $this->request->getPost('email'),
             'password' => password_hash($this->request->getPost('password'), PASSWORD_DEFAULT),
             'referred_code' => $generateReferred_code,
-            'status' => 1
+            'status' => 1,
+            'autodial' => 1,
         ];
     
         $model->insert($data);
@@ -171,6 +172,8 @@ class Signup extends Controller {
 
             $code = 'BGC-A' . str_pad($id, 5, '0', STR_PAD_LEFT);
             $model->update($id, ['code' => $code]);
+
+            wallet_apply_registration_bonus((int) $id);
 
             $modelReferrals = new ReferralsModel();
 
@@ -304,7 +307,8 @@ class Signup extends Controller {
             'password'  => password_hash('123456', PASSWORD_DEFAULT),
             'verified_email' => 1,
             'referred_code' => $generateReferred_code,
-            'status'    => 1
+            'status'    => 1,
+            'autodial'  => 1,
         ];
 
         $profileImageUrl = $googleInfo->picture;
@@ -330,6 +334,8 @@ class Signup extends Controller {
 
         $code = 'BGC-A' . str_pad($id, 5, '0', STR_PAD_LEFT);
         $model->update($id, ['code' => $code]);
+
+        wallet_apply_registration_bonus((int) $id);
 
         $modelReferrals = new ReferralsModel();
 

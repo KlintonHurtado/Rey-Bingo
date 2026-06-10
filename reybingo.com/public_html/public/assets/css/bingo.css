@@ -9,10 +9,40 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
+    min-height: 100vh;
+    width: 100%;
     font-family: 'Fredoka One', cursive;
     font-size: 1rem;
     overflow: hidden;
     color:#ffffff;
+}
+
+#content-page {
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+}
+
+/* Evitar que SweetAlert2 / Bootstrap muevan el layout de fondo */
+html.swal2-shown,
+html.swal2-shown body,
+body.swal2-shown,
+body.swal2-height-auto,
+body.modal-open {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+}
+
+body.swal2-shown,
+body.swal2-height-auto,
+body.modal-open {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    width: 100% !important;
+    overflow: hidden !important;
 }
 
 .logo {
@@ -330,12 +360,21 @@ body {
 
 .play-cards {
     display: grid;
-    grid-gap: 5px;
-    margin: auto;
+    grid-gap: 12px;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 420px;
     mask-image: none;
     -webkit-mask-image: none;
     transition: mask-image 0.3s ease, -webkit-mask-image 0.3s ease;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: 1fr;
+    justify-items: center;
+}
+
+.play-cards .card {
+    width: 100%;
+    max-width: 380px;
+    margin: 0 auto;
 }
 
 .play-cards .list-group {
@@ -398,7 +437,8 @@ body {
     white-space: nowrap;
     overflow: hidden;
     vertical-align: bottom;
-    width: 200px; /* ancho visible del contenedor */
+    width: 100%; /* responsive, se adapta al ancho de la card */
+    max-width: 200px;
 }
 
 .scrolling-text span {
@@ -1216,6 +1256,34 @@ small.text-danger {
     transform: scale(1.3);
 }
 
+.btn-kyc-admin {
+    position: fixed;
+    right: 10px;
+    bottom: 75px;
+    background: linear-gradient(145deg, #11998e, #38ef7d);
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2), 0px 0px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-kyc-admin:active {
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2), 0px 0px 20px rgba(0, 0, 0, 0.3);
+    transform: translateY(4px);
+}
+
+.btn-kyc-admin:hover {
+    color: #ffffff;
+    animation: pulse-icon 0.4s ease-in-out;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2), 0px 0px 20px rgba(0, 0, 0, 0.3);
+    transform: scale(1.05);
+}
+
+.btn-kyc-admin i {
+    transition: transform 0.3s ease-in-out;
+}
+
+.btn-kyc-admin:hover i {
+    transform: scale(1.3);
+}
+
 .btn-board {
     font-size: 1rem;
     background: linear-gradient(145deg, #77DDFF, #55AAFF);
@@ -1994,7 +2062,13 @@ hr {
     max-width: 90%; /* sigue limitando si el texto es muy largo */
     word-wrap: break-word;
     width: fit-content; /* hace que se ajuste al contenido */
+    align-self: flex-start; /* Other users' messages default to left */
 }
+
+.message-bubble.own-message {
+    align-self: flex-end; /* Own messages align to the right */
+}
+
 .message-bubble.fade-out {
     opacity: 0;
     transform: translateX(-20px);
@@ -2288,9 +2362,9 @@ hr {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     background-color: rgba(255, 255, 255, 0.5);
-    padding: 3px;
+    padding: 4px;
     border-radius: 50px;
     margin-top: 0px;
     margin-bottom: 0px;
@@ -2314,14 +2388,7 @@ hr {
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    width: 15px;
-    font-size: 0.6rem;
-}
-
-.live .size-40 {
-    width: 25px;
-    height: 25px;
-    font-size: 0.7rem;
+    width: auto;
 }
 
 .live .bingo-ball::after {
@@ -3004,6 +3071,17 @@ input[type=number]::-webkit-outer-spin-button {
     border: none;
 }
 
+.bingo-bg-bonus {
+    background: linear-gradient(135deg, #f0b429, #c99400);
+    color: #fff;
+    border: none;
+}
+
+.text-bonus,
+.icon-bonus {
+    color: #c99400 !important;
+}
+
 .bingo-bg-danger {
     background: linear-gradient(135deg, #dc3545, #a71d2a);
     color: #fff;
@@ -3559,7 +3637,73 @@ input[type=number]::-webkit-outer-spin-button {
     }
 
     .play-cards {
-        grid-template-columns: repeat(2, 1fr) !important;
+        grid-template-columns: 1fr !important;
+        max-width: 100%;
+        padding: 0 8px;
+    }
+
+    .player-play-view .play-cards--multi {
+        display: flex !important;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 0;
+        width: max-content;
+        min-width: 100%;
+        max-width: none !important;
+        padding: 0 0 8px;
+        grid-template-columns: unset !important;
+    }
+
+    .player-play-view .play-room-slide {
+        flex: 0 0 var(--play-room-slide-step, 100%);
+        width: var(--play-room-slide-step, 100%);
+        min-width: var(--play-room-slide-step, 100%);
+        max-width: var(--play-room-slide-step, 100%);
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        scroll-snap-align: start;
+        scroll-snap-stop: always;
+        box-sizing: border-box;
+    }
+
+    .player-play-view .play-cards--multi .card {
+        flex: 0 0 auto;
+        width: var(--play-room-slide-width, min(300px, 74vw)) !important;
+        min-width: var(--play-room-slide-width, min(300px, 74vw));
+        max-width: var(--play-room-slide-width, min(300px, 74vw)) !important;
+        margin: 0 !important;
+    }
+
+    .player-play-view .play-section--multi {
+        width: 100%;
+        height: auto !important;
+        max-height: none !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        align-items: flex-start !important;
+        padding-bottom: 5rem !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .player-play-view .play-section--multi::-webkit-scrollbar {
+        display: none;
+    }
+
+    .play-cards .card {
+        width: min(100%, 380px) !important;
+        max-width: 380px !important;
+        margin: 0 auto !important;
+    }
+
+    .player-play-view .play-cards--multi .card {
+        width: var(--play-room-slide-width, min(300px, 74vw)) !important;
+        max-width: var(--play-room-slide-width, min(300px, 74vw)) !important;
+        margin: 0 !important;
     }
 
     .card-hour {
@@ -3578,7 +3722,7 @@ input[type=number]::-webkit-outer-spin-button {
     .card-price {
         position: absolute;
         top: 30px;
-        right: -55px
+        right: -55px;
         background: #e91e63;
         color: #fff;
         font-weight: bold;

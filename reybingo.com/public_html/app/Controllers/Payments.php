@@ -19,7 +19,7 @@ use CodeIgniter\Controller;
 
 class Payments extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'wallet']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo']);
         session();
     }
 
@@ -269,6 +269,10 @@ class Payments extends Controller {
         $modelTransfers = new TransfersModel();
 
         $allTransactions = [];
+
+        if (session()->get('group') == 0 && session()->get('id')) {
+            wallet_backfill_registration_bonus_transaction((int) session()->get('id'));
+        }
         
         try {
             // Obtener pagos
@@ -280,6 +284,28 @@ class Payments extends Controller {
 
             foreach ($payments as $payment) {
                 $user = $modelUsers->find($payment['user']);
+
+                if ($payment['type'] === 'registration_bonus') {
+                    $allTransactions[] = [
+                        'id' => $payment['id'],
+                        'type' => 'bonus',
+                        'type_Tra' => translate('registration bonus'),
+                        'user_id' => $payment['user'],
+                        'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                        'user_code' => $user ? $user['code'] : 'N/A',
+                        'bank' => translate('registration bonus info'),
+                        'reference' => 'ABN-' . str_pad($payment['id'], 4, '0', STR_PAD_LEFT),
+                        'amount' => $payment['amount'],
+                        'date' => $payment['created_at'],
+                        'date_formatted' => date('d/m/Y', strtotime($payment['created_at'])),
+                        'status' => $payment['status'],
+                        'status_raw' => $payment['status'],
+                        'status_formatted' => $this->formatStatusPayment($payment['status']),
+                        'created_at' => date('d/m/Y', strtotime($payment['created_at'])),
+                    ];
+                    continue;
+                }
+
                 if ($payment['type'] == 'award') {
                     $typePayment = translate('per award paid');
                 } else if ($payment['type'] == 'referred') {
@@ -1173,7 +1199,8 @@ class Payments extends Controller {
         }
 
         $withdrawable = wallet_withdrawable($user);
-        if ($this->request->getPost('retire-amount') > $withdrawable) {
+        $retireAmount = (float) $this->request->getPost('retire-amount');
+        if ($retireAmount > $withdrawable) {
             $response = [
                 'success' => false,
                 'errors' => [
@@ -1400,15 +1427,14 @@ class Payments extends Controller {
 
         $reference = str_pad($transferId, 4, '0', STR_PAD_LEFT);
 
-        $modelUsers->update($receiver['id'], ['wallet' => $receiver['wallet'] + $transfer['amount']]);
+        wallet_credit_withdrawable($receiver['id'], (float) $transfer['amount']);
+        wallet_deduct_withdrawable($user['id'], (float) $transfer['amount']);
 
         $modelNotifications = new NotificationsModel();
 
-        $user = $modelUsers->find(session()->get('id'));
-
-        $wallet = $user['wallet'] - $transfer['amount'];
-
-        $modelUsers->update($user['id'], ['wallet' => $wallet]);
+        // Obtener balance actualizado para la respuesta
+        $userUpdated = wallet_service()->normalizeUser($modelUsers->find($user['id']));
+        $wallet = wallet_withdrawable($userUpdated);
 
         $notificationData = [
             'user' => $receiver['id'],
@@ -1461,10 +1487,11 @@ class Payments extends Controller {
     public function availablewalletGet() {
         $modelUsers = new UsersModel();
 
-        $user = $modelUsers->find(session()->get('id'));
+        $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
 
         return $this->response->setJSON([
-            'wallet' => $user['wallet']
+            'wallet' => wallet_summary_payload($user),
+            'withdrawable' => wallet_withdrawable($user),
         ]);
     }
 
@@ -1606,7 +1633,17 @@ class Payments extends Controller {
                 $modelNotifications->insert($notificationData);
             } elseif ($action === 'refuse') {
                 if ($deposit['status'] === '2') {
-                    $modelUsers->update($deposit['user'], ['wallet' => $user['wallet'] - $deposit['amount']]);
+                    // Revertir el saldo de recarga usando el servicio correcto (no el campo legacy)
+                    // Verificamos que tenga suficiente recarga para descontar
+                    $userNormalized = wallet_service()->normalizeUser($user);
+                    $deductAmt = min((float) $deposit['amount'], $userNormalized['wallet_recharge']);
+                    if ($deductAmt > 0) {
+                        wallet_service()->syncLegacyWallet($deposit['user'], [
+                            'wallet_bonus'    => $userNormalized['wallet_bonus'],
+                            'wallet_recharge' => round($userNormalized['wallet_recharge'] - $deductAmt, 2),
+                            'wallet_withdraw' => $userNormalized['wallet_withdraw'],
+                        ]);
+                    }
                 }
 
                 $modelDeposits->update($id, ['status' => 0, 'observation' => $observation]);
@@ -1684,7 +1721,8 @@ class Payments extends Controller {
                 $modelNotifications->insert($notificationData);
             } elseif ($action === 'refuse') {
                 if ($retire['status'] === '2') {
-                    $modelUsers->update($retire['user'], ['wallet' => $user['wallet'] + $retire['amount']]);
+                    // Restaurar el saldo de retiro usando el servicio correcto (no el campo legacy)
+                    wallet_credit_withdrawable($retire['user'], (float) $retire['amount']);
                 }
 
                 $modelRetires->update($id, ['status' => 0, 'observation' => $observation]);
@@ -1715,7 +1753,6 @@ class Payments extends Controller {
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelPayments = new PaymentsModel();
-        $modelCartons = new CartonsModel();
         $modelModalities = new ModalitiesModel();
 
         $requestData = $this->request->getJSON();
@@ -1732,81 +1769,92 @@ class Payments extends Controller {
         }
 
         $game = $modelGames->find($sing['game']);
-
         if (!$game) {
             return $this->response->setJSON(['success' => false, 'error' => translate('game not found')]);
         }
 
-        $sings = $modelSings->where('game', $sing['game'])->where('modality', $sing['modality'])->findAll();
-        
-        $singsCount = count($sings);
-        if ($singsCount < 1) {
-            return $this->response->setJSON(['success' => false, 'error' => translate('no valid winners found')]);
-        }
-
-        $award = $modelAwards->where('game', $sing['game'])->where('modality', $sing['modality'])->first();
+        $award = $modelAwards->where('game', $sing['game'])
+            ->where('modality', $sing['modality'])
+            ->where('status', 1)
+            ->first();
 
         if (!$award) {
             return $this->response->setJSON(['success' => false, 'error' => translate('award not found')]);
         }
 
-        $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
-        $accumulated = $cartons * $game['price'];
-        $total_award = $accumulated - ($accumulated * systemGet('rateEarnings'));
-
-        if ($game['award'] == 2) {
-            $awardPerSing = $award['amount'] / $singsCount;
-        } else {
-            $awardPerSing = ($total_award * $award['amount'] / 100) / $singsCount;
-        }
+        $awardPerSing = bingo_calculate_award_per_sing($game, $award, (int) $sing['game'], (int) $sing['modality']);
 
         $user = $modelUsers->find($sing['user']);
         if (!$user) {
             return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
         }
 
+        $singStatus = (int) ($sing['status'] ?? 0);
+
         if ($action === 'pay') {
-            if ($sing['status'] === '1') {
-                wallet_credit_withdrawable($sing['user'], (float) $awardPerSing);
+            if ($singStatus === 2) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error'   => translate('this award has already been paid'),
+                ]);
             }
+
+            if ($singStatus !== 1) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error'   => translate('the winner is not pending payment'),
+                ]);
+            }
+
+            if ($awardPerSing <= 0) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error'   => 'El premio calculado es 0.00. Verifique el tipo de premio del juego y el monto configurado en la modalidad.',
+                ]);
+            }
+
+            wallet_credit_withdrawable((int) $sing['user'], $awardPerSing);
             $modelSings->update($id, ['status' => 2]);
 
             $dataPayment = [
-                'user' => $sing['user'],
-                'type' => 'award',
+                'user'    => $sing['user'],
+                'type'    => 'award',
                 'type_id' => $sing['id'],
-                'amount' => $awardPerSing,
-                'status' => 2
+                'amount'  => $awardPerSing,
+                'status'  => 2,
             ];
 
             $modelPayments->insert($dataPayment);
             $paymentId = $modelPayments->insertID();
 
-            $modelNotifications = new NotificationsModel();
+            $modalitySing = $modelModalities->find($sing['modality']) ?? ['name' => ''];
+            bingo_notify_award_payment(
+                $user,
+                $game,
+                $sing,
+                $modalitySing,
+                $awardPerSing,
+                (int) $paymentId,
+                (int) session()->get('id')
+            );
 
-            $currentUserId = session()->get('id');
-
-            $modalitySing = $modelModalities->find($sing['modality']);
-
-            $notificationData = [
-                'user' => $user['id'],
-                'from' => $currentUserId,
-                'game' => $sing['game'],
-                'modality' => $sing['modality'],
-                'type' => 'payment',
-                'type_id' => $paymentId,
-                'title' => '💵 PAGO ACREDITADO',
-                'message' => 'Se ha acreditado en su billetera la suma de ' . systemGet('currency') . ' ' . number_format($awardPerSing, 2) . ' como pago por el 🏆 premio ganado en la partida "' . $game['description'] . '" modalidad ' . translate($modalitySing['name']) . '.',
-            ];
-
-            $modelNotifications->insert($notificationData);
-        } elseif ($action === 'earring') {
-            if ($sing['status'] === '2') {
-                $modelUsers->update($sing['user'], ['wallet' => $user['wallet'] - $awardPerSing]);
-            }
-            $modelSings->update($id, ['status' => 1]);
+            return $this->response->setJSON([
+                'success' => true,
+                'amount'  => number_format($awardPerSing, 2, '.', ''),
+            ]);
         }
 
-        return $this->response->setJSON(['success' => true]);
+        if ($action === 'earring') {
+            if ($singStatus === 2) {
+                wallet_deduct_withdrawable((int) $sing['user'], $awardPerSing);
+            }
+
+            $modelSings->update($id, ['status' => 1]);
+
+            return $this->response->setJSON(['success' => true]);
+        }
+
+        return $this->response->setJSON(['success' => false, 'error' => translate('invalid action')]);
     }
+
 }

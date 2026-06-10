@@ -5,6 +5,7 @@ const CONFIG = {
     MAX_MESSAGES: 50,        // Aumentado para el nuevo sistema
     MAX_CONFETTI: 100,
     BASE_POLL_INTERVAL: 2000,
+    CHAT_POLL_INTERVAL: 600,
     MAX_POLL_INTERVAL: 10000,
     USER_COUNT_INTERVAL: 2500,
     ACCUMULATED_COUNT_INTERVAL: 2500,
@@ -20,10 +21,15 @@ const CONFIG = {
 // ==========================================
 let numbersgenerated = [];
 let lastNumbers = fiveNumbers || [];
+let centerBallTimer = null;
+let centerBallHideTimer = null;
 let narrationAudio;
 let soundWinner;
 let isGameFinishedShown = false;
 let messagesDisplayed = [];
+let lastChatPollId = 0;
+let pendingOutgoingMessageIds = new Set();
+let chatSendInFlight = false;
 let intervalNextGame;
 let winners = [];
 let winnerIndex = 0;
@@ -174,8 +180,8 @@ class SmartPoller {
         try {
             const result = await callback();
             
-            // Reset interval on success
-            if (result && result.status === 'success') {
+            // Reset interval on success or empty poll
+            if (result && (result.status === 'success' || result.status === 'empty')) {
                 this.currentInterval = this.baseInterval;
                 this.consecutiveErrors = 0;
             }
@@ -497,7 +503,7 @@ const intervalManager = new IntervalManager();
 const domCache = new DOMCache();
 const messagePool = new MessagePool();
 const audioManager = new AudioManager();
-const messagePoller = new SmartPoller(CONFIG.BASE_POLL_INTERVAL);
+const messagePoller = new SmartPoller(CONFIG.CHAT_POLL_INTERVAL);
 const confettiManager = new CanvasConfetti();
 const bingoCardManager = new BingoCardManager();
 
@@ -538,9 +544,16 @@ function throttle(func, limit) {
 // ==========================================
 
 // Función para crear burbujas de mensaje estilo redes sociales
-function createMessageBubble(content, profilePicUrl) {
+function createMessageBubble(content, profilePicUrl, isOwn = false) {
     const bubble = messagePool.get();
     bubble.style.display = "flex";
+    
+    // Configurar alineación
+    if (isOwn) {
+        bubble.classList.add("own-message");
+    } else {
+        bubble.classList.remove("own-message");
+    }
     
     // Reutilizar o crear imagen de perfil
     let img = bubble.querySelector('.profile-pic');
@@ -560,9 +573,11 @@ function createMessageBubble(content, profilePicUrl) {
     
     span.textContent = content;
     span.style.fontSize = '';
-    span.className = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(content)
-        ? 'emoji-message'
-        : 'text-message';
+    
+    // Check if the content is only emojis (no alphanumeric or standard punctuation characters)
+    const trimmed = content.trim();
+    const isOnlyEmoji = !/[\p{L}\p{N}¡!¿?.,;]/u.test(trimmed) && trimmed.length <= 8;
+    span.className = isOnlyEmoji ? 'emoji-message' : 'text-message';
     bubble.style.background = '';
 
     return bubble;
@@ -606,14 +621,35 @@ function scrollToBottom() {
 function getMessageText(messageData) {
     if (!messageData) return '';
     if (typeof messageData === 'string') return messageData;
-    return messageData.message ?? '';
+    return messageData.message || messageData.text || '';
+}
+
+function getCurrentUserId() {
+    if (typeof window.currentUserId !== 'undefined' && window.currentUserId !== null && window.currentUserId !== '') {
+        return parseInt(window.currentUserId, 10) || 0;
+    }
+
+    if (typeof USER_ID !== 'undefined' && USER_ID !== null && USER_ID !== '') {
+        return parseInt(USER_ID, 10) || 0;
+    }
+
+    return 0;
+}
+
+function registerChatMessageId(messageId) {
+    const parsed = parseInt(messageId, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+        return;
+    }
+
+    lastChatPollId = Math.max(lastChatPollId, parsed);
+    if (!messagesDisplayed.includes(parsed)) {
+        messagesDisplayed.push(parsed);
+    }
 }
 
 function getLastChatMessageId() {
-    const numericIds = messagesDisplayed
-        .map((id) => parseInt(id, 10))
-        .filter((id) => !Number.isNaN(id) && id > 0);
-    return numericIds.length ? Math.max(...numericIds) : 0;
+    return lastChatPollId;
 }
 
 function processIncomingChatMessages(data) {
@@ -623,17 +659,42 @@ function processIncomingChatMessages(data) {
         ? data.messages
         : (data.status === 'success' && data.message ? [data.message] : []);
 
+    const currentUserId = getCurrentUserId();
+
     list.forEach((row) => {
         const id = parseInt(row.id, 10);
         const text = getMessageText(row);
         if (!text) return;
-        if (!Number.isNaN(id) && id > 0 && messagesDisplayed.includes(id)) return;
-        displayMessage({ message: text, id: Number.isNaN(id) ? Date.now() : id }, row.image || data.image);
+
+        if (!Number.isNaN(id) && id > 0) {
+            if (messagesDisplayed.includes(id)) {
+                return;
+            }
+
+            if (pendingOutgoingMessageIds.has(id)) {
+                pendingOutgoingMessageIds.delete(id);
+                registerChatMessageId(id);
+                return;
+            }
+
+            registerChatMessageId(id);
+        }
+
+        const rowUserId = parseInt(row.user, 10);
+        const isOwn = !Number.isNaN(rowUserId) && rowUserId > 0
+            ? rowUserId === currentUserId
+            : false;
+
+        displayMessage(
+            { message: text, id: Number.isNaN(id) || id <= 0 ? undefined : id },
+            row.image || data.image,
+            isOwn
+        );
     });
 }
 
 // Función mejorada para mostrar mensajes estilo redes sociales
-function displayMessage(messageData, imageUrl) {
+function displayMessage(messageData, imageUrl, isOwn = false) {
     const display = $id("message-display");
     if (!display) return;
     
@@ -641,7 +702,8 @@ function displayMessage(messageData, imageUrl) {
     
     const bubble = createMessageBubble(
         getMessageText(messageData),
-        imageUrl || imagePath || 'default-avatar.png'
+        imageUrl || imagePath || 'default-avatar.png',
+        isOwn
     );
     
     // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
@@ -649,8 +711,8 @@ function displayMessage(messageData, imageUrl) {
     
     if (messageData.id) {
         const msgId = parseInt(messageData.id, 10);
-        if (!Number.isNaN(msgId) && !messagesDisplayed.includes(msgId)) {
-            messagesDisplayed.push(msgId);
+        if (!Number.isNaN(msgId) && msgId > 0) {
+            registerChatMessageId(msgId);
         }
     }
     
@@ -661,45 +723,44 @@ function displayMessage(messageData, imageUrl) {
 // Función mejorada para enviar mensajes
 function sendMessage(content, id) {
     if (!content || !content.trim()) return;
-    
+    if (chatSendInFlight) return;
+
     const trimmedContent = content.trim();
-    const messageId = id || Date.now();
-    
-    // Mostrar mensaje inmediatamente en la interfaz
-    displayMessage({ message: trimmedContent, id: messageId }, imagePath);
-    
-    // Enviar al servidor
+    chatSendInFlight = true;
+
+    const inputField = $('#message-send-new');
+    if (inputField.length) {
+        inputField.val('');
+    }
+
+    displayMessage({ message: trimmedContent }, imagePath, true);
+
     $.post(site_url + 'playings/messageSubmit', { message: trimmedContent })
         .done((data) => {
             if (data.status === 'success') {
-                $('#message-send-new').val('');
-                if (data.id) {
-                    const tempIndex = messagesDisplayed.indexOf(messageId);
-                    if (tempIndex >= 0) {
-                        messagesDisplayed[tempIndex] = data.id;
-                    } else {
-                        messagesDisplayed.push(data.id);
-                    }
+                const msgId = parseInt(data.id, 10);
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    pendingOutgoingMessageIds.add(msgId);
+                    registerChatMessageId(msgId);
                 }
             }
         })
         .fail(() => {
             console.warn('Error al enviar mensaje');
+        })
+        .always(() => {
+            chatSendInFlight = false;
         });
 }
 
-// Función para enviar emojis (reutiliza la lógica de sendMessage)
 function sendEmoji(content, id) {
     sendMessage(content, id);
 }
 
-// Función para enviar mensaje desde el campo de texto
 function sendMessageText() {
     const inputField = $id('message-send-new');
-    if (inputField && inputField.value.trim()) {
-        sendMessage(inputField.value);
-        inputField.value = '';
-    }
+    if (!inputField || !inputField.value.trim()) return;
+    sendMessage(inputField.value);
 }
 
 // Polling de chat (mensajes de jugadores en la partida activa)
@@ -816,7 +877,8 @@ function showCountdown(data, callback) {
 
 function updateBallsCounter(totalNumbersGenerated) {
     const totalBalls = 75;
-    const drawn = totalNumbersGenerated;
+    const drawn = parseInt(totalNumbersGenerated, 10) || 0;
+    window.totalNumbersGenerated = drawn;
     const remaining = totalBalls - drawn;
     
     const counter = $('#balls-counter');
@@ -834,142 +896,219 @@ function updateBallsCounter(totalNumbersGenerated) {
     }
 }
 
-function handleNewNumber(newNumber, totalNumbersGenerated) {
-    if (numbersgenerated.includes(newNumber)) return;
+function parseBallNumber(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
 
-    updateBallsCounter(totalNumbersGenerated);
-    numbersgenerated.push(newNumber);
-    
-    const el = $id('number-' + newNumber);
-    if (el) el.removeAttribute('onclick');
-
-    const centerBlock = $id('block-number');
-    const centerBall = $id('last-number-center');
-    
-    if (!centerBlock || !centerBall) return;
-
-    centerBlock.style.display = 'flex';
-    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
-    centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
-    centerBall.style.display = 'flex';
-
-    setTimeout(() => {
-        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-        centerBall.style.opacity = '0';
-        
-        setTimeout(() => {
-            centerBall.removeAttribute('style');
-            centerBall.className = '';
-            centerBlock.style.display = 'none';
-            
-            lastNumbers.push(newNumber);
-            if (lastNumbers.length > 5) lastNumbers.shift();
-            
-            const latestUncurrent = lastNumbers.slice(0, -1);
-            const container = $("#last-five-numbers");
-            if (container.length) {
-                container.empty();
-                latestUncurrent.forEach(num => {
-                    container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
-                });
-            }
-        }, 1000);
-        
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-                .removeClass()
-                .addClass(`bingo-ball ${getColumnClass(newNumber)} size-100`);
-        }
-    }, 7000);
-
-    // Reproducir narración si está activada
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
+function clearCenterBallTimers() {
+    if (centerBallTimer) {
+        clearTimeout(centerBallTimer);
+        centerBallTimer = null;
     }
 
-    setTimeout(() => {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.removeClass("move-number");
-        }
-    }, 1000);
-
-    const numberEl = $("#number-" + newNumber);
-    if (numberEl.length) {
-        numberEl.addClass(`bingo-ball ${getColumnClass(newNumber)} size-50`);
+    if (centerBallHideTimer) {
+        clearTimeout(centerBallHideTimer);
+        centerBallHideTimer = null;
     }
 }
 
-function handleNewNumberCRON(newNumber, totalNumbersGenerated) {
-    if (numbersgenerated.includes(newNumber)) return;
+function updateMainBall(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
 
-    updateBallsCounter(totalNumbersGenerated);
-    numbersgenerated.push(newNumber);
-    
-    const el = $id('number-' + newNumber);
-    if (el) el.removeAttribute('onclick');
+    const lastNumberEl = $('#last-number');
+    if (!lastNumberEl.length) {
+        return;
+    }
 
-    /*const centerBlock = $id('block-number');
+    lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
+        .removeClass()
+        .addClass(`bingo-ball ${getColumnClass(parsed)} size-100`);
+}
+
+function renderBallHistory() {
+    const container = $("#last-five-numbers");
+    if (!container.length) {
+        return;
+    }
+
+    const ordered = (window.drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        container.empty();
+        return;
+    }
+
+    const history = ordered.length > 1
+        ? ordered.slice(Math.max(0, ordered.length - 5), -1)
+        : [];
+
+    container.empty();
+    history.slice(-4).forEach(function(num) {
+        container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
+    });
+}
+
+function markBoardGridNumber(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const numberEl = $("#number-" + parsed);
+    if (!numberEl.length) {
+        return;
+    }
+
+    numberEl.addClass(`bingo-ball ${getColumnClass(parsed)} size-50`);
+    numberEl.removeAttr('onclick');
+}
+
+function reconcileBallDisplay(orderedNumbers) {
+    const ordered = (orderedNumbers || window.drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        return;
+    }
+
+    window.drawnNumbers = ordered.slice();
+    lastNumbers = ordered.slice(-5);
+    updateMainBall(ordered[ordered.length - 1]);
+    renderBallHistory();
+    ordered.forEach(markBoardGridNumber);
+}
+
+function showCenterBallAnimation(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const centerBlock = $id('block-number');
     const centerBall = $id('last-number-center');
-    
-    if (!centerBlock || !centerBall) return;
+    if (!centerBlock || !centerBall) {
+        return;
+    }
+
+    clearCenterBallTimers();
 
     centerBlock.style.display = 'flex';
-    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
-    centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
-    centerBall.style.display = 'flex';*/
+    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
+    centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
+    centerBall.style.display = 'flex';
+    centerBall.style.transform = '';
+    centerBall.style.opacity = '1';
 
-    // Marcar número en cartones si está inicializado el gestor
-    if (bingoCardManager.initialized) {
-        bingoCardManager.markNumber(newNumber);
+    const displayMs = parseInt(window.timeBallGet, 10) || 3000;
+
+    centerBallHideTimer = setTimeout(function() {
+        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
+        centerBall.style.opacity = '0';
+
+        centerBallTimer = setTimeout(function() {
+            centerBall.removeAttribute('style');
+            centerBall.className = '';
+            centerBlock.style.display = 'none';
+        }, 500);
+    }, displayMs);
+}
+
+function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
+    if (Array.isArray(drawnNumbers) && drawnNumbers.length) {
+        return drawnNumbers.map(parseBallNumber).filter(Boolean);
     }
 
-    setTimeout(() => {
-        //centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-        //centerBall.style.opacity = '0';
-        
-        setTimeout(() => {
-            //centerBall.removeAttribute('style');
-            //centerBall.className = '';
-            //centerBlock.style.display = 'none';
-            
-            lastNumbers.push(newNumber);
-            if (lastNumbers.length > 5) lastNumbers.shift();
-            
-            const latestUncurrent = lastNumbers.slice(0, -1);
-            const container = $("#last-five-numbers");
-            if (container.length) {
-                container.empty();
-                latestUncurrent.forEach(num => {
-                    container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
-                });
-            }
-        }, 1000);
-        
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-                .removeClass()
-                .addClass(`bingo-ball ${getColumnClass(newNumber)} size-100`);
-        }
-    }, 1000);
-
-    // Reproducir narración si está activada
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
+    const ordered = numbersgenerated.slice();
+    const parsed = parseBallNumber(newNumber);
+    if (parsed && !ordered.includes(parsed)) {
+        ordered.push(parsed);
     }
 
-    setTimeout(() => {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.removeClass("move-number");
-        }
-    }, 1000);
+    return ordered;
+}
 
-    const numberEl = $("#number-" + newNumber);
-    if (numberEl.length) {
-        numberEl.addClass(`bingo-ball ${getColumnClass(newNumber)} size-50`);
+function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options) {
+    const opts = options || {};
+    const ordered = (drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        return;
+    }
+
+    const previous = numbersgenerated.slice();
+    const missing = ordered.filter(function(num) {
+        return !previous.includes(num);
+    });
+
+    numbersgenerated = ordered.slice();
+    window.drawnNumbers = ordered.slice();
+
+    if (totalNumbersGenerated !== undefined) {
+        updateBallsCounter(totalNumbersGenerated);
+    }
+
+    reconcileBallDisplay(ordered);
+
+    if (missing.length && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
+    }
+
+    if (opts.showCenterAnimation && missing.length > 0) {
+        showCenterBallAnimation(missing[missing.length - 1]);
+    }
+
+    if (bingoCardManager.initialized && missing.length > 0) {
+        missing.forEach(function(num) {
+            bingoCardManager.markNumber(num);
+        });
+    }
+}
+
+function handleNewNumber(newNumber, totalNumbersGenerated, drawnNumbers) {
+    const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { showCenterAnimation: true });
+}
+
+function handleNewNumberCRON(newNumber, totalNumbersGenerated, drawnNumbers) {
+    const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { showCenterAnimation: false });
+}
+
+function processNumberGetResponse(data) {
+    if (!data) {
+        return;
+    }
+
+    if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
+        syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
+    } else if (data.number) {
+        handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+    }
+
+    if (data.status === 'pause') {
+        intervalManager.clear('lastNumber');
+        showCountdown(data, startAutomaticLast);
+    } else if (data.status === 'success') {
+        startAutomaticLast();
+    } else if (data.status === 'completed') {
+        intervalManager.clear('lastNumber');
+
+        if (data.player && data.player !== '') {
+            showCountdown(data, function() {
+                setTimeout(showGameFinalized, timeBallGet);
+            });
+        } else {
+            setTimeout(showGameFinalized, timeBallGet);
+        }
     }
 }
 
@@ -1007,7 +1146,7 @@ function generateAutoNumber() {
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
-                handleNewNumber(data.number, data.totalNumbersGenerated);
+                handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
             }
         })
         .fail(() => {
@@ -1032,7 +1171,7 @@ function generateNumber(number) {
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
-                handleNewNumber(data.number, data.totalNumbersGenerated);
+                handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
             }
         })
         .fail(() => {
@@ -1052,51 +1191,16 @@ function stopAutomaticGeneration() {
 function lastNumberGet() {
     $.get(site_url + 'boards/numberGet')
         .done((data) => {
-            console.log('Admin Response:', data); // Para debug
-            
             if (data.status === 'iscron') {
-
-                handleNewNumberCRON(data.number, data.totalNumbersGenerated);
-                
-            } else if (data.status === 'pause') {
-                // Hay un bingo - pausar y mostrar notificación
-                intervalManager.clear('lastNumber');
-                showCountdown(data, startAutomaticLast);
-                
-            } else if (data.status === 'success') {
-                // Funcionamiento normal - continuar generando números
-                // Actualizar interfaz con último número si es necesario
-                if (data.number) {
-                    updateLastNumber(data.number, data.totalNumbersGenerated);
-                }
-                // Continuar el ciclo automático
-                startAutomaticLast();
-                
-            } else if (data.status === 'completed') {
-                // Juego terminado
-                intervalManager.clear('lastNumber');
-                
-                // Si hay información de jugador, mostrar notificación final
-                if (data.player && data.player !== '') {
-                    showCountdown(data, () => {
-                        setTimeout(showGameFinalized, timeBallGet);
-                    });
-                } else {
-                    // No hay notificación final, ir directo a finalizar
-                    setTimeout(showGameFinalized, timeBallGet);
-                }
+                handleNewNumberCRON(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+                return;
             }
+
+            processNumberGetResponse(data);
         })
         .fail((xhr, status, error) => {
             console.warn('Failed to get last number:', error);
         });
-}
-
-// Función auxiliar para actualizar el último número (si no existe, créala)
-function updateLastNumber(number, total) {
-    // Actualizar la interfaz con el último número generado
-    // Implementar según tu interfaz específica
-    console.log('Last number:', number, 'Total:', total);
 }
 
 function startAutomaticLast() {
@@ -1244,11 +1348,10 @@ function RemoveMicrophone() {
 // CONFIGURACIÓN DE EVENTOS MEJORADA
 // ==========================================
 function setupEvents() {
-    // Eventos de mensajes mejorados
-    $('#message-button').on('click', sendMessageText);
-    
-    $('#message-send-new').on('keypress', (e) => {
-        if (e.which === 13) {
+    $('#message-button').off('click.chatSend').on('click.chatSend', sendMessageText);
+
+    $('#message-send-new').off('keydown.chatSend').on('keydown.chatSend', (e) => {
+        if (e.key === 'Enter' || e.which === 13) {
             e.preventDefault();
             sendMessageText();
         }
@@ -1456,14 +1559,33 @@ function setupGameCountdown() {
     const targetDate = new Date(gameDate);
     let winnerIndex = 0;
 
+    function hasGameStarted() {
+        if (numbersgenerated.length > 0) {
+            return true;
+        }
+
+        const drawn = parseInt(window.totalNumbersGenerated, 10);
+        return Number.isFinite(drawn) && drawn > 0;
+    }
+
     function updateCountdown() {
         const now = new Date();
         const timeDiff = targetDate - now;
 
+        if (hasGameStarted()) {
+            clearInterval(intervalNextGame);
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+            }
+            return;
+        }
+
         if (timeDiff <= 0) {
             clearInterval(intervalNextGame);
 
-            if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
+            if (hasGameStarted()) {
                 if (winners.length > 0) {
                     startWinnerSlider();
                 } else {
@@ -1498,11 +1620,11 @@ function setupGameCountdown() {
     }
 
     const now = new Date();
-    if (now < targetDate) {
+    if (now < targetDate && !hasGameStarted()) {
         updateCountdown();
         intervalNextGame = setInterval(updateCountdown, 1000);
     } else {
-        if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
+        if (hasGameStarted()) {
             if (winners.length > 0) {
                 startWinnerSlider();
             } else {
@@ -1608,6 +1730,9 @@ class ResourceManager {
         
         // Resetear arrays de mensajes mostrados
         messagesDisplayed.length = 0;
+        lastChatPollId = 0;
+        pendingOutgoingMessageIds.clear();
+        pollMessagesOptimized();
     }
 }
 
@@ -1805,6 +1930,18 @@ function initializeApp() {
     // Iniciar contador de acumulado
     intervalManager.set('gameAccumulated', updateGameAccumulated, CONFIG.ACCUMULATED_COUNT_INTERVAL);
     updateGameAccumulated();
+
+    if (window.totalNumbersGenerated !== undefined) {
+        updateBallsCounter(window.totalNumbersGenerated);
+    }
+
+    if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length) {
+        numbersgenerated = window.drawnNumbers.map(parseBallNumber).filter(Boolean);
+        reconcileBallDisplay(numbersgenerated);
+    } else if (Array.isArray(window.fiveNumbers) && window.fiveNumbers.length) {
+        numbersgenerated = window.fiveNumbers.map(parseBallNumber).filter(Boolean);
+        reconcileBallDisplay(numbersgenerated);
+    }
     
     // Iniciar último número si es necesario
     if (typeof timeBallLast !== 'undefined') {

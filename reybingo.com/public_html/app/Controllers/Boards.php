@@ -17,7 +17,7 @@ use CodeIgniter\Controller;
 
 class Boards extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo']);
         session();
     }
     
@@ -119,8 +119,9 @@ class Boards extends Controller {
             $modality['amount'] = $award['amount'] ?? 0;
         }
 
-        $selectedNumbers = $model->where('game', $game['id'])->where('status', 1)->findAll();
-        $selectedNumbers = array_column($selectedNumbers, 'number');
+        $drawnNumbersOrdered = $model->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'ASC')->findAll();
+        $drawnNumbersOrdered = array_values(array_map('intval', array_column($drawnNumbersOrdered, 'number')));
+        $selectedNumbers = $drawnNumbersOrdered;
 
         $lastNumber = $model->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();  
 
@@ -134,7 +135,7 @@ class Boards extends Controller {
         $singsModalities = $modelSings->where('game', $game['id'])->findAll();
         $singsModalities = array_column($singsModalities, 'modality');
 
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
+        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
             $wmodality = $modelModalities->find($winner['modality']);
@@ -166,7 +167,7 @@ class Boards extends Controller {
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('boards/board', ['contacts' => $contacts, 'user' => $user, 'status' => $status, 'game' => $game, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'imagePath' => $imagePath])
+            'contentPage' => view('boards/board', ['contacts' => $contacts, 'user' => $user, 'status' => $status, 'game' => $game, 'selectedNumbers' => $selectedNumbers, 'drawnNumbersOrdered' => $drawnNumbersOrdered, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'imagePath' => $imagePath])
         ];
 
         if ($this->request->isAJAX()) {
@@ -240,7 +241,7 @@ class Boards extends Controller {
         $singsModalities = $modelSings->where('game', $game['id'])->findAll();
         $singsModalities = array_column($singsModalities, 'modality');
 
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
+        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
             $wmodality = $modelModalities->find($winner['modality']);
@@ -330,7 +331,7 @@ class Boards extends Controller {
 
         $lastSings = $modelSings->where('game', $game['id'])->where('status', 0)->findAll();
 
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
+        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
             $wmodality = $modelModalities->find($winner['modality']);
@@ -377,12 +378,14 @@ class Boards extends Controller {
         ];
 
         $model->insert($data);
+        $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
 
         return $this->response->setJSON([
             'status' => 'success',
             'totalNumbersGenerated' => $totalNumbersGenerated + 1,
             'message' => translate('new number generated'),
-            'number' => $number
+            'number' => $number,
+            'drawnNumbers' => $drawnNumbers,
         ]);
     }
 
@@ -434,7 +437,7 @@ class Boards extends Controller {
 
         $lastSings = $modelSings->where('game', $game['id'])->where('status', 0)->findAll();
 
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
+        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
             $wmodality = $modelModalities->find($winner['modality']);
@@ -481,12 +484,14 @@ class Boards extends Controller {
         ];
 
         $model->insert($data);
+        $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
 
         return $this->response->setJSON([
             'status' => 'success',
             'totalNumbersGenerated' => $totalNumbersGenerated + 1,
             'message' => translate('new number generated'),
-            'number' => $number
+            'number' => $number,
+            'drawnNumbers' => $drawnNumbers,
         ]);
     }
 
@@ -514,7 +519,8 @@ class Boards extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no numbers drawn yet')]);
         }
 
-        $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+        $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
+        $totalNumbersGenerated = count($drawnNumbers);
 
         // Obtener lista de ganadores para incluir en todas las respuestas
         $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
@@ -527,12 +533,14 @@ class Boards extends Controller {
 
         // Si salieron las 75 bolas, finalizar juego
         if ($totalNumbersGenerated >= 75) {
-            $modelSings->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
+            bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
             $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
 
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
                 'number' => $lastNumber['number'],
@@ -560,12 +568,14 @@ class Boards extends Controller {
             $updatedSingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
             
             if ($updatedSingsCount >= $AwardsCount) {
-                // Finalizar el juego
+                bingo_ensure_winners_registered((int) $game['id']);
+                $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
                 $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
                 
                 return $this->response->setJSON([
                     'status' => 'completed',
                     'totalNumbersGenerated' => $totalNumbersGenerated,
+                    'drawnNumbers' => $drawnNumbers,
                     'winners' => $winners,
                     'message' => translate('the game is over, all the prizes have been awarded'),
                     'number' => $lastNumber['number'],
@@ -580,6 +590,7 @@ class Boards extends Controller {
             return $this->response->setJSON([
                 'status' => 'pause',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
                 'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
                 'number' => $lastNumber['number'],
@@ -592,11 +603,14 @@ class Boards extends Controller {
 
         // Verificar si todos los premios ya fueron ganados (sin bingos pendientes)
         if ($SingsCount >= $AwardsCount) {
+            bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
             $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
             
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
@@ -611,6 +625,7 @@ class Boards extends Controller {
             return $this->response->setJSON([
                 'status' => 'iscron',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
                 'message' => translate('last number'),
                 'number' => $lastNumber['number'],
@@ -625,6 +640,7 @@ class Boards extends Controller {
         return $this->response->setJSON([
             'status' => 'success',
             'totalNumbersGenerated' => $totalNumbersGenerated,
+            'drawnNumbers' => $drawnNumbers,
             'winners' => $winners,
             'message' => translate('last number'),
             'number' => $lastNumber['number'],
@@ -830,11 +846,20 @@ class Boards extends Controller {
         $game = $modelGames->find(session()->get('game_id'));
         $data['game'] = $game;
 
-        $room = $modelGameRooms->where('id', $game['id'])->first();
+        if ($game) {
+            bingo_ensure_winners_registered((int) $game['id']);
+        }
+
+        if (! $game) {
+            $data['sings'] = [];
+            return view('playings/awards', $data);
+        }
+
+        $room = $modelGameRooms->where('id', $game['room'])->first();
 
         $data['room'] = $room ? $room['name'] : translate('room not found');
 
-        $sings = $modelSings->where('game', $game['id'])->findAll();
+        $sings = bingo_get_official_sings_for_game((int) $game['id'], true);
 
         $singsByModality = [];
         foreach ($sings as $sing) {
@@ -848,9 +873,7 @@ class Boards extends Controller {
 
             $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
 
-            $total_sing = $modelSings->where('game', $game['id'])->where('modality', $sing['modality'])->countAllResults();
-
-            $room = $modelGameRooms->where('id', $game['id'])->first();
+            $total_sing = max(1, count($singsByModality[$sing['modality']] ?? []));
 
             $carton = $modelCartons->where('id', $sing['carton'])->first();
 
@@ -882,11 +905,13 @@ class Boards extends Controller {
                 }
             }
 
-            if ($sing['status'] == 0) {
+            $sing['status_raw'] = (int) ($sing['status'] ?? 0);
+
+            if ($sing['status_raw'] === 0) {
                 $sing['status'] = '<span class="status-badge"><span class="badge bg-danger"><i class="fa-duotone fa-solid fa-xmark"></i> ' . translate('rejected') . '</span></span>';
-            } elseif ($sing['status'] == 1) {
+            } elseif ($sing['status_raw'] === 1) {
                 $sing['status'] = '<span class="status-badge"><span class="badge bg-warning"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span></span>';
-            } elseif ($sing['status'] == 2) {
+            } elseif ($sing['status_raw'] === 2) {
                 $sing['status'] = '<span class="status-badge"><span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('paid') . '</span></span>';
             }
         }
@@ -976,9 +1001,11 @@ class Boards extends Controller {
                 }
             }
 
-            if ($sing['status'] == 1) {
+            $sing['status_raw'] = (int) ($sing['status'] ?? 0);
+
+            if ($sing['status_raw'] === 1) {
                 $sing['status'] = '<span class="status-badge"><span class="badge bg-warning"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span></span>';
-            } elseif ($sing['status'] == 2) {
+            } elseif ($sing['status_raw'] === 2) {
                 $sing['status'] = '<span class="status-badge"><span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('paid') . '</span></span>';
             }
         }
@@ -1137,10 +1164,11 @@ class Boards extends Controller {
                     $sing['award_amount'] = translate('amount not available');
                 }
 
-                // Formatear estado
-                if ($sing['status'] == 1) {
+                $sing['status_raw'] = (int) ($sing['status'] ?? 0);
+
+                if ($sing['status_raw'] === 1) {
                     $sing['status'] = '<span class="status-badge"><span class="badge bg-warning"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span></span>';
-                } elseif ($sing['status'] == 2) {
+                } elseif ($sing['status_raw'] === 2) {
                     $sing['status'] = '<span class="status-badge"><span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('paid') . '</span></span>';
                 } else {
                     $sing['status'] = '<span class="status-badge"><span class="badge bg-secondary"><i class="fa-duotone fa-solid fa-question"></i> ' . translate('unknown') . '</span></span>';
@@ -1185,5 +1213,24 @@ class Boards extends Controller {
 
         // Si no es AJAX, devolver la vista completa
         return view('playings/winners_table', $data);
+    }
+
+    private function getOrderedDrawnNumbers(int $gameId): array
+    {
+        return bingo_get_ordered_drawn_numbers($gameId);
+    }
+
+    private function buildWinnersList(int $gameId, SingsModel $modelSings, UsersModel $modelUsers, ModalitiesModel $modelModalities): array
+    {
+        $winners = bingo_get_official_sings_for_game($gameId, true);
+
+        foreach ($winners as &$winner) {
+            $user = $modelUsers->find($winner['user']);
+            $wmodality = $modelModalities->find($winner['modality']);
+            $winner['player'] = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+            $winner['modality'] = translate($wmodality['name'] ?? '');
+        }
+
+        return $winners;
     }
 }

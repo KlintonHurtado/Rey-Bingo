@@ -1276,8 +1276,8 @@
                         hideNotificationIndicator();
                     }
 
-                    if (wallet !== null) {
-                        availableWallet(wallet);
+                    if (wallet !== null && typeof window.availableWallet === 'function') {
+                        window.availableWallet(wallet);
                     }
 
                     if (games !== null) {
@@ -1550,16 +1550,6 @@
                 }, notificationConfig.displayTime);
             }*/
 
-            function availableWallet(wallet) {
-                const elements = document.querySelectorAll('.available-wallet');
-                elements.forEach(el => {
-                    // Solo actualizar si el valor es diferente al actual
-                    if (el.textContent !== wallet.toString()) {
-                        el.textContent = wallet;
-                    }
-                });
-            }
-
             const gameTimers = new Map();
 
             function parseLocalDateTime(date, time) {
@@ -1674,7 +1664,14 @@
 
             function removeGameCard(gameId) {
                 const card = document.querySelector(`.card-game-${gameId}`);
-                if (card && card.parentNode) card.parentNode.removeChild(card);
+                if (card) {
+                    const slide = card.closest('.play-room-slide');
+                    if (slide && slide.parentNode) {
+                        slide.parentNode.removeChild(slide);
+                    } else if (card.parentNode) {
+                        card.parentNode.removeChild(card);
+                    }
+                }
 
                 const t = gameTimers.get(gameId);
                 if (t) {
@@ -1717,10 +1714,27 @@
                         <div class="card-body p-1">
                             ${buttonsHtml}
                         </div>`;
-                    cardsContainer.appendChild(card);
+                    const slide = document.createElement('div');
+                    slide.className = 'play-room-slide';
+                    slide.appendChild(card);
+                    cardsContainer.appendChild(slide);
                 } else {
                     const accEl = document.getElementById(`card-accumulated-${game.id}`);
                     if (accEl) accEl.textContent = `Premio: <?= systemGet('currency'); ?> ${game.accumulated}`;
+
+                    const btnElPlay = document.getElementById(`card-button-play-${game.id}`);
+                    if (btnElPlay) {
+                        if (game.cartons >= 1) {
+                            btnElPlay.disabled = false;
+                            btnElPlay.removeAttribute('disabled');
+                            btnElPlay.classList.remove('disabled');
+                            btnElPlay.setAttribute('onclick', `gameGet(${game.id});`);
+                        } else {
+                            btnElPlay.disabled = true;
+                            btnElPlay.setAttribute('disabled', 'disabled');
+                            btnElPlay.removeAttribute('onclick');
+                        }
+                    }
                 }
 
                 ensureCountdown(game);
@@ -1877,14 +1891,25 @@
                               removeGameCard(domId);
                             }
                         });
+
+                        if (typeof window.syncPlayCardsLayout === 'function') {
+                            window.syncPlayCardsLayout();
+                        }
                     <?php endif; ?>
                 <?php endif; ?>
             }
 
             function removeGameCard(gameId) {
                 const card = document.querySelector(`.card-game-${gameId}`);
-                if (card && card.parentNode) card.parentNode.removeChild(card);
-                    const t = gameTimers.get(gameId);
+                if (card) {
+                    const slide = card.closest('.play-room-slide');
+                    if (slide && slide.parentNode) {
+                        slide.parentNode.removeChild(slide);
+                    } else if (card.parentNode) {
+                        card.parentNode.removeChild(card);
+                    }
+                }
+                const t = gameTimers.get(gameId);
                 if (t) {
                     clearInterval(t);
                     gameTimers.delete(gameId);

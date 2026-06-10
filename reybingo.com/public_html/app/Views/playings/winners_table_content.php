@@ -36,7 +36,9 @@
                         <?php if (session()->get('group') == 1) : ?>
                         <td class="text-center" id="award-<?= $sing['id'] ?>"><?= $sing['status'] ?></td>
                         <td class="text-center">
+                            <?php if (($sing['status_raw'] ?? 0) == 1) : ?>
                             <a class="btn btn-primary btn-modal text-white" onclick="payawardSubmit('<?= $sing['id'] ?>', '<?= $sing['user_name'] ?>', '<?= $sing['award_amount'] ?>', 'pay');"><i class="fa-duotone fa-hand-holding-dollar"></i></a>
+                            <?php endif; ?>
                         </td>
                         <?php endif; ?>
                     </tr>

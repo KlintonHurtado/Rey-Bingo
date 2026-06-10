@@ -352,6 +352,10 @@ class Home extends Controller {
                 'label' => translate('bgc rate'),  
                 'rules' => 'required|decimal'
             ],
+            'registrationBonus' => [
+                'label' => 'Abono al registrarse',
+                'rules' => 'required|decimal|greater_than_equal_to[0]'
+            ],
             
             // Configuración de Depósitos y Retiros
             'activateMinimumDeposit' => [
@@ -471,6 +475,7 @@ class Home extends Controller {
             'rateReferrals' => $this->request->getPost('rateReferrals') / 100,
             'valueBGC' => $this->request->getPost('valueBGC'),
             'rateBGC' => $this->request->getPost('rateBGC') / 100,
+            'registrationBonus' => $this->request->getPost('registrationBonus'),
             'activateMinimumDeposit' => $this->request->getPost('activateMinimumDeposit'),
             'minimumDeposit' => $this->request->getPost('minimumDeposit'),
             'maximumDeposit' => $this->request->getPost('maximumDeposit'),

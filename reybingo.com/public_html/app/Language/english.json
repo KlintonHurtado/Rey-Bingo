@@ -638,6 +638,9 @@
     "results": "Results",
     "reject": "Reject",
     "no transactions found": "No transactions found",
+    "registration bonus": "Welcome bonus",
+    "registration bonus info": "Bonus granted upon registration",
+    "bonus": "Bonus",
     "completed": "Completed",
     "total records": "Total records",
     "are you sure you want to change the status": "Are you sure you want to change the status",
@@ -742,5 +745,6 @@
     "total gaming winnings": "Total gaming winnings",
     "paste": "Paste",
     "voucher": "Voucher",
-    "error processing payment": "Error processing payment"
+    "error processing payment": "Error processing payment",
+    "there are no winners yet": "There are no winners yet"
 }

@@ -44,11 +44,12 @@ class Kyc extends Controller
             return redirect()->to('/signin');
         }
 
-        $front = $this->request->getFile('kyc_front');
-        $back  = $this->request->getFile('kyc_back');
+        $front  = $this->request->getFile('kyc_front');
+        $back   = $this->request->getFile('kyc_back');
+        $selfie = $this->request->getFile('kyc_selfie');
 
-        if (! $front || ! $front->isValid() || ! $back || ! $back->isValid()) {
-            return redirect()->to('/kyc')->with('error', 'Debe subir ambas imágenes (frente y reverso).');
+        if (! $front || ! $front->isValid() || ! $back || ! $back->isValid() || ! $selfie || ! $selfie->isValid()) {
+            return redirect()->to('/kyc')->with('error', 'Debe subir las 3 imágenes: frente, reverso y selfie con el documento en la barbilla.');
         }
 
         $uploadPath = FCPATH . 'uploads/kyc';
@@ -57,20 +58,24 @@ class Kyc extends Controller
         }
 
         $userId = session()->get('id');
-        $frontName = 'front_' . $userId . '_' . time() . '.' . $front->getExtension();
-        $backName  = 'back_' . $userId . '_' . time() . '.' . $back->getExtension();
+        $timestamp = time();
+        $frontName  = 'front_' . $userId . '_' . $timestamp . '.' . $front->getExtension();
+        $backName   = 'back_' . $userId . '_' . $timestamp . '.' . $back->getExtension();
+        $selfieName = 'selfie_' . $userId . '_' . $timestamp . '.' . $selfie->getExtension();
 
         $front->move($uploadPath, $frontName);
         $back->move($uploadPath, $backName);
+        $selfie->move($uploadPath, $selfieName);
 
         $modelUsers = new UsersModel();
         $modelUsers->update($userId, [
             'kyc_front'        => $frontName,
             'kyc_back'         => $backName,
+            'kyc_selfie'       => $selfieName,
             'kyc_status'       => 'pending',
             'kyc_observations' => null,
         ]);
 
-        return redirect()->to('/kyc')->with('success', 'Documentos enviados. Pendiente de revisión.');
+        return redirect()->to('/kyc')->with('success', 'Documentos enviados (frente, reverso y selfie). Pendiente de revisión.');
     }
 }

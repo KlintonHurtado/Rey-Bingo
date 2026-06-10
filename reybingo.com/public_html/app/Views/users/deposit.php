@@ -17,6 +17,7 @@
                 <div class="row" id="deposit-wallet">
                     
                     <h6 class="help-block text-center"><?= translate('send your payment information, amount, reference and phone number'); ?></h6>
+                    <p class="text-muted small text-center mb-2">No necesitas verificación KYC para depositar. La verificación de identidad solo se solicita al retirar ganancias.</p>
 
                     <div class="row" id="step-deposit-1">
                         <?php if (session()->get('group') == 1) : ?>

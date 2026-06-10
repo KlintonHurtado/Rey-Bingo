@@ -78,6 +78,8 @@ $routes->get('play', 'Playings::play');
 $routes->get('playing', 'Playings::playing');
 $routes->post('playings/playSubmit', 'Playings::playSubmit');
 $routes->get('playings/numberGet', 'Playings::numberGet');
+$routes->get('playings/winnersGet', 'Playings::winnersGet');
+$routes->get('playings/awardsGet', 'Playings::awardsGet');
 $routes->post('playings/dialNumber', 'Playings::dialNumber');
 $routes->post('playings/singBingo', 'Playings::singBingo');
 $routes->get('playings/getInitialGameState', 'Playings::getInitialGameState');

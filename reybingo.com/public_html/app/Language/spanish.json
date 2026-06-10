@@ -638,6 +638,9 @@
     "results": "Resultados",
     "reject": "Rechazar",
     "no transactions found": "No se encontraron transacciones",
+    "registration bonus": "Abono de bienvenida",
+    "registration bonus info": "Abono otorgado al registrarse",
+    "bonus": "Abono",
     "completed": "Completado",
     "total records": "Total de registros",
     "are you sure you want to change the status": "¿Estás seguro de que deseas cambiar el estado?",
@@ -741,5 +744,6 @@
     "voucher of payment": "Comprobante de pago",
     "paste": "Pegar",
     "balance": "Saldo",
-    "error processing payment": "Error processing payment"
+    "error processing payment": "Error processing payment",
+    "there are no winners yet": "There are no winners yet"
 }
