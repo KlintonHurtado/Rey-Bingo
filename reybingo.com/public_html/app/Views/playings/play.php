@@ -41,6 +41,25 @@
     .next-game:empty {
         display: none;
     }
+    .play-countdown-panel {
+        display: inline-block;
+        max-width: 100%;
+        line-height: 1.35;
+        letter-spacing: 0.02em;
+    }
+    .card-time-display {
+        display: inline-block;
+        margin-top: 2px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(9, 8, 39, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.68rem;
+        line-height: 1.2;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
     .favorite-game-btn {
         border: 0;
         background: rgba(255, 255, 255, 0.24);
@@ -292,7 +311,7 @@
                             <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo w-50" alt="img">
                         <?php endif; ?>
                         <h5 class="mb-0 p-2 hidden"><?= translate('hello'); ?>, <?= session()->get('firstname'); ?>!</h5>
-                        <h6 class="text-white text-center next-game mt-2 text-uppercase"></h6>
+                        <h6 class="text-white text-center next-game play-countdown-panel mt-2 text-uppercase"></h6>
                         <?php
                             $user = wallet_service()->normalizeUser($user);
                             $walletTotal = wallet_total($user);
@@ -383,11 +402,16 @@
                             $playCardsLayoutClass = $activeGameCount > 1 ? 'play-cards--multi' : 'play-cards--single';
                             $playSectionLayoutClass = $activeGameCount > 1 ? 'play-section--multi' : 'play-section--single';
                         ?>
+                        <?php if (!empty($games)) : ?>
+                            <div class="mb-2 px-1 w-100">
+                                <input type="search" id="play-games-search" class="form-control form-control-lg form-bingo" placeholder="Buscar sala o partida..." autocomplete="off">
+                            </div>
+                            <div class="mb-2 px-1 w-100">
+                                <input type="number" id="play-min-start-filter" class="form-control form-control-lg form-bingo" min="0" step="0.01" placeholder="Mínimo de inicio (precio cartón)">
+                            </div>
+                        <?php endif; ?>
                         <div class="play-rooms-carousel" id="play-rooms-carousel">
                             <div class="play-section play-section--rooms <?= esc($playSectionLayoutClass) ?> p-2">
-                            <?php if (!empty($games)) : ?>
-                                <!-- Buscadores removidos según solicitud -->
-                            <?php endif; ?>
                             <div class="play-cards <?= esc($playCardsLayoutClass) ?>">
                                 <?php if (!empty($games)) : ?>
                                     <?php
@@ -398,10 +422,10 @@
                                     ?>
                                     <?php foreach ($games as $index => $game): ?>
                                         <div class="play-room-slide">
-                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>">
+                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                             <div class="text-end p-1 pb-0">
-                                                <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">Γÿå</button>
+                                                <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">&#9734;</button>
                                             </div>
                                             <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
                                             <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
@@ -416,7 +440,7 @@
                                             <ul class="list-group list-group-flush">
                                                 <li class="p-0" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
                                                 <li class="p-0" id="card-accumulated-<?= $game['id'] ?>"></li>
-                                                <li class="p-0" style="font-size: 0.7rem;" id="card-time-<?= $game['id'] ?>"></li>
+                                                <li class="p-0" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
                                             </ul>
                                             <div class="card-body p-1">
                                                 <?php if ($game['cartons'] >= 1) : ?>
@@ -789,12 +813,81 @@
             const gameId = parseInt(btn.getAttribute('data-favorite-game') || '0', 10);
             const isFavorite = favorites.includes(gameId);
             btn.classList.toggle('is-favorite', isFavorite);
-            btn.textContent = isFavorite ? 'Γÿà' : 'Γÿå';
+            btn.textContent = isFavorite ? '\u2605' : '\u2606';
         });
 
         if (typeof window.syncPlayCardsLayout === 'function') {
             window.syncPlayCardsLayout();
         }
+    }
+
+    function formatPlayCountdownText(targetDate) {
+        const timeDiff = targetDate - Date.now();
+        if (timeDiff <= 0) {
+            return '¡EL JUEGO YA INICIÓ!';
+        }
+
+        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+        if (days > 0) {
+            return `INICIA EN: ${days} DÍA${days > 1 ? 'S' : ''} ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        }
+        if (hours > 0) {
+            return `INICIA EN: ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        }
+        if (minutes === 0) {
+            const sec = Math.max(0, seconds);
+            return `INICIA EN: ${sec} SEGUNDO${sec === 1 ? '' : 'S'}`;
+        }
+        return `INICIA EN: ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MINUTO${minutes === 1 ? '' : 'S'}`;
+    }
+
+    function initPlayRoomCountdowns() {
+        const cards = document.querySelectorAll('.play-cards .card[data-game-start]');
+        cards.forEach(function(card) {
+            const gameId = card.getAttribute('data-game-id');
+            const startValue = card.getAttribute('data-game-start');
+            const timeEl = document.querySelector(`#card-time-${gameId} .card-time-display`);
+            const btnPlay = document.getElementById(`card-button-play-${gameId}`);
+            const btnBuy = document.getElementById(`card-button-buy-${gameId}`);
+
+            if (!gameId || !startValue || !timeEl) {
+                return;
+            }
+
+            const targetDate = new Date(startValue.replace(' ', 'T'));
+            if (Number.isNaN(targetDate.getTime())) {
+                return;
+            }
+
+            const tick = function() {
+                const text = formatPlayCountdownText(targetDate);
+                timeEl.textContent = text;
+                const started = text === '¡EL JUEGO YA INICIÓ!';
+
+                if (btnBuy) {
+                    btnBuy.disabled = started;
+                    btnBuy.classList.toggle('disabled', started);
+                    btnBuy.textContent = started ? 'Jugando...' : '<?= translate('buy cartons'); ?>';
+                }
+
+                if (btnPlay && started) {
+                    const hasCartons = card.getAttribute('data-has-cartons') === '1';
+                    btnPlay.disabled = !hasCartons;
+                    btnPlay.classList.toggle('disabled', !hasCartons);
+                    btnPlay.textContent = hasCartons ? '<?= translate('come in to play'); ?>' : 'No disponible';
+                }
+            };
+
+            tick();
+            if (!window._playRoomCountdownTimers) {
+                window._playRoomCountdownTimers = [];
+            }
+            window._playRoomCountdownTimers.push(setInterval(tick, 1000));
+        });
     }
 
     document.getElementById('play-games-search')?.addEventListener('input', applyGameFiltersAndFavorites);
@@ -819,6 +912,10 @@
             window.syncPlayCardsLayout();
         } else if (typeof window.initPlayRoomsScrollHints === 'function') {
             window.initPlayRoomsScrollHints();
+        }
+
+        if (typeof initPlayRoomCountdowns === 'function') {
+            initPlayRoomCountdowns();
         }
 
         if (typeof window.refreshWalletFromServer === 'function') {

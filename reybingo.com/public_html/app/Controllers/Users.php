@@ -298,7 +298,11 @@ class Users extends Controller {
             'sounds' => $this->request->getPost('sounds') ?? 1,
             'narration' => $this->request->getPost('narration') ?? 1,
             'autodial' => $this->request->getPost('autodial') ?? 1,
-            'roulette' => $this->request->getPost('roulette') ?? 1
+            'roulette' => $this->request->getPost('roulette') ?? 1,
+            'address_line' => $this->request->getPost('address_line') ?? '',
+            'city' => $this->request->getPost('city') ?? '',
+            'state' => $this->request->getPost('state') ?? '',
+            'is_reseller' => (int) ($this->request->getPost('is_reseller') ?? 0),
         ];
         
         if ($action === 'add') {
@@ -660,7 +664,7 @@ class Users extends Controller {
         $headers = [
             'ID', 'Codigo', 'Nombres', 'Apellidos', 'Usuario',
             'Documento', 'Telefono', 'Email', 'Direccion', 'Ciudad', 'Estado',
-            'Saldo total', 'Saldo recarga', 'Saldo retiro', 'Saldo bono', 'KYC'
+            'Punto de venta', 'Saldo total', 'Saldo recarga', 'Saldo retiro', 'Saldo bono', 'KYC'
         ];
 
         $fh = fopen('php://temp', 'w+');
@@ -680,6 +684,7 @@ class Users extends Controller {
                 $user['address_line'] ?? '',
                 $user['city'] ?? '',
                 $user['state'] ?? '',
+                ! empty($user['is_reseller']) ? 'Si' : 'No',
                 wallet_total($user),
                 $user['wallet_recharge'] ?? 0,
                 $user['wallet_withdraw'] ?? 0,

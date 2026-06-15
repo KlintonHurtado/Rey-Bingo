@@ -56,6 +56,21 @@
                         <small id="document-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-12 mb-2">
+                        <label for="address_line" class="form-label"><?= translate('address'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="address_line" placeholder="<?= translate('address'); ?>" value="<?= $isUpdate ? esc($userData['address_line'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="city" class="form-label"><?= translate('city'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="city" id="city" placeholder="<?= translate('city'); ?>" value="<?= $isUpdate ? esc($userData['city'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="state" class="form-label"><?= translate('state'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="state" id="state" placeholder="<?= translate('state'); ?>" value="<?= $isUpdate ? esc($userData['state'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
                     <!-- Información de Cuenta -->
                     <div class="col-md-12 mb-3 mt-3">
                         <h6 class="text-white"><?= translate('account information'); ?></h6>
@@ -88,6 +103,14 @@
                         <select class="form-control form-control-lg form-bingo" name="status" id="status">
                             <option value="1" <?= $isUpdate && $userData['status'] == 1 ? 'selected' : ''; ?>><?= translate('active'); ?></option>
                             <option value="0" <?= $isUpdate && $userData['status'] == 0 ? 'selected' : ''; ?>><?= translate('banned'); ?></option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="is_reseller" class="form-label">Punto de venta / afiliado</label>
+                        <select class="form-control form-control-lg form-bingo" name="is_reseller" id="is_reseller">
+                            <option value="0" <?= $isUpdate && (int) ($userData['is_reseller'] ?? 0) === 0 ? 'selected' : ''; ?>><?= translate('no'); ?></option>
+                            <option value="1" <?= $isUpdate && (int) ($userData['is_reseller'] ?? 0) === 1 ? 'selected' : ''; ?>><?= translate('yes'); ?></option>
                         </select>
                     </div>
 

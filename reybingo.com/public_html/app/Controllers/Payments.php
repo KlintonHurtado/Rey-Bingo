@@ -204,7 +204,7 @@ class Payments extends Controller {
         
         // Calcular estadísticas
         $data['statistics'] = $this->calculateStatistics($filteredTransactions);
-        $data['adminKpis'] = $this->getAdminKpis();
+        $data['adminKpis'] = $this->getAdminKpis($filters);
         
         // Paginación
         $perPage = $filters['per_page'] ?? 15;
@@ -236,7 +236,7 @@ class Payments extends Controller {
                 'payments' => $payments,
                 'statistics' => $statistics,
                 'pagination' => $pagination,
-                'adminKpis' => $this->getAdminKpis(),
+                'adminKpis' => $this->getAdminKpis($filters),
                 'total' => count($filteredTransactions)
             ]);
         } catch (\Exception $e) {
@@ -554,7 +554,7 @@ class Payments extends Controller {
         ];
     }
 
-    private function getAdminKpis(): array
+    private function getAdminKpis(array $filters = []): array
     {
         if (session()->get('group') != 1) {
             return [
@@ -566,13 +566,95 @@ class Payments extends Controller {
 
         $modelDeposits = new DepositsModel();
         $modelPayments = new PaymentsModel();
-        $modelAwards = new AwardsModel();
+
+        $manualBuilder = $modelDeposits->builder();
+        $manualBuilder->selectSum('amount', 'total')
+            ->where('status', 2);
+        $this->applyKpiFilters($manualBuilder, $filters, 'date', 'user');
+        $manualCredits = (float) ($manualBuilder->get()->getRow()->total ?? 0);
+
+        $spendBuilder = $modelPayments->builder();
+        $spendBuilder->selectSum('amount', 'total')
+            ->where('status', 2)
+            ->whereNotIn('type', ['award', 'referred', 'registration_bonus']);
+        $this->applyKpiFilters($spendBuilder, $filters, 'created_at', 'user');
+        $userSpend = (float) ($spendBuilder->get()->getRow()->total ?? 0);
+
+        $prizesBuilder = $modelPayments->builder();
+        $prizesBuilder->selectSum('amount', 'total')
+            ->where('status', 2)
+            ->where('type', 'award');
+        $this->applyKpiFilters($prizesBuilder, $filters, 'created_at', 'user');
+        $totalPrizes = (float) ($prizesBuilder->get()->getRow()->total ?? 0);
 
         return [
-            'manual_credits' => round((float) ($modelDeposits->selectSum('amount')->where('status', 2)->get()->getRow()->amount ?? 0), 2),
-            'user_spend' => round((float) ($modelPayments->selectSum('amount')->where('status', 2)->get()->getRow()->amount ?? 0), 2),
-            'total_prizes' => round((float) ($modelAwards->selectSum('amount')->where('status', 1)->get()->getRow()->amount ?? 0), 2),
+            'manual_credits' => round($manualCredits, 2),
+            'user_spend' => round($userSpend, 2),
+            'total_prizes' => round($totalPrizes, 2),
         ];
+    }
+
+    private function applyKpiFilters($builder, array $filters, string $dateField, string $userField): void
+    {
+        if (! empty($filters['user_id']) && $filters['user_id'] !== 'all') {
+            $builder->where($userField, (int) $filters['user_id']);
+        }
+
+        if (! empty($filters['date_from'])) {
+            $builder->where($dateField . ' >=', $filters['date_from']);
+        }
+
+        if (! empty($filters['date_to'])) {
+            $builder->where($dateField . ' <=', $filters['date_to'] . ' 23:59:59');
+        }
+    }
+
+    public function exportData()
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
+            return redirect()->to('/signin');
+        }
+
+        $filters = $this->getFilters();
+        $allTransactions = $this->getAllTransactions();
+        $filteredTransactions = $this->applyFilters($allTransactions, $filters);
+
+        $filename = 'payments-export-' . date('Ymd-His') . '.csv';
+        $headers = [
+            'ID',
+            'Tipo',
+            'Usuario',
+            'Codigo',
+            'Referencia',
+            'Monto',
+            'Fecha',
+            'Estado',
+        ];
+
+        $fh = fopen('php://temp', 'w+');
+        fputcsv($fh, $headers);
+
+        foreach ($filteredTransactions as $transaction) {
+            fputcsv($fh, [
+                $transaction['id'] ?? '',
+                strip_tags($transaction['type_Tra'] ?? ($transaction['type'] ?? '')),
+                $transaction['user_name'] ?? '',
+                $transaction['user_code'] ?? '',
+                $transaction['reference'] ?? '',
+                $transaction['amount'] ?? 0,
+                $transaction['date_formatted'] ?? ($transaction['date'] ?? ''),
+                strip_tags($transaction['status_formatted'] ?? ''),
+            ]);
+        }
+
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setBody($csv);
     }
 
     private function formatBankInfo($type, $user, $bank = null, $userTo = null) {
