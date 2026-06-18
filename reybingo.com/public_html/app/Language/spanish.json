@@ -745,5 +745,17 @@
     "paste": "Pegar",
     "balance": "Saldo",
     "error processing payment": "Error processing payment",
-    "there are no winners yet": "There are no winners yet"
+    "there are no winners yet": "There are no winners yet",
+    "minimum players to start": "Jugadores mínimos para iniciar",
+    "the game can only start when there are more players than this number": "La partida solo puede iniciar cuando haya más jugadores que este número",
+    "the game needs more than {min} players to start. current players: {current}": "La partida necesita más de {min} jugadores para iniciar. Jugadores actuales: {current}",
+    "client domain login": "Ingreso por dominio del cliente",
+    "activate client domain": "Activar dominio del cliente",
+    "client domain": "Dominio del cliente",
+    "client domain help": "Ejemplo: juego.micliente.com. Los usuarios deberán iniciar sesión desde ese dominio.",
+    "official client access": "Acceso oficial",
+    "client login url": "URL de ingreso del cliente",
+    "client domain is required when enabled": "Debe indicar el dominio del cliente cuando la opción está activa.",
+    "client domain format is invalid": "El formato del dominio no es válido.",
+    "login must use client domain": "Debe iniciar sesión desde el dominio oficial del cliente."
 }

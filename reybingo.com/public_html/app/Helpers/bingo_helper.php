@@ -529,3 +529,54 @@ if (! function_exists('bingo_ensure_winners_registered')) {
         $modelSings->where('game', $gameId)->where('status', 0)->set(['status' => 1])->update();
     }
 }
+
+if (! function_exists('bingo_count_game_players')) {
+    function bingo_count_game_players(int $gameId): int
+    {
+        $modelCartons = new CartonsModel();
+
+        return (int) $modelCartons
+            ->where('game', $gameId)
+            ->where('user !=', 0)
+            ->select('user')
+            ->distinct()
+            ->countAllResults();
+    }
+}
+
+if (! function_exists('bingo_get_min_players')) {
+    function bingo_get_min_players(array $game): int
+    {
+        $min = (int) ($game['min_players'] ?? 10);
+
+        return max(1, $min);
+    }
+}
+
+if (! function_exists('bingo_can_start_game')) {
+    function bingo_can_start_game(array $game, ?int $playerCount = null): bool
+    {
+        if ($playerCount === null) {
+            $playerCount = bingo_count_game_players((int) $game['id']);
+        }
+
+        return $playerCount > bingo_get_min_players($game);
+    }
+}
+
+if (! function_exists('bingo_min_players_start_message')) {
+    function bingo_min_players_start_message(array $game, ?int $playerCount = null): string
+    {
+        if ($playerCount === null) {
+            $playerCount = bingo_count_game_players((int) $game['id']);
+        }
+
+        $required = bingo_get_min_players($game);
+
+        return str_replace(
+            ['{min}', '{current}'],
+            [(string) ($required + 1), (string) $playerCount],
+            translate('the game needs more than {min} players to start. current players: {current}')
+        );
+    }
+}

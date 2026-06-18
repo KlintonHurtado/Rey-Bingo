@@ -301,9 +301,16 @@ class Boards extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('game not found')]);
         }
 
-        $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
-
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => bingo_min_players_start_message($game),
+            ]);
+        }
+
+        $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
             $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
@@ -407,9 +414,16 @@ class Boards extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('game not found')]);
         }
 
-        $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
-
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => bingo_min_players_start_message($game),
+            ]);
+        }
+
+        $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
             $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();

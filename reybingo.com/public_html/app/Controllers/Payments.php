@@ -554,6 +554,11 @@ class Payments extends Controller {
         ];
     }
 
+    private function getUserAccreditationStats(int $userId): array
+    {
+        return $this->buildAccreditationStats(['user_id' => $userId]);
+    }
+
     private function getAdminKpis(array $filters = []): array
     {
         if (session()->get('group') != 1) {
@@ -564,6 +569,11 @@ class Payments extends Controller {
             ];
         }
 
+        return $this->buildAccreditationStats($filters);
+    }
+
+    private function buildAccreditationStats(array $filters = []): array
+    {
         $modelDeposits = new DepositsModel();
         $modelPayments = new PaymentsModel();
 
@@ -806,6 +816,10 @@ class Payments extends Controller {
 
             if ($data['deposit']) {
                 $data['user'] = $modelUsers->find($data['deposit']['user']);
+                if ($data['user']) {
+                    $data['user'] = wallet_service()->normalizeUser($data['user']);
+                    $data['userStats'] = $this->getUserAccreditationStats((int) $data['deposit']['user']);
+                }
             }
 
             $data['status'] = $this->formatStatusDeposit($data['deposit']['status']);
@@ -861,6 +875,37 @@ class Payments extends Controller {
         $data['user'] = $modelUsers->find(session()->get('id'));
 
         return view('users/deposit', $data);
+    }
+
+    public function userAccreditationStatsGet($userId = null)
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => 'Acceso no autorizado',
+            ]);
+        }
+
+        $userId = (int) $userId;
+        if ($userId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        if (! $modelUsers->find($userId)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'stats' => $this->getUserAccreditationStats($userId),
+        ]);
     }
 
     public function depositStepSubmit() {
@@ -963,12 +1008,13 @@ class Payments extends Controller {
         if ($isAdmin && $selectedUser) {
             $depositUserId = $selectedUser;
             $observation = $this->request->getPost('observation');
-            $status = 2;
         } else {
             $depositUserId = session()->get('id');
             $observation = '';
-            $status = 1;
         }
+
+        // Todo depósito manual queda pendiente hasta que un admin lo apruebe.
+        $status = 1;
 
         $data = [
             'user'      => $depositUserId,
@@ -1023,71 +1069,45 @@ class Payments extends Controller {
         $currentUserId = session()->get('id');
         $modelNotifications = new NotificationsModel();
 
-        if ($isAdmin && $selectedUser) {
-            wallet_credit_recharge($depositUserId, (float) $data['amount']);
+        $admins = $modelUsers->select('id')->where('group', 1)->findAll();
+        $creator = $modelUsers->find($currentUserId);
+        $creatorName = $creator ? trim($creator['firstname'] . ' ' . $creator['lastname']) : translate('user');
 
-            $deposits = $modelDeposits->where('user', $depositUserId)->countAllResults();
+        foreach ($admins as $admin) {
+            $notificationData = [
+                'user' => $admin['id'],
+                'from' => $currentUserId,
+                'type' => 'deposit',
+                'type_id' => $depositId,
+                'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
+                'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha registrado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
+            ];
 
-            $userReferrer = $modelReferrals->where('id_referrer', $depositUserId)->where('status', 1)->first();
+            $modelNotifications->insert($notificationData);
+        }
 
-            if ($userReferrer && $deposits == 1) {
-                $reward = $data['amount'] * systemGet('rateReferrals');
-
-                $userReferred = $modelUsers->find($userReferrer['id_referred']);
-                wallet_credit_withdrawable($userReferrer['id_referred'], (float) $reward);
-
-                $modelReferrals->update($userReferrer['id'], ['amount' => $reward, 'status' => 2]);
-
-                $modelPayments = new PaymentsModel();
-
-                $dataPayment = [
-                    'user' => $userReferrer['id_referred'],
-                    'type' => 'payment',
-                    'type_id' => $userReferrer['id'],
-                    'amount' => $reward,
-                    'status' => 2
-                ];
-
-                $modelPayments->insert($dataPayment);
-                $paymentId = $modelPayments->insertID();
-
-                $notificationData = [
-                    'user' => $userReferrer['id_referred'],
-                    'from' => $currentUserId,
-                    'type' => 'payment',
-                    'type_id' => $paymentId,
-                    'title' => '🥳 PAGO ACREDITADO',
-                    'message' => 'Se ha acreditado en su billetera la suma de ' . systemGet('currency') . ' ' . number_format($reward, 2) . ' como recompensa por invitar a un amigo. ¡Sigue invitando y acumula más beneficios!',
-                ];
-
-                $modelNotifications->insert($notificationData);
-            }
-
+        if ((int) $depositUserId !== (int) $currentUserId) {
             $notificationData = [
                 'user' => $depositUserId,
                 'from' => $currentUserId,
                 'type' => 'deposit',
                 'type_id' => $depositId,
-                'title' => '✅ DEPÓSITO ACREDITADO',
-                'message' => 'Su depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' ha sido verificado y acreditado correctamente en su billetera.',
+                'title' => '📥 DEPÓSITO EN REVISIÓN',
+                'message' => $creatorName . ' registró un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . '. Está pendiente de verificación; el saldo se acreditará cuando sea aprobado.',
             ];
 
             $modelNotifications->insert($notificationData);
-        } else {
-            $admins = $modelUsers->select('id')->where('group', 1)->findAll();
+        } elseif (! $isAdmin) {
+            $notificationData = [
+                'user' => $depositUserId,
+                'from' => $currentUserId,
+                'type' => 'deposit',
+                'type_id' => $depositId,
+                'title' => '📥 DEPÓSITO EN REVISIÓN',
+                'message' => 'Su solicitud de depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' fue recibida y está pendiente de verificación.',
+            ];
 
-            foreach ($admins as $admin) {
-                $notificationData = [
-                    'user' => $admin['id'],
-                    'from' => $currentUserId,
-                    'type' => 'deposit',
-                    'type_id' => $depositId,
-                    'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
-                    'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha realizado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
-                ];
-
-                $modelNotifications->insert($notificationData);
-            }
+            $modelNotifications->insert($notificationData);
         }
 
         if ($depositId) {
@@ -1654,49 +1674,63 @@ class Payments extends Controller {
             }
 
             if ($action === 'approve') {
-                if ($deposit['status'] === '1' || $deposit['status'] === '0') {
-                    wallet_credit_recharge($deposit['user'], (float) $deposit['amount']);
+                $depositStatus = (int) $deposit['status'];
 
-                    $modelDeposits->update($id, ['status' => 2, 'observation' => $observation]);
+                if ($depositStatus === 2) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'error' => 'Este depósito ya fue aprobado y acreditado.',
+                    ]);
+                }
 
-                    $totalDeposits = $modelDeposits->where('user', $deposit['user'])->where('status', 2)->countAllResults();
+                if ($depositStatus !== 1) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'error' => 'Solo se pueden aprobar depósitos pendientes.',
+                    ]);
+                }
 
-                    $userReferrer = $modelReferrals->where('id_referrer', $deposit['user'])->where('status', 1)->first();
+                wallet_credit_recharge($deposit['user'], (float) $deposit['amount']);
 
-                    if ($userReferrer && $totalDeposits == 1) {
-                        $reward = $deposit['amount'] * systemGet('rateReferrals');
+                $modelDeposits->update($id, ['status' => 2, 'observation' => $observation]);
 
-                        $userReferred = $modelUsers->find($userReferrer['id_referred']);
-                        wallet_credit_withdrawable($userReferrer['id_referred'], (float) $reward);
+                $totalDeposits = $modelDeposits->where('user', $deposit['user'])->where('status', 2)->countAllResults();
 
-                        $modelReferrals->update($userReferrer['id'], ['amount' => $reward, 'status' => 2]);
+                $userReferrer = $modelReferrals->where('id_referrer', $deposit['user'])->where('status', 1)->first();
 
-                        $modelNotifications = new NotificationsModel();
+                if ($userReferrer && $totalDeposits == 1) {
+                    $reward = $deposit['amount'] * systemGet('rateReferrals');
 
-                        $currentUserId = session()->get('id');
+                    $userReferred = $modelUsers->find($userReferrer['id_referred']);
+                    wallet_credit_withdrawable($userReferrer['id_referred'], (float) $reward);
 
-                        $dataPayment = [
-                            'user' => $userReferrer['id_referred'],
-                            'type' => 'referred',
-                            'type_id' => $userReferrer['id'],
-                            'amount' => $reward,
-                            'status' => 2
-                        ];
+                    $modelReferrals->update($userReferrer['id'], ['amount' => $reward, 'status' => 2]);
 
-                        $modelPayments->insert($dataPayment);
-                        $paymentId = $modelPayments->insertID();
+                    $modelNotifications = new NotificationsModel();
 
-                        $notificationData = [
-                            'user' => $userReferrer['id_referred'],
-                            'from' => $currentUserId,
-                            'type' => 'payment',
-                            'type_id' => $paymentId,
-                            'title' => '🥳 PAGO ACREDITADO',
-                            'message' => 'Se ha acreditado en su billetera la suma de ' . systemGet('currency') . ' ' . number_format($reward, 2) . ' como recompensa por invitar a un amigo. ¡Sigue invitando y acumula más beneficios!',
-                        ];
+                    $currentUserId = session()->get('id');
 
-                        $modelNotifications->insert($notificationData);
-                    }
+                    $dataPayment = [
+                        'user' => $userReferrer['id_referred'],
+                        'type' => 'referred',
+                        'type_id' => $userReferrer['id'],
+                        'amount' => $reward,
+                        'status' => 2
+                    ];
+
+                    $modelPayments->insert($dataPayment);
+                    $paymentId = $modelPayments->insertID();
+
+                    $notificationData = [
+                        'user' => $userReferrer['id_referred'],
+                        'from' => $currentUserId,
+                        'type' => 'payment',
+                        'type_id' => $paymentId,
+                        'title' => '🥳 PAGO ACREDITADO',
+                        'message' => 'Se ha acreditado en su billetera la suma de ' . systemGet('currency') . ' ' . number_format($reward, 2) . ' como recompensa por invitar a un amigo. ¡Sigue invitando y acumula más beneficios!',
+                    ];
+
+                    $modelNotifications->insert($notificationData);
                 }
 
                 $modelNotifications = new NotificationsModel();
@@ -1714,7 +1748,7 @@ class Payments extends Controller {
 
                 $modelNotifications->insert($notificationData);
             } elseif ($action === 'refuse') {
-                if ($deposit['status'] === '2') {
+                if ((int) $deposit['status'] === 2) {
                     // Revertir el saldo de recarga usando el servicio correcto (no el campo legacy)
                     // Verificamos que tenga suficiente recarga para descontar
                     $userNormalized = wallet_service()->normalizeUser($user);

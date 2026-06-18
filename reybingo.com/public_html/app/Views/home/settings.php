@@ -125,6 +125,32 @@
                                 <input type="url" class="form-control form-control-lg form-bingo" name="linkGroup" id="linkGroup" placeholder="<?= translate('WhatsApp group link'); ?>" value="<?= systemGet('linkGroup'); ?>">
                                 <small id="linkGroup-error" class="text-danger d-none"></small>
                             </div>
+                            <div class="col-md-12 mb-2">
+                                <hr class="my-2">
+                                <h6 class="text-start mb-2"><?= translate('client domain login'); ?></h6>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="activateClientDomain" class="form-label"><?= translate('activate client domain'); ?></label>
+                                <select class="form-control form-control-lg form-bingo" name="activateClientDomain" id="activateClientDomain">
+                                    <option <?= (int) systemGet('activateClientDomain') === 1 ? 'selected' : '' ?> value="1"><?= translate('yes'); ?></option>
+                                    <option <?= (int) systemGet('activateClientDomain') !== 1 ? 'selected' : '' ?> value="0"><?= translate('not'); ?></option>
+                                </select>
+                                <small id="activateClientDomain-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="clientDomain" class="form-label"><?= translate('client domain'); ?></label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="clientDomain" id="clientDomain" placeholder="juego.micliente.com" value="<?= esc(systemGet('clientDomain')); ?>">
+                                <small class="text-muted d-block mt-1"><?= translate('client domain help'); ?></small>
+                                <small id="clientDomain-error" class="text-danger d-none"></small>
+                            </div>
+                            <?php if (bingo_client_domain() !== ''): ?>
+                            <div class="col-md-12 mb-3">
+                                <div class="alert alert-info text-start mb-0 py-2 px-3">
+                                    <?= translate('official client access'); ?>:
+                                    <strong><?= esc(bingo_client_login_url('/signin')); ?></strong>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 

@@ -164,6 +164,7 @@ $routes->get('payments/availablewalletGet', 'Payments::availablewalletGet');
 $routes->post('payments/statusSubmit', 'Payments::statusSubmit');
 $routes->post('payments/payawardSubmit', 'Payments::payawardSubmit');
 $routes->get('payments/requestGet/(:segment)/(:num)', 'Payments::requestGet/$1/$2');
+$routes->get('payments/userAccreditationStatsGet/(:num)', 'Payments::userAccreditationStatsGet/$1');
 $routes->get('payments/modalVoucher/(:num)', 'Payments::modalVoucher/$1');
 
 $routes->get('payments/show', 'Payments::show');

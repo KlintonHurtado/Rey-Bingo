@@ -33,6 +33,13 @@
                         <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?>" autocomplete="off" value="0.00">
                         <small id="price-error" class="text-danger d-none"></small>
                     </div>
+
+                    <div class="col-md-4 mb-1">
+                        <label for="min_players" class="form-label"><?= translate('minimum players to start'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="min_players" id="min_players" min="1" max="9999" step="1" placeholder="10" autocomplete="off" value="10">
+                        <small class="text-muted"><?= translate('the game can only start when there are more players than this number'); ?></small>
+                        <small id="min_players-error" class="text-danger d-none"></small>
+                    </div>
                     
                     <div class="col-md-4 mb-1">
                         <label for="date" class="form-label"><?= translate('date'); ?></label>
@@ -401,6 +408,13 @@
                 if (response.success) {
                     window.location.href = response.redirect;
                 } else {
+                    if (response.message) {
+                        Toastify({
+                            text: response.message,
+                            duration: 4000, gravity: "top", position: "right",
+                            style: { background: "#dc3545" }, stopOnFocus: true
+                        }).showToast();
+                    }
                     if (response.errors) {
                         $.each(response.errors, function(field, message) {
                             $('#' + field + '-error').text(message).removeClass('d-none');
@@ -439,6 +453,7 @@
             $('#room').val('<?= esc($gameData['room']) ?>');
             $('#description').val('<?= esc($gameData['description']) ?>');
             $('#price').val('<?= esc($gameData['price']) ?>');
+            $('#min_players').val('<?= esc($gameData['min_players'] ?? 10) ?>');
             $('#date').val('<?= esc($gameData['date']) ?>');
             $('#time').val('<?= date('H:i', strtotime($gameData['time'])) ?>');
             $('#award').val('<?= esc($gameData['award']) ?>');

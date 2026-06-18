@@ -1531,44 +1531,57 @@ class Games extends Controller {
 
         if (session()->get('group') == 1) {
             if (!$game) {
-                $response = [
-                    'success' => true,
-                    'redirect' => site_url('/games') 
-                ];
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('game not found'),
+                    'redirect' => site_url('/games'),
+                ]);
+            }
+
+            if (bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => bingo_min_players_start_message($game),
+                ]);
             }
 
             session()->set('game_id', $game_id);
 
-            $response = [
+            return $this->response->setJSON([
                 'success' => true,
-                'redirect' => site_url('/board') 
-            ];
-        } elseif (session()->get('group') == 0) {
+                'redirect' => site_url('/board'),
+            ]);
+        }
+
+        if (session()->get('group') == 0) {
             if (!$game) {
-                $response = [
+                return $this->response->setJSON([
                     'success' => true,
-                    'redirect' => site_url('/play') 
-                ];
+                    'redirect' => site_url('/play'),
+                ]);
             }
 
             $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
-        
+
             if (empty($cartons)) {
-                $response = [
+                return $this->response->setJSON([
                     'success' => true,
-                    'redirect' => site_url('/play') 
-                ];
+                    'redirect' => site_url('/play'),
+                ]);
             }
 
             session()->set('game_id', $game_id);
 
-            $response = [
+            return $this->response->setJSON([
                 'success' => true,
-                'redirect' => site_url('/playing') 
-            ];
+                'redirect' => site_url('/playing'),
+            ]);
         }
 
-        return $this->response->setJSON($response);
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => translate('unauthorized access'),
+        ]);
     }
 
     public function live($game_id) {
@@ -1578,20 +1591,28 @@ class Games extends Controller {
         $game = $modelGames->find($game_id);
 
         if (!$game) {
-            $response = [
-                'success' => true,
-                'redirect' => site_url('/games') 
-            ];
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('game not found'),
+                'redirect' => site_url('/games'),
+            ]);
+        }
+
+        if (session()->get('group') == 1
+            && bingo_count_drawn_numbers((int) $game['id']) === 0
+            && !bingo_can_start_game($game)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => bingo_min_players_start_message($game),
+            ]);
         }
 
         session()->set('game_id', $game_id);
 
-        $response = [
+        return $this->response->setJSON([
             'success' => true,
-            'redirect' => site_url('/live') 
-        ];
-
-        return $this->response->setJSON($response);
+            'redirect' => site_url('/live'),
+        ]);
     }
 
     public function uploadVideo() {
@@ -1670,6 +1691,10 @@ class Games extends Controller {
             'price' => [
                 'label' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton'),
                 'rules' => 'required'
+            ],
+            'min_players' => [
+                'label' => translate('minimum players to start'),
+                'rules' => 'required|integer|greater_than[0]|less_than_equal_to[9999]'
             ],
             'date' => [
                 'label' => translate('date'), 
@@ -1786,6 +1811,7 @@ class Games extends Controller {
             'room' => $this->request->getPost('room'),
             'description' => $this->request->getPost('description'),
             'price' => $this->request->getPost('price'),
+            'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),
@@ -2034,6 +2060,10 @@ class Games extends Controller {
                 'label' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton'),
                 'rules' => 'required'
             ],
+            'min_players' => [
+                'label' => translate('minimum players to start'),
+                'rules' => 'required|integer|greater_than[0]|less_than_equal_to[9999]'
+            ],
             'date' => [
                 'label' => translate('date'), 
                 'rules' => 'required|valid_date[Y-m-d]'
@@ -2149,6 +2179,7 @@ class Games extends Controller {
             'room' => $this->request->getPost('room'),
             'description' => $this->request->getPost('description'),
             'price' => $this->request->getPost('price'),
+            'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),
@@ -2364,6 +2395,15 @@ class Games extends Controller {
             }
         }
 
+        $game = $model->find($gameId);
+
+        if ($game && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => bingo_min_players_start_message($game),
+            ]);
+        }
+
         session()->set('game_id', $gameId);
 
         return $this->response->setJSON([
@@ -2454,12 +2494,21 @@ class Games extends Controller {
 
             $buttons = '';
             $canView = ($game['numbers'] == 75 || $SingsCount >= $AwardsCount);
+            $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players']);
+            $minPlayersMessage = esc(bingo_min_players_start_message($game, (int) $game['players']), 'attr');
 
             if (session()->get('group') == 1) {
+                $playButtonClass = $canView ? 'primary' : ($canStart ? 'success' : 'secondary');
+                $playButtonIcon = $canView ? 'eye' : 'play';
+                $playButtonAction = ($canView || $canStart)
+                    ? "gameGet('" . $game['id'] . "');"
+                    : "notifyMinPlayersRequired('" . $minPlayersMessage . "');";
+
                 if ($game['type'] != 3) {
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . ($canView ? 'primary' : 'success') . ' btn-modal btn-sm" onclick="gameGet(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . ($canView ? 'eye' : 'play') . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . ($canView ? 'primary' : 'success') . ' btn-modal btn-sm" onclick="gameGet(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . ($canView ? 'eye' : 'play') . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-primary btn-modal text-white" onclick="liveGet(\'' . $game['id'] . '\');"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $liveButtonAction = $canStart ? "liveGet('" . $game['id'] . "');" : "notifyMinPlayersRequired('" . $minPlayersMessage . "');";
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-primary btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
             } else {
                 if ($canView) {

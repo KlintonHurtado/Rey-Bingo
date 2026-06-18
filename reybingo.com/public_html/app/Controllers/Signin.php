@@ -41,6 +41,17 @@ class Signin extends Controller {
 
     public function signinSubmit() {
         $modelUsers = new UsersModel();
+
+        if (!bingo_can_authenticate_on_host()) {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'username' => translate('login must use client domain'),
+                ],
+                'redirect' => bingo_client_login_url('/signin'),
+            ];
+            return $this->response->setJSON($response);
+        }
         
         $validationRules = [
             'username' => [

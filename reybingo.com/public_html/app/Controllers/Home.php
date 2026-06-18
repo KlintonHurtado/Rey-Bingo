@@ -270,6 +270,14 @@ class Home extends Controller {
                 'label' => translate('language'),  
                 'rules' => 'required'
             ],
+            'activateClientDomain' => [
+                'label' => translate('activate client domain'),
+                'rules' => 'required|in_list[0,1]'
+            ],
+            'clientDomain' => [
+                'label' => translate('client domain'),
+                'rules' => 'permit_empty|max_length[255]'
+            ],
             
             // Configuración de Pagos
             'bank' => [
@@ -424,6 +432,29 @@ class Home extends Controller {
             return $this->response->setJSON($response);
         }
 
+        $activateClientDomain = (int) $this->request->getPost('activateClientDomain');
+        $clientDomain = bingo_normalize_hostname($this->request->getPost('clientDomain'));
+
+        if ($activateClientDomain === 1 && $clientDomain === '') {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'clientDomain' => translate('client domain is required when enabled'),
+                ],
+            ];
+            return $this->response->setJSON($response);
+        }
+
+        if ($clientDomain !== '' && !preg_match('/^[a-z0-9]([a-z0-9\-\.]*[a-z0-9])?$/i', $clientDomain)) {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'clientDomain' => translate('client domain format is invalid'),
+                ],
+            ];
+            return $this->response->setJSON($response);
+        }
+
         // Organizar datos por secciones
         $generalSettings = [
             'name' => $this->request->getPost('name'),
@@ -436,7 +467,9 @@ class Home extends Controller {
             'country' => $this->request->getPost('country'),
             'language' => $this->request->getPost('language'),
             'accountInstagram' => $this->request->getPost('accountInstagram'),
-            'linkGroup' => $this->request->getPost('linkGroup')
+            'linkGroup' => $this->request->getPost('linkGroup'),
+            'activateClientDomain' => (string) $activateClientDomain,
+            'clientDomain' => $clientDomain,
         ];
 
         $paymentSettings = [

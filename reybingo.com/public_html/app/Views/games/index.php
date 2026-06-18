@@ -28,7 +28,7 @@
 <div class="container">
     <div class="row d-flex justify-content-center">
         <div class="col-md-12">
-            <div class="card mb-3">
+            <div class="card mb-3 admin-games-filters-card">
                 <div class="collapse show">
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-end mb-2">

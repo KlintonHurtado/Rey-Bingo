@@ -29,6 +29,25 @@
                         <?php endif; ?>
                     </div>
 
+                    <?php if ((int) $deposit['status'] === 1) : ?>
+                        <div class="col-md-12">
+                            <div class="alert alert-warning text-center py-2 px-3 mb-2 small">
+                                <strong>Este depósito aún no está acreditado.</strong><br>
+                                Los <strong><?= systemGet('currency'); ?> <?= number_format((float) $deposit['amount'], 2); ?></strong> se sumarán al saldo del jugador <u>solo cuando presione Aprobar</u>.
+                                <br>
+                                Saldo actual: <strong><?= systemGet('currency'); ?> <?= number_format(wallet_total($user), 2); ?></strong>
+                                → Tras aprobar: <strong><?= systemGet('currency'); ?> <?= number_format(wallet_total($user) + (float) $deposit['amount'], 2); ?></strong>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (! empty($userStats)) : ?>
+                        <div class="col-md-12">
+                            <p class="small text-muted mb-2 text-center">Historial del jugador (solo depósitos ya aprobados)</p>
+                            <?= view('users/partials/accreditation_user_stats', ['userStats' => $userStats]) ?>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if ($deposit['status'] == 1) : ?>
                         <div class="col-md-12 mb-1">
                             <label for="observation" class="form-label"><?= translate('observation'); ?></label>
@@ -47,7 +66,14 @@
                 <hr />
 
                 <div class="text-center">
-                    <?= translate('available in wallet'); ?> <?= systemGet('currency'); ?> <span class="available-wallet"><?= $user['wallet']; ?></span>
+                    <small class="text-muted d-block">Saldo actual del jugador</small>
+                    <?= translate('available in wallet'); ?> <?= systemGet('currency'); ?>
+                    <strong class="available-wallet"><?= number_format(wallet_total($user), 2) ?></strong>
+                    <div class="small text-muted mt-1">
+                        Recarga: <?= number_format($user['wallet_recharge'], 2) ?> ·
+                        Retiro: <?= number_format($user['wallet_withdraw'], 2) ?> ·
+                        Bono: <?= number_format($user['wallet_bonus'], 2) ?>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -151,6 +177,16 @@
                     $('#modalRequest').modal('hide');
 
                     statusElement.innerHTML = '<span class="status-badge" data-status="0"><span class="badge bg-danger"><i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('rejected'); ?></span></span>';
+                    Toastify({
+                        text: data.error,
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                    console.error('error updating status:', data.error);
+                } else if (data.error) {
                     Toastify({
                         text: data.error,
                         duration: 3000,

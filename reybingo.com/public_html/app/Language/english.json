@@ -746,5 +746,17 @@
     "paste": "Paste",
     "voucher": "Voucher",
     "error processing payment": "Error processing payment",
-    "there are no winners yet": "There are no winners yet"
+    "there are no winners yet": "There are no winners yet",
+    "minimum players to start": "Minimum players to start",
+    "the game can only start when there are more players than this number": "The game can only start when there are more players than this number",
+    "the game needs more than {min} players to start. current players: {current}": "The game needs more than {min} players to start. Current players: {current}",
+    "client domain login": "Client domain login",
+    "activate client domain": "Activate client domain",
+    "client domain": "Client domain",
+    "client domain help": "Example: play.myclient.com. Users must sign in from that domain.",
+    "official client access": "Official access",
+    "client login url": "Client login URL",
+    "client domain is required when enabled": "Client domain is required when this option is enabled.",
+    "client domain format is invalid": "The domain format is invalid.",
+    "login must use client domain": "You must sign in from the official client domain."
 }

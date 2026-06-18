@@ -6,8 +6,19 @@
         </div>
         <div class="modal-body p-1 pt-0 text-center">
             <div class="text-center p-2"><?= $game['description']; ?></div>
+            <div class="carton-filters-bar">
+                <div class="carton-search-wrap">
+                    <i class="fa-duotone fa-solid fa-magnifying-glass carton-search-icon"></i>
+                    <input type="search" id="carton-serial-search" class="carton-serial-search" placeholder="Buscar cartón por serial o número" autocomplete="off" inputmode="search">
+                </div>
+                <button type="button" class="carton-open-favorites-btn" id="toggle-favorite-cartons-filter" aria-pressed="false">
+                    <i class="fa-duotone fa-solid fa-star"></i> Mis favoritos (<span id="carton-favorites-count-num">0</span>)
+                </button>
+            </div>
             <div class="action-sheet-content mb-3" style="max-height: 400px; overflow-y: auto;" id="cartons-container">
                 <div class="cartons-section-select">
+                    <div id="cartons-favorites-empty" class="cartons-favorites-empty">No tienes cartones favoritos en esta partida.</div>
+                    <div id="cartons-search-empty" class="cartons-favorites-empty">No se encontraron cartones con esa búsqueda.</div>
                     <div class="content-cartons-select" id="cartons-list">
                         <!-- Cartones se cargarán dinámicamente -->
                     </div>
@@ -29,6 +40,165 @@
 </div>
 
 <style>
+.carton-filters-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 0 auto 14px;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.carton-search-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 300px;
+}
+
+.carton-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.78rem;
+    color: #6236ff;
+    pointer-events: none;
+}
+
+.carton-serial-search {
+    width: 100%;
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 12px 7px 32px;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    color: #333;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.carton-serial-search:focus {
+    outline: 2px solid rgba(98, 54, 255, 0.35);
+}
+
+.carton-serial-search::placeholder {
+    color: #8a8a8a;
+}
+
+.carton-open-favorites-btn {
+    border: 0;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    padding: 6px 14px;
+    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: linear-gradient(145deg, #ffc107, #ff9800);
+    color: #522f00;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    width: auto;
+    margin: 0;
+}
+
+.carton-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0 2px 6px;
+}
+
+.carton-serial-label {
+    font-size: 0.68rem;
+    color: #6c757d;
+    text-align: left;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.carton-favorite-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #6236ff;
+    font-size: 0.88rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14);
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.carton-favorite-btn:hover {
+    transform: scale(1.06);
+}
+
+.carton-favorite-btn.is-favorite {
+    background: linear-gradient(145deg, #ffc107, #ff9800);
+    color: #522f00;
+}
+
+.carton-open-favorites-btn.is-active {
+    background: linear-gradient(145deg, #ff9800, #f57c00);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.bingo-border-carton-select.carton-filter-hidden {
+    display: none !important;
+}
+
+.cartons-favorites-empty {
+    display: none;
+    padding: 18px 12px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.82rem;
+}
+
+.cartons-favorites-empty.is-visible {
+    display: block;
+}
+
+.bingo-border-carton-select.is-favorite-carton {
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.85);
+    border-radius: 10px;
+}
+
+#cartons-container .content-cartons-select {
+    grid-gap: 12px 10px;
+    padding: 4px 6px 10px;
+}
+
+#cartons-container .bingo-border-carton-select {
+    padding: 6px 5px 8px;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.carton-scroll-highlight {
+    animation: cartonPulse 1.2s ease;
+}
+
+@keyframes cartonPulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.8); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
 .bingo-border-carton-select:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
@@ -37,7 +207,8 @@
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 2px;
-    max-width: 300px;
+    width: 100%;
+    max-width: 100%;
     margin: 0 auto;
     border: 2px solid #ddd;
     border-radius: 8px;
@@ -94,6 +265,244 @@
     if (window.currentWalletManager) {
         window.currentWalletManager.destroy();
         window.currentWalletManager = null;
+    }
+
+    const FAVORITE_CARTONS_KEY = 'favoriteCartons';
+    const FAVORITE_CARTONS_META_KEY = 'favoriteCartonsMeta';
+    const currentGameId = '<?= $game['id'] ?>';
+    let showOnlyFavoriteCartons = false;
+    let cartonSearchQuery = '';
+
+    function getFavoriteCartonIds(targetGameId) {
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_KEY) || '{}');
+        return (all[String(targetGameId)] || []).map(function(id) { return String(id); });
+    }
+
+    function saveFavoriteCartonIds(targetGameId, ids) {
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_KEY) || '{}');
+        all[String(targetGameId)] = ids;
+        localStorage.setItem(FAVORITE_CARTONS_KEY, JSON.stringify(all));
+    }
+
+    function getFavoriteCartonMeta(cartonId) {
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
+        const gameMeta = all[String(currentGameId)] || {};
+        return gameMeta[String(cartonId)] || null;
+    }
+
+    function saveFavoriteCartonMeta(cartonId, serial, numbers) {
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
+        if (!all[String(currentGameId)]) {
+            all[String(currentGameId)] = {};
+        }
+        all[String(currentGameId)][String(cartonId)] = {
+            serial: String(serial),
+            numbers: numbers || null
+        };
+        localStorage.setItem(FAVORITE_CARTONS_META_KEY, JSON.stringify(all));
+    }
+
+    function removeFavoriteCartonMeta(cartonId) {
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
+        if (all[String(currentGameId)]) {
+            delete all[String(currentGameId)][String(cartonId)];
+            localStorage.setItem(FAVORITE_CARTONS_META_KEY, JSON.stringify(all));
+        }
+    }
+
+    function isFavoriteCarton(cartonId) {
+        return getFavoriteCartonIds(currentGameId).includes(String(cartonId));
+    }
+
+    function updateFavoriteCartonsCount() {
+        const countEl = document.getElementById('carton-favorites-count-num');
+        if (countEl) {
+            countEl.textContent = getFavoriteCartonIds(currentGameId).length;
+        }
+    }
+
+    function updateFavoriteCartonUI(cartonId) {
+        const wrapper = document.querySelector(`.bingo-border-carton-select[data-carton-wrapper-id="${cartonId}"]`);
+        if (!wrapper) return;
+
+        const isFavorite = isFavoriteCarton(cartonId);
+        const button = wrapper.querySelector('.favorite-carton-btn');
+        if (button) {
+            button.classList.toggle('is-favorite', isFavorite);
+            button.innerHTML = isFavorite ? '&#9733;' : '&#9734;';
+            button.title = isFavorite ? 'Quitar de favoritos' : 'Marcar favorito';
+        }
+        wrapper.classList.toggle('is-favorite-carton', isFavorite);
+    }
+
+    function updateFavoritesFilterButton() {
+        const btn = document.getElementById('toggle-favorite-cartons-filter');
+        if (!btn) return;
+        btn.classList.toggle('is-active', showOnlyFavoriteCartons);
+        btn.setAttribute('aria-pressed', showOnlyFavoriteCartons ? 'true' : 'false');
+    }
+
+    function normalizeCartonSearch(value) {
+        return String(value || '').toLowerCase().replace(/\s+/g, '').replace(/^c/, '');
+    }
+
+    function cartonMatchesSearch(wrapper, query) {
+        if (!query) {
+            return true;
+        }
+
+        const normalizedQuery = normalizeCartonSearch(query);
+        const serial = normalizeCartonSearch(wrapper.dataset.cartonSerial || '');
+        if (serial.includes(normalizedQuery)) {
+            return true;
+        }
+
+        const label = wrapper.querySelector('.carton-serial-label');
+        if (label && normalizeCartonSearch(label.textContent).includes(normalizedQuery)) {
+            return true;
+        }
+
+        const numbers = wrapper.querySelectorAll('.bingo-carton-number:not(.modality)');
+        for (let i = 0; i < numbers.length; i++) {
+            if (numbers[i].textContent.trim().includes(normalizedQuery)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function applyCartonsFilters() {
+        const wrappers = document.querySelectorAll('.bingo-border-carton-select[data-carton-wrapper-id]');
+        let visibleFavorites = 0;
+        let visibleMatches = 0;
+        const hasSearch = cartonSearchQuery.trim().length > 0;
+
+        wrappers.forEach(function(wrapper) {
+            const cartonId = String(wrapper.dataset.cartonWrapperId || '');
+            const isFavorite = isFavoriteCarton(cartonId);
+            const matchesSearch = cartonMatchesSearch(wrapper, cartonSearchQuery);
+            const shouldHide = (showOnlyFavoriteCartons && !isFavorite) || (hasSearch && !matchesSearch);
+
+            wrapper.classList.toggle('carton-filter-hidden', shouldHide);
+            wrapper.style.display = shouldHide ? 'none' : '';
+
+            if (showOnlyFavoriteCartons && isFavorite && !shouldHide) {
+                visibleFavorites++;
+            }
+            if (!shouldHide) {
+                visibleMatches++;
+            }
+        });
+
+        const favoritesEmpty = document.getElementById('cartons-favorites-empty');
+        if (favoritesEmpty) {
+            favoritesEmpty.classList.toggle('is-visible', showOnlyFavoriteCartons && visibleFavorites === 0 && !hasSearch);
+        }
+
+        const searchEmpty = document.getElementById('cartons-search-empty');
+        if (searchEmpty) {
+            searchEmpty.classList.toggle('is-visible', hasSearch && visibleMatches === 0);
+        }
+    }
+
+    function applyFavoriteCartonsFilter() {
+        applyCartonsFilters();
+    }
+
+    function handleCartonSearchInput(value) {
+        cartonSearchQuery = String(value || '').trim();
+        applyCartonsFilters();
+    }
+
+    function toggleFavoritesFilter(playerSelection) {
+        const count = getFavoriteCartonIds(currentGameId).length;
+        if (!showOnlyFavoriteCartons && count === 0) {
+            if (playerSelection) {
+                playerSelection.showNotification('No tienes cartones favoritos en esta partida.', 'info');
+            }
+            return;
+        }
+
+        showOnlyFavoriteCartons = !showOnlyFavoriteCartons;
+        updateFavoritesFilterButton();
+        applyFavoriteCartonsFilter();
+
+        if (showOnlyFavoriteCartons) {
+            const list = document.getElementById('cartons-container');
+            if (list) {
+                list.scrollTop = 0;
+            }
+        }
+    }
+
+    function refreshAllFavoriteCartonsUI() {
+        document.querySelectorAll('.bingo-border-carton-select[data-carton-wrapper-id]').forEach(function(wrapper) {
+            updateFavoriteCartonUI(wrapper.dataset.cartonWrapperId);
+        });
+        updateFavoriteCartonsCount();
+        applyFavoriteCartonsFilter();
+    }
+
+    function toggleFavoriteCarton(cartonId, serial, playerSelection) {
+        let ids = getFavoriteCartonIds(currentGameId);
+        const id = String(cartonId);
+        const wasFavorite = ids.includes(id);
+
+        if (wasFavorite) {
+            ids = ids.filter(function(item) { return item !== id; });
+            removeFavoriteCartonMeta(id);
+        } else {
+            ids.push(id);
+            let numbers = null;
+            if (playerSelection) {
+                const carton = playerSelection.cartons.find(function(c) { return String(c.id) === String(cartonId); });
+                if (carton) {
+                    numbers = carton.numbers;
+                }
+            }
+            saveFavoriteCartonMeta(id, serial || getCartonSerialFromDom(id), numbers);
+        }
+
+        saveFavoriteCartonIds(currentGameId, ids);
+        updateFavoriteCartonUI(id);
+        updateFavoriteCartonsCount();
+        sortFavoriteCartonsFirst();
+        applyFavoriteCartonsFilter();
+
+        if (showOnlyFavoriteCartons && wasFavorite && getFavoriteCartonIds(currentGameId).length === 0) {
+            showOnlyFavoriteCartons = false;
+            updateFavoritesFilterButton();
+            applyFavoriteCartonsFilter();
+        }
+
+        return !wasFavorite;
+    }
+
+    function sortFavoriteCartonsFirst() {
+        const list = document.getElementById('cartons-list');
+        if (!list) return;
+
+        const items = Array.from(list.querySelectorAll('.bingo-border-carton-select[data-carton-wrapper-id]'));
+        items.sort(function(a, b) {
+            const aFav = isFavoriteCarton(a.dataset.cartonWrapperId) ? 1 : 0;
+            const bFav = isFavoriteCarton(b.dataset.cartonWrapperId) ? 1 : 0;
+            if (aFav !== bFav) return bFav - aFav;
+            return String(a.dataset.cartonWrapperId).localeCompare(String(b.dataset.cartonWrapperId));
+        });
+
+        items.forEach(function(item) {
+            list.appendChild(item);
+        });
+    }
+
+    function getCartonSerialFromDom(cartonId) {
+        const wrapper = document.querySelector(`.bingo-border-carton-select[data-carton-wrapper-id="${cartonId}"]`);
+        if (wrapper && wrapper.dataset.cartonSerial) {
+            return wrapper.dataset.cartonSerial;
+        }
+        const meta = getFavoriteCartonMeta(cartonId);
+        return meta && meta.serial ? meta.serial : cartonId;
     }
 
     // Clase WalletManager mejorada
@@ -231,6 +640,20 @@
             
             // Event listener optimizado para cartones
             this.cartonsListHandler = (e) => {
+                const favoriteBtn = e.target.closest('.favorite-carton-btn');
+                if (favoriteBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const cartonId = favoriteBtn.dataset.favoriteCarton;
+                    const serial = favoriteBtn.dataset.cartonSerial;
+                    const added = toggleFavoriteCarton(cartonId, serial, this);
+                    this.showNotification(
+                        added ? 'Cartón agregado a favoritos.' : 'Cartón quitado de favoritos.',
+                        added ? 'success' : 'info'
+                    );
+                    return;
+                }
+
                 e.preventDefault();
                 e.stopPropagation();
                 
@@ -253,6 +676,26 @@
             };
             
             this.elements.cartonsList.addEventListener('click', this.cartonsListHandler);
+
+            this.openFavoritesHandler = (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                toggleFavoritesFilter(this);
+            };
+
+            const openFavoritesBtn = document.getElementById('toggle-favorite-cartons-filter');
+            if (openFavoritesBtn) {
+                openFavoritesBtn.onclick = this.openFavoritesHandler;
+            }
+
+            const searchInput = document.getElementById('carton-serial-search');
+            if (searchInput) {
+                this.searchInputHandler = (e) => handleCartonSearchInput(e.target.value);
+                searchInput.addEventListener('input', this.searchInputHandler);
+                searchInput.addEventListener('search', this.searchInputHandler);
+            }
         }
         
         // Sistema de cola para acciones mejorado
@@ -393,6 +836,15 @@
             this.actionQueue = [];
             this.processingQueue = false;
             
+            showOnlyFavoriteCartons = false;
+            cartonSearchQuery = '';
+            updateFavoritesFilterButton();
+
+            const searchInput = document.getElementById('carton-serial-search');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            
             this.elements.cartonsList.innerHTML = '';
             this.updatePlayButton();
             this.updateWalletDisplay();
@@ -528,9 +980,14 @@
                 
                 const cartonDiv = document.createElement('div');
                 cartonDiv.className = 'bingo-border-carton-select';
+                cartonDiv.dataset.cartonWrapperId = carton.id;
+                cartonDiv.dataset.cartonSerial = carton.serial;
                 
                 cartonDiv.innerHTML = `
-                    <h6 class="ms-2 mb-1 text-center text-muted" style="font-size: 0.8rem;">SERIAL: C${carton.serial}</h6>
+                    <div class="carton-card-head">
+                        <span class="carton-serial-label">SERIAL: C${carton.serial}</span>
+                        <button type="button" class="carton-favorite-btn favorite-carton-btn" data-favorite-carton="${carton.id}" data-carton-serial="${carton.serial}" data-game-id="${this.selectedGame}" aria-label="Marcar cartón favorito" title="Marcar favorito">&#9734;</button>
+                    </div>
                     <div class="${cartonClass}" id="carton-${carton.id}" data-carton-id="${carton.id}">
                         <div class="bingo-carton-header B"><span>B</span></div>
                         <div class="bingo-carton-header I"><span>I</span></div>
@@ -546,6 +1003,10 @@
             });
             
             this.elements.cartonsList.appendChild(fragment);
+            newCartons.forEach(carton => updateFavoriteCartonUI(carton.id));
+            updateFavoriteCartonsCount();
+            sortFavoriteCartonsFirst();
+            applyFavoriteCartonsFilter();
         }
         
         renderCartonNumbers(numbers) {
@@ -815,6 +1276,17 @@
             if (this.elements.cartonsList && this.cartonsListHandler) {
                 this.elements.cartonsList.removeEventListener('click', this.cartonsListHandler);
             }
+
+            const openFavoritesBtn = document.getElementById('toggle-favorite-cartons-filter');
+            if (openFavoritesBtn) {
+                openFavoritesBtn.onclick = null;
+            }
+
+            const searchInput = document.getElementById('carton-serial-search');
+            if (searchInput && this.searchInputHandler) {
+                searchInput.removeEventListener('input', this.searchInputHandler);
+                searchInput.removeEventListener('search', this.searchInputHandler);
+            }
             
             if (this.elements.cartonsContainer && this.scrollHandler) {
                 this.elements.cartonsContainer.removeEventListener('scroll', this.scrollHandler);
@@ -847,6 +1319,7 @@
         // Crear instancias globales
         window.currentWalletManager = new WalletManager();
         window.currentPlayerSelection = new PlayerSelection();
+        refreshAllFavoriteCartonsUI();
         
         console.log('Bingo modal initialized');
     }
@@ -866,20 +1339,13 @@
         console.log('Bingo modal cleaned up');
     }
 
-    // Event listeners para el ciclo de vida del modal
-    document.addEventListener('DOMContentLoaded', function() {
-        // Buscar el modal
-        const modal = document.querySelector('.modal-dialog');
-        if (modal) {
-            // Si el modal ya está visible, inicializar inmediatamente
-            initializeBingoModal();
-        }
-    });
+    // Inicializar al cargar la vista (ajax)
+    initializeBingoModal();
 
     // Listener para cuando se muestre el modal (si se usa Bootstrap modal)
     document.addEventListener('shown.bs.modal', function(e) {
         const modal = e.target.querySelector('.modal-dialog');
-        if (modal && modal.querySelector('#cartons-list')) {
+        if (modal && modal.querySelector('#cartons-list') && !window.currentPlayerSelection) {
             initializeBingoModal();
         }
     });

@@ -6,6 +6,10 @@
                     <div class="text-center">
                         <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo" alt="img">
                         <h5 class="mb-0 p-2"><?= translate('create account'); ?></h5>
+                        <p class="small text-muted mb-0"><?= translate('official client access'); ?>: <strong><?= esc(bingo_official_login_host()); ?></strong></p>
+                        <?php if (bingo_client_domain_enabled()): ?>
+                        <p class="small text-muted mb-0"><?= translate('client login url'); ?>: <strong><?= esc(bingo_client_login_url('/signup')); ?></strong></p>
+                        <?php endif; ?>
                     </div>
                 
                     <?php echo form_open(site_url() . 'signup/signupSubmit', array('enctype' => 'multipart/form-data', 'id' => 'signup-form'));?>

@@ -8,7 +8,7 @@ class GamesModel extends Model {
     protected $table = 'games'; 
     protected $primaryKey = 'id'; 
 
-    protected $allowedFields = ['user', 'room', 'description', 'modalities', 'price', 'date', 'time', 'award', 'type', 'url', 'video', 'reset', 'cover', 'created_at', 'updated_at', 'status'];
+    protected $allowedFields = ['user', 'room', 'description', 'modalities', 'price', 'min_players', 'date', 'time', 'award', 'type', 'url', 'video', 'reset', 'cover', 'created_at', 'updated_at', 'status'];
 
     protected $useTimestamps = true;
 

@@ -74,12 +74,123 @@
         color: #522f00;
     }
 
+    .play-filters-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 420px;
+        margin: 0 auto 0.35rem;
+        padding: 0 2px;
+    }
+
+    .play-filter-field {
+        position: relative;
+        min-width: 0;
+    }
+
+    .play-filter-field--search {
+        flex: 1 1 auto;
+    }
+
+    .play-filter-field--min {
+        flex: 0 0 34%;
+        max-width: 118px;
+    }
+
+    .play-filter-field i {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6236ff;
+        font-size: 0.78rem;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.9;
+    }
+
+    .player-play-view .play-filter-input.form-bingo {
+        width: 100%;
+        margin: 0;
+        border-width: 3px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0 12px 0 30px;
+        height: 36px;
+        line-height: 36px;
+        box-shadow: none;
+    }
+
+    .player-play-view .play-filter-input.form-bingo::placeholder {
+        color: #7a7f95;
+        font-weight: 600;
+        font-size: 0.72rem;
+    }
+
+    @media (min-width: 769px) {
+        .play-filters-bar {
+            max-width: 100%;
+            margin-bottom: 0.65rem;
+            gap: 10px;
+        }
+
+        .play-filter-field--min {
+            flex: 0 0 180px;
+            max-width: 180px;
+        }
+
+        .player-play-view .play-filter-input.form-bingo {
+            font-size: 0.92rem;
+            height: 42px;
+            line-height: 42px;
+            padding-left: 34px;
+        }
+
+        .player-play-view .play-filter-input.form-bingo::placeholder {
+            font-size: 0.85rem;
+        }
+    }
+
     .player-play-view {
-        padding-top: 5.5rem;
+        padding-top: 5.85rem;
     }
 
     .player-wallet-card {
-        margin-top: 0.5rem !important;
+        margin: 0.9rem 0.5rem 0.55rem !important;
+        padding: 0.45rem 0.55rem !important;
+    }
+
+    .player-play-view .next-game.play-countdown-panel {
+        margin-top: 0.35rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+
+    .player-play-view .text-center > .logo {
+        margin-bottom: 0.15rem;
+    }
+
+    @media (max-width: 768px) {
+        body:has(.player-play-view) {
+            align-items: flex-start !important;
+        }
+
+        #content-page:has(.player-play-view) {
+            min-height: 100dvh;
+        }
+
+        .player-play-view {
+            padding-top: 5.85rem;
+        }
+
+        .player-play-view .play-section--single {
+            max-height: calc(100dvh - 262px);
+        }
+
+        .player-play-view .play-filters-bar {
+            margin-bottom: 0.58rem;
+        }
     }
 
     @media (min-width: 769px) {
@@ -316,7 +427,7 @@
                             $user = wallet_service()->normalizeUser($user);
                             $walletTotal = wallet_total($user);
                         ?>
-                        <div class="card m-2 p-2 text-center player-wallet-card" style="background: rgba(255,255,255,0.92); border-radius: 12px;">
+                        <div class="card p-2 text-center player-wallet-card" style="background: rgba(255,255,255,0.92); border-radius: 12px;">
                             <small class="text-muted d-block">Saldo total</small>
                             <strong><?= systemGet('currency'); ?> <span class="available-wallet wallet-total-value"><?= number_format($walletTotal, 2); ?></span></strong>
                             <div class="d-flex justify-content-center gap-2 mt-1 flex-wrap" style="font-size: 0.75rem;">
@@ -403,11 +514,15 @@
                             $playSectionLayoutClass = $activeGameCount > 1 ? 'play-section--multi' : 'play-section--single';
                         ?>
                         <?php if (!empty($games)) : ?>
-                            <div class="mb-2 px-1 w-100">
-                                <input type="search" id="play-games-search" class="form-control form-control-lg form-bingo" placeholder="Buscar sala o partida..." autocomplete="off">
-                            </div>
-                            <div class="mb-2 px-1 w-100">
-                                <input type="number" id="play-min-start-filter" class="form-control form-control-lg form-bingo" min="0" step="0.01" placeholder="Mínimo de inicio (precio cartón)">
+                            <div class="play-filters-bar" id="play-filters-bar">
+                                <div class="play-filter-field play-filter-field--search">
+                                    <i class="fa-duotone fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                    <input type="search" id="play-games-search" class="form-control form-bingo play-filter-input" placeholder="Buscar sala..." autocomplete="off">
+                                </div>
+                                <div class="play-filter-field play-filter-field--min">
+                                    <i class="fa-duotone fa-solid fa-coins" aria-hidden="true"></i>
+                                    <input type="number" id="play-min-start-filter" class="form-control form-bingo play-filter-input" min="0" step="0.01" placeholder="Mín. cartón" inputmode="decimal">
+                                </div>
                             </div>
                         <?php endif; ?>
                         <div class="play-rooms-carousel" id="play-rooms-carousel">
