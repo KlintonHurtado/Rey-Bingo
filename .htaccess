@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_URI} !^/reybingo\.com/public_html/public/
+    RewriteRule ^(.*)$ /reybingo.com/public_html/public/$1 [L]
+</IfModule>

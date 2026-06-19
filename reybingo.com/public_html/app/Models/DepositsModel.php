@@ -69,4 +69,4 @@ class DepositsModel extends Model {
 
         return false;
     }
-}
+}   
