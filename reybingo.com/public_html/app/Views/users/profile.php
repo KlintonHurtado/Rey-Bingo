@@ -1,13 +1,7 @@
-
-<a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
-
-<button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();">
-    <i class="fa-duotone fa-solid fa-wallet"></i>
-</button>
-
-<button type="button" class="btn btn-small btn-gamepad" onclick="gamesGet();">
-    <i class="fa-duotone fa-solid fa-gamepad"></i>
-</button>
+<?= view('playings/partials/player_nav_cluster', [
+    'mode' => 'home',
+    'wonCartonsExtraClass' => 'btn-won-cartons-profile',
+]); ?>
 
 <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
     <?php if ($user['sounds'] == 1): ?>
@@ -24,11 +18,17 @@
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
 
 <?php if (session()->get('group') == 1) : ?>
-    <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
+    <button type="button" class="btn btn-small btn-users btn-users-profile" onclick="statisticsViewUsers();" title="<?= translate('users management'); ?>">
+        <i class="fa-duotone fa-solid fa-users"></i>
+    </button>
+    <?= view('stores/nav_button', ['extraClass' => 'btn-store-admin-right']); ?>
+    <?= view('operators/nav_button', ['extraClass' => 'btn-operators-admin-right']); ?>
+    <?= view('users/low_balance_players/nav_button', ['extraClass' => 'btn-low-balance-admin-right']) ?>
     <a class="btn btn-small btn-kyc-admin" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check"></i></a>
+    <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
 <?php endif; ?>
 
-<div class="container" style="padding-bottom: 120px; max-height: 100dvh; overflow-y: auto;">
+<div class="container admin-profile-scroll">
     <div class="row d-flex justify-content-center">
         <div class="col-md-5 col-xl-5">
             <div class="row">
@@ -119,7 +119,9 @@
                         <?= translate('do you want to update your password?'); ?> <br /> <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" href="<?= site_url('password'); ?>"><?= translate('change here'); ?></a>
                     </div>
 
-                    <?= view('users/kyc_content', ['user' => $user]); ?>
+                    <?php if (bingo_user_requires_kyc($user)) : ?>
+                        <?= view('users/kyc_content', ['user' => $user]); ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

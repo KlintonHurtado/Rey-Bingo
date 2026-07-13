@@ -151,43 +151,242 @@ class Playings extends Controller {
         }
     }
 
+    public function rouletteGames()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $modelGames = new GamesModel();
+        $modelGameRooms = new GameRoomsModel();
+
+        $games = $modelGames
+            ->where('status', 1)
+            ->where('allow_roulette_cartons', 1)
+            ->orderBy('date', 'ASC')
+            ->orderBy('time', 'ASC')
+            ->findAll();
+
+        $payload = [];
+        foreach ($games as $game) {
+            $room = $modelGameRooms->find($game['room']);
+            $payload[] = bingo_game_roulette_payload($game, $room ?: null);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'games'   => $payload,
+        ]);
+    }
+
     public function claimPrize() {
-        $cartons = $this->request->getPost('cartons');
-        if (!$cartons || !is_numeric($cartons)) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Cantidad inválida']);
+        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'No autorizado']);
+        }
+
+        if (systemGet('activateRoulette') != 1) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'La ruleta no está activa.']);
+        }
+
+        $cartons = (int) $this->request->getPost('cartons');
+
+        if ($cartons < 1) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Datos de premio inválidos']);
+        }
+
+        $modelUsers = new UsersModel();
+        $modelRoulettes = new RoulettesModel();
+        $modelNotifications = new NotificationsModel();
+
+        $user = $modelUsers->find(session()->get('id'));
+        if (! $user) {
+            return $this->response->setJSON(['status' => 'error', 'message' => translate('user not found')]);
+        }
+
+        if ((int) ($user['roulette'] ?? 1) === 1) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Ya reclamaste tu premio de ruleta.']);
+        }
+
+        $modelUsers->update($user['id'], ['roulette' => 1]);
+
+        $modelRoulettes->insert([
+            'user'    => $user['id'],
+            'game'    => null,
+            'cartons' => $cartons,
+            'price'   => 0,
+            'amount'  => 0,
+            'status'  => 0,
+        ]);
+
+        $rouletteId = $modelRoulettes->getInsertID();
+
+        $modelNotifications->insert([
+            'user'    => $user['id'],
+            'from'    => 0,
+            'type'    => 'roulette',
+            'type_id' => $rouletteId,
+            'title'   => '🎁 ' . translate('roulette'),
+            'message' => 'Reclamaste ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
+                . ' en la ruleta. Entra a "Mis cartones ganados" para elegir la partida y modalidad.',
+        ]);
+
+        return $this->response->setJSON([
+            'status'              => 'success',
+            'message'             => '¡Premio reclamado! Tus ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
+                . ' están listos para asignar.',
+            'cartons'             => $cartons,
+            'pending_cartons'     => bingo_count_pending_roulette_cartons((int) $user['id']),
+            'redirect_url'        => site_url('playings/wonCartons'),
+        ]);
+    }
+
+    public function wonCartons()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+            return redirect()->to('/signin');
+        }
+
+        $modelUsers = new UsersModel();
+        $modelGames = new GamesModel();
+        $modelGameRooms = new GameRoomsModel();
+        $modelContacts = new ContactsModel();
+
+        $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
+        if (! $user) {
+            return redirect()->to('/signin');
+        }
+
+        $contacts = $modelContacts->findAll();
+        $pendingPrizes = bingo_fetch_pending_roulette_prizes((int) $user['id']);
+        $games = $modelGames
+            ->where('status', 1)
+            ->where('allow_roulette_cartons', 1)
+            ->orderBy('date', 'ASC')
+            ->orderBy('time', 'ASC')
+            ->findAll();
+
+        $gameOptions = [];
+        foreach ($games as $game) {
+            $room = $modelGameRooms->find($game['room']);
+            $gameOptions[] = bingo_game_roulette_payload($game, $room ?: null);
+        }
+
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $data = [
+            'page' => [
+                'title' => 'Mis cartones ganados',
+            ],
+            'validation' => \Config\Services::validation(),
+            'user'       => $user,
+            'contacts'   => $contacts,
+            'imagePath'  => $imagePath,
+            'contentPage' => view('playings/won_cartons', [
+                'pendingPrizes' => $pendingPrizes,
+                'gameOptions'   => $gameOptions,
+                'pendingTotal'  => bingo_count_pending_roulette_cartons((int) $user['id']),
+                'user'          => $user,
+                'imagePath'     => $imagePath,
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function assignWonCartons()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $rouletteId = (int) $this->request->getPost('roulette_id');
+        $gameId = (int) $this->request->getPost('game_id');
+
+        if ($rouletteId <= 0 || $gameId <= 0) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Selecciona una partida válida.']);
         }
 
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelRoulettes = new RoulettesModel();
+        $modelNotifications = new NotificationsModel();
 
-        $user = $modelUsers->find(session()->get('id'));
-        $lastGame = $modelGames->orderBy('created_at', 'DESC')->first();
+        $userId = (int) session()->get('id');
+        $roulette = $modelRoulettes->find($rouletteId);
 
-        if (!$lastGame) {
+        if (! $roulette || (int) $roulette['user'] !== $userId || (int) ($roulette['status'] ?? 1) !== 0) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Premio no disponible para asignar.']);
+        }
+
+        $cartons = (int) ($roulette['cartons'] ?? 0);
+        if ($cartons < 1) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Cantidad de cartones inválida.']);
+        }
+
+        $game = $modelGames->find($gameId);
+        if (! $game || (int) $game['status'] !== 1) {
+            return $this->response->setJSON(['success' => false, 'message' => translate('game not found')]);
+        }
+
+        if (! bingo_game_allows_roulette_cartons($game)) {
             return $this->response->setJSON([
-                'status' => 'error',
-                'message' => 'No hay ninguna partida de bingo creada en el sistema para poder reclamar cartones.'
+                'success' => false,
+                'message' => translate('roulette cartons not allowed in this game'),
             ]);
         }
 
-        $credit = $cartons * $lastGame['price'];
-        wallet_credit_withdrawable($user['id'], $credit);
-        $modelUsers->update($user['id'], ['roulette' => 1]);
+        $assignment = bingo_generate_cartons_for_user($userId, $gameId, $cartons);
+        if (! $assignment['success']) {
+            return $this->response->setJSON(['success' => false, 'message' => $assignment['message']]);
+        }
 
-        $data = [
-            'user'    => session()->get('id'),
-            'cartons' => $cartons,
-            'price'   => $lastGame['price'],
-            'amount'  => $credit,
-            'status'  => 1
-        ];
+        $price = (float) $game['price'];
+        $amount = round($cartons * $price, 2);
+        $gameLabel = trim((string) ($game['description'] ?? ''));
 
-        $modelRoulettes->insert($data);
+        $modelRoulettes->update($rouletteId, [
+            'game'   => $gameId,
+            'price'  => $price,
+            'amount' => $amount,
+            'status' => 1,
+        ]);
+
+        $modelNotifications->insert([
+            'user'    => $userId,
+            'from'    => 0,
+            'type'    => 'roulette',
+            'type_id' => $rouletteId,
+            'title'   => '🎁 Cartones asignados',
+            'message' => 'Se asignaron ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
+                . ($gameLabel !== '' ? ' para la partida "' . $gameLabel . '"' : '')
+                . '. Valor: ' . systemGet('currency') . ' ' . number_format($amount, 2) . '.',
+        ]);
+
+        session()->set('game_id', $gameId);
 
         return $this->response->setJSON([
-            'status' => 'success',
-            'message' => "¡Se acreditaron $cartons cartones a tu cuenta!",
+            'success'          => true,
+            'message'          => 'Cartones asignados correctamente.',
+            'pending_cartons'  => bingo_count_pending_roulette_cartons($userId),
+            'redirect_url'     => site_url('play'),
+        ]);
+    }
+
+    public function pendingWonCartonsCountGet()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+            return $this->response->setJSON(['success' => false, 'count' => 0]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'count'   => bingo_count_pending_roulette_cartons((int) session()->get('id')),
         ]);
     }
 
@@ -367,6 +566,10 @@ class Playings extends Controller {
                 throw new \Exception(translate('insufficient wallet balance'));
             }
 
+            if ($totalCost > 0) {
+                bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $savedCartonIds);
+            }
+
             // Completar transacción
             $db->transComplete();
 
@@ -459,6 +662,53 @@ class Playings extends Controller {
             'success' => true,
             'cartons' => $cartonData,
             'hasMore' => $page < $modelCartons->pager->getPageCount()
+        ]);
+    }
+
+    public function loadFavoriteCartons()
+    {
+        $gameId = (int) $this->request->getPost('game_id');
+        $serialsRaw = $this->request->getPost('serials');
+
+        if ($gameId <= 0) {
+            return $this->response->setJSON(['success' => false, 'message' => translate('game not found')]);
+        }
+
+        $serials = is_array($serialsRaw) ? $serialsRaw : json_decode((string) $serialsRaw, true);
+        if (! is_array($serials)) {
+            $serials = [];
+        }
+
+        $serials = array_values(array_unique(array_filter(array_map(static function ($serial): string {
+            return preg_replace('/^c/i', '', trim((string) $serial));
+        }, $serials))));
+
+        if ($serials === []) {
+            return $this->response->setJSON(['success' => true, 'cartons' => []]);
+        }
+
+        $modelCartons = new CartonsModel();
+        $modelNumbersCartons = new NumbersCartonsModel();
+
+        $cartons = $modelCartons
+            ->where('game', $gameId)
+            ->where('user', 0)
+            ->whereIn('serial', $serials)
+            ->findAll();
+
+        $cartonData = [];
+        foreach ($cartons as $carton) {
+            $numbers = $modelNumbersCartons->where('carton', $carton['id'])->orderBy('position', 'ASC')->findAll();
+            $cartonData[] = [
+                'cartonId' => $carton['id'],
+                'serial'   => $carton['serial'],
+                'numbers'  => $numbers,
+            ];
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'cartons' => $cartonData,
         ]);
     }
 
@@ -1018,7 +1268,11 @@ class Playings extends Controller {
             
                 $modelNumbersCartons->insertBatch($numbersData);
 
-                wallet_deduct_purchase($user['id'], $toGenerate * $game['price']);
+                $genCost = $toGenerate * $game['price'];
+                wallet_deduct_purchase($user['id'], $genCost);
+                if ($genCost > 0) {
+                    bingo_after_carton_purchase((int) $user['id'], (int) $game['id'], (float) $genCost);
+                }
             }        
                 
             $response = [
@@ -1206,6 +1460,10 @@ class Playings extends Controller {
 
                 if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
                     throw new \Exception(translate('insufficient wallet balance'));
+                }
+
+                if ($totalCost > 0) {
+                    bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
                 }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();
@@ -1409,6 +1667,10 @@ class Playings extends Controller {
 
                 if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
                     throw new \Exception(translate('insufficient wallet balance'));
+                }
+
+                if ($totalCost > 0) {
+                    bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
                 }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();

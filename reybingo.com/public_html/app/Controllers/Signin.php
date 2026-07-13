@@ -16,6 +16,10 @@ class Signin extends Controller {
     public function index() {
         if (session()->get('logged_in') && session()->get('group') == 1) {
             return redirect()->to('/games');
+        } else if (session()->get('logged_in') && session()->get('group') == 2) {
+            return redirect()->to('/store');
+        } else if (session()->get('logged_in') && session()->get('group') == 3) {
+            return redirect()->to('/operator');
         } else if (session()->get('logged_in') && session()->get('group') == 0) {
             return redirect()->to('/play');
         }
@@ -41,6 +45,17 @@ class Signin extends Controller {
 
     public function signinSubmit() {
         $modelUsers = new UsersModel();
+
+        if (!bingo_can_authenticate_on_host()) {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'username' => translate('login must use client domain'),
+                ],
+                'redirect' => bingo_client_login_url('/signin'),
+            ];
+            return $this->response->setJSON($response);
+        }
         
         $validationRules = [
             'username' => [
@@ -141,6 +156,16 @@ class Signin extends Controller {
             $response = [
                 'success' => true,
                 'redirect' => site_url('/games')
+            ];
+        } elseif ($user['group'] == 2) {
+            $response = [
+                'success' => true,
+                'redirect' => site_url('/store')
+            ];
+        } elseif ($user['group'] == 3) {
+            $response = [
+                'success' => true,
+                'redirect' => site_url('/operator')
             ];
         } else {
             $response = [

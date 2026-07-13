@@ -132,7 +132,7 @@
                         <div class="card bingo-bg-primary text-white m-0">
                             <div class="card-body text-center p-2">
                                 <small>Acreditación manual</small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['manual_credits'] ?? 0, 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span id="kpi-manual-credits"><?= number_format($adminKpis['manual_credits'] ?? 0, 2); ?></span></div>
                             </div>
                         </div>
                     </div>
@@ -140,7 +140,7 @@
                         <div class="card bingo-bg-danger text-white m-0">
                             <div class="card-body text-center p-2">
                                 <small>Gasto de usuarios</small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['user_spend'] ?? 0, 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span id="kpi-user-spend"><?= number_format($adminKpis['user_spend'] ?? 0, 2); ?></span></div>
                             </div>
                         </div>
                     </div>
@@ -148,7 +148,7 @@
                         <div class="card bingo-bg-success text-white m-0">
                             <div class="card-body text-center p-2">
                                 <small>Total de premios</small>
-                                <div class="fw-bold"><?= systemGet('currency'); ?> <?= number_format($adminKpis['total_prizes'] ?? 0, 2); ?></div>
+                                <div class="fw-bold"><?= systemGet('currency'); ?> <span id="kpi-total-prizes"><?= number_format($adminKpis['total_prizes'] ?? 0, 2); ?></span></div>
                             </div>
                         </div>
                     </div>
@@ -161,6 +161,9 @@
                     <div class="card-body p-3">
                         <?php if (session()->get('group') == 1) : ?>
                             <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('deposit'); ?>" onclick="depositGet();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                            <button type="button" class="btn btn-success btn-sm float-end mt-4 me-2" id="export-data">
+                                <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('export'); ?>
+                            </button>
                         <?php endif; ?>
                         <div class="row g-2">
                             <!-- Búsqueda general -->
@@ -666,6 +669,7 @@
                     if (response.success) {
                         updateTablePayment(response.payments);
                         updateStatistics(response.statistics);
+                        updateAdminKpis(response.adminKpis);
                         updatePagination(response.pagination);
                         updateResultsCount(response.total, response.payments.length);
                     } else {
@@ -966,6 +970,16 @@
             `;
 
             container.html(paginationHtml).show();
+        }
+
+        function updateAdminKpis(adminKpis) {
+            if (!adminKpis) {
+                return;
+            }
+
+            $('#kpi-manual-credits').text(formatNumber(adminKpis.manual_credits || 0));
+            $('#kpi-user-spend').text(formatNumber(adminKpis.user_spend || 0));
+            $('#kpi-total-prizes').text(formatNumber(adminKpis.total_prizes || 0));
         }
 
         /**

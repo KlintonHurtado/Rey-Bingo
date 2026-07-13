@@ -33,6 +33,13 @@
                                 </select>
                                 <small id="deposit-user-error" class="text-danger d-none"></small>
                             </div>
+                            <div class="col-md-12 mb-2 d-none" id="deposit-user-stats-wrap">
+                                <p class="small text-muted mb-2 text-center">Historial del jugador seleccionado</p>
+                                <?= view('users/partials/accreditation_user_stats', [
+                                    'userStats' => ['manual_credits' => 0, 'user_spend' => 0, 'total_prizes' => 0],
+                                    'wrapperClass' => 'user-accreditation-stats deposit-user-stats',
+                                ]) ?>
+                            </div>
                         <?php endif; ?>
 
                         <div class="col-md-12 mb-1">
@@ -228,6 +235,43 @@
     $(document).ready(function () {
         infobankGet();
 
+        <?php if (session()->get('group') == 1) : ?>
+        function loadDepositUserStats(userId) {
+            const wrap = document.getElementById('deposit-user-stats-wrap');
+            if (!wrap) {
+                return;
+            }
+
+            if (!userId) {
+                wrap.classList.add('d-none');
+                return;
+            }
+
+            fetch(`<?= site_url('payments/userAccreditationStatsGet') ?>/${userId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success || !data.stats) {
+                        wrap.classList.add('d-none');
+                        return;
+                    }
+
+                    wrap.querySelector('.stat-manual-credits').textContent = formatNumber(data.stats.manual_credits || 0);
+                    wrap.querySelector('.stat-user-spend').textContent = formatNumber(data.stats.user_spend || 0);
+                    wrap.querySelector('.stat-total-prizes').textContent = formatNumber(data.stats.total_prizes || 0);
+                    wrap.classList.remove('d-none');
+                })
+                .catch(() => wrap.classList.add('d-none'));
+        }
+
+        $('#deposit-user').on('change', function() {
+            loadDepositUserStats(this.value);
+        });
+
+        if ($('#deposit-user').val()) {
+            loadDepositUserStats($('#deposit-user').val());
+        }
+        <?php endif; ?>
+
         $('#deposit-step-button').on('click', function() {
 
             var button = $('#deposit-step-button');
@@ -311,7 +355,7 @@
                         }
 
                         Toastify({
-                            text: "<?= translate('deposit sent successfully'); ?>",
+                            text: "<?= translate('deposit sent successfully'); ?> Pendiente de aprobación por un administrador.",
                             duration: 3000,
                             gravity: "top",
                             position: "right",

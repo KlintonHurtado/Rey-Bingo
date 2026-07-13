@@ -6,9 +6,18 @@
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 68px 16px 30px 16px;
     display: flex;
     flex-direction: column;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.kyc-portal-wrapper::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 /* ─── Flash alert ─────────────────────────────────────── */
 .kyc-flash {

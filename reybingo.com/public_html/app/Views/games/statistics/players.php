@@ -1,6 +1,11 @@
 <div class="row mt-4">
     <div class="col-md-12">
         <h4><?= translate('users management'); ?></h4>
+        <?php if (session()->get('group') == 1): ?>
+            <button type="button" class="btn btn-sm btn-success btn-bingo float-end" onclick="openUserExportModal();">
+                <i class="fa-duotone fa-solid fa-file-arrow-down"></i> Exportar Excel
+            </button>
+        <?php endif; ?>
     </div>
 </div>
 

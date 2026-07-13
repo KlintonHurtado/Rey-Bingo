@@ -33,6 +33,18 @@
                         <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?>" autocomplete="off" value="0.00">
                         <small id="price-error" class="text-danger d-none"></small>
                     </div>
+
+                    <div class="col-md-4 mb-1">
+                        <label for="min_players" class="form-label"><?= translate('minimum players to start'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="min_players" id="min_players" min="1" max="9999" step="1" placeholder="10" autocomplete="off" value="10">
+                        <small id="min_players-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-4 mb-1">
+                        <label for="min_cartons" class="form-label"><?= translate('minimum cartons to start'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="min_cartons" id="min_cartons" min="1" max="99999" step="1" placeholder="10" autocomplete="off" value="10">
+                        <small id="min_cartons-error" class="text-danger d-none"></small>
+                    </div>
                     
                     <div class="col-md-4 mb-1">
                         <label for="date" class="form-label"><?= translate('date'); ?></label>
@@ -93,6 +105,14 @@
                                 <option value="1"><?= translate('yes'); ?></option>
                             </select>
                             <small id="reset-error" class="text-danger d-none"></small>
+                        </div>
+
+                        <div class="col-md-12 mb-1">
+                            <label for="allow_roulette_cartons" class="form-check-label d-block">
+                                <input class="form-check-input" type="checkbox" name="allow_roulette_cartons" id="allow_roulette_cartons" value="1" checked>
+                                <?= translate('allow roulette cartons'); ?>
+                            </label>
+                            <small class="text-muted"><?= translate('allow roulette cartons help'); ?></small>
                         </div>
 
                         <div class="col-md-12 mb-1" id="type-url" style="display: none;">
@@ -401,6 +421,13 @@
                 if (response.success) {
                     window.location.href = response.redirect;
                 } else {
+                    if (response.message) {
+                        Toastify({
+                            text: response.message,
+                            duration: 4000, gravity: "top", position: "right",
+                            style: { background: "#dc3545" }, stopOnFocus: true
+                        }).showToast();
+                    }
                     if (response.errors) {
                         $.each(response.errors, function(field, message) {
                             $('#' + field + '-error').text(message).removeClass('d-none');
@@ -439,10 +466,14 @@
             $('#room').val('<?= esc($gameData['room']) ?>');
             $('#description').val('<?= esc($gameData['description']) ?>');
             $('#price').val('<?= esc($gameData['price']) ?>');
+            $('#min_players').val('<?= esc($gameData['min_players'] ?? 10) ?>');
+            $('#min_cartons').val('<?= esc($gameData['min_cartons'] ?? 10) ?>');
             $('#date').val('<?= esc($gameData['date']) ?>');
             $('#time').val('<?= date('H:i', strtotime($gameData['time'])) ?>');
             $('#award').val('<?= esc($gameData['award']) ?>');
             $('#type').val('<?= esc($gameData['type']) ?>');
+            $('#reset').val('<?= esc($gameData['reset'] ?? 2) ?>');
+            $('#allow_roulette_cartons').prop('checked', <?= ! empty($gameData['allow_roulette_cartons']) ? 'true' : 'false' ?>);
             $('#url').val('<?= esc($gameData['url']) ?>');
             $('#coverImage').attr('src', '<?= esc($cover) ?>');
             $('#game-modal-title').html('<i class="fa-duotone fa-solid fa-gamepad"></i> <?= translate('update game'); ?>');

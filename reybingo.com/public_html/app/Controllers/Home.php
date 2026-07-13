@@ -270,6 +270,14 @@ class Home extends Controller {
                 'label' => translate('language'),  
                 'rules' => 'required'
             ],
+            'activateClientDomain' => [
+                'label' => translate('activate client domain'),
+                'rules' => 'required|in_list[0,1]'
+            ],
+            'clientDomain' => [
+                'label' => translate('client domain'),
+                'rules' => 'permit_empty|max_length[255]'
+            ],
             
             // Configuración de Pagos
             'bank' => [
@@ -343,6 +351,26 @@ class Home extends Controller {
             'rateReferrals' => [
                 'label' => translate('referrals rate'),  
                 'rules' => 'required|decimal'
+            ],
+            'rateStoreCommission' => [
+                'label' => translate('store recharge commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateStoreGgrCommission' => [
+                'label' => translate('store ggr commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateStorePrizeCommission' => [
+                'label' => translate('store prize commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateOperatorCommission' => [
+                'label' => translate('operator ggr total rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'ggrSettlementMode' => [
+                'label' => translate('ggr settlement mode'),
+                'rules' => 'required|in_list[monthly,immediate]',
             ],
             'valueBGC' => [
                 'label' => translate('Bingo Coin value'),  
@@ -424,6 +452,29 @@ class Home extends Controller {
             return $this->response->setJSON($response);
         }
 
+        $activateClientDomain = (int) $this->request->getPost('activateClientDomain');
+        $clientDomain = bingo_normalize_hostname($this->request->getPost('clientDomain'));
+
+        if ($activateClientDomain === 1 && $clientDomain === '') {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'clientDomain' => translate('client domain is required when enabled'),
+                ],
+            ];
+            return $this->response->setJSON($response);
+        }
+
+        if ($clientDomain !== '' && !preg_match('/^[a-z0-9]([a-z0-9\-\.]*[a-z0-9])?$/i', $clientDomain)) {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'clientDomain' => translate('client domain format is invalid'),
+                ],
+            ];
+            return $this->response->setJSON($response);
+        }
+
         // Organizar datos por secciones
         $generalSettings = [
             'name' => $this->request->getPost('name'),
@@ -436,7 +487,9 @@ class Home extends Controller {
             'country' => $this->request->getPost('country'),
             'language' => $this->request->getPost('language'),
             'accountInstagram' => $this->request->getPost('accountInstagram'),
-            'linkGroup' => $this->request->getPost('linkGroup')
+            'linkGroup' => $this->request->getPost('linkGroup'),
+            'activateClientDomain' => (string) $activateClientDomain,
+            'clientDomain' => $clientDomain,
         ];
 
         $paymentSettings = [
@@ -473,6 +526,12 @@ class Home extends Controller {
             'rateExchange' => $this->request->getPost('rateExchange'),
             'rateEarnings' => $this->request->getPost('rateEarnings') / 100,
             'rateReferrals' => $this->request->getPost('rateReferrals') / 100,
+            'rateStoreCommission' => ((float) ($this->request->getPost('rateStoreCommission') ?: 0)) / 100,
+            'rateStoreGgrCommission' => ((float) ($this->request->getPost('rateStoreGgrCommission') ?: 0)) / 100,
+            'rateStorePrizeCommission' => ((float) ($this->request->getPost('rateStorePrizeCommission') ?: 0)) / 100,
+            'rateOperatorCommission' => ((float) ($this->request->getPost('rateOperatorCommission') ?: 0)) / 100,
+            'ggrSettlementMode' => $this->request->getPost('ggrSettlementMode') === 'immediate' ? 'immediate' : 'monthly',
+            'autoApproveGgrCommissions' => $this->request->getPost('ggrSettlementMode') === 'immediate' ? '1' : '0',
             'valueBGC' => $this->request->getPost('valueBGC'),
             'rateBGC' => $this->request->getPost('rateBGC') / 100,
             'registrationBonus' => $this->request->getPost('registrationBonus'),

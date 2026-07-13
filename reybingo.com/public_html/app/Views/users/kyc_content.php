@@ -1,4 +1,8 @@
 <?php
+if (! bingo_user_requires_kyc($user)) {
+    return;
+}
+
 $kycStatus = $user['kyc_status'] ?? 'pending';
 $kycLabels = [
     'pending'  => ['Pendiente', 'warning'],

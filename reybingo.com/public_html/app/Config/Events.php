@@ -3,7 +3,6 @@
 namespace Config;
 
 use CodeIgniter\Events\Events;
-use CodeIgniter\Exceptions\FrameworkException;
 
 /*
  * --------------------------------------------------------------------
@@ -25,7 +24,8 @@ use CodeIgniter\Exceptions\FrameworkException;
 Events::on('pre_system', static function (): void {
     if (ENVIRONMENT !== 'testing') {
         if (ini_get('zlib.output_compression')) {
-            throw FrameworkException::forEnabledZlibOutputCompression();
+            // Hostinger y otros hostings suelen tener zlib activo; no tumbar la app.
+            log_message('warning', 'zlib.output_compression está activo en el servidor.');
         }
 
         while (ob_get_level() > 0) {
@@ -36,4 +36,28 @@ Events::on('pre_system', static function (): void {
     }
 
     // Debug Toolbar desactivado (no mostrar barra inferior en el navegador)
+});
+
+Events::on('post_controller_constructor', static function (): void {
+    if (function_exists('bingo_ensure_games_schema')) {
+        bingo_ensure_games_schema();
+    }
+    if (function_exists('bingo_ensure_deposits_schema')) {
+        bingo_ensure_deposits_schema();
+    }
+    if (function_exists('bingo_ensure_users_schema')) {
+        bingo_ensure_users_schema();
+    }
+    if (function_exists('bingo_ensure_system_settings_schema')) {
+        bingo_ensure_system_settings_schema();
+    }
+    if (function_exists('bingo_ensure_roulettes_schema')) {
+        bingo_ensure_roulettes_schema();
+    }
+    if (function_exists('bingo_ensure_low_balance_grants_schema')) {
+        bingo_ensure_low_balance_grants_schema();
+    }
+    if (function_exists('bingo_ensure_affiliate_ggr_schema')) {
+        bingo_ensure_affiliate_ggr_schema();
+    }
 });

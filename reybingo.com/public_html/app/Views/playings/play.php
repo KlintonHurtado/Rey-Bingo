@@ -1,15 +1,10 @@
-
-<a class="btn btn-small btn-profile" href="<?= site_url('profile'); ?>"><img src="<?= $imagePath ?>" alt="img"></a>
-
-<button type="button" class="btn btn-small btn-wallet btn-wallet-profile" onclick="paymentsGet();">
-    <i class="fa-duotone fa-solid fa-wallet"></i>
-</button>
+<?= view('playings/partials/player_nav_cluster', [
+    'mode' => 'avatar',
+    'imagePath' => $imagePath,
+    'wonCartonsExtraClass' => 'btn-won-cartons-play',
+]); ?>
 
 <span class="code-bgc fs-3 hidden" id="copyCode"><?= $user["code"] ?></span>
-
-<button type="button" class="btn btn-small btn-gamepad btn-gamepad-profile" onclick="gamesGet();">
-    <i class="fa-duotone fa-solid fa-gamepad"></i>
-</button>
 
 <button type="button" class="btn btn-small btn-qrcode" onclick="referralsGet();">
     <i class="fa-duotone fa-solid fa-qrcode"></i>
@@ -41,6 +36,25 @@
     .next-game:empty {
         display: none;
     }
+    .play-countdown-panel {
+        display: inline-block;
+        max-width: 100%;
+        line-height: 1.35;
+        letter-spacing: 0.02em;
+    }
+    .card-time-display {
+        display: inline-block;
+        margin-top: 2px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(9, 8, 39, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.68rem;
+        line-height: 1.2;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
     .favorite-game-btn {
         border: 0;
         background: rgba(255, 255, 255, 0.24);
@@ -55,20 +69,95 @@
         color: #522f00;
     }
 
-    .player-play-view {
-        padding-top: 5.5rem;
+    .play-filters-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 420px;
+        margin: 0 auto 0.35rem;
+        padding: 0 2px;
     }
 
-    .player-wallet-card {
-        margin-top: 0.5rem !important;
+    .play-filter-field {
+        position: relative;
+        min-width: 0;
+    }
+
+    .play-filter-field--search {
+        flex: 1 1 auto;
+    }
+
+    .play-filter-field--min {
+        flex: 0 0 34%;
+        max-width: 118px;
+    }
+
+    .play-filter-field i {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6236ff;
+        font-size: 0.78rem;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.9;
+    }
+
+    .player-play-view .play-filter-input.form-bingo {
+        width: 100%;
+        margin: 0;
+        border-width: 3px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0 12px 0 30px;
+        height: 36px;
+        line-height: 36px;
+        box-shadow: none;
+    }
+
+    .player-play-view .play-filter-input.form-bingo::placeholder {
+        color: #7a7f95;
+        font-weight: 600;
+        font-size: 0.72rem;
     }
 
     @media (min-width: 769px) {
-        .player-play-view {
-            padding-top: 2rem;
+        .play-filters-bar {
+            max-width: 720px;
+            margin-bottom: 0.75rem;
+            gap: 12px;
+        }
+
+        .play-filter-field--min {
+            flex: 0 0 160px;
+            max-width: 160px;
+        }
+
+        .player-play-view .play-filter-input.form-bingo {
+            font-size: 0.95rem;
+            height: 46px;
+            line-height: 46px;
+            padding-left: 38px;
+        }
+
+        .player-play-view .play-filter-input.form-bingo::placeholder {
+            font-size: 0.9rem;
         }
     }
 
+    .player-play-view {
+        padding-top: 5.85rem;
+    }
+
+    .player-wallet-card {
+        margin: 0.9rem 0.5rem 0.55rem !important;
+        padding: 0.45rem 0.55rem !important;
+    }
+
+    @media (max-width: 768px) {
     .player-play-view .play-section--multi {
         height: auto;
         min-height: 0;
@@ -218,6 +307,42 @@
         margin-bottom: 4px !important;
     }
 
+        body:has(.player-play-view) {
+            align-items: flex-start !important;
+        }
+
+        #content-page:has(.player-play-view) {
+            min-height: 100dvh;
+        }
+
+        .player-play-view {
+            padding-top: 5.85rem;
+        }
+
+        .player-play-view .play-section--single {
+            max-height: calc(100dvh - 262px);
+        }
+
+        .player-play-view .play-filters-bar {
+            margin-bottom: 0.58rem;
+        }
+    }
+
+    .player-play-view .next-game.play-countdown-panel {
+        margin-top: 0.35rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+
+    .player-play-view .text-center > .logo {
+        margin-bottom: 0.15rem;
+    }
+
+    @media (min-width: 769px) {
+        .player-play-view {
+            padding-top: 5.5rem;
+        }
+    }
+
     .play-rooms-carousel {
         position: relative;
         width: 100%;
@@ -292,12 +417,12 @@
                             <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo w-50" alt="img">
                         <?php endif; ?>
                         <h5 class="mb-0 p-2 hidden"><?= translate('hello'); ?>, <?= session()->get('firstname'); ?>!</h5>
-                        <h6 class="text-white text-center next-game mt-2 text-uppercase"></h6>
+                        <h6 class="text-white text-center next-game play-countdown-panel mt-2 text-uppercase"></h6>
                         <?php
                             $user = wallet_service()->normalizeUser($user);
                             $walletTotal = wallet_total($user);
                         ?>
-                        <div class="card m-2 p-2 text-center player-wallet-card" style="background: rgba(255,255,255,0.92); border-radius: 12px;">
+                        <div class="card p-2 text-center player-wallet-card" style="background: rgba(255,255,255,0.92); border-radius: 12px;">
                             <small class="text-muted d-block">Saldo total</small>
                             <strong><?= systemGet('currency'); ?> <span class="available-wallet wallet-total-value"><?= number_format($walletTotal, 2); ?></span></strong>
                             <div class="d-flex justify-content-center gap-2 mt-1 flex-wrap" style="font-size: 0.75rem;">
@@ -383,11 +508,20 @@
                             $playCardsLayoutClass = $activeGameCount > 1 ? 'play-cards--multi' : 'play-cards--single';
                             $playSectionLayoutClass = $activeGameCount > 1 ? 'play-section--multi' : 'play-section--single';
                         ?>
+                        <?php if (!empty($games)) : ?>
+                            <div class="play-filters-bar" id="play-filters-bar">
+                                <div class="play-filter-field play-filter-field--search">
+                                    <i class="fa-duotone fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                    <input type="search" id="play-games-search" class="form-control form-bingo play-filter-input" placeholder="Buscar sala..." autocomplete="off">
+                                </div>
+                                <div class="play-filter-field play-filter-field--min">
+                                    <i class="fa-duotone fa-solid fa-coins" aria-hidden="true"></i>
+                                    <input type="number" id="play-min-start-filter" class="form-control form-bingo play-filter-input" min="0" step="0.01" placeholder="Mín. cartón" inputmode="decimal">
+                                </div>
+                            </div>
+                        <?php endif; ?>
                         <div class="play-rooms-carousel" id="play-rooms-carousel">
                             <div class="play-section play-section--rooms <?= esc($playSectionLayoutClass) ?> p-2">
-                            <?php if (!empty($games)) : ?>
-                                <!-- Buscadores removidos según solicitud -->
-                            <?php endif; ?>
                             <div class="play-cards <?= esc($playCardsLayoutClass) ?>">
                                 <?php if (!empty($games)) : ?>
                                     <?php
@@ -398,10 +532,10 @@
                                     ?>
                                     <?php foreach ($games as $index => $game): ?>
                                         <div class="play-room-slide">
-                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>">
+                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                             <div class="text-end p-1 pb-0">
-                                                <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">Γÿå</button>
+                                                <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">&#9734;</button>
                                             </div>
                                             <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
                                             <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
@@ -416,7 +550,7 @@
                                             <ul class="list-group list-group-flush">
                                                 <li class="p-0" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
                                                 <li class="p-0" id="card-accumulated-<?= $game['id'] ?>"></li>
-                                                <li class="p-0" style="font-size: 0.7rem;" id="card-time-<?= $game['id'] ?>"></li>
+                                                <li class="p-0" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
                                             </ul>
                                             <div class="card-body p-1">
                                                 <?php if ($game['cartons'] >= 1) : ?>
@@ -631,6 +765,10 @@
     <?php endif; ?>
 
     window.setPlayRoomSlideWidths = function setPlayRoomSlideWidths() {
+        if (window.innerWidth >= 769) {
+            return;
+        }
+
         const playSection = document.querySelector('.play-section--rooms.play-section--multi');
         const cardsContainer = playSection ? playSection.querySelector('.play-cards--multi') : null;
         if (!playSection || !cardsContainer) {
@@ -653,6 +791,13 @@
         const nextBtn = document.getElementById('play-rooms-scroll-next');
 
         if (!carousel || !playSection || !prevBtn || !nextBtn) {
+            return;
+        }
+
+        if (window.innerWidth >= 769) {
+            prevBtn.classList.remove('is-visible');
+            nextBtn.classList.remove('is-visible');
+            carousel.classList.remove('has-scroll-right', 'has-scroll-left');
             return;
         }
 
@@ -789,12 +934,81 @@
             const gameId = parseInt(btn.getAttribute('data-favorite-game') || '0', 10);
             const isFavorite = favorites.includes(gameId);
             btn.classList.toggle('is-favorite', isFavorite);
-            btn.textContent = isFavorite ? 'Γÿà' : 'Γÿå';
+            btn.textContent = isFavorite ? '\u2605' : '\u2606';
         });
 
         if (typeof window.syncPlayCardsLayout === 'function') {
             window.syncPlayCardsLayout();
         }
+    }
+
+    function formatPlayCountdownText(targetDate) {
+        const timeDiff = targetDate - Date.now();
+        if (timeDiff <= 0) {
+            return '¡EL JUEGO YA INICIÓ!';
+        }
+
+        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+        if (days > 0) {
+            return `INICIA EN: ${days} DÍA${days > 1 ? 'S' : ''} ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        }
+        if (hours > 0) {
+            return `INICIA EN: ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        }
+        if (minutes === 0) {
+            const sec = Math.max(0, seconds);
+            return `INICIA EN: ${sec} SEGUNDO${sec === 1 ? '' : 'S'}`;
+        }
+        return `INICIA EN: ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MINUTO${minutes === 1 ? '' : 'S'}`;
+    }
+
+    function initPlayRoomCountdowns() {
+        const cards = document.querySelectorAll('.play-cards .card[data-game-start]');
+        cards.forEach(function(card) {
+            const gameId = card.getAttribute('data-game-id');
+            const startValue = card.getAttribute('data-game-start');
+            const timeEl = document.querySelector(`#card-time-${gameId} .card-time-display`);
+            const btnPlay = document.getElementById(`card-button-play-${gameId}`);
+            const btnBuy = document.getElementById(`card-button-buy-${gameId}`);
+
+            if (!gameId || !startValue || !timeEl) {
+                return;
+            }
+
+            const targetDate = new Date(startValue.replace(' ', 'T'));
+            if (Number.isNaN(targetDate.getTime())) {
+                return;
+            }
+
+            const tick = function() {
+                const text = formatPlayCountdownText(targetDate);
+                timeEl.textContent = text;
+                const started = text === '¡EL JUEGO YA INICIÓ!';
+
+                if (btnBuy) {
+                    btnBuy.disabled = started;
+                    btnBuy.classList.toggle('disabled', started);
+                    btnBuy.textContent = started ? 'Jugando...' : '<?= translate('buy cartons'); ?>';
+                }
+
+                if (btnPlay && started) {
+                    const hasCartons = card.getAttribute('data-has-cartons') === '1';
+                    btnPlay.disabled = !hasCartons;
+                    btnPlay.classList.toggle('disabled', !hasCartons);
+                    btnPlay.textContent = hasCartons ? '<?= translate('come in to play'); ?>' : 'No disponible';
+                }
+            };
+
+            tick();
+            if (!window._playRoomCountdownTimers) {
+                window._playRoomCountdownTimers = [];
+            }
+            window._playRoomCountdownTimers.push(setInterval(tick, 1000));
+        });
     }
 
     document.getElementById('play-games-search')?.addEventListener('input', applyGameFiltersAndFavorites);
@@ -819,6 +1033,10 @@
             window.syncPlayCardsLayout();
         } else if (typeof window.initPlayRoomsScrollHints === 'function') {
             window.initPlayRoomsScrollHints();
+        }
+
+        if (typeof initPlayRoomCountdowns === 'function') {
+            initPlayRoomCountdowns();
         }
 
         if (typeof window.refreshWalletFromServer === 'function') {

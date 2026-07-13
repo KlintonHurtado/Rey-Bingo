@@ -526,6 +526,8 @@
 
     <div class="modal fade" id="modalUser" tabindex="-1" role="dialog"></div>
 
+    <div class="modal fade" id="modalUserExport" tabindex="-1" role="dialog"></div>
+
     <div class="modal fade" id="modalUserDetails" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">

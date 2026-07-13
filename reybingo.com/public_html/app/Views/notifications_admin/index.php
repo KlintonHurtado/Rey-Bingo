@@ -24,7 +24,7 @@
 
 <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
 
-<div class="container" style="max-height: 600px; overflow: auto;">
+<div class="container">
     <div class="row d-flex justify-content-center">
         <div class="col-md-12">
             <div class="row">

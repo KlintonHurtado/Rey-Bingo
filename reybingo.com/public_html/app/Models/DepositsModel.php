@@ -9,7 +9,7 @@ class DepositsModel extends Model {
     protected $primaryKey = 'id'; // Llave primaria
 
     // Campos permitidos para insert/update
-    protected $allowedFields = ['user', 'account', 'method', 'bank', 'document', 'phone', 'reference', 'amount', 'date', 'voucher', 'observation', 'created_at', 'updated_at', 'status'];
+    protected $allowedFields = ['user', 'store', 'account', 'method', 'bank', 'document', 'phone', 'reference', 'amount', 'commission_amount', 'date', 'voucher', 'observation', 'created_at', 'updated_at', 'status'];
 
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;

@@ -6,7 +6,13 @@
                     <div class="text-center">
                         <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo" alt="img">
                         <h5 class="mb-0 p-2"><?= translate('login'); ?></h5>
-                        <p class="small text-muted mb-0">Acceso oficial: <strong><?= esc(parse_url(base_url(), PHP_URL_HOST) ?: base_url()); ?></strong></p>
+                        <?php if (($registeredType ?? '') === 'store' || service('request')->getGet('registered') === 'store') : ?>
+                            <div class="alert alert-success py-2 px-3 small mb-2"><?= translate('store account created sign in'); ?></div>
+                        <?php endif; ?>
+                        <p class="small text-muted mb-0"><?= translate('official client access'); ?>: <strong><?= esc(bingo_official_login_host()); ?></strong></p>
+                        <?php if (bingo_client_domain_enabled()): ?>
+                        <p class="small text-muted mb-0"><?= translate('client login url'); ?>: <strong><?= esc(bingo_client_login_url('/signin')); ?></strong></p>
+                        <?php endif; ?>
                     </div>
             
                     <?php echo form_open(site_url() . 'signin/signinSubmit', array('enctype' => 'multipart/form-data', 'id' => 'signin-form'));?>

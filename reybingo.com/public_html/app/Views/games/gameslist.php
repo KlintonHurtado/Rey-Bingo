@@ -127,6 +127,17 @@
 <?php endif; ?>
 
 <script type="text/javascript">
+    function notifyMinPlayersRequired(message) {
+        Toastify({
+            text: message,
+            duration: 4000,
+            gravity: "top",
+            position: "right",
+            style: { background: "#dc3545" },
+            stopOnFocus: true
+        }).showToast();
+    }
+
     function gameslistGetPage(page) {
         var date = $('#datefilter').val() || 'all';
         var room = $('#roomfilter').val() || 'all';
@@ -175,10 +186,9 @@
             if (data.success) {
                 window.location.href = data.redirect;
             } else {
-                console.error('error when starting the game:', data.message || 'unknown error');
                 Toastify({
-                    text: "<?= translate('the game could not be started. try again'); ?>",
-                    duration: 3000,
+                    text: data.message || "<?= translate('the game could not be started. try again'); ?>",
+                    duration: 4000,
                     gravity: "top",
                     position: "right",
                     style: { background: "#dc3545" },
@@ -211,10 +221,9 @@
             if (data.success) {
                 window.location.href = data.redirect;
             } else {
-                console.error('error when starting the game:', data.message || 'unknown error');
                 Toastify({
-                    text: "<?= translate('the game could not be started. try again'); ?>",
-                    duration: 3000,
+                    text: data.message || "<?= translate('the game could not be started. try again'); ?>",
+                    duration: 4000,
                     gravity: "top",
                     position: "right",
                     style: { background: "#dc3545" },

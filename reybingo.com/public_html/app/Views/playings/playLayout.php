@@ -1,15 +1,10 @@
-
-<a class="btn btn-small btn-profile" href="<?= site_url('profile'); ?>"><img src="<?= $imagePath ?>" alt="img"></a>
-
-<button type="button" class="btn btn-small btn-wallet btn-wallet-profile" onclick="paymentsGet();">
-    <i class="fa-duotone fa-solid fa-wallet"></i>
-</button>
+<?= view('playings/partials/player_nav_cluster', [
+    'mode' => 'avatar',
+    'imagePath' => $imagePath,
+    'showWonCartons' => false,
+]); ?>
 
 <span class="code-bgc fs-3 hidden" id="copyCode"><?= $user["code"] ?></span>
-
-<button type="button" class="btn btn-small btn-gamepad btn-gamepad-profile" onclick="gamesGet();">
-    <i class="fa-duotone fa-solid fa-gamepad"></i>
-</button>
 
 <button type="button" class="btn btn-small btn-qrcode" onclick="referralsGet();">
     <i class="fa-duotone fa-solid fa-qrcode"></i>

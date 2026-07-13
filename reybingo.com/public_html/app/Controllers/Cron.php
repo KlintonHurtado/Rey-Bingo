@@ -353,6 +353,7 @@ class Cron extends Controller
                         'status' => 0, // finalizado
                         'updated_at' => $now
                     ]);
+                    bingo_on_game_finished($gameId);
                     log_message('info', "Juego {$gameId} finalizado automáticamente");
                     continue;
                 }
@@ -393,6 +394,7 @@ class Cron extends Controller
                         'status' => 0,
                         'updated_at' => $now
                     ]);
+                    bingo_on_game_finished($gameId);
                     log_message('info', "Juego {$gameId} completado tras cantar bola {$number}");
                 }
             }
@@ -455,6 +457,7 @@ class Cron extends Controller
                         'status' => 0, // finalizado
                         'updated_at' => $now
                     ]);
+                    bingo_on_game_finished($gameId);
                     log_message('info', "Juego {$gameId} finalizado automáticamente");
                     continue;
                 }
@@ -496,6 +499,7 @@ class Cron extends Controller
                         'status' => 0,
                         'updated_at' => $now
                     ]);
+                    bingo_on_game_finished($gameId);
                     log_message('info', "Juego {$gameId} completado tras cantar bola {$number}");
                 }
             }
@@ -576,6 +580,7 @@ class Cron extends Controller
                     'updated_at' => $now
                 ]);
 
+                bingo_on_game_finished($gameId);
                 $gamesCompleted[] = $gameId;
                 log_message('info', "Juego {$gameId} finalizado automáticamente - ya completado");
                 continue; // IMPORTANTE: No procesar más este juego
@@ -618,6 +623,7 @@ class Cron extends Controller
                     'status' => 0,
                     'updated_at' => $now
                 ]);
+                bingo_on_game_finished($gameId);
                 $gamesCompleted[] = $gameId;
                 log_message('info', "Juego {$gameId} completado tras cantar bola {$number}");
             }
@@ -1611,5 +1617,19 @@ class Cron extends Controller
         }
 
         return true;
+    }
+
+    public function settleMonthlyGgr()
+    {
+        helper('affiliate_ggr');
+
+        $yearMonth = trim((string) $this->request->getGet('period'));
+        if ($yearMonth === '') {
+            $yearMonth = null;
+        }
+
+        $result = bingo_settle_monthly_ggr_commissions($yearMonth);
+
+        return $this->response->setJSON($result);
     }
 }
