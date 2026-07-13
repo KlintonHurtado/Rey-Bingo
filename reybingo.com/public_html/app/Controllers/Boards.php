@@ -306,7 +306,7 @@ class Boards extends Controller {
         if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
             return $this->response->setJSON([
                 'status' => 'error',
-                'message' => bingo_min_players_start_message($game),
+                'message' => bingo_game_start_block_message($game),
             ]);
         }
 
@@ -419,7 +419,7 @@ class Boards extends Controller {
         if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
             return $this->response->setJSON([
                 'status' => 'error',
-                'message' => bingo_min_players_start_message($game),
+                'message' => bingo_game_start_block_message($game),
             ]);
         }
 
@@ -550,6 +550,7 @@ class Boards extends Controller {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
             $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+            bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
 
             return $this->response->setJSON([
                 'status' => 'completed',
@@ -585,6 +586,7 @@ class Boards extends Controller {
                 bingo_ensure_winners_registered((int) $game['id']);
                 $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
                 $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
                 
                 return $this->response->setJSON([
                     'status' => 'completed',
@@ -620,6 +622,7 @@ class Boards extends Controller {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
             $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+            bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
             
             return $this->response->setJSON([
                 'status' => 'completed',

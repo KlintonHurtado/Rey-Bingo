@@ -186,6 +186,10 @@
                         window.location.href = response.redirect;
                     } else {
                         if (response.errors) {
+                            if (response.errors.username || response.errors.email || response.errors.password || response.errors.password_confirm) {
+                                $('#signup-step-1').hide();
+                                $('#signup-step-2').show();
+                            }
                             $.each(response.errors, function(field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');

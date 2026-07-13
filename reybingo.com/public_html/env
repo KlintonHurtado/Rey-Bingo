@@ -1,82 +1,84 @@
 #--------------------------------------------------------------------
-# Example Environment Configuration file
-#
-# This file can be used as a starting point for your own
-# custom .env files, and contains most of the possible settings
-# available in a default install.
-#
-# By default, all of the settings are commented out. If you want
-# to override the setting, you must un-comment it by removing the '#'
-# at the beginning of the line.
+# REY BINGO - Hostinger (bingo.reybingo.com)
+# Copia este archivo como ".env" en public_html (con el punto al inicio)
 #--------------------------------------------------------------------
 
 #--------------------------------------------------------------------
 # ENVIRONMENT
 #--------------------------------------------------------------------
-
-# CI_ENVIRONMENT = development
+CI_ENVIRONMENT = production
 
 #--------------------------------------------------------------------
 # APP
 #--------------------------------------------------------------------
-
-# app.baseURL = ''
-# If you have trouble with `.`, you could also use `_`.
-# app_baseURL = ''
-# app.forceGlobalSecureRequests = false
-# app.CSPEnabled = false
+app.baseURL = 'https://bingo.reybingo.com/'
+app.forceGlobalSecureRequests = true
+app.CSPEnabled = false
 
 #--------------------------------------------------------------------
-# DATABASE
+# DATABASE (verifica en hPanel > Bases de datos)
 #--------------------------------------------------------------------
-
-# database.default.hostname = localhost
-# database.default.database = ci4
-# database.default.username = root
-# database.default.password = root
-# database.default.DBDriver = MySQLi
-# database.default.DBPrefix =
-# database.default.port = 3306
-
-# If you use MySQLi as tests, first update the values of Config\Database::$tests.
-# database.tests.hostname = localhost
-# database.tests.database = ci4_test
-# database.tests.username = root
-# database.tests.password = root
-# database.tests.DBDriver = MySQLi
-# database.tests.DBPrefix =
-# database.tests.charset = utf8mb4
-# database.tests.DBCollat = utf8mb4_general_ci
-# database.tests.port = 3306
+database.default.hostname = localhost
+database.default.database = u154283797_bingo
+database.default.username = u154283797_bingo
+database.default.password = 'adminBingo1234*.Juego'
+database.default.DBDriver = MySQLi
+database.default.DBPrefix =
+database.default.port = 3306
+database.default.charset = utf8mb4
+database.default.DBCollat = utf8mb4_general_ci
 
 #--------------------------------------------------------------------
 # ENCRYPTION
+# Genera una clave en el servidor con: php spark key:generate
+# O pega aqui la salida hex2bin:... que te devuelva ese comando
 #--------------------------------------------------------------------
-
 # encryption.key =
 
 #--------------------------------------------------------------------
-# SESSION
+# SESSION (opcional: por defecto usa base de datos - tabla ci_sessions)
 #--------------------------------------------------------------------
-
-# session.driver = 'CodeIgniter\Session\Handlers\FileHandler'
-# session.savePath = null
+# session.driver = 'CodeIgniter\Session\Handlers\DatabaseHandler'
+# session.savePath = ci_sessions
 
 #--------------------------------------------------------------------
 # LOGGER
 #--------------------------------------------------------------------
-
 # logger.threshold = 4
-app.baseURL = 'https://bingo.hubbills.com/'   # O la URL de tu hosting
 
-# --- Pusher Channels ---
-PUSHER_APP_ID="2056936"
-PUSHER_KEY="2122f1f7f38d52589522"
-PUSHER_SECRET="46ea09ab5b8cdcd96913"
-PUSHER_CLUSTER="us2"   # cambia según tu panel de Pusher
-PUSHER_USETLS=true
+#--------------------------------------------------------------------
+# PUSHER (tiempo real en partidas)
+#--------------------------------------------------------------------
+PUSHER_APP_ID = 2056936
+PUSHER_APP_KEY = 2122f1f7f38d52589522
+PUSHER_APP_SECRET = 46ea09ab5b8cdcd96913
+PUSHER_APP_CLUSTER = us2
 
-# --- Juego ---
-# Si quieres cartón completo: 45
-# Si quieres que baste con 24 aciertos: 24
-REQUIRED_MATCHES=24
+# Alias usados en vistas y PusherFactory
+PUSHER_KEY = 2122f1f7f38d52589522
+PUSHER_SECRET = 46ea09ab5b8cdcd96913
+PUSHER_CLUSTER = us2
+PUSHER_USETLS = true
+
+#--------------------------------------------------------------------
+# JUEGO
+#--------------------------------------------------------------------
+REQUIRED_MATCHES = 24
+
+#--------------------------------------------------------------------
+# STRIPE (opcional - si no usas Stripe, deja comentado)
+#--------------------------------------------------------------------
+# stripe.secretKey =
+# stripe.currency = usd
+# stripe.webhookSecret =
+
+#--------------------------------------------------------------------
+# WEBHOOKS (opcional)
+#--------------------------------------------------------------------
+# payment.webhookSecret =
+
+#--------------------------------------------------------------------
+# PUSH NOTIFICATIONS (opcional)
+#--------------------------------------------------------------------
+# push.vapid.publicKey =
+# push.vapid.privateKey =

@@ -9,7 +9,7 @@ class RoulettesModel extends Model {
     protected $primaryKey = 'id'; // Llave primaria
 
     // Campos permitidos para insert/update
-    protected $allowedFields = ['user', 'cartons', 'price', 'amount', 'status', 'created_at', 'updated_at'];
+    protected $allowedFields = ['user', 'game', 'cartons', 'price', 'amount', 'status', 'created_at', 'updated_at'];
 
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;

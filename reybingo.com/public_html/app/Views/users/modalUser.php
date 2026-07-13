@@ -95,6 +95,8 @@
                         <select class="form-control form-control-lg form-bingo" name="group" id="group">
                             <option value="0" <?= $isUpdate && $userData['group'] == 0 ? 'selected' : ''; ?>><?= translate('player'); ?></option>
                             <option value="1" <?= $isUpdate && $userData['group'] == 1 ? 'selected' : ''; ?>><?= translate('admin'); ?></option>
+                            <option value="2" <?= $isUpdate && $userData['group'] == 2 ? 'selected' : ''; ?>><?= translate('point of sale'); ?></option>
+                            <option value="3" <?= $isUpdate && $userData['group'] == 3 ? 'selected' : ''; ?>><?= translate('operator'); ?></option>
                         </select>
                     </div>
 
@@ -107,7 +109,7 @@
                     </div>
 
                     <div class="col-md-6 mb-2">
-                        <label for="is_reseller" class="form-label">Punto de venta / afiliado</label>
+                        <label for="is_reseller" class="form-label"><?= translate('point of sale'); ?></label>
                         <select class="form-control form-control-lg form-bingo" name="is_reseller" id="is_reseller">
                             <option value="0" <?= $isUpdate && (int) ($userData['is_reseller'] ?? 0) === 0 ? 'selected' : ''; ?>><?= translate('no'); ?></option>
                             <option value="1" <?= $isUpdate && (int) ($userData['is_reseller'] ?? 0) === 1 ? 'selected' : ''; ?>><?= translate('yes'); ?></option>

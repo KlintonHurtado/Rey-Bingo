@@ -352,6 +352,26 @@ class Home extends Controller {
                 'label' => translate('referrals rate'),  
                 'rules' => 'required|decimal'
             ],
+            'rateStoreCommission' => [
+                'label' => translate('store recharge commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateStoreGgrCommission' => [
+                'label' => translate('store ggr commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateStorePrizeCommission' => [
+                'label' => translate('store prize commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'rateOperatorCommission' => [
+                'label' => translate('operator ggr total rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+            'ggrSettlementMode' => [
+                'label' => translate('ggr settlement mode'),
+                'rules' => 'required|in_list[monthly,immediate]',
+            ],
             'valueBGC' => [
                 'label' => translate('Bingo Coin value'),  
                 'rules' => 'required|decimal'
@@ -506,6 +526,12 @@ class Home extends Controller {
             'rateExchange' => $this->request->getPost('rateExchange'),
             'rateEarnings' => $this->request->getPost('rateEarnings') / 100,
             'rateReferrals' => $this->request->getPost('rateReferrals') / 100,
+            'rateStoreCommission' => ((float) ($this->request->getPost('rateStoreCommission') ?: 0)) / 100,
+            'rateStoreGgrCommission' => ((float) ($this->request->getPost('rateStoreGgrCommission') ?: 0)) / 100,
+            'rateStorePrizeCommission' => ((float) ($this->request->getPost('rateStorePrizeCommission') ?: 0)) / 100,
+            'rateOperatorCommission' => ((float) ($this->request->getPost('rateOperatorCommission') ?: 0)) / 100,
+            'ggrSettlementMode' => $this->request->getPost('ggrSettlementMode') === 'immediate' ? 'immediate' : 'monthly',
+            'autoApproveGgrCommissions' => $this->request->getPost('ggrSettlementMode') === 'immediate' ? '1' : '0',
             'valueBGC' => $this->request->getPost('valueBGC'),
             'rateBGC' => $this->request->getPost('rateBGC') / 100,
             'registrationBonus' => $this->request->getPost('registrationBonus'),

@@ -1,42 +1,100 @@
+(function () {
+    var APP_LOADED_KEY = 'reybingo-app-loaded';
+    var preloaderInterval = null;
+
+    function markAppLoaded() {
+        try {
+            sessionStorage.setItem(APP_LOADED_KEY, '1');
+        } catch (e) {}
+    }
+
+    function wasAppLoadedInSession() {
+        try {
+            return sessionStorage.getItem(APP_LOADED_KEY) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function hidePreloader(delayMs) {
+        var preloader = document.querySelector('.preloader');
+        if (!preloader) {
+            return;
+        }
+
+        if (preloaderInterval) {
+            clearInterval(preloaderInterval);
+            preloaderInterval = null;
+        }
+
+        var hide = function () {
+            preloader.style.display = 'none';
+            document.documentElement.classList.add('reybingo-skip-preloader');
+            markAppLoaded();
+        };
+
+        if (delayMs > 0) {
+            setTimeout(hide, delayMs);
+        } else {
+            hide();
+        }
+    }
+
+    window.hideReyBingoPreloader = function (immediate) {
+        hidePreloader(immediate ? 0 : 500);
+    };
+
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted || wasAppLoadedInSession()) {
+            hidePreloader(0);
+        }
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && wasAppLoadedInSession()) {
+            hidePreloader(0);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var preloader = document.querySelector('.preloader');
+        var loadingProgressBar = document.querySelector('.loading-progress');
+        var loadingPercentage = document.querySelector('.loading-percentage');
+
+        if (!preloader || !loadingProgressBar || !loadingPercentage) {
+            return;
+        }
+
+        if (wasAppLoadedInSession()) {
+            hidePreloader(0);
+            return;
+        }
+
+        function removePreloader() {
+            hidePreloader(500);
+        }
+
+        window.addEventListener('load', removePreloader, { once: true });
+
+        var fakeLoadingProgress = 0;
+        preloaderInterval = setInterval(function () {
+            fakeLoadingProgress += 10;
+            loadingProgressBar.style.width = fakeLoadingProgress + '%';
+            loadingPercentage.textContent = fakeLoadingProgress + '%';
+            if (fakeLoadingProgress >= 100) {
+                clearInterval(preloaderInterval);
+                preloaderInterval = null;
+                removePreloader();
+            }
+        }, 100);
+    });
+})();
+
 var App = function() {
     
     var uiInit = function () {
         linkPage();
     };
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        var preloader = document.querySelector('.preloader');
-        var loadingProgressBar = document.querySelector('.loading-progress');
-        var loadingPercentage = document.querySelector('.loading-percentage');
-    
-        function updateProgress(event) {
-            if (event.lengthComputable) {
-                var percentComplete = Math.round((event.loaded / event.total) * 100);
-                loadingProgressBar.style.width = percentComplete + '%';
-                loadingPercentage.textContent = percentComplete + '%';
-            }
-        }
-    
-        function removePreloader() {
-            setTimeout(() => {
-                preloader.style.display = 'none';
-            }, 500);
-        }
-    
-        window.addEventListener('load', removePreloader);
-    
-        // Simular carga (puedes eliminar esto en producción)
-        var fakeLoadingProgress = 0;
-        var interval = setInterval(function() {
-            fakeLoadingProgress += 10;
-            loadingProgressBar.style.width = fakeLoadingProgress + '%';
-            loadingPercentage.textContent = fakeLoadingProgress + '%';
-            if (fakeLoadingProgress >= 100) {
-                clearInterval(interval);
-                removePreloader();
-            }
-        }, 100);
-    });
     
     $(document).ready(function() {
         generateStars();
@@ -267,6 +325,30 @@ function availableCartonsRoomGet(game) {
     }
 }
 
+function refreshWonCartonsPendingBadge() {
+    $.get(site_url + 'playings/pendingWonCartonsCountGet', function(response) {
+        if (response && response.success) {
+            updateWonCartonsPendingBadge(response.count);
+        }
+    }, 'json');
+}
+
+function updateWonCartonsPendingBadge(count) {
+    var badge = document.getElementById('won-cartons-pending-badge');
+    if (!badge) {
+        return;
+    }
+
+    var total = parseInt(count, 10) || 0;
+    badge.textContent = total;
+
+    if (total > 0) {
+        badge.classList.remove('d-none');
+    } else {
+        badge.classList.add('d-none');
+    }
+}
+
 function gamesGet() {
     $("#modalGames").load(site_url + 'games/gamesGet', function() {
         showBsModal('#modalGames');
@@ -309,10 +391,60 @@ function modalityAdd() {
     });
 }
 
-function statisticsView() {
+function statisticsView(initialTab) {
     $("#modalStatistics").load(site_url + 'games/statisticsView', function() {
         showBsModal('#modalStatistics');
+
+        if (!initialTab) {
+            return;
+        }
+
+        var targetTabElement = document.getElementById(initialTab + '-tab');
+        if (!targetTabElement) {
+            return;
+        }
+
+        var tab = bootstrap.Tab.getOrCreateInstance(targetTabElement);
+        tab.show();
+
+        if (typeof statisticsGet === 'function') {
+            statisticsGet(initialTab);
+        }
     });
+}
+
+function statisticsViewUsers() {
+    statisticsView('players');
+}
+
+function openUserExportModal() {
+    $("#modalUserExport").load(site_url + 'users/exportUsersModal', function() {
+        showBsModal('#modalUserExport');
+    });
+}
+
+function updateLowBalancePendingBadge(count) {
+    var badge = document.getElementById('low-balance-pending-badge');
+    if (!badge) {
+        return;
+    }
+
+    var total = parseInt(count, 10) || 0;
+    badge.textContent = total;
+
+    if (total > 0) {
+        badge.classList.remove('d-none');
+    } else {
+        badge.classList.add('d-none');
+    }
+}
+
+function refreshLowBalancePendingBadge() {
+    $.get(site_url + 'users/lowBalancePendingCountGet', function(response) {
+        if (response && response.success) {
+            updateLowBalancePendingBadge(response.count);
+        }
+    }, 'json');
 }
 
 function playersGet() {

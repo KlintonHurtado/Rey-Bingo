@@ -1,9 +1,10 @@
 
-<a class="btn btn-small btn-profile" href="<?= site_url('profile'); ?>"><img src="<?= $imagePath ?>" alt="img"></a>
-
-<button type="button" class="btn btn-small btn-wallet btn-wallet-profile" onclick="paymentsGet();">
-    <i class="fa-duotone fa-solid fa-wallet"></i>
-</button>
+<?= view('games/partials/admin_nav_cluster', [
+    'imagePath' => $imagePath,
+    'activeNav' => '',
+    'showStatistics' => true,
+    'showUsers' => true,
+]) ?>
 
 <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
     <?php if ($user['sounds'] == 1): ?>
@@ -18,8 +19,6 @@
 <button class="btn btn-small btn-sliders" onclick="ViewSliders();"><i class="fa-duotone fa-solid fa-sliders-simple"></i></button>
 
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
-
-<button class="btn btn-small btn-statistics" onclick="statisticsView();"><i class="fa-duotone fa-chart-column"></i></button>
 
 <button class="btn btn-small btn-game" onclick="awardsGameGet();"><i class="fa-duotone fa-solid fa-trophy-star"></i></button>
 

@@ -9,7 +9,16 @@
                 <div class="row">
                     <div class="col-md-12 mb-1">
                         <h6 class="mb-1"><strong><?= translate('deposit details'); ?>:</strong> #<?= esc(str_pad($deposit['id'], 4, '0', STR_PAD_LEFT)) ?></h6>
-                        <h6 class="mb-1"><strong><?= translate('player'); ?>:</strong> <?= esc($user['code']) ?> - <?= esc($user['firstname']) ?> <?= esc($user['lastname']) ?></h6>
+                        <?php $isStoreFunding = bingo_deposit_is_store_funding($deposit); ?>
+                        <?php if ($isStoreFunding) : ?>
+                            <h6 class="mb-1"><strong><?= translate('store'); ?>:</strong> <?= esc(bingo_store_display_name($user)) ?></h6>
+                            <h6 class="mb-1 text-muted small"><?= translate('store balance request admin note'); ?></h6>
+                        <?php else : ?>
+                            <h6 class="mb-1"><strong><?= translate('player'); ?>:</strong> <?= esc($user['code']) ?> - <?= esc($user['firstname']) ?> <?= esc($user['lastname']) ?></h6>
+                            <?php if (! empty($storeUser)) : ?>
+                                <h6 class="mb-1"><strong><?= translate('store'); ?>:</strong> <?= esc(bingo_store_display_name($storeUser)) ?></h6>
+                            <?php endif; ?>
+                        <?php endif; ?>
                         <h6 class="mb-1"><strong><?= translate('bank'); ?>:</strong> <?= esc($deposit['bank']) ?></h6>
                     </div>
 
@@ -32,8 +41,13 @@
                     <?php if ((int) $deposit['status'] === 1) : ?>
                         <div class="col-md-12">
                             <div class="alert alert-warning text-center py-2 px-3 mb-2 small">
-                                <strong>Este depósito aún no está acreditado.</strong><br>
-                                Los <strong><?= systemGet('currency'); ?> <?= number_format((float) $deposit['amount'], 2); ?></strong> se sumarán al saldo del jugador <u>solo cuando presione Aprobar</u>.
+                                <?php if ($isStoreFunding) : ?>
+                                    <strong><?= translate('store balance request pending note'); ?></strong><br>
+                                    Los <strong><?= systemGet('currency'); ?> <?= number_format((float) $deposit['amount'], 2); ?></strong> se acreditarán al saldo del Punto de venta <u>cuando presione Aprobar</u>.
+                                <?php else : ?>
+                                    <strong>Este depósito aún no está acreditado.</strong><br>
+                                    Los <strong><?= systemGet('currency'); ?> <?= number_format((float) $deposit['amount'], 2); ?></strong> se sumarán al saldo del jugador <u>solo cuando presione Aprobar</u>.
+                                <?php endif; ?>
                                 <br>
                                 Saldo actual: <strong><?= systemGet('currency'); ?> <?= number_format(wallet_total($user), 2); ?></strong>
                                 → Tras aprobar: <strong><?= systemGet('currency'); ?> <?= number_format(wallet_total($user) + (float) $deposit['amount'], 2); ?></strong>

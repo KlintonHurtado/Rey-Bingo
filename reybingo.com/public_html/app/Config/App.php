@@ -21,7 +21,7 @@ class App extends BaseConfig {
      *
      * E.g., http://example.com/
      */
-    public string $baseURL = 'https://reybingo.com/';
+    public string $baseURL = 'https://bingo.reybingo.com/';
 
     /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.
@@ -34,7 +34,7 @@ class App extends BaseConfig {
      *
      * @var list<string>
      */
-    public array $allowedHostnames = [];
+    public array $allowedHostnames = ['reybingo.com', 'www.reybingo.com', 'bingo.hubbills.com'];
 
     /**
      * --------------------------------------------------------------------------
@@ -101,17 +101,23 @@ class App extends BaseConfig {
     //public string $defaultLocale = 'es';
     
     private function getLanguageFromDatabase(): string {
-        $db = \Config\Database::connect();
-        $builder = $db->table('system');
-        
-        $query = $builder->select('value')->where('key', 'language')->get();
-        
-        $language = $query->getRow() ? $query->getRow()->value : 'english';
+        try {
+            $db = \Config\Database::connect();
+            $builder = $db->table('system');
 
-        if ($language === 'spanish') {
-            return 'es';
-        } elseif ($language === 'english') {
-            return 'en';
+            $query = $builder->select('value')->where('key', 'language')->get();
+            $row = $query->getRow();
+            $language = $row ? (string) ($row->value ?? 'english') : 'english';
+
+            if ($language === 'spanish') {
+                return 'es';
+            }
+
+            if ($language === 'english') {
+                return 'en';
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo leer el idioma desde la base de datos: ' . $e->getMessage());
         }
 
         return 'en';

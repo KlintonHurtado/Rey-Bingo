@@ -17,6 +17,11 @@ class Kyc extends Controller
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
         $user = $modelUsers->find(session()->get('id'));
+
+        if (bingo_is_store((int) ($user['group'] ?? -1))) {
+            return redirect()->to('/store');
+        }
+
         $imagePath = ! empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
         $data = [
@@ -42,6 +47,12 @@ class Kyc extends Controller
     {
         if (! session()->get('logged_in')) {
             return redirect()->to('/signin');
+        }
+
+        $modelUsers = new UsersModel();
+        $user = $modelUsers->find(session()->get('id'));
+        if (bingo_is_store((int) ($user['group'] ?? -1))) {
+            return redirect()->to('/store');
         }
 
         $front  = $this->request->getFile('kyc_front');

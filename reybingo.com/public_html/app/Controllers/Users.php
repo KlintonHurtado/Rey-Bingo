@@ -17,6 +17,7 @@ use App\Models\AwardsModel;
 use App\Models\SingsModel;
 use App\Models\GameRoomsModel;
 use App\Models\BoardsModel;
+use App\Libraries\ExcelExport;
 use CodeIgniter\Controller;
 
 class Users extends Controller {
@@ -76,6 +77,829 @@ class Users extends Controller {
         }
         
         return view('users/modalUser', $data);
+    }
+
+    public function stores()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $modelUsers = new UsersModel();
+        $modelContacts = new ContactsModel();
+
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $stores = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->orderBy('id', 'DESC')
+            ->findAll();
+        $stores = bingo_enrich_stores_with_operator($stores);
+
+        $data = [
+            'page' => [
+                'title' => translate('point of sale management'),
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('stores/index', [
+                'contacts' => $modelContacts->findAll(),
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'stores' => $stores,
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function addStore($storeId = null)
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $model = new UsersModel();
+        $data = ['isUpdate' => false, 'storeData' => null];
+
+        if ($storeId) {
+            $store = $model->where('id', $storeId)->where('group', bingo_group_store())->first();
+            if (! $store) {
+                throw new \CodeIgniter\Exceptions\PageNotFoundException(translate('store not found'));
+            }
+            $data['storeData'] = $store;
+            $data['isUpdate'] = true;
+        }
+
+        $data['operators'] = bingo_list_operators(false);
+
+        return view('stores/modalStore', $data);
+    }
+
+    public function storeSubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $model = new UsersModel();
+        $storeId = (int) $this->request->getPost('store-id');
+        $action = $this->request->getPost('store-action');
+
+        $validationRules = [
+            'firstname' => [
+                'label' => translate('first name'),
+                'rules' => 'required|min_length[2]',
+            ],
+            'lastname' => [
+                'label' => translate('last name'),
+                'rules' => 'required|min_length[2]',
+            ],
+            'email' => [
+                'label' => translate('email'),
+                'rules' => 'required|valid_email|is_unique[users.email,id,' . $storeId . ']',
+            ],
+            'business_name' => [
+                'label' => translate('business name'),
+                'rules' => 'required|min_length[2]|max_length[255]',
+            ],
+            'store_commission_rate' => [
+                'label' => translate('store commission rate'),
+                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
+            ],
+        ];
+
+        if ($action === 'add') {
+            $validationRules['password'] = [
+                'label' => translate('password'),
+                'rules' => 'required|min_length[6]',
+            ];
+        } elseif ($this->request->getPost('password')) {
+            $validationRules['password'] = [
+                'label' => translate('password'),
+                'rules' => 'min_length[6]',
+            ];
+        }
+
+        if (! $this->validate($validationRules)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => $this->validator->getErrors(),
+            ]);
+        }
+
+        $email = strtolower(trim((string) $this->request->getPost('email')));
+        $storeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_commission_rate'));
+        $ggrCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('ggr_commission_rate'));
+        $prizeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_prize_commission_rate'));
+        $data = [
+            'firstname' => trim((string) $this->request->getPost('firstname')),
+            'lastname' => trim((string) $this->request->getPost('lastname')),
+            'business_name' => trim((string) $this->request->getPost('business_name')),
+            'email' => $email,
+            'username' => bingo_generate_store_username($email, $model, $storeId ?: null),
+            'group' => bingo_group_store(),
+            'status' => 1,
+            'sounds' => 1,
+            'narration' => 1,
+            'autodial' => 1,
+            'roulette' => 1,
+            'wallet' => 0,
+            'document' => '',
+            'phone' => '',
+            'bank' => '',
+            'account' => '',
+            'image' => '',
+            'verified_email' => 1,
+            'verification_token' => '',
+            'restore_code' => '',
+            'restore_token' => '',
+            'is_reseller' => 0,
+            'store_commission_rate' => $storeCommissionRate,
+            'ggr_commission_rate' => $ggrCommissionRate,
+            'store_prize_commission_rate' => $prizeCommissionRate,
+            'kyc_status' => 'verified',
+        ];
+
+        if ($action === 'update' && $storeId) {
+            $existing = $model->where('id', $storeId)->where('group', bingo_group_store())->first();
+            if (! $existing) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('store not found'),
+                ]);
+            }
+
+            $updateData = [
+                'firstname' => $data['firstname'],
+                'lastname' => $data['lastname'],
+                'business_name' => $data['business_name'],
+                'email' => $email,
+                'store_commission_rate' => $storeCommissionRate,
+                'ggr_commission_rate' => $ggrCommissionRate,
+                'store_prize_commission_rate' => $prizeCommissionRate,
+            ];
+
+            if ($email !== strtolower(trim((string) $existing['email']))) {
+                $updateData['username'] = bingo_generate_store_username($email, $model, $storeId);
+            }
+
+            if ($this->request->getPost('password')) {
+                $updateData['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
+            }
+
+            if ($model->update($storeId, $updateData)) {
+                bingo_assign_store_operator($storeId, (int) $this->request->getPost('operator_id') ?: null);
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => translate('store updated successfully'),
+                ]);
+            }
+        } else {
+            $lastUser = $model->orderBy('id', 'DESC')->first();
+            $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
+            $data['code'] = 'BGC-T' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT);
+            $data['document'] = 'ST-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            $data['phone'] = '9' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT);
+            $data['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
+            $data['referred_code'] = strtoupper(substr(md5(uniqid()), 0, 8));
+
+            if ($model->insert($data)) {
+                $newStoreId = (int) $model->getInsertID();
+                bingo_assign_store_operator($newStoreId, (int) $this->request->getPost('operator_id') ?: null);
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => translate('store added successfully'),
+                ]);
+            }
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => translate('error processing request'),
+        ]);
+    }
+
+    public function storeDeactivate()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        $storeId = (int) $this->request->getPost('store_id');
+        $status = (int) $this->request->getPost('status');
+
+        if ($storeId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user id required'),
+            ]);
+        }
+
+        $model = new UsersModel();
+        $store = $model->where('id', $storeId)->where('group', bingo_group_store())->where('deleted', 0)->first();
+
+        if (! $store) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('store not found'),
+            ]);
+        }
+
+        $newStatus = $status === 1 ? 1 : 2;
+
+        if ($model->update($storeId, ['status' => $newStatus])) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => $newStatus === 1
+                    ? translate('store activated successfully')
+                    : translate('store deactivated successfully'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'error' => translate('error updating user status'),
+        ]);
+    }
+
+    public function storeDelete()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        $storeId = (int) $this->request->getPost('store_id');
+        if ($storeId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user id required'),
+            ]);
+        }
+
+        $model = new UsersModel();
+        $store = $model->where('id', $storeId)->where('group', bingo_group_store())->where('deleted', 0)->first();
+
+        if (! $store) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('store not found'),
+            ]);
+        }
+
+        if ($model->update($storeId, ['deleted' => 1, 'status' => 2])) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => translate('store deleted successfully'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'error' => translate('error deleting user'),
+        ]);
+    }
+
+    public function storesListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        $modelUsers = new UsersModel();
+        $stores = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->orderBy('id', 'DESC')
+            ->findAll();
+
+        return view('stores/list', ['stores' => bingo_enrich_stores_with_operator($stores)]);
+    }
+
+    public function operators()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $modelUsers = new UsersModel();
+        $modelContacts = new ContactsModel();
+
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $operators = $modelUsers
+            ->where('group', bingo_group_operator())
+            ->where('deleted', 0)
+            ->orderBy('id', 'DESC')
+            ->findAll();
+
+        foreach ($operators as &$operator) {
+            $operator['stores_count'] = bingo_operator_store_count((int) $operator['id']);
+        }
+
+        $data = [
+            'page' => [
+                'title' => translate('operator management'),
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('operators/index', [
+                'contacts' => $modelContacts->findAll(),
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'operators' => $operators,
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function addOperator($operatorId = null)
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $model = new UsersModel();
+        $data = ['isUpdate' => false, 'operatorData' => null, 'assignedStoreIds' => []];
+
+        if ($operatorId) {
+            $operator = $model->where('id', $operatorId)->where('group', bingo_group_operator())->first();
+            if (! $operator) {
+                throw new \CodeIgniter\Exceptions\PageNotFoundException(translate('operator not found'));
+            }
+
+            $data['operatorData'] = $operator;
+            $data['isUpdate'] = true;
+            $assigned = $model
+                ->select('id')
+                ->where('group', bingo_group_store())
+                ->where('operator_id', (int) $operatorId)
+                ->where('deleted', 0)
+                ->findAll();
+            $data['assignedStoreIds'] = array_map(static fn ($row) => (int) $row['id'], $assigned);
+        }
+
+        $data['stores'] = $model
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->orderBy('business_name', 'ASC')
+            ->findAll();
+
+        return view('operators/modalOperator', $data);
+    }
+
+    public function operatorSubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $model = new UsersModel();
+        $operatorId = (int) $this->request->getPost('operator-id');
+        $action = $this->request->getPost('operator-action');
+        $storeIds = $this->request->getPost('store_ids');
+        $storeIds = is_array($storeIds) ? $storeIds : [];
+
+        $validationRules = [
+            'firstname' => [
+                'label' => translate('first name'),
+                'rules' => 'required|min_length[2]',
+            ],
+            'lastname' => [
+                'label' => translate('last name'),
+                'rules' => 'required|min_length[2]',
+            ],
+            'email' => [
+                'label' => translate('email'),
+                'rules' => 'required|valid_email|is_unique[users.email,id,' . $operatorId . ']',
+            ],
+        ];
+
+        if ($action === 'add') {
+            $validationRules['password'] = [
+                'label' => translate('password'),
+                'rules' => 'required|min_length[6]',
+            ];
+        } elseif ($this->request->getPost('password')) {
+            $validationRules['password'] = [
+                'label' => translate('password'),
+                'rules' => 'min_length[6]',
+            ];
+        }
+
+        if (! $this->validate($validationRules)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => $this->validator->getErrors(),
+            ]);
+        }
+
+        $email = strtolower(trim((string) $this->request->getPost('email')));
+        $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
+        $data = [
+            'firstname' => trim((string) $this->request->getPost('firstname')),
+            'lastname' => trim((string) $this->request->getPost('lastname')),
+            'email' => $email,
+            'username' => bingo_generate_operator_username($email, $model, $operatorId ?: null),
+            'group' => bingo_group_operator(),
+            'status' => 1,
+            'sounds' => 1,
+            'narration' => 1,
+            'autodial' => 1,
+            'roulette' => 1,
+            'wallet' => 0,
+            'document' => '',
+            'phone' => '',
+            'bank' => '',
+            'account' => '',
+            'image' => '',
+            'verified_email' => 1,
+            'verification_token' => '',
+            'restore_code' => '',
+            'restore_token' => '',
+            'is_reseller' => 0,
+            'operator_commission_rate' => $operatorCommissionRate,
+            'ggr_commission_rate' => null,
+            'kyc_status' => 'verified',
+        ];
+
+        if ($action === 'update' && $operatorId) {
+            $existing = $model->where('id', $operatorId)->where('group', bingo_group_operator())->first();
+            if (! $existing) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('operator not found'),
+                ]);
+            }
+
+            $updateData = [
+                'firstname' => $data['firstname'],
+                'lastname' => $data['lastname'],
+                'email' => $email,
+                'operator_commission_rate' => $operatorCommissionRate,
+                'ggr_commission_rate' => null,
+            ];
+
+            if ($email !== strtolower(trim((string) $existing['email']))) {
+                $updateData['username'] = bingo_generate_operator_username($email, $model, $operatorId);
+            }
+
+            if ($this->request->getPost('password')) {
+                $updateData['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
+            }
+
+            if ($model->update($operatorId, $updateData)) {
+                bingo_sync_operator_stores($operatorId, $storeIds);
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => translate('operator updated successfully'),
+                ]);
+            }
+        } else {
+            $lastUser = $model->orderBy('id', 'DESC')->first();
+            $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
+            $data['code'] = 'BGC-O' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT);
+            $data['document'] = 'OP-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            $data['phone'] = '8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT);
+            $data['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
+            $data['referred_code'] = strtoupper(substr(md5(uniqid('operator', true)), 0, 8));
+
+            if ($model->insert($data)) {
+                $newOperatorId = (int) $model->getInsertID();
+                bingo_sync_operator_stores($newOperatorId, $storeIds);
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => translate('operator added successfully'),
+                ]);
+            }
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => translate('error processing request'),
+        ]);
+    }
+
+    public function operatorDeactivate()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        $operatorId = (int) $this->request->getPost('operator_id');
+        $status = (int) $this->request->getPost('status');
+
+        if ($operatorId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user id required'),
+            ]);
+        }
+
+        $model = new UsersModel();
+        $operator = $model->where('id', $operatorId)->where('group', bingo_group_operator())->where('deleted', 0)->first();
+
+        if (! $operator) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('operator not found'),
+            ]);
+        }
+
+        $newStatus = $status === 1 ? 1 : 2;
+
+        if ($model->update($operatorId, ['status' => $newStatus])) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => $newStatus === 1
+                    ? translate('operator activated successfully')
+                    : translate('operator deactivated successfully'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'error' => translate('error updating user status'),
+        ]);
+    }
+
+    public function operatorDelete()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $operatorId = (int) $this->request->getPost('operator_id');
+        if ($operatorId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user id required'),
+            ]);
+        }
+
+        $model = new UsersModel();
+        $operator = $model->where('id', $operatorId)->where('group', bingo_group_operator())->where('deleted', 0)->first();
+
+        if (! $operator) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('operator not found'),
+            ]);
+        }
+
+        if ($model->update($operatorId, ['deleted' => 1, 'status' => 2])) {
+            bingo_sync_operator_stores($operatorId, []);
+
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => translate('operator deleted successfully'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'error' => translate('error deleting user'),
+        ]);
+    }
+
+    public function operatorsListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('bingo');
+
+        $modelUsers = new UsersModel();
+        $operators = $modelUsers
+            ->where('group', bingo_group_operator())
+            ->where('deleted', 0)
+            ->orderBy('id', 'DESC')
+            ->findAll();
+
+        foreach ($operators as &$operator) {
+            $operator['stores_count'] = bingo_operator_store_count((int) $operator['id']);
+        }
+
+        return view('operators/list', ['operators' => $operators]);
+    }
+
+    public function lowBalancePlayers()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet']);
+
+        $modelUsers = new UsersModel();
+        $modelContacts = new ContactsModel();
+
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $payload = bingo_fetch_low_balance_players();
+
+        $data = [
+            'page' => [
+                'title' => translate('low balance players'),
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('users/low_balance_players/index', [
+                'contacts' => $modelContacts->findAll(),
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'players' => $payload['players'],
+                'threshold' => $payload['threshold'],
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function lowBalancePlayersListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet']);
+
+        if (bingo_low_balance_auto_enabled()) {
+            bingo_process_low_balance_auto_roulette_batch();
+        }
+
+        $payload = bingo_fetch_low_balance_players();
+
+        return view('users/low_balance_players/list', [
+            'players' => $payload['players'],
+            'threshold' => $payload['threshold'],
+        ]);
+    }
+
+    public function lowBalanceHistoryListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet']);
+
+        return view('users/low_balance_players/history_modal', [
+            'history' => bingo_fetch_low_balance_roulette_history(),
+        ]);
+    }
+
+    public function grantPlayerRoulette()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        if (! $this->request->isAJAX()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        $userId = (int) $this->request->getPost('user_id');
+        if ($userId <= 0) {
+            return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
+        }
+
+        $modelUsers = new UsersModel();
+        $player = $modelUsers
+            ->where('id', $userId)
+            ->where('group', bingo_group_player())
+            ->where('deleted', 0)
+            ->first();
+
+        if (! $player) {
+            return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
+        }
+
+        if ((int) ($player['roulette'] ?? 1) === 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('player already has roulette'),
+            ]);
+        }
+
+        helper('bingo');
+
+        if (! bingo_grant_player_roulette($userId, translate('roulette granted notification'), true)) {
+            return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
+        }
+
+        bingo_log_low_balance_roulette_grant($userId, 'manual', (int) session()->get('id'));
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('roulette granted successfully'),
+            'pending_count' => bingo_low_balance_roulette_pending_count(),
+        ]);
+    }
+
+    public function lowBalancePendingCountGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        helper('bingo');
+
+        return $this->response->setJSON([
+            'success' => true,
+            'count' => bingo_low_balance_roulette_pending_count(),
+        ]);
+    }
+
+    public function lowBalanceSettingsSubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        if (! $this->request->isAJAX()) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        $threshold = $this->request->getPost('lowBalanceThreshold');
+        $autoRoulette = $this->request->getPost('lowBalanceAutoRoulette');
+
+        if ($threshold === null || $threshold === '' || ! is_numeric($threshold) || (float) $threshold < 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('low balance threshold invalid'),
+            ]);
+        }
+
+        if (! in_array((string) $autoRoulette, ['0', '1'], true)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('invalid value'),
+            ]);
+        }
+
+        helper('bingo');
+        bingo_ensure_system_settings_schema();
+
+        $modelSystem = new \App\Models\SystemModel();
+        $modelSystem->updateValue('lowBalanceThreshold', number_format((float) $threshold, 2, '.', ''));
+        $modelSystem->updateValue('lowBalanceAutoRoulette', (string) $autoRoulette);
+
+        $autoProcessed = 0;
+        if ((int) $autoRoulette === 1) {
+            $autoProcessed = bingo_process_low_balance_auto_roulette_batch();
+        }
+
+        $message = translate('low balance settings saved');
+        if ($autoProcessed > 0) {
+            $message .= ' (' . $autoProcessed . ' ' . translate('players') . ')';
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => $message,
+            'threshold' => bingo_low_balance_threshold(),
+            'auto_processed' => $autoProcessed,
+        ]);
     }
 
     public function deleteUser() {
@@ -195,6 +1019,7 @@ class Users extends Controller {
         
         // Usuarios por grupo
         $stats['admin_users'] = $this->modelUsers->where('group', 1)->where('deleted', 0)->countAllResults();
+        $stats['store_users'] = $this->modelUsers->where('group', 2)->where('deleted', 0)->countAllResults();
         $stats['player_users'] = $this->modelUsers->where('group', 0)->where('deleted', 0)->countAllResults();
         
         // Total en wallets
@@ -309,7 +1134,9 @@ class Users extends Controller {
             // Generar código único
             $lastUser = $model->orderBy('id', 'DESC')->first();
             $nextId = $lastUser ? $lastUser['id'] + 1 : 1;
-            $data['code'] = 'BGC-A' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+            $group = (int) ($data['group'] ?? 0);
+            $codePrefix = $group === bingo_group_store() ? 'BGC-T' : 'BGC-A';
+            $data['code'] = $codePrefix . str_pad($nextId, 5, '0', STR_PAD_LEFT);
             
             // Hash de la contraseña
             $data['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
@@ -651,56 +1478,289 @@ class Users extends Controller {
         return view('users/referrals', $data);
     }
 
-    public function exportRequiredFields()
+    public function exportUsersModal()
     {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
             return redirect()->to('/signin');
         }
 
-        $model = new UsersModel();
-        $users = $model->where('group', 0)->orderBy('id', 'DESC')->findAll();
+        return view('users/export_modal', [
+            'exportFields' => $this->userExportFieldMap(),
+        ]);
+    }
 
-        $filename = 'users-required-fields-' . date('Ymd-His') . '.csv';
-        $headers = [
-            'ID', 'Codigo', 'Nombres', 'Apellidos', 'Usuario',
-            'Documento', 'Telefono', 'Email', 'Direccion', 'Ciudad', 'Estado',
-            'Punto de venta', 'Saldo total', 'Saldo recarga', 'Saldo retiro', 'Saldo bono', 'KYC'
-        ];
-
-        $fh = fopen('php://temp', 'w+');
-        fputcsv($fh, $headers);
-
-        foreach ($users as $user) {
-            $user = wallet_service()->normalizeUser($user);
-            fputcsv($fh, [
-                $user['id'] ?? '',
-                $user['code'] ?? '',
-                $user['firstname'] ?? '',
-                $user['lastname'] ?? '',
-                $user['username'] ?? '',
-                $user['document'] ?? '',
-                $user['phone'] ?? '',
-                $user['email'] ?? '',
-                $user['address_line'] ?? '',
-                $user['city'] ?? '',
-                $user['state'] ?? '',
-                ! empty($user['is_reseller']) ? 'Si' : 'No',
-                wallet_total($user),
-                $user['wallet_recharge'] ?? 0,
-                $user['wallet_withdraw'] ?? 0,
-                $user['wallet_bonus'] ?? 0,
-                $user['kyc_status'] ?? 'pending',
-            ]);
+    public function searchUsersForExport()
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
+            return $this->response->setJSON(['success' => false, 'users' => []]);
         }
 
-        rewind($fh);
-        $csv = stream_get_contents($fh);
-        fclose($fh);
+        $query = trim((string) ($this->request->getGet('q') ?? ''));
+        if (mb_strlen($query) < 2) {
+            return $this->response->setJSON(['success' => true, 'users' => []]);
+        }
 
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv; charset=utf-8')
-            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
-            ->setBody($csv);
+        $model = new UsersModel();
+        $users = $model->builder()
+            ->where('deleted', 0)
+            ->groupStart()
+                ->like('firstname', $query)
+                ->orLike('lastname', $query)
+                ->orLike('username', $query)
+                ->orLike('email', $query)
+                ->orLike('phone', $query)
+                ->orLike('document', $query)
+                ->orLike('code', $query)
+                ->orLike('business_name', $query)
+            ->groupEnd()
+            ->orderBy('id', 'DESC')
+            ->limit(15)
+            ->get()
+            ->getResultArray();
+
+        $payload = array_map(function (array $user): array {
+            $name = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+            $groupLabel = $this->exportUserGroupLabel((int) ($user['group'] ?? 0));
+
+            return [
+                'id' => (int) $user['id'],
+                'label' => trim($name) . ' (@' . ($user['username'] ?? '') . ') · ' . $groupLabel,
+            ];
+        }, $users);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'users' => $payload,
+        ]);
+    }
+
+    public function exportRequiredFields()
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
+            return redirect()->to('/signin');
+        }
+
+        helper('wallet');
+
+        $fieldMap = $this->userExportFieldMap();
+        $selectedFields = $this->resolveSelectedExportFields($fieldMap);
+        $users = $this->resolveUsersForExport();
+
+        if ($users === []) {
+            return $this->response
+                ->setStatusCode(400)
+                ->setBody('No hay usuarios para exportar con los criterios seleccionados.');
+        }
+
+        $headers = [];
+        $numericColumns = [];
+        $integerColumns = [];
+
+        foreach ($selectedFields as $index => $fieldKey) {
+            $headers[] = $fieldMap[$fieldKey]['label'];
+            $type = $fieldMap[$fieldKey]['type'] ?? '';
+            if ($type === 'money') {
+                $numericColumns[] = $index;
+            }
+            if ($type === 'integer') {
+                $integerColumns[] = $index;
+            }
+        }
+
+        $rows = [];
+        foreach ($users as $user) {
+            $row = [];
+            foreach ($selectedFields as $fieldKey) {
+                $row[] = $this->resolveUserExportValue($user, $fieldKey);
+            }
+            $rows[] = $row;
+        }
+
+        $filename = 'usuarios-export-' . date('Ymd-His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse($headers, $rows, $filename, [
+            'sheet_name' => 'Usuarios',
+            'numeric_columns' => $numericColumns,
+            'integer_columns' => $integerColumns,
+        ]);
+    }
+
+    /**
+     * @return array<string, array{label: string, type?: string}>
+     */
+    private function userExportFieldMap(): array
+    {
+        return [
+            'id' => ['label' => 'ID', 'type' => 'integer'],
+            'code' => ['label' => 'Codigo'],
+            'group' => ['label' => 'Grupo'],
+            'firstname' => ['label' => 'Nombres'],
+            'lastname' => ['label' => 'Apellidos'],
+            'business_name' => ['label' => 'Nombre negocio'],
+            'username' => ['label' => 'Usuario'],
+            'document' => ['label' => 'Documento'],
+            'phone' => ['label' => 'Telefono'],
+            'email' => ['label' => 'Email'],
+            'address_line' => ['label' => 'Direccion'],
+            'city' => ['label' => 'Ciudad'],
+            'state' => ['label' => 'Estado'],
+            'is_reseller' => ['label' => translate('point of sale')],
+            'bank' => ['label' => 'Banco'],
+            'account' => ['label' => 'Cuenta'],
+            'wallet_total' => ['label' => 'Saldo total', 'type' => 'money'],
+            'wallet_recharge' => ['label' => 'Saldo recarga', 'type' => 'money'],
+            'wallet_withdraw' => ['label' => 'Saldo retiro', 'type' => 'money'],
+            'wallet_bonus' => ['label' => 'Saldo bono', 'type' => 'money'],
+            'kyc_status' => ['label' => 'KYC'],
+            'status' => ['label' => 'Estado cuenta'],
+            'created_at' => ['label' => 'Fecha registro'],
+        ];
+    }
+
+    /**
+     * @param array<string, array{label: string, type?: string}> $fieldMap
+     * @return list<string>
+     */
+    private function resolveSelectedExportFields(array $fieldMap): array
+    {
+        $requested = $this->request->getPost('fields') ?? $this->request->getGet('fields');
+        $selected = [];
+
+        if (is_string($requested) && $requested !== '') {
+            $requested = explode(',', $requested);
+        }
+
+        if (is_array($requested)) {
+            foreach ($requested as $fieldKey) {
+                $fieldKey = trim((string) $fieldKey);
+                if ($fieldKey !== '' && isset($fieldMap[$fieldKey])) {
+                    $selected[] = $fieldKey;
+                }
+            }
+        }
+
+        if ($selected === []) {
+            return array_keys($fieldMap);
+        }
+
+        return $selected;
+    }
+
+    private function resolveUsersForExport(): array
+    {
+        $scope = (string) ($this->request->getPost('export_scope') ?? $this->request->getGet('export_scope') ?? 'filtered');
+        $search = trim((string) ($this->request->getPost('search') ?? $this->request->getGet('search') ?? ''));
+        $status = (string) ($this->request->getPost('status') ?? $this->request->getGet('status') ?? 'all');
+        $groupParam = $this->request->getPost('group') ?? $this->request->getGet('group');
+        $group = $groupParam === null ? '0' : (string) $groupParam;
+
+        if ($scope === 'selected') {
+            $userIds = $this->request->getPost('user_ids') ?? $this->request->getGet('user_ids');
+            if (! is_array($userIds)) {
+                $userIds = $userIds ? [(int) $userIds] : [];
+            }
+
+            $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds))));
+            if ($userIds === []) {
+                return [];
+            }
+
+            $model = new UsersModel();
+
+            return $model->builder()
+                ->where('deleted', 0)
+                ->whereIn('id', $userIds)
+                ->orderBy('id', 'DESC')
+                ->get()
+                ->getResultArray();
+        }
+
+        if ($scope === 'all') {
+            return $this->fetchUsersForExport('', 'all', 'all');
+        }
+
+        return $this->fetchUsersForExport($search, $status, $group);
+    }
+
+    private function resolveUserExportValue(array $user, string $fieldKey): mixed
+    {
+        $user = wallet_service()->normalizeUser($user);
+
+        return match ($fieldKey) {
+            'id' => (int) ($user['id'] ?? 0),
+            'code' => $user['code'] ?? '',
+            'group' => $this->exportUserGroupLabel((int) ($user['group'] ?? 0)),
+            'firstname' => $user['firstname'] ?? '',
+            'lastname' => $user['lastname'] ?? '',
+            'business_name' => $user['business_name'] ?? '',
+            'username' => $user['username'] ?? '',
+            'document' => $user['document'] ?? '',
+            'phone' => $user['phone'] ?? '',
+            'email' => $user['email'] ?? '',
+            'address_line' => $user['address_line'] ?? '',
+            'city' => $user['city'] ?? '',
+            'state' => $user['state'] ?? '',
+            'is_reseller' => ! empty($user['is_reseller']) ? 'Si' : 'No',
+            'bank' => $user['bank'] ?? '',
+            'account' => $user['account'] ?? '',
+            'wallet_total' => (float) wallet_total($user),
+            'wallet_recharge' => (float) ($user['wallet_recharge'] ?? 0),
+            'wallet_withdraw' => (float) ($user['wallet_withdraw'] ?? 0),
+            'wallet_bonus' => (float) ($user['wallet_bonus'] ?? 0),
+            'kyc_status' => $user['kyc_status'] ?? 'pending',
+            'status' => $this->exportUserStatusLabel((int) ($user['status'] ?? 0)),
+            'created_at' => ! empty($user['created_at']) ? date('d/m/Y H:i', strtotime($user['created_at'])) : '',
+            default => '',
+        };
+    }
+
+    private function fetchUsersForExport(string $search, string $status, string $group): array
+    {
+        $model = new UsersModel();
+        $builder = $model->builder();
+
+        if ($search !== '') {
+            $builder->groupStart()
+                ->like('firstname', $search)
+                ->orLike('lastname', $search)
+                ->orLike('username', $search)
+                ->orLike('email', $search)
+                ->orLike('phone', $search)
+                ->orLike('document', $search)
+                ->orLike('business_name', $search)
+                ->groupEnd();
+        }
+
+        if ($status !== 'all') {
+            $builder->where('status', (int) $status);
+        }
+
+        if ($group !== 'all') {
+            $builder->where('group', (int) $group);
+        }
+
+        $builder->where('deleted', 0);
+
+        return $builder->orderBy('id', 'DESC')->get()->getResultArray();
+    }
+
+    private function exportUserGroupLabel(int $group): string
+    {
+        return match ($group) {
+            1 => 'Admin',
+            2 => translate('point of sale'),
+            3 => translate('operator'),
+            default => 'Jugador',
+        };
+    }
+
+    private function exportUserStatusLabel(int $status): string
+    {
+        return match ($status) {
+            1 => 'Activo',
+            2 => 'Desactivado',
+            default => 'Baneado',
+        };
     }
 
     public function userNotifications() {

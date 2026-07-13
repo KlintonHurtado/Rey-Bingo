@@ -7,15 +7,24 @@
         <div class="modal-body p-1 pt-0 text-center">
             <div class="text-center p-2"><?= $game['description']; ?> <span id="selection-time"></span></div>
             <div class="carton-filters-bar">
-                <div class="carton-search-wrap">
-                    <i class="fa-duotone fa-solid fa-magnifying-glass carton-search-icon"></i>
-                    <input type="search" id="carton-serial-search" class="carton-serial-search" placeholder="Buscar cartón por serial o número" autocomplete="off" inputmode="search">
+                <div class="carton-favorites-nav" id="carton-favorites-nav" aria-hidden="true">
+                    <button type="button" class="carton-favorites-back-btn" id="carton-favorites-back-btn" aria-label="Volver a todos los cartones">
+                        <i class="fa-duotone fa-solid fa-arrow-left"></i>
+                    </button>
+                    <span class="carton-favorites-nav-title">Favoritos</span>
                 </div>
-                <button type="button" class="carton-open-favorites-btn" id="toggle-favorite-cartons-filter" aria-pressed="false">
-                    <i class="fa-duotone fa-solid fa-star"></i> Mis favoritos (<span id="carton-favorites-count-num">0</span>)
-                </button>
+                <div class="carton-filters-default" id="carton-filters-default">
+                    <div class="carton-search-wrap">
+                        <i class="fa-duotone fa-solid fa-magnifying-glass carton-search-icon"></i>
+                        <input type="search" id="carton-serial-search" class="carton-serial-search" placeholder="Buscar por serial, número o columna (ej: O 70)" autocomplete="off" inputmode="search">
+                    </div>
+                    <button type="button" class="carton-open-favorites-btn" id="toggle-favorite-cartons-filter" aria-pressed="false">
+                        <i class="fa-duotone fa-solid fa-star"></i> Favoritos (<span id="carton-favorites-count-num">0</span>)
+                    </button>
+                    <div id="carton-search-results" class="carton-search-results" aria-live="polite"></div>
+                </div>
             </div>
-            <div class="action-sheet-content mb-3" style="max-height: 400px; overflow-y: auto;" id="cartons-container">
+            <div class="action-sheet-content mb-3" id="cartons-container">
                 <div class="cartons-section-select">
                     <?php if (isset($cartons) && count($cartons) == 0): ?>
                         <style>
@@ -24,7 +33,7 @@
                             }
                         </style>
                     <?php endif; ?>
-                    <div id="cartons-favorites-empty" class="cartons-favorites-empty">No tienes cartones favoritos en esta partida.</div>
+                    <div id="cartons-favorites-empty" class="cartons-favorites-empty">No hay cartones favoritos disponibles aquí.</div>
                     <div id="cartons-search-empty" class="cartons-favorites-empty">No se encontraron cartones con esa búsqueda.</div>
                     <div class="content-cartons-select" id="cartons-list">
                     <?php if (isset($cartons) && count($cartons) > 0): ?>
@@ -35,11 +44,11 @@
                                     <button type="button" class="carton-favorite-btn favorite-carton-btn" data-favorite-carton="<?= $cartonData['cartonId']; ?>" data-carton-serial="<?= esc($cartonData['serial']); ?>" data-game-id="<?= $game['id']; ?>" aria-label="Marcar cartón favorito" title="Marcar favorito">&#9734;</button>
                                 </div>
                                 <div class="bingo-carton" id="carton-<?= $cartonData['cartonId']; ?>" data-carton-id="<?= $cartonData['cartonId']; ?>">
-                                        <div class="bingo-carton-header B"><span>B</span></div>
-                                        <div class="bingo-carton-header I"><span>I</span></div>
-                                        <div class="bingo-carton-header N"><span>N</span></div>
-                                        <div class="bingo-carton-header G"><span>G</span></div>
-                                        <div class="bingo-carton-header O"><span>O</span></div>
+                                        <div class="bingo-carton-header bingo-col-b"><span>B</span></div>
+                                        <div class="bingo-carton-header bingo-col-i"><span>I</span></div>
+                                        <div class="bingo-carton-header bingo-col-n"><span>N</span></div>
+                                        <div class="bingo-carton-header bingo-col-g"><span>G</span></div>
+                                        <div class="bingo-carton-header bingo-col-o"><span>O</span></div>
                                         
                                         <?php foreach ($cartonData['numbers'] as $index => $number): ?>
                                             <?php if ($index === 12): ?>
@@ -80,6 +89,54 @@
     margin: 0 auto 14px;
     padding: 0 10px 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.carton-filters-default {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.carton-filters-default.is-hidden {
+    display: none;
+}
+
+.carton-favorites-nav {
+    display: none;
+    width: 100%;
+    max-width: 300px;
+    align-items: center;
+    gap: 10px;
+}
+
+.carton-favorites-nav.is-visible {
+    display: flex;
+}
+
+.carton-favorites-back-btn {
+    border: 0;
+    border-radius: 999px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.96);
+    color: #6236ff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.carton-favorites-nav-title {
+    flex: 1;
+    text-align: left;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .carton-search-wrap {
@@ -193,6 +250,37 @@
     display: none !important;
 }
 
+.cartons-search-active .bingo-border-carton-select.carton-search-match {
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.95);
+}
+
+.bingo-carton-number.carton-search-hit {
+    background: #4caf50 !important;
+    color: #fff !important;
+    border-radius: 8px;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+    transform: scale(1.04);
+    font-weight: 700;
+    z-index: 2;
+}
+
+.bingo-carton-number.carton-search-dim {
+    opacity: 0.22;
+}
+
+.carton-search-results {
+    display: none;
+    width: 100%;
+    text-align: center;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.92);
+    margin-top: -4px;
+}
+
+.carton-search-results.is-visible {
+    display: block;
+}
+
 .cartons-favorites-empty {
     display: none;
     padding: 18px 12px;
@@ -232,6 +320,7 @@
 }
 </style>
 
+<script src="<?= asset_url('js/carton-search.js'); ?>"></script>
 <script type="text/javascript">
     var currentPage = <?= $currentPage ?? 1 ?>;
     var hasMorePages = <?= ($currentPage < $totalPages) ? 'true' : 'false' ?>;
@@ -242,62 +331,135 @@
     var gameId = <?= $game['id'] ?>;
     var realTimeInterval;
     var lastUpdateTimestamp = 0;
-    var FAVORITE_CARTONS_KEY = 'favoriteCartons';
-    var FAVORITE_CARTONS_META_KEY = 'favoriteCartonsMeta';
+    var FAVORITE_CARTONS_KEY = 'favoriteCartonSerials';
+    var FAVORITE_CARTONS_META_KEY = 'favoriteCartonsMetaBySerial';
+    var LEGACY_FAVORITE_CARTONS_KEY = 'favoriteCartons';
+    var LEGACY_FAVORITE_CARTONS_META_KEY = 'favoriteCartonsMeta';
     var showOnlyFavoriteCartons = false;
     var cartonSearchQuery = '';
+    var legacyFavoritesMigrated = false;
 
-    function getFavoriteCartonIds(targetGameId) {
-        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_KEY) || '{}');
-        return (all[String(targetGameId)] || []).map(function(id) { return String(id); });
+    function normalizeFavoriteSerial(serial) {
+        return String(serial || '').trim().replace(/^c/i, '');
     }
 
-    function saveFavoriteCartonIds(targetGameId, ids) {
-        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_KEY) || '{}');
-        all[String(targetGameId)] = ids;
-        localStorage.setItem(FAVORITE_CARTONS_KEY, JSON.stringify(all));
-    }
-
-    function getFavoriteCartonMeta(cartonId) {
-        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
-        const gameMeta = all[String(gameId)] || {};
-        return gameMeta[String(cartonId)] || null;
-    }
-
-    function saveFavoriteCartonMeta(cartonId, serial, numbers) {
-        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
-        if (!all[String(gameId)]) {
-            all[String(gameId)] = {};
+    function migrateLegacyFavoriteStorage() {
+        if (legacyFavoritesMigrated) {
+            return;
         }
-        all[String(gameId)][String(cartonId)] = {
+        legacyFavoritesMigrated = true;
+
+        if (localStorage.getItem(FAVORITE_CARTONS_KEY)) {
+            return;
+        }
+
+        try {
+            const legacyIds = JSON.parse(localStorage.getItem(LEGACY_FAVORITE_CARTONS_KEY) || 'null');
+            const legacyMeta = JSON.parse(localStorage.getItem(LEGACY_FAVORITE_CARTONS_META_KEY) || '{}');
+            if (!legacyIds || typeof legacyIds !== 'object' || Array.isArray(legacyIds)) {
+                return;
+            }
+
+            const serials = [];
+            const metaBySerial = {};
+
+            Object.keys(legacyIds).forEach(function(gameKey) {
+                (legacyIds[gameKey] || []).forEach(function(cartonId) {
+                    const meta = (legacyMeta[gameKey] || {})[String(cartonId)];
+                    const serial = normalizeFavoriteSerial(meta && meta.serial ? meta.serial : cartonId);
+                    if (!serial || serials.includes(serial)) {
+                        return;
+                    }
+                    serials.push(serial);
+                    if (meta) {
+                        metaBySerial[serial] = {
+                            serial: String(meta.serial || serial),
+                            numbers: meta.numbers || null
+                        };
+                    }
+                });
+            });
+
+            localStorage.setItem(FAVORITE_CARTONS_KEY, JSON.stringify(serials));
+            localStorage.setItem(FAVORITE_CARTONS_META_KEY, JSON.stringify(metaBySerial));
+        } catch (error) {
+            console.warn('No se pudo migrar favoritos legacy:', error);
+        }
+    }
+
+    function getFavoriteCartonSerials() {
+        migrateLegacyFavoriteStorage();
+        const raw = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_KEY) || '[]');
+        return Array.isArray(raw) ? raw.map(normalizeFavoriteSerial).filter(Boolean) : [];
+    }
+
+    function saveFavoriteCartonSerials(serials) {
+        const unique = [...new Set(serials.map(normalizeFavoriteSerial).filter(Boolean))];
+        localStorage.setItem(FAVORITE_CARTONS_KEY, JSON.stringify(unique));
+    }
+
+    function saveFavoriteCartonMetaBySerial(serial, numbers) {
+        const normalized = normalizeFavoriteSerial(serial);
+        if (!normalized) {
+            return;
+        }
+
+        const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
+        all[normalized] = {
             serial: String(serial),
             numbers: numbers || null
         };
         localStorage.setItem(FAVORITE_CARTONS_META_KEY, JSON.stringify(all));
     }
 
-    function removeFavoriteCartonMeta(cartonId) {
+    function removeFavoriteCartonMetaBySerial(serial) {
+        const normalized = normalizeFavoriteSerial(serial);
         const all = JSON.parse(localStorage.getItem(FAVORITE_CARTONS_META_KEY) || '{}');
-        if (all[String(gameId)]) {
-            delete all[String(gameId)][String(cartonId)];
+        if (all[normalized]) {
+            delete all[normalized];
             localStorage.setItem(FAVORITE_CARTONS_META_KEY, JSON.stringify(all));
         }
     }
 
     function isFavoriteCarton(cartonId) {
-        return getFavoriteCartonIds(gameId).includes(String(cartonId));
+        const serial = getCartonSerialFromDom(cartonId);
+        if (!serial) {
+            return false;
+        }
+        return getFavoriteCartonSerials().includes(serial);
+    }
+
+    function favoriteCartonExistsInDom(serial) {
+        const normalized = normalizeFavoriteSerial(serial);
+        let exists = false;
+
+        $('.bingo-border-carton-select[data-carton-serial]').each(function() {
+            if (normalizeFavoriteSerial($(this).data('carton-serial') || '') === normalized) {
+                exists = true;
+                return false;
+            }
+        });
+
+        return exists;
     }
 
     function getCartonSerialFromDom(cartonId) {
         const wrapper = $(`.bingo-border-carton-select[data-carton-wrapper-id="${cartonId}"]`);
         if (wrapper.length && wrapper.data('carton-serial')) {
-            return String(wrapper.data('carton-serial'));
+            return normalizeFavoriteSerial(wrapper.data('carton-serial'));
         }
-        const meta = getFavoriteCartonMeta(cartonId);
-        if (meta && meta.serial) {
-            return String(meta.serial);
-        }
-        return String(getCartonSerial(cartonId));
+        return '';
+    }
+
+    function countFavoriteCartonsInCurrentView() {
+        let count = 0;
+        $('.bingo-border-carton-select[data-carton-wrapper-id]').each(function() {
+            const serial = normalizeFavoriteSerial($(this).data('carton-serial') || '');
+            if (serial && getFavoriteCartonSerials().includes(serial)) {
+                count++;
+            }
+        });
+        return count;
     }
 
     function captureCartonNumbersFromDom(cartonId) {
@@ -315,13 +477,32 @@
         const $btn = $('#toggle-favorite-cartons-filter');
         $btn.toggleClass('is-active', showOnlyFavoriteCartons);
         $btn.attr('aria-pressed', showOnlyFavoriteCartons ? 'true' : 'false');
+
+        $('#carton-favorites-nav')
+            .toggleClass('is-visible', showOnlyFavoriteCartons)
+            .attr('aria-hidden', showOnlyFavoriteCartons ? 'false' : 'true');
+        $('#carton-filters-default').toggleClass('is-hidden', showOnlyFavoriteCartons);
+    }
+
+    function exitFavoritesFilter() {
+        if (!showOnlyFavoriteCartons) {
+            return;
+        }
+
+        showOnlyFavoriteCartons = false;
+        updateFavoritesFilterButton();
+        applyFavoriteCartonsFilter();
     }
 
     function normalizeCartonSearch(value) {
-        return String(value || '').toLowerCase().replace(/\s+/g, '').replace(/^c/, '');
+        return window.CartonSearch ? CartonSearch.normalizeCartonSearch(value) : String(value || '').toLowerCase().replace(/\s+/g, '').replace(/^c/, '');
     }
 
     function cartonMatchesSearch($wrapper, query) {
+        if (window.CartonSearch) {
+            return CartonSearch.cartonMatchesSearch($wrapper, query);
+        }
+
         if (!query) {
             return true;
         }
@@ -329,11 +510,6 @@
         const normalizedQuery = normalizeCartonSearch(query);
         const serial = normalizeCartonSearch($wrapper.data('carton-serial') || '');
         if (serial.includes(normalizedQuery)) {
-            return true;
-        }
-
-        const labelText = $wrapper.find('.carton-serial-label').text();
-        if (normalizeCartonSearch(labelText).includes(normalizedQuery)) {
             return true;
         }
 
@@ -350,26 +526,59 @@
 
     function applyCartonsFilters() {
         let visibleFavorites = 0;
-        let visibleMatches = 0;
         const hasSearch = cartonSearchQuery.trim().length > 0;
+        let visibleMatches = 0;
 
-        $('.bingo-border-carton-select[data-carton-wrapper-id]').each(function() {
-            const $wrapper = $(this);
-            const cartonId = String($wrapper.data('carton-wrapper-id'));
-            const isFavorite = isFavoriteCarton(cartonId);
-            const matchesSearch = cartonMatchesSearch($wrapper, cartonSearchQuery);
-            const shouldHide = (showOnlyFavoriteCartons && !isFavorite) || (hasSearch && !matchesSearch);
+        if (hasSearch && showOnlyFavoriteCartons) {
+            showOnlyFavoriteCartons = false;
+            updateFavoritesFilterButton();
+        }
 
-            $wrapper.toggleClass('carton-filter-hidden', shouldHide);
-            this.style.display = shouldHide ? 'none' : '';
+        if (window.CartonSearch) {
+            const stats = CartonSearch.applyCartonsSearchState('#cartons-container', cartonSearchQuery);
+            visibleMatches = stats.visible;
 
-            if (showOnlyFavoriteCartons && isFavorite && !shouldHide) {
-                visibleFavorites++;
+            if (showOnlyFavoriteCartons) {
+                $('.bingo-border-carton-select[data-carton-wrapper-id]:not(.carton-filter-hidden)').each(function() {
+                    const cartonId = String($(this).data('carton-wrapper-id'));
+                    if (isFavoriteCarton(cartonId)) {
+                        visibleFavorites++;
+                    } else {
+                        $(this).addClass('carton-filter-hidden').hide();
+                        visibleMatches--;
+                    }
+                });
             }
-            if (!shouldHide) {
-                visibleMatches++;
-            }
-        });
+        } else {
+            $('.bingo-border-carton-select[data-carton-wrapper-id]').each(function() {
+                const $wrapper = $(this);
+                const cartonId = String($wrapper.data('carton-wrapper-id'));
+                const isFavorite = isFavoriteCarton(cartonId);
+                const matchesSearch = cartonMatchesSearch($wrapper, cartonSearchQuery);
+                const shouldHide = (showOnlyFavoriteCartons && !isFavorite) || (hasSearch && !matchesSearch);
+
+                $wrapper.toggleClass('carton-filter-hidden', shouldHide);
+                this.style.display = shouldHide ? 'none' : '';
+
+                if (showOnlyFavoriteCartons && isFavorite && !shouldHide) {
+                    visibleFavorites++;
+                }
+                if (!shouldHide) {
+                    visibleMatches++;
+                }
+            });
+        }
+
+        const $results = $('#carton-search-results');
+        if (hasSearch) {
+            $results
+                .addClass('is-visible')
+                .text(visibleMatches > 0
+                    ? visibleMatches + ' cartón' + (visibleMatches === 1 ? '' : 'es') + ' encontrado' + (visibleMatches === 1 ? '' : 's')
+                    : 'Ningún cartón coincide con la búsqueda');
+        } else {
+            $results.removeClass('is-visible').text('');
+        }
 
         $('#cartons-favorites-empty').toggleClass('is-visible', showOnlyFavoriteCartons && visibleFavorites === 0 && !hasSearch);
         $('#cartons-search-empty').toggleClass('is-visible', hasSearch && visibleMatches === 0);
@@ -384,42 +593,100 @@
         applyCartonsFilters();
     }
 
-    function toggleFavoritesFilter() {
-        const count = getFavoriteCartonIds(gameId).length;
-        if (!showOnlyFavoriteCartons && count === 0) {
-            showNotification('No tienes cartones favoritos en esta partida.', 'info');
+    let loadingFavoriteCartons = false;
+
+    function ensureFavoriteCartonsFromServer(done) {
+        const serials = getFavoriteCartonSerials();
+        const missing = serials.filter(function(serial) {
+            return !favoriteCartonExistsInDom(serial);
+        });
+
+        if (!missing.length) {
+            if (typeof done === 'function') {
+                done();
+            }
             return;
         }
 
-        showOnlyFavoriteCartons = !showOnlyFavoriteCartons;
+        if (loadingFavoriteCartons) {
+            if (typeof done === 'function') {
+                done();
+            }
+            return;
+        }
+
+        loadingFavoriteCartons = true;
+
+        $.ajax({
+            url: '<?= site_url('playings/loadFavoriteCartons') ?>',
+            method: 'POST',
+            data: {
+                game_id: gameId,
+                serials: JSON.stringify(missing)
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            success: function(response) {
+                if (response.success && response.cartons && response.cartons.length > 0) {
+                    appendCartons(response.cartons);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading favorite cartons:', error);
+            },
+            complete: function() {
+                loadingFavoriteCartons = false;
+                if (typeof done === 'function') {
+                    done();
+                }
+            }
+        });
+    }
+
+    function toggleFavoritesFilter() {
+        if (!showOnlyFavoriteCartons && getFavoriteCartonSerials().length === 0) {
+            showNotification('No tienes cartones favoritos guardados.', 'info');
+            return;
+        }
+
+        if (!showOnlyFavoriteCartons) {
+            ensureFavoriteCartonsFromServer(function() {
+                showOnlyFavoriteCartons = true;
+                updateFavoritesFilterButton();
+                applyFavoriteCartonsFilter();
+                $('#cartons-container').scrollTop(0);
+            });
+            return;
+        }
+
+        showOnlyFavoriteCartons = false;
         updateFavoritesFilterButton();
         applyFavoriteCartonsFilter();
-
-        if (showOnlyFavoriteCartons) {
-            $('#cartons-container').scrollTop(0);
-        }
     }
 
     function toggleFavoriteCarton(cartonId, serial) {
-        const id = String(cartonId);
-        let ids = getFavoriteCartonIds(gameId);
-        const wasFavorite = ids.includes(id);
-
-        if (wasFavorite) {
-            ids = ids.filter(function(item) { return item !== id; });
-            removeFavoriteCartonMeta(id);
-        } else {
-            ids.push(id);
-            saveFavoriteCartonMeta(id, serial || getCartonSerialFromDom(id), captureCartonNumbersFromDom(id));
+        const normalizedSerial = normalizeFavoriteSerial(serial || getCartonSerialFromDom(cartonId));
+        if (!normalizedSerial) {
+            return false;
         }
 
-        saveFavoriteCartonIds(gameId, ids);
-        updateFavoriteCartonUI(cartonId);
-        updateFavoriteCartonsCount();
-        sortFavoriteCartonsFirst();
-        applyFavoriteCartonsFilter();
+        let serials = getFavoriteCartonSerials();
+        const wasFavorite = serials.includes(normalizedSerial);
 
-        if (showOnlyFavoriteCartons && wasFavorite && getFavoriteCartonIds(gameId).length === 0) {
+        if (wasFavorite) {
+            serials = serials.filter(function(item) { return item !== normalizedSerial; });
+            removeFavoriteCartonMetaBySerial(normalizedSerial);
+        } else {
+            serials.push(normalizedSerial);
+            saveFavoriteCartonMetaBySerial(normalizedSerial, captureCartonNumbersFromDom(cartonId));
+        }
+
+        saveFavoriteCartonSerials(serials);
+        refreshAllFavoriteCartonsUI();
+
+        if (showOnlyFavoriteCartons && wasFavorite && countFavoriteCartonsInCurrentView() === 0) {
             showOnlyFavoriteCartons = false;
             updateFavoritesFilterButton();
             applyFavoriteCartonsFilter();
@@ -451,8 +718,7 @@
     }
 
     function updateFavoriteCartonsCount() {
-        const count = getFavoriteCartonIds(gameId).length;
-        $('#carton-favorites-count-num').text(count);
+        $('#carton-favorites-count-num').text(getFavoriteCartonSerials().length);
     }
 
     function sortFavoriteCartonsFirst() {
@@ -504,7 +770,7 @@
         html += `<button type="button" class="carton-favorite-btn favorite-carton-btn" data-favorite-carton="${cartonId}" data-carton-serial="${cartonData.serial}" data-game-id="${gameId}" aria-label="Marcar cartón favorito" title="Marcar favorito">&#9734;</button>`;
         html += `</div>`;
         html += `<div class="${cartonClass}" id="carton-${cartonId}" data-carton-id="${cartonId}">`;
-        html += `<div class="bingo-carton-header B"><span>B</span></div><div class="bingo-carton-header I"><span>I</span></div><div class="bingo-carton-header N"><span>N</span></div><div class="bingo-carton-header G"><span>G</span></div><div class="bingo-carton-header O"><span>O</span></div>`;
+        html += `<div class="bingo-carton-header bingo-col-b"><span>B</span></div><div class="bingo-carton-header bingo-col-i"><span>I</span></div><div class="bingo-carton-header bingo-col-n"><span>N</span></div><div class="bingo-carton-header bingo-col-g"><span>G</span></div><div class="bingo-carton-header bingo-col-o"><span>O</span></div>`;
 
         cartonData.numbers.forEach(function(number, index) {
             if (index === 12) {
@@ -558,6 +824,12 @@
             e.preventDefault();
             e.stopPropagation();
             toggleFavoritesFilter();
+        });
+
+        $('#carton-favorites-back-btn').off('click.favBack').on('click.favBack', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            exitFavoritesFilter();
         });
 
         $('#carton-serial-search').off('input.cartonSearch search.cartonSearch').on('input.cartonSearch search.cartonSearch', function() {
@@ -946,6 +1218,7 @@
         
         $('#cartons-list').append(html);
         refreshAllFavoriteCartonsUI();
+        applyCartonsFilters();
     }
 
     // Funciones de actualización visual de cartones

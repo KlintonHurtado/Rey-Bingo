@@ -1,15 +1,10 @@
-
-<a class="btn btn-small btn-profile" href="<?= site_url('profile'); ?>"><img src="<?= $imagePath ?>" alt="img"></a>
-
-<button type="button" class="btn btn-small btn-wallet btn-wallet-profile" onclick="paymentsGet();">
-    <i class="fa-duotone fa-solid fa-wallet"></i>
-</button>
+<?= view('playings/partials/player_nav_cluster', [
+    'mode' => 'avatar',
+    'imagePath' => $imagePath,
+    'wonCartonsExtraClass' => 'btn-won-cartons-play',
+]); ?>
 
 <span class="code-bgc fs-3 hidden" id="copyCode"><?= $user["code"] ?></span>
-
-<button type="button" class="btn btn-small btn-gamepad btn-gamepad-profile" onclick="gamesGet();">
-    <i class="fa-duotone fa-solid fa-gamepad"></i>
-</button>
 
 <button type="button" class="btn btn-small btn-qrcode" onclick="referralsGet();">
     <i class="fa-duotone fa-solid fa-qrcode"></i>
@@ -131,25 +126,25 @@
 
     @media (min-width: 769px) {
         .play-filters-bar {
-            max-width: 100%;
-            margin-bottom: 0.65rem;
-            gap: 10px;
+            max-width: 720px;
+            margin-bottom: 0.75rem;
+            gap: 12px;
         }
 
         .play-filter-field--min {
-            flex: 0 0 180px;
-            max-width: 180px;
+            flex: 0 0 160px;
+            max-width: 160px;
         }
 
         .player-play-view .play-filter-input.form-bingo {
-            font-size: 0.92rem;
-            height: 42px;
-            line-height: 42px;
-            padding-left: 34px;
+            font-size: 0.95rem;
+            height: 46px;
+            line-height: 46px;
+            padding-left: 38px;
         }
 
         .player-play-view .play-filter-input.form-bingo::placeholder {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
         }
     }
 
@@ -162,43 +157,7 @@
         padding: 0.45rem 0.55rem !important;
     }
 
-    .player-play-view .next-game.play-countdown-panel {
-        margin-top: 0.35rem !important;
-        margin-bottom: 0.25rem !important;
-    }
-
-    .player-play-view .text-center > .logo {
-        margin-bottom: 0.15rem;
-    }
-
     @media (max-width: 768px) {
-        body:has(.player-play-view) {
-            align-items: flex-start !important;
-        }
-
-        #content-page:has(.player-play-view) {
-            min-height: 100dvh;
-        }
-
-        .player-play-view {
-            padding-top: 5.85rem;
-        }
-
-        .player-play-view .play-section--single {
-            max-height: calc(100dvh - 262px);
-        }
-
-        .player-play-view .play-filters-bar {
-            margin-bottom: 0.58rem;
-        }
-    }
-
-    @media (min-width: 769px) {
-        .player-play-view {
-            padding-top: 2rem;
-        }
-    }
-
     .player-play-view .play-section--multi {
         height: auto;
         min-height: 0;
@@ -346,6 +305,42 @@
         padding: 6px 10px;
         font-size: 0.82rem;
         margin-bottom: 4px !important;
+    }
+
+        body:has(.player-play-view) {
+            align-items: flex-start !important;
+        }
+
+        #content-page:has(.player-play-view) {
+            min-height: 100dvh;
+        }
+
+        .player-play-view {
+            padding-top: 5.85rem;
+        }
+
+        .player-play-view .play-section--single {
+            max-height: calc(100dvh - 262px);
+        }
+
+        .player-play-view .play-filters-bar {
+            margin-bottom: 0.58rem;
+        }
+    }
+
+    .player-play-view .next-game.play-countdown-panel {
+        margin-top: 0.35rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+
+    .player-play-view .text-center > .logo {
+        margin-bottom: 0.15rem;
+    }
+
+    @media (min-width: 769px) {
+        .player-play-view {
+            padding-top: 5.5rem;
+        }
     }
 
     .play-rooms-carousel {
@@ -770,6 +765,10 @@
     <?php endif; ?>
 
     window.setPlayRoomSlideWidths = function setPlayRoomSlideWidths() {
+        if (window.innerWidth >= 769) {
+            return;
+        }
+
         const playSection = document.querySelector('.play-section--rooms.play-section--multi');
         const cardsContainer = playSection ? playSection.querySelector('.play-cards--multi') : null;
         if (!playSection || !cardsContainer) {
@@ -792,6 +791,13 @@
         const nextBtn = document.getElementById('play-rooms-scroll-next');
 
         if (!carousel || !playSection || !prevBtn || !nextBtn) {
+            return;
+        }
+
+        if (window.innerWidth >= 769) {
+            prevBtn.classList.remove('is-visible');
+            nextBtn.classList.remove('is-visible');
+            carousel.classList.remove('has-scroll-right', 'has-scroll-left');
             return;
         }
 

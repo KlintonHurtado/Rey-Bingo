@@ -48,6 +48,9 @@ class WalletService
         );
 
         $this->users->update($userId, array_merge($balances, ['wallet' => $total]));
+
+        helper('bingo');
+        bingo_check_low_balance_auto_roulette($userId);
     }
 
     public function canAfford(array $user, float $amount): bool
@@ -159,5 +162,28 @@ class WalletService
         ]);
 
         return true;
+    }
+
+    public function deductRecharge(int $userId, float $amount): bool
+    {
+        $user = $this->normalizeUser($this->users->find($userId));
+        if (! $user || $amount <= 0 || $user['wallet_recharge'] < $amount) {
+            return false;
+        }
+
+        $this->syncLegacyWallet($userId, [
+            'wallet_bonus'    => $user['wallet_bonus'],
+            'wallet_recharge' => round($user['wallet_recharge'] - $amount, 2),
+            'wallet_withdraw' => $user['wallet_withdraw'],
+        ]);
+
+        return true;
+    }
+
+    public function getRechargeBalance(array $user): float
+    {
+        $user = $this->normalizeUser($user);
+
+        return round($user['wallet_recharge'], 2);
     }
 }

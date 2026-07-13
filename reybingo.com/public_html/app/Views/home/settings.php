@@ -334,25 +334,63 @@
                             <div class="col-md-4 mb-3">
                                 <label for="registrationBonus" class="form-label">Bono al registrarse</label>
                                 <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="registrationBonus" id="registrationBonus" placeholder="0.00" value="<?= esc(systemGet('registrationBonus') ?? '0'); ?>">
-                                <small class="text-muted">Se acredita como bono al registrarse. Solo puede gastarse en cartones; no es retirable ni transferible.</small>
+                                <small class="text-muted"><?= translate('registration bonus help short'); ?></small>
                                 <small id="registrationBonus-error" class="text-danger d-none"></small>
                             </div>
 
                             <div class="col-md-12">
-                                <h6><?= translate('commission rates'); ?> (%)</h6>
+                                <h6><?= translate('point of sale settings'); ?></h6>
                                 <hr class="my-1">
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label for="rateStoreCommission" class="form-label"><?= translate('store recharge commission rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStoreCommission" id="rateStoreCommission" placeholder="<?= translate('store recharge commission rate'); ?>" value="<?= (float) (systemGet('rateStoreCommission') ?? 0) * 100; ?>">
+                                <small id="rateStoreCommission-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label for="rateStoreGgrCommission" class="form-label"><?= translate('store ggr commission rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStoreGgrCommission" id="rateStoreGgrCommission" placeholder="<?= translate('store ggr commission rate'); ?>" value="<?= (float) (systemGet('rateStoreGgrCommission') ?? 0) * 100; ?>">
+                                <small id="rateStoreGgrCommission-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label for="rateStorePrizeCommission" class="form-label"><?= translate('store prize commission rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStorePrizeCommission" id="rateStorePrizeCommission" placeholder="<?= translate('store prize commission rate'); ?>" value="<?= (float) (systemGet('rateStorePrizeCommission') ?? 0) * 100; ?>">
+                                <small id="rateStorePrizeCommission-error" class="text-danger d-none"></small>
+                            </div>
+
+                            <div class="col-md-12">
+                                <h6><?= translate('operator settings'); ?></h6>
+                                <hr class="my-1">
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label for="rateOperatorCommission" class="form-label"><?= translate('operator ggr total rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateOperatorCommission" id="rateOperatorCommission" placeholder="<?= translate('operator ggr total rate'); ?>" value="<?= (float) (systemGet('rateOperatorCommission') ?? 0) * 100; ?>">
+                                <small id="rateOperatorCommission-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <label for="ggrSettlementMode" class="form-label"><?= translate('ggr settlement mode'); ?></label>
+                                <?php $ggrSettlementMode = bingo_ggr_settlement_mode(); ?>
+                                <select class="form-control form-control-lg form-bingo" name="ggrSettlementMode" id="ggrSettlementMode">
+                                    <option value="monthly" <?= $ggrSettlementMode === 'monthly' ? 'selected' : ''; ?>><?= translate('ggr settlement monthly'); ?></option>
+                                    <option value="immediate" <?= $ggrSettlementMode === 'immediate' ? 'selected' : ''; ?>><?= translate('ggr settlement immediate'); ?></option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-12">
+                                <h6><?= translate('business settings'); ?></h6>
+                                <hr class="my-1">
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
                                 <label for="rateEarnings" class="form-label"><?= translate('earnings rate'); ?> %</label>
                                 <input type="number" step="0.01" class="form-control form-control-lg form-bingo" name="rateEarnings" id="rateEarnings" placeholder="<?= translate('earnings rate'); ?>" value="<?= systemGet('rateEarnings') * 100; ?>">
                                 <small id="rateEarnings-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 col-lg-3 mb-3">
                                 <label for="rateReferrals" class="form-label"><?= translate('referrals rate'); ?> %</label>
                                 <input type="number" step="0.01" class="form-control form-control-lg form-bingo" name="rateReferrals" id="rateReferrals" placeholder="<?= translate('referrals rate'); ?>" value="<?= systemGet('rateReferrals') * 100; ?>">
                                 <small id="rateReferrals-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 col-lg-3 mb-3">
                                 <label for="rateBGC" class="form-label"><?= translate('BGC rate'); ?> %</label>
                                 <input type="number" step="0.01" class="form-control form-control-lg form-bingo" name="rateBGC" id="rateBGC" placeholder="<?= translate('BGC rate'); ?>" value="<?= systemGet('rateBGC') * 100; ?>">
                                 <small id="rateBGC-error" class="text-danger d-none"></small>

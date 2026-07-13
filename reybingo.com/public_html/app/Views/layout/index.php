@@ -41,12 +41,21 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="<?= asset_url('css/toastify.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('css/bingo.css') ?>" rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                if (sessionStorage.getItem('reybingo-app-loaded') === '1') {
+                    document.documentElement.classList.add('reybingo-skip-preloader');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <link href="<?= asset_url('css/sweetalert.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/components/font-awesome/css/fontawesome.min.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/czm-chat-support.css') ?>" rel="stylesheet">
 </head>
 <body class="bg-gradient-bingo">
-<?= view('layout/_layout_user_bootstrap') ?>
+<?php include APPPATH . 'Views/layout/_layout_user_bootstrap.php'; ?>
     <div class="preloader">
         <div class="canvas">
             <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid" alt="img" style="width: 250px;">
@@ -69,9 +78,9 @@
     <span class="notification-indicator hidden" id="notificationIndicator"></span>
 
     <?php if (session()->get('logged_in')) : ?>
-        <input type="hidden" name="sounds" id="sounds" value="<?= $user['sounds']; ?>">
-        <input type="hidden" name="narration" id="narration" value="<?= $user['narration']; ?>">
-        <input type="hidden" name="autodial" id="autodial" value="<?= $user['autodial']; ?>">
+        <input type="hidden" name="sounds" id="sounds" value="<?= esc($user['sounds'] ?? 0); ?>">
+        <input type="hidden" name="narration" id="narration" value="<?= esc($user['narration'] ?? 0); ?>">
+        <input type="hidden" name="autodial" id="autodial" value="<?= esc($user['autodial'] ?? 0); ?>">
     <?php else : ?>
         <input type="hidden" name="sounds" id="sounds" value="0">
     <?php endif; ?>
@@ -82,6 +91,12 @@
     <div class="modal fade" id="modalStatistics" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalUser" tabindex="-1" role="dialog"></div>
+
+    <div class="modal fade" id="modalUserExport" tabindex="-1" role="dialog"></div>
+
+    <div class="modal fade" id="modalStore" tabindex="-1" role="dialog"></div>
+
+    <div class="modal fade" id="modalOperator" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalUserDetails" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -409,6 +424,12 @@
                 animation-duration: 1s !important;
             }
         }
+
+        .roulette-game-picker {
+            max-width: 420px;
+            margin: 0 auto;
+            text-align: left;
+        }
     </style>
   
     <div class="modal fade" id="modalactivateRoulette" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -425,7 +446,8 @@
                             <div>
                                 <button class="btn btn-primary btn-bingo btn-spin mt-3" style="width: 200px; display: inline-block;" id="spin">GIRAR RULETA</button>
                                 <h1 id="result"></h1>
-                                <button class="btn btn-primary btn-bingo btn-spin mt-2" id="claimBtn" onclick="claimPrize();"width: 200px; style="display: none;">RECLAMAR</button>
+                                <p class="small text-muted mt-2 mb-0">Al reclamar, tus cartones quedarán guardados en <strong>Mis cartones ganados</strong> para que elijas la partida.</p>
+                                <button class="btn btn-primary btn-bingo btn-spin mt-3" id="claimBtn" onclick="claimPrize();" style="width: 220px; display: none;">RECLAMAR PREMIO</button>
                             </div>
                         </div>
                     </div>
@@ -1614,8 +1636,10 @@
         const wheel = document.getElementById("wheel");
         const ctx = wheel.getContext("2d");
         const spinBtn = document.getElementById("spin");
-        const claimBtn = document.getElementById("claimBtn"); // ✅ Definir aquí
+        const claimBtn = document.getElementById("claimBtn");
         const result = document.getElementById("result");
+
+        const rouletteModalEl = document.getElementById('modalactivateRoulette');
 
         const totalSegments = 30;
         const segmentAngle = (2 * Math.PI) / totalSegments;
@@ -1707,11 +1731,6 @@
                     const angleAtPointer = (3 * Math.PI / 2 - finalAngle + 2 * Math.PI) % (2 * Math.PI);
                     let index = Math.floor(angleAtPointer / segmentAngle) % totalSegments;
 
-                    // Si el premio es 10 CARTONES, forzar selección de otro premio
-                    while (segments[index] === "10 CARTONES") {
-                        index = (index + 1) % totalSegments;
-                    }
-
                     const selectedPrize = segments[index];
 
                     if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
@@ -1721,11 +1740,12 @@
                     }
 
                     if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
-                        AppcreateConfetti(); // ✅ Corregido
+                        AppcreateConfetti();
                         spinBtn.style.display = "none";
                         claimBtn.style.display = "inline-block";
-                        claimBtn.style.width = "200px";
+                        claimBtn.style.width = "220px";
                         claimBtn.disabled = false;
+                        claimBtn.textContent = 'RECLAMAR PREMIO';
 
                         // ✅ Extraer número de cartones (singular y plural)
                         let cartons = 0;
@@ -1756,9 +1776,7 @@
         spinBtn.addEventListener("click", spinWheel);
 
         function claimPrize() {
-            const cartons = parseInt(claimBtn.dataset.cartons) || 0; // ✅ Usar la referencia global y parsear
-
-            console.log('Reclamando cartones:', cartons); // ✅ Debug
+            const cartons = parseInt(claimBtn.dataset.cartons, 10) || 0;
 
             if (cartons === 0) {
                 Toastify({
@@ -1773,7 +1791,7 @@
             }
 
             claimBtn.disabled = true;
-            claimBtn.textContent = 'Procesando...';
+            claimBtn.textContent = 'Reclamando premio...';
 
             $.ajax({
                 url: "<?= site_url('playings/claimPrize') ?>",
@@ -1785,17 +1803,27 @@
                         $('#modalactivateRoulette').modal('hide');
                         Toastify({
                             text: data.message,
-                            duration: 3000,
+                            duration: 4000,
                             gravity: "top",
                             position: "right",
                             style: { background: "#198754" },
                             stopOnFocus: true
                         }).showToast();
                         claimBtn.style.display = 'none';
+
+                        if (typeof updateWonCartonsPendingBadge === 'function') {
+                            updateWonCartonsPendingBadge(data.pending_cartons || cartons);
+                        }
+
+                        if (data.redirect_url) {
+                            setTimeout(function() {
+                                window.location.href = data.redirect_url;
+                            }, 1400);
+                        }
                     } else {
                         Toastify({
-                            text: "<?= translate('there was an error in the request to the server'); ?>",
-                            duration: 3000,
+                            text: data.message || "<?= translate('there was an error in the request to the server'); ?>",
+                            duration: 4000,
                             gravity: "top",
                             position: "right",
                             style: { background: "#dc3545" },
@@ -1934,7 +1962,12 @@
             Swal.fire = function (options) {
                 const defaults = {
                     scrollbarPadding: false,
-                    heightAuto: false
+                    heightAuto: false,
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-primary',
+                        cancelButton: 'btn btn-danger'
+                    }
                 };
 
                 if (typeof options === 'string') {
@@ -1988,7 +2021,7 @@
                 /* Representative Settings */
                 persons: [
 
-                    <?php foreach ($contacts as $contact): ?>
+                    <?php foreach (($contacts ?? []) as $contact): ?>
                     {
                         avatar: {
                             src: '<img src="<?= site_url('assets/img/person/' . $contact['id'] . '.svg'); ?>" alt="img">', /* Image, Icon or SVG */
@@ -2050,7 +2083,7 @@
 
                 // Reintenta si el dispositivo se vuelve visible tras estar oculto (por ejemplo, al volver a la pestaña)
                 document.addEventListener('visibilitychange', () => {
-                    if (wakeLock !== null && document.visibilityState === 'visible') {
+                    if (document.visibilityState === 'visible' && (wakeLock === null || wakeLock.released)) {
                         requestWakeLock();
                     }
                 });

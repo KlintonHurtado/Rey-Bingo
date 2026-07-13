@@ -887,26 +887,9 @@ class Games extends Controller {
                         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
                         // CORRECCIÓN: Obtener TODOS los premios del juego, no solo el primero
-                        $awards = $modelAwards->where('game', $game['id'])->where('status', 1)->findAll();
+                        $awards = (new AwardsModel())->where('game', $game['id'])->where('status', 1)->findAll();
+                        $game['total'] = bingo_get_game_award_total_for_display($game, (int) $game['cartons']);
                         $accumulated = $game['cartons'] * $game['price'];
-                        $total_award = $accumulated - ($accumulated * systemGet('rateEarnings'));
-
-                        // Calcular el total sumando todos los premios
-                        $game['total'] = 0;
-                        
-                        if (!empty($awards)) {
-                            foreach ($awards as $award) {
-                                if ($game['award'] == 2) {
-                                    // Si es monto fijo, sumar directamente
-                                    $game['total'] += $award['amount'];
-                                } else {
-                                    // Si es porcentaje, calcular el porcentaje del total disponible
-                                    $game['total'] += ($total_award * $award['amount'] / 100);
-                                }
-                            }
-                        }
-
-                        $game['accumulated'] = $accumulated;
 
                         $game['earnings'] = $accumulated - $game['total'];
                         
@@ -1541,7 +1524,7 @@ class Games extends Controller {
             if (bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => bingo_min_players_start_message($game),
+                    'message' => bingo_game_start_block_message($game),
                 ]);
             }
 
@@ -1603,7 +1586,7 @@ class Games extends Controller {
             && !bingo_can_start_game($game)) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => bingo_min_players_start_message($game),
+                'message' => bingo_game_start_block_message($game),
             ]);
         }
 
@@ -1695,6 +1678,10 @@ class Games extends Controller {
             'min_players' => [
                 'label' => translate('minimum players to start'),
                 'rules' => 'required|integer|greater_than[0]|less_than_equal_to[9999]'
+            ],
+            'min_cartons' => [
+                'label' => translate('minimum cartons to start'),
+                'rules' => 'required|integer|greater_than[0]|less_than_equal_to[99999]'
             ],
             'date' => [
                 'label' => translate('date'), 
@@ -1812,6 +1799,8 @@ class Games extends Controller {
             'description' => $this->request->getPost('description'),
             'price' => $this->request->getPost('price'),
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
+            'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
+            'allow_roulette_cartons' => $this->request->getPost('allow_roulette_cartons') ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),
@@ -2064,6 +2053,10 @@ class Games extends Controller {
                 'label' => translate('minimum players to start'),
                 'rules' => 'required|integer|greater_than[0]|less_than_equal_to[9999]'
             ],
+            'min_cartons' => [
+                'label' => translate('minimum cartons to start'),
+                'rules' => 'required|integer|greater_than[0]|less_than_equal_to[99999]'
+            ],
             'date' => [
                 'label' => translate('date'), 
                 'rules' => 'required|valid_date[Y-m-d]'
@@ -2180,6 +2173,8 @@ class Games extends Controller {
             'description' => $this->request->getPost('description'),
             'price' => $this->request->getPost('price'),
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
+            'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
+            'allow_roulette_cartons' => $this->request->getPost('allow_roulette_cartons') ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),
@@ -2400,7 +2395,7 @@ class Games extends Controller {
         if ($game && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => bingo_min_players_start_message($game),
+                'message' => bingo_game_start_block_message($game),
             ]);
         }
 
@@ -2468,18 +2463,15 @@ class Games extends Controller {
             $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
             $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
-            $accumulated = $cartons * $game['price'];
-            $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+            $game['total'] = bingo_get_game_award_total_for_display($game, (int) $cartons);
 
             $numbers = $modelBoards->where('game', $game['id'])->countAllResults();
-                    
+
             $percentage = ($numbers / 75) * 100;
-        
+
             $game['numbers_called'] = $numbers;
 
             $game['percentage'] = round($percentage, 1);
-
-            $game['total'] = $gameAccumulated;
             
             if ($game['numbers'] == 0) {
                 $game['status_value'] = 'unstarted';
@@ -2494,20 +2486,20 @@ class Games extends Controller {
 
             $buttons = '';
             $canView = ($game['numbers'] == 75 || $SingsCount >= $AwardsCount);
-            $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players']);
-            $minPlayersMessage = esc(bingo_min_players_start_message($game, (int) $game['players']), 'attr');
+            $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players'], (int) $cartons);
+            $startBlockMessage = esc(bingo_game_start_block_message($game, (int) $game['players'], (int) $cartons), 'attr');
 
             if (session()->get('group') == 1) {
                 $playButtonClass = $canView ? 'primary' : ($canStart ? 'success' : 'secondary');
                 $playButtonIcon = $canView ? 'eye' : 'play';
                 $playButtonAction = ($canView || $canStart)
                     ? "gameGet('" . $game['id'] . "');"
-                    : "notifyMinPlayersRequired('" . $minPlayersMessage . "');";
+                    : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
 
                 if ($game['type'] != 3) {
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
-                    $liveButtonAction = $canStart ? "liveGet('" . $game['id'] . "');" : "notifyMinPlayersRequired('" . $minPlayersMessage . "');";
+                    $liveButtonAction = $canStart ? "liveGet('" . $game['id'] . "');" : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-primary btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
             } else {

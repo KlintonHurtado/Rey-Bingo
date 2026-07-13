@@ -18,8 +18,8 @@
                     </small>
 
                     <div class="mt-2 p-2 rounded" style="background: rgba(98,54,255,0.12);">
-                        <strong>Punto de venta / afiliado</strong>
-                        <p class="small mb-1">Tu enlace para vender en tienda o compartir:</p>
+                        <strong><?= translate('point of sale'); ?></strong>
+                        <p class="small mb-1"><?= translate('point of sale link share help'); ?></p>
                         <input type="text" class="form-control form-control-sm form-bingo mb-1" id="affiliate-link" readonly value="<?= site_url('signup/' . ($user['referred_code'] ?? $user['code'])); ?>">
                         <button type="button" class="btn btn-primary btn-bingo btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('affiliate-link').value);">Copiar enlace</button>
                     </div>

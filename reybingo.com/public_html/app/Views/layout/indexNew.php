@@ -41,6 +41,15 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="<?= asset_url('css/toastify.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('css/bingo.css') ?>" rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                if (sessionStorage.getItem('reybingo-app-loaded') === '1') {
+                    document.documentElement.classList.add('reybingo-skip-preloader');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <link href="<?= asset_url('css/sweetalert.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/components/font-awesome/css/fontawesome.min.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/czm-chat-support.css') ?>" rel="stylesheet">
@@ -703,6 +712,8 @@
     <div class="modal fade" id="modalStatistics" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalUser" tabindex="-1" role="dialog"></div>
+
+    <div class="modal fade" id="modalUserExport" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalUserDetails" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -2557,7 +2568,7 @@
                 /* Representative Settings */
                 persons: [
 
-                    <?php foreach ($contacts as $contact): ?>
+                    <?php foreach (($contacts ?? []) as $contact): ?>
                     {
                         avatar: {
                             src: '<img src="<?= site_url('assets/img/person/' . $contact['id'] . '.svg'); ?>" alt="img">', /* Image, Icon or SVG */

@@ -44,12 +44,24 @@ if (! function_exists('wallet_credit_withdrawable')) {
     }
 }
 
+if (! function_exists('wallet_credit_commission_earnings')) {
+    /** Comisiones y GGR acreditan saldo retirable (no saldo operativo del PV). */
+    function wallet_credit_commission_earnings(int $userId, float $amount): void
+    {
+        wallet_credit_withdrawable($userId, $amount);
+    }
+}
+
 if (! function_exists('wallet_kyc_allows_withdraw')) {
     /**
      * KYC obligatorio solo para retiros. Depósitos y compras de cartones no lo exigen.
      */
     function wallet_kyc_allows_withdraw(array $user): bool
     {
+        if (function_exists('bingo_user_requires_kyc') && ! bingo_user_requires_kyc($user)) {
+            return true;
+        }
+
         return ($user['kyc_status'] ?? 'pending') === 'verified';
     }
 }
@@ -94,6 +106,20 @@ if (! function_exists('wallet_deduct_withdrawable')) {
     function wallet_deduct_withdrawable(int $userId, float $amount): bool
     {
         return wallet_service()->deductWithdrawable($userId, $amount);
+    }
+}
+
+if (! function_exists('wallet_deduct_recharge')) {
+    function wallet_deduct_recharge(int $userId, float $amount): bool
+    {
+        return wallet_service()->deductRecharge($userId, $amount);
+    }
+}
+
+if (! function_exists('wallet_recharge_balance')) {
+    function wallet_recharge_balance(array $user): float
+    {
+        return wallet_service()->getRechargeBalance($user);
     }
 }
 

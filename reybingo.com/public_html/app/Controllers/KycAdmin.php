@@ -20,18 +20,21 @@ class KycAdmin extends Controller
         $imagePath = ! empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
         $pending = $modelUsers->where('kyc_status', 'pending')
+            ->where('group', bingo_group_player())
             ->where('kyc_front !=', '')
             ->where('kyc_front IS NOT NULL')
             ->orderBy('updated_at', 'DESC')
             ->findAll();
 
         $verified = $modelUsers->where('kyc_status', 'verified')
+            ->where('group', bingo_group_player())
             ->where('kyc_front !=', '')
             ->where('kyc_front IS NOT NULL')
             ->orderBy('updated_at', 'DESC')
             ->findAll();
 
         $rejected = $modelUsers->where('kyc_status', 'rejected')
+            ->where('group', bingo_group_player())
             ->where('kyc_front !=', '')
             ->where('kyc_front IS NOT NULL')
             ->orderBy('updated_at', 'DESC')
