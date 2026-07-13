@@ -13,6 +13,9 @@ $pendingTotal = (int) ($pendingTotal ?? 0);
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
 
 <div class="container admin-stores-page mt-5 pt-4">
+    <!-- Espaciador móvil para el menú flotante -->
+    <div class="d-block d-md-none" style="height: 180px;"></div>
+    
     <div class="row d-flex justify-content-center">
         <div class="col-md-10 col-lg-8">
             <div class="card mb-3 admin-stores-card">
