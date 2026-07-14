@@ -41,7 +41,7 @@
             <div class="row">
                 <div class="col">
                     <div class="text-center">
-                        <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo" alt="img">
+                        <img src="<?= site_url('assets/img/logo_principal.png'); ?>?v=2" class="img-fluid logo" alt="img">
                         <h5 class="mb-0 p-2"><?= translate('login'); ?></h5>
                         <?php if (($registeredType ?? '') === 'store' || service('request')->getGet('registered') === 'store') : ?>
                             <div class="alert alert-success py-2 px-3 small mb-2"><?= translate('store account created sign in'); ?></div>

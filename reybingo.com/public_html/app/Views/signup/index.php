@@ -4,7 +4,7 @@
             <div class="row">
                 <div class="col">
                     <div class="text-center">
-                        <img src="<?= site_url('assets/img/logo.png'); ?>" class="img-fluid logo" alt="img">
+                        <img src="<?= site_url('assets/img/logo_principal.png'); ?>?v=2" class="img-fluid logo" alt="img">
                         <h5 class="mb-0 p-2"><?= translate('create account'); ?></h5>
                         <p class="small text-muted mb-0"><?= translate('official client access'); ?>: <strong><?= esc(bingo_official_login_host()); ?></strong></p>
                         <?php if (bingo_client_domain_enabled()): ?>
