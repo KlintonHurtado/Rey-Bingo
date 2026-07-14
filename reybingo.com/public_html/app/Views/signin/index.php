@@ -40,15 +40,10 @@
         <div class="col-md-5 col-xl-5">
             <div class="row">
                 <div class="col">
-                    <div class="text-center">
+                    <div class="text-center mb-3">
                         <img src="<?= site_url('assets/img/logo_principal.png'); ?>?v=2" class="img-fluid logo" alt="img">
-                        <h5 class="mb-0 p-2"><?= translate('login'); ?></h5>
                         <?php if (($registeredType ?? '') === 'store' || service('request')->getGet('registered') === 'store') : ?>
                             <div class="alert alert-success py-2 px-3 small mb-2"><?= translate('store account created sign in'); ?></div>
-                        <?php endif; ?>
-                        <p class="small text-muted mb-0"><?= translate('official client access'); ?>: <strong><?= esc(bingo_official_login_host()); ?></strong></p>
-                        <?php if (bingo_client_domain_enabled()): ?>
-                        <p class="small text-muted mb-0"><?= translate('client login url'); ?>: <strong><?= esc(bingo_client_login_url('/signin')); ?></strong></p>
                         <?php endif; ?>
                     </div>
             
