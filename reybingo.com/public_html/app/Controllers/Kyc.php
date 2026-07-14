@@ -60,7 +60,7 @@ class Kyc extends Controller
         $selfie = $this->request->getFile('kyc_selfie');
 
         if (! $front || ! $front->isValid() || ! $back || ! $back->isValid() || ! $selfie || ! $selfie->isValid()) {
-            return redirect()->to('/kyc')->with('error', 'Debe subir las 3 imágenes: frente, reverso y selfie con el documento en la barbilla.');
+            return redirect()->back()->with('error', 'Debe subir las 3 imágenes: frente, reverso y selfie con el documento en la barbilla.');
         }
 
         $uploadPath = FCPATH . 'uploads/kyc';
@@ -87,6 +87,6 @@ class Kyc extends Controller
             'kyc_observations' => null,
         ]);
 
-        return redirect()->to('/kyc')->with('success', 'Documentos enviados (frente, reverso y selfie). Pendiente de revisión.');
+        return redirect()->back()->with('success', 'Documentos enviados correctamente. Pendiente de revisión.');
     }
 }
