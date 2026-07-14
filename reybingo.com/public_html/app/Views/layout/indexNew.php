@@ -2774,6 +2774,22 @@
                 confettiTimeout = null;
             }
         }
+
+        // Detectar instalación de la PWA y mostrar confirmación
+        window.addEventListener('appinstalled', (evt) => {
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: "🎉 ¡Aplicación instalada con éxito! Ya puedes abrirla directamente desde tu pantalla de inicio o escritorio.",
+                    duration: 6000,
+                    gravity: "top",
+                    position: "center",
+                    style: { background: "#1a62e7" },
+                    stopOnFocus: true
+                }).showToast();
+            } else {
+                alert("🎉 ¡Aplicación instalada con éxito! Ya puedes abrirla directamente desde tu pantalla de inicio o escritorio.");
+            }
+        });
     </script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
     <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
