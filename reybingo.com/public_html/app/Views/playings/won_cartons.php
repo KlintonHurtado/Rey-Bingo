@@ -10,9 +10,41 @@ $pendingTotal = (int) ($pendingTotal ?? 0);
     'wonCartonsExtraClass' => 'btn-won-cartons-profile is-active',
 ]); ?>
 
+<style>
+html:has(#content-page > .won-cartons-scroll),
+body:has(#content-page > .won-cartons-scroll) {
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
+#content-page:has(> .won-cartons-scroll) {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+}
+
+.won-cartons-scroll {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 80px;
+}
+
+.won-cartons-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+</style>
+
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
 
-<div class="container admin-stores-page mt-5 pt-4">
+<div class="won-cartons-scroll">
+    <div class="container admin-stores-page mt-5 pt-4">
     <!-- Espaciador móvil para el menú flotante -->
     <div class="d-block d-md-none" style="height: 180px;"></div>
     
@@ -87,6 +119,7 @@ $pendingTotal = (int) ($pendingTotal ?? 0);
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script>
