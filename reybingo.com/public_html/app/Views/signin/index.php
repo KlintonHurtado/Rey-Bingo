@@ -1,3 +1,16 @@
+<style>
+.btn-register-green {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+    color: #ffffff !important;
+}
+.btn-register-green:hover, .btn-register-green:focus, .btn-register-green:active {
+    background: #218838 !important;
+    border-color: #1e7e34 !important;
+    color: #ffffff !important;
+}
+</style>
+
 <div class="container">
     <div class="row d-flex justify-content-center">
         <div class="col-md-5 col-xl-5">
@@ -37,7 +50,7 @@
                                     <input class="form-check-input" type="checkbox" name="remember" id="remember" value="1" checked>
                                     <label for="remember" class="form-check-label"><?= translate('remember'); ?></label>
                                 </div>
-                                <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover float-end" href="<?= site_url('restore'); ?>"><?= translate('forgot your password?'); ?></a>
+                                <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" style="float: right !important;" href="<?= site_url('restore'); ?>"><?= translate('forgot your password?'); ?></a>
                             </div>
 
                             <div class="col-md-12">
@@ -46,7 +59,7 @@
 
                             <div class="col-md-12 pt-3 text-center">
                                 <span class="text-white font-weight-bold" style="color: #ffffff;"><?= translate('dont have an account yet?'); ?></span>
-                                <a href="<?= site_url('signup'); ?>" class="btn btn-success d-block w-50 btn-bingo mx-auto mt-2" style="background-color: #28a745; border-color: #28a745;">Registrarse aquí</a>
+                                <a href="<?= site_url('signup'); ?>" class="btn btn-register-green d-block w-50 btn-bingo mx-auto mt-2">Registrarse aquí</a>
                             </div>
 
                             <div class="col-md-12 pt-3">
