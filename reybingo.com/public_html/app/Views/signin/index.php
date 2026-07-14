@@ -44,17 +44,16 @@
                                 <button type="submit" class="btn btn-primary d-block w-50 btn-bingo" id="signin-button"><?= translate('enter'); ?></button>
                             </div>
 
+                            <div class="col-md-12 pt-3 text-center">
+                                <span class="text-white font-weight-bold" style="color: #ffffff;"><?= translate('dont have an account yet?'); ?></span>
+                                <a href="<?= site_url('signup'); ?>" class="btn btn-success d-block w-50 btn-bingo mx-auto mt-2" style="background-color: #28a745; border-color: #28a745;">Registrarse aquí</a>
+                            </div>
+
                             <div class="col-md-12 pt-3">
                                 <a href="<?= site_url('signup/google') ?>" class="btn btn-primary d-block google"><img src="https://developers.google.com/identity/images/g-logo.png" style="width:20px; margin-right:10px;"> <?= translate('signin with google'); ?></a>
                             </div>
                         </div>
                     <?= form_close(); ?>
-                    
-                    <hr />
-
-                    <div class="text-center">
-                        <?= translate('dont have an account yet?'); ?> <br /> <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" href="<?= site_url('signup'); ?>"><?= translate('create an account'); ?></a>
-                    </div>
                 </div>
             </div>
         </div>
