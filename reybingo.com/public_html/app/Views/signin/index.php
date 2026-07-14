@@ -22,6 +22,9 @@
 .btn-register-green, #signin-button {
     font-family: 'Fredoka One', cursive !important;
 }
+.logo {
+    margin-bottom: -25px !important;
+}
 #username, #password {
     border: 2px solid #1a62e7 !important;
     height: 46px !important;
