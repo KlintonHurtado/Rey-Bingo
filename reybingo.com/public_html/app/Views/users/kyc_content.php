@@ -4,12 +4,14 @@ if (! bingo_user_requires_kyc($user)) {
 }
 
 $kycStatus = $user['kyc_status'] ?? 'pending';
+$hasSubmitted = ! empty($user['kyc_front']);
+
 $kycLabels = [
-    'pending'  => ['Pendiente', 'warning'],
+    'pending'  => $hasSubmitted ? ['Pendiente', 'warning'] : ['Sin verificar', 'secondary'],
     'verified' => ['Verificado', 'success'],
     'rejected' => ['Rechazado', 'danger'],
 ];
-[$kycLabel, $kycClass] = $kycLabels[$kycStatus] ?? ['Pendiente', 'secondary'];
+[$kycLabel, $kycClass] = $kycLabels[$kycStatus] ?? ['Sin verificar', 'secondary'];
 ?>
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-body">
@@ -26,7 +28,7 @@ $kycLabels = [
             <div class="alert alert-danger py-2 small"><?= session()->getFlashdata('error'); ?></div>
         <?php endif; ?>
         <?php 
-        $isPending = ($kycStatus === 'pending'); 
+        $isPending = ($kycStatus === 'pending' && $hasSubmitted); 
         ?>
         <?php if ($kycStatus !== 'verified'): ?>
             <?= form_open(site_url('kyc/submit'), ['enctype' => 'multipart/form-data', 'id' => 'kyc-form']); ?>
