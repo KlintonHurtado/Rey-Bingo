@@ -1,14 +1,19 @@
 {
   "name": "REY BINGO",
   "short_name": "REY BINGO",
-  "start_url": "https://reybingo.hubbills.com/",
+  "start_url": "/signin",
   "display": "standalone",
   "background_color": "#6236ff",
   "theme_color": "#6236ff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://reybingo.hubbills.com/assets/img/favicon-512x512.png",
+      "src": "favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

@@ -9,6 +9,30 @@
     border-color: #1e7e34 !important;
     color: #ffffff !important;
 }
+#signin-button {
+    background: #1a62e7 !important;
+    border-color: #1a62e7 !important;
+    color: #ffffff !important;
+}
+#signin-button:hover, #signin-button:focus, #signin-button:active {
+    background: #144eb9 !important;
+    border-color: #144eb9 !important;
+    color: #ffffff !important;
+}
+.btn-register-green, #signin-button {
+    font-family: 'Fredoka One', cursive !important;
+}
+#username, #password {
+    border: 2px solid #1a62e7 !important;
+    height: 46px !important;
+    font-size: 0.95rem !important;
+    border-radius: 30px !important;
+    padding: 8px 20px !important;
+}
+#username:focus, #password:focus {
+    border-color: #1a62e7 !important;
+    box-shadow: 0 0 0 0.2rem rgba(26, 98, 231, 0.25) !important;
+}
 </style>
 
 <div class="container">
