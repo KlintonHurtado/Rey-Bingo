@@ -691,7 +691,7 @@ INSERT INTO `system` (`id`, `key`, `value`) VALUES
 (1, 'name', 'BINGO FAMILY'),
 (2, 'contact', 'Maria Mendoza'),
 (3, 'phone', '04160300910'),
-(4, 'currency', 'Bs'),
+(4, 'currency', '$'),
 (5, 'language', 'spanish'),
 (6, 'bank', '1'),
 (7, 'method', 'mobile payment'),
