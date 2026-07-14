@@ -46,5 +46,11 @@ $showGgr = $showGgr ?? ($showAffiliates ?? true);
                 <i class="fa-duotone fa-solid fa-users"></i>
             </button>
         <?php endif; ?>
+
+        <?php if (session()->get('group') == 1) : ?>
+            <a class="btn btn-small btn-kyc-admin admin-nav-cluster-item<?= $activeNav === 'kyc' ? ' is-active' : '' ?>" href="<?= site_url('kycAdmin'); ?>" title="Revisión KYC">
+                <i class="fa-duotone fa-solid fa-user-check"></i>
+            </a>
+        <?php endif; ?>
     </div>
 </div>

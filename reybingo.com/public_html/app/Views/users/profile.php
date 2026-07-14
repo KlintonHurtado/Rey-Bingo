@@ -1,7 +1,17 @@
-<?= view('playings/partials/player_nav_cluster', [
-    'mode' => 'home',
-    'wonCartonsExtraClass' => 'btn-won-cartons-profile',
-]); ?>
+<?php if (session()->get('group') == 1) : ?>
+    <?= view('games/partials/admin_nav_cluster', [
+        'imagePath' => $imagePath,
+        'activeNav' => 'profile',
+        'showHome' => true,
+        'showStatistics' => false,
+        'showUsers' => true,
+    ]) ?>
+<?php else : ?>
+    <?= view('playings/partials/player_nav_cluster', [
+        'mode' => 'home',
+        'wonCartonsExtraClass' => 'btn-won-cartons-profile',
+    ]); ?>
+<?php endif; ?>
 
 <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
     <?php if ($user['sounds'] == 1): ?>
@@ -18,13 +28,6 @@
 <a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>"><i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i></a>
 
 <?php if (session()->get('group') == 1) : ?>
-    <button type="button" class="btn btn-small btn-users btn-users-profile" onclick="statisticsViewUsers();" title="<?= translate('users management'); ?>">
-        <i class="fa-duotone fa-solid fa-users"></i>
-    </button>
-    <?= view('stores/nav_button', ['extraClass' => 'btn-store-admin-right']); ?>
-    <?= view('operators/nav_button', ['extraClass' => 'btn-operators-admin-right']); ?>
-    <?= view('users/low_balance_players/nav_button', ['extraClass' => 'btn-low-balance-admin-right']) ?>
-    <a class="btn btn-small btn-kyc-admin" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check"></i></a>
     <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
 <?php endif; ?>
 

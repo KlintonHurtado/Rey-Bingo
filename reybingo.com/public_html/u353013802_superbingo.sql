@@ -1,4 +1,4 @@
-reybingo-- phpMyAdmin SQL Dump
+-- phpMyAdmin SQL Dump
 -- version 5.2.2
 -- https://www.phpmyadmin.net/
 --
@@ -177,6 +177,7 @@ INSERT INTO `contacts` (`id`, `name`, `phone`, `charge`, `created_at`, `updated_
 CREATE TABLE `deposits` (
   `id` int(11) NOT NULL,
   `user` int(11) NOT NULL,
+  `store` int(11) UNSIGNED DEFAULT NULL,
   `account` varchar(255) NOT NULL,
   `method` varchar(255) NOT NULL,
   `bank` varchar(255) NOT NULL,
@@ -184,6 +185,7 @@ CREATE TABLE `deposits` (
   `phone` varchar(255) NOT NULL,
   `reference` varchar(255) NOT NULL,
   `amount` decimal(18,2) NOT NULL,
+  `commission_amount` decimal(12,2) DEFAULT NULL,
   `date` date NOT NULL,
   `voucher` varchar(255) NOT NULL,
   `observation` varchar(255) NOT NULL,
@@ -260,6 +262,8 @@ CREATE TABLE `games` (
   `description` varchar(255) NOT NULL,
   `modalities` varchar(255) NOT NULL,
   `price` decimal(18,2) NOT NULL,
+  `min_players` int(11) UNSIGNED NOT NULL DEFAULT 10,
+  `min_cartons` int(11) UNSIGNED NOT NULL DEFAULT 10,
   `date` date NOT NULL,
   `time` time NOT NULL,
   `award` int(11) NOT NULL DEFAULT 0,
@@ -736,7 +740,17 @@ INSERT INTO `system` (`id`, `key`, `value`) VALUES
 (51, 'singBingoOnlyLastBall', '1'),
 (52, 'priceRanges', '1'),
 (53, 'addGamesFrom', '08:00'),
-(54, 'addGamesTo', '22:30');
+(54, 'addGamesTo', '22:30'),
+(55, 'rateStoreCommission', '0'),
+(56, 'activateClientDomain', '0'),
+(57, 'clientDomain', ''),
+(58, 'activateGgrAffiliate', '1'),
+(59, 'affiliateCommissionMode', 'hybrid'),
+(60, 'rateAffiliateCpa', '0'),
+(61, 'autoApproveGgrCommissions', '1'),
+(62, 'registrationBonus', '0'),
+(63, 'rateStoreGgrCommission', '0'),
+(64, 'ggrSettlementMode', 'monthly');
 
 -- --------------------------------------------------------
 
@@ -781,12 +795,29 @@ CREATE TABLE `users` (
   `code` varchar(255) NOT NULL,
   `group` int(11) NOT NULL,
   `wallet` decimal(18,2) NOT NULL,
+  `wallet_recharge` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `wallet_withdraw` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `wallet_bonus` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `kyc_status` varchar(20) NOT NULL DEFAULT 'pending',
+  `kyc_front` varchar(255) DEFAULT NULL,
+  `kyc_back` varchar(255) DEFAULT NULL,
+  `kyc_selfie` varchar(255) DEFAULT NULL,
+  `kyc_observations` text DEFAULT NULL,
   `document` varchar(255) NOT NULL,
   `firstname` varchar(255) NOT NULL,
   `lastname` varchar(255) NOT NULL,
+  `business_name` varchar(255) DEFAULT NULL,
+  `store_commission_rate` decimal(8,4) DEFAULT NULL,
+  `operator_commission_rate` decimal(8,4) DEFAULT NULL,
+  `ggr_commission_rate` decimal(8,4) DEFAULT NULL,
+  `affiliate_cpa_amount` decimal(10,2) DEFAULT NULL,
   `username` varchar(255) NOT NULL,
   `password` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
+  `address_line` varchar(255) DEFAULT NULL,
+  `city` varchar(120) DEFAULT NULL,
+  `state` varchar(120) DEFAULT NULL,
+  `is_reseller` tinyint(1) NOT NULL DEFAULT 0,
   `phone` varchar(255) NOT NULL,
   `bank` varchar(255) NOT NULL,
   `account` varchar(255) NOT NULL,
@@ -802,9 +833,14 @@ CREATE TABLE `users` (
   `restore_code` varchar(255) NOT NULL,
   `restore_token` varchar(255) NOT NULL,
   `referred_code` varchar(255) NOT NULL,
+  `referred_store_id` int(11) UNSIGNED DEFAULT NULL,
+  `affiliate_signup_store_id` int(11) UNSIGNED DEFAULT NULL,
+  `operator_id` int(11) UNSIGNED DEFAULT NULL,
+  `referred_operator_id` int(11) UNSIGNED DEFAULT NULL,
   `status` int(11) NOT NULL,
   `deleted` int(11) NOT NULL,
   `roulette` int(11) NOT NULL,
+  `low_balance_alert` tinyint(1) UNSIGNED NOT NULL DEFAULT 0,
   `level_id` int(11) NOT NULL DEFAULT 1,
   `total_points` int(11) NOT NULL DEFAULT 0,
   `current_points` int(11) NOT NULL DEFAULT 0,
@@ -857,6 +893,70 @@ CREATE TABLE `user_packages` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `affiliate_ggr_events`
+--
+
+CREATE TABLE `affiliate_ggr_events` (
+  `id` int(11) UNSIGNED NOT NULL,
+  `player_id` int(11) UNSIGNED NOT NULL,
+  `game_id` int(11) UNSIGNED NOT NULL,
+  `event_type` varchar(20) NOT NULL,
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `reference_type` varchar(50) DEFAULT NULL,
+  `reference_id` int(11) UNSIGNED DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `affiliate_ggr_commissions`
+--
+
+CREATE TABLE `affiliate_ggr_commissions` (
+  `id` int(11) UNSIGNED NOT NULL,
+  `player_id` int(11) UNSIGNED NOT NULL,
+  `affiliate_id` int(11) UNSIGNED NOT NULL,
+  `affiliate_type` varchar(20) NOT NULL,
+  `game_id` int(11) UNSIGNED NOT NULL,
+  `total_stake` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `total_payout` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `ggr_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `commission_rate` decimal(8,4) NOT NULL DEFAULT 0.0000,
+  `commission_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 0,
+  `payment_id` int(11) UNSIGNED DEFAULT NULL,
+  `period_date` date DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `affiliate_ggr_monthly_settlements`
+--
+
+CREATE TABLE `affiliate_ggr_monthly_settlements` (
+  `id` int(11) UNSIGNED NOT NULL,
+  `affiliate_id` int(11) UNSIGNED NOT NULL,
+  `affiliate_type` varchar(20) NOT NULL,
+  `period_month` date NOT NULL,
+  `total_stake` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `total_payout` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `total_ggr` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `commission_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `commission_count` int(11) UNSIGNED NOT NULL DEFAULT 0,
+  `payment_id` int(11) UNSIGNED DEFAULT NULL,
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 2,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -1087,6 +1187,29 @@ ALTER TABLE `user_packages`
   ADD KEY `payment_id` (`payment_id`);
 
 --
+-- Indices de la tabla `affiliate_ggr_events`
+--
+ALTER TABLE `affiliate_ggr_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `game_id_player_id` (`game_id`, `player_id`),
+  ADD KEY `player_id_event_type` (`player_id`, `event_type`);
+
+--
+-- Indices de la tabla `affiliate_ggr_commissions`
+--
+ALTER TABLE `affiliate_ggr_commissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `player_affiliate_game` (`player_id`, `affiliate_id`, `affiliate_type`, `game_id`),
+  ADD KEY `affiliate_status` (`affiliate_id`, `affiliate_type`, `status`);
+
+--
+-- Indices de la tabla `affiliate_ggr_monthly_settlements`
+--
+ALTER TABLE `affiliate_ggr_monthly_settlements`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `affiliate_period` (`affiliate_id`, `affiliate_type`, `period_month`);
+
+--
 -- AUTO_INCREMENT de las tablas volcadas
 --
 
@@ -1293,6 +1416,24 @@ ALTER TABLE `user_achievements`
 --
 ALTER TABLE `user_packages`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `affiliate_ggr_events`
+--
+ALTER TABLE `affiliate_ggr_events`
+  MODIFY `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `affiliate_ggr_commissions`
+--
+ALTER TABLE `affiliate_ggr_commissions`
+  MODIFY `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `affiliate_ggr_monthly_settlements`
+--
+ALTER TABLE `affiliate_ggr_monthly_settlements`
+  MODIFY `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -107,12 +107,14 @@
                             <small id="reset-error" class="text-danger d-none"></small>
                         </div>
 
-                        <div class="col-md-12 mb-1">
-                            <label for="allow_roulette_cartons" class="form-check-label d-block">
-                                <input class="form-check-input" type="checkbox" name="allow_roulette_cartons" id="allow_roulette_cartons" value="1" checked>
-                                <?= translate('allow roulette cartons'); ?>
-                            </label>
-                            <small class="text-muted"><?= translate('allow roulette cartons help'); ?></small>
+                        <div class="col-md-12 mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="allow_roulette_cartons" id="allow_roulette_cartons" value="1" checked style="cursor: pointer; transform: scale(1.2); margin-top: 0.25rem;">
+                                <label class="form-check-label ms-2" for="allow_roulette_cartons" style="cursor: pointer;">
+                                    <?= translate('allow roulette cartons'); ?>
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-1"><?= translate('allow roulette cartons help'); ?></small>
                         </div>
 
                         <div class="col-md-12 mb-1" id="type-url" style="display: none;">
