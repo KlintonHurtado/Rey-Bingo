@@ -172,8 +172,6 @@
                                 <select class='form-control form-control-lg form-bingo' name="method" id="method">
                                     <option value=""><?= translate('payment method'); ?></option>
                                     <option <?= systemGet('method') == 'transfer' ? 'selected' : '' ?> value="transfer"><?= translate('transfer'); ?></option>
-                                    <option <?= systemGet('method') == 'mobile payment' ? 'selected' : '' ?> value="mobile payment"><?= translate('mobile payment'); ?></option>
-                                    <option <?= systemGet('method') == 'deposit' ? 'selected' : '' ?> value="deposit"><?= translate('deposit'); ?></option>
                                 </select>
                                 <small id="method-error" class="text-danger d-none"></small>
                             </div>

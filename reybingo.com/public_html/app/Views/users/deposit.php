@@ -53,8 +53,6 @@
                                 <option value="stripe">Stripe</option>
                                 <?php endif; ?>
                                 <option <?= systemGet('method') == 'transfer' ? 'selected' : '' ?> value="transfer"><?= translate('transfer'); ?></option>
-                                <option <?= systemGet('method') == 'mobile payment' ? 'selected' : '' ?> value="mobile payment"><?= translate('mobile payment'); ?></option>
-                                <option <?= systemGet('method') == 'deposit' ? 'selected' : '' ?> value="deposit"><?= translate('deposit'); ?></option>
                             </select>
                             <small id="deposit-method-error" class="text-danger d-none"></small>
                         </div>
