@@ -82,9 +82,9 @@
                             </div>
                             
                             <div class="col-md-6 mb-1">
-                                <label for="phone-bank" class="form-label"><?= translate('phone'); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="phone-bank" id="phone-bank" placeholder="<?= translate('phone'); ?>" autocomplete="off">
-                                <small id="phone-bank-error" class="text-danger d-none"></small>
+                                <label for="type-bank" class="form-label"><?= translate('type'); ?></label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="type-bank" id="type-bank" placeholder="<?= translate('type'); ?>" autocomplete="off">
+                                <small id="type-bank-error" class="text-danger d-none"></small>
                             </div>
                         </div>
                     </div>
@@ -107,7 +107,7 @@
             $('#account-bank').val('<?= esc($bankData['account']) ?>');
             $('#holder-bank').val('<?= esc($bankData['holder']) ?>');
             $('#document-bank').val('<?= esc($bankData['document']) ?>');
-            $('#phone-bank').val('<?= esc($bankData['phone']) ?>');
+            $('#type-bank').val('<?= esc($bankData['type'] ?? '') ?>');
             $('#logoBankImage').attr('src', '<?= esc($logo_url) ?>');
             $('#bank-modal-title').html('<i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('update bank'); ?>');
             $('#bank-button').text('<?= translate('update'); ?>');
@@ -152,7 +152,7 @@
                                                 <div style="flex: 1; padding-left: 5px;">
                                                     <h6 class="mb-1"><strong><?= translate('name bank'); ?>:</strong> ${bank.name}</h6>
                                                     <small class="mb-0"><strong><?= translate("account"); ?>:</strong> ${bank.account} - <strong><?= translate("holder"); ?>:</strong> ${bank.holder} <br />
-                                                    <small class="mb-0"><strong><?= translate("document"); ?>:</strong> ${bank.document} - <strong><?= translate("phone"); ?>:</strong> ${bank.phone}</small>
+                                                    <small class="mb-0"><strong><?= translate("document"); ?>:</strong> ${bank.document} - <strong><?= translate("type"); ?>:</strong> ${bank.type}</small>
                                                 </div>
                                             </div>
                                         </td>
@@ -243,7 +243,7 @@
                 <td class="text-left">
                     <h1 class="h5 help-block"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('name bank'); ?>: ${bank.name}</h1>
                     <h1 class="h5 help-block"><?= translate('account'); ?>: ${bank.account} - <?= translate('holder'); ?>: ${bank.holder}</h1>
-                    <h1 class="h5 help-block"><?= translate('document'); ?>: ${bank.document} - <?= translate('phone'); ?>: ${bank.phone}</h1>
+                    <h1 class="h5 help-block"><?= translate('document'); ?>: ${bank.document} - <?= translate('type'); ?>: ${bank.type}</h1>
                 </td>
                 <td class="text-center"><span class="badge bg-primary p-2 text-uppercase fs-6"><?= translate('not'); ?></span></td>
                 <td class="text-center">

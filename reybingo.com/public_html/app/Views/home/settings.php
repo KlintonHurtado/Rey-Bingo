@@ -589,7 +589,7 @@
                                                                 <div style="flex: 1; padding-left: 15px;">
                                                                     <h6 class="mb-1"><strong><?= translate('name bank'); ?>:</strong> <?= esc($bank['name']) ?></h6>
                                                                     <small class="mb-0"><strong><?= translate("account"); ?>:</strong> <?= esc($bank['account']) ?> - <strong><?= translate("holder"); ?>:</strong> <?= esc($bank['holder']) ?></small><br>
-                                                                    <small class="mb-0"><strong><?= translate("document"); ?>:</strong> <?= esc($bank['document']) ?> - <strong><?= translate("phone"); ?>:</strong> <?= esc($bank['phone']) ?></small>
+                                                                    <small class="mb-0"><strong><?= translate("document"); ?>:</strong> <?= esc($bank['document']) ?> - <strong><?= translate("type"); ?>:</strong> <?= esc($bank['type'] ?? '') ?></small>
                                                                 </div>
                                                             </div>
                                                         </td>

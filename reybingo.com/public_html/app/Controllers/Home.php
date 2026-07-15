@@ -86,9 +86,9 @@ class Home extends Controller {
                 'label' => translate('document'),
                 'rules' => 'required|numeric'
             ],
-            'phone-bank' => [
-                'label' => translate('phone'),
-                'rules' => 'required|numeric'
+            'type-bank' => [
+                'label' => translate('type'),
+                'rules' => 'required'
             ]
         ];
 
@@ -106,7 +106,7 @@ class Home extends Controller {
             'account' => $this->request->getPost('account-bank'),
             'holder'  => $this->request->getPost('holder-bank'),
             'document'=> $this->request->getPost('document-bank'),
-            'phone'   => $this->request->getPost('phone-bank'),
+            'type'    => $this->request->getPost('type-bank'),
             'status'  => 1
         ];
 

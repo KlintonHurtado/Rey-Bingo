@@ -1242,7 +1242,7 @@ class Payments extends Controller {
             'account' => $bank['account'],
             'holder' => $bank['holder'],
             'document' => $bank['document'],
-            'phone' => $bank['phone']
+            'type' => $bank['type']
         ]);
     }
 

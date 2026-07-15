@@ -115,7 +115,7 @@
                                 <small><strong><?= translate('document'); ?>:</strong> ${data.document || '-'}</small>
                             </div>
                             <div class="store-bank-info-row">
-                                <small><strong><?= translate('phone'); ?>:</strong> ${data.phone || '-'}</small>
+                                <small><strong><?= translate('type'); ?>:</strong> ${data.type || '-'}</small>
                             </div>
                         </div>
                     </div>

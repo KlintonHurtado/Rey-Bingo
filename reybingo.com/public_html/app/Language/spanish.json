@@ -19,6 +19,7 @@
     "first and last names": "Nombres y apellidos",
     "document": "Cedula",
     "phone": "Teléfono",
+    "type": "Tipo",
     "email": "Correo electrónico",
     "confirm password": "Confirmar contraseña",
     "create": "Crear",

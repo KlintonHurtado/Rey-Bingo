@@ -9,7 +9,7 @@ class BanksModel extends Model {
     protected $primaryKey = 'id'; // Llave primaria
 
     // Campos permitidos para insert/update
-    protected $allowedFields = ['code', 'name', 'account', 'holder', 'document', 'phone', 'logo', 'created_at', 'updated_at', 'status'];
+    protected $allowedFields = ['code', 'name', 'account', 'holder', 'document', 'type', 'logo', 'created_at', 'updated_at', 'status'];
 
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;

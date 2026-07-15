@@ -19,6 +19,7 @@
     "first and last names": "First and last names",
     "document": "Document",
     "phone": "Phone",
+    "type": "Type",
     "email": "Email",
     "confirm password": "Confirm password",
     "create": "Create",

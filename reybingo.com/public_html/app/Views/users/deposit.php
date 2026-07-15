@@ -748,8 +748,8 @@
                             <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('document'); ?>', '${data.document}')"></i>
                         </div>
                         <div class="d-flex justify-content-between align-items-center py-1">
-                            <small><strong><?= translate('phone'); ?>:</strong> ${data.phone}</small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('phone'); ?>', '${data.phone}')"></i>
+                            <small><strong><?= translate('type'); ?>:</strong> ${data.type}</small>
+                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('type'); ?>', '${data.type}')"></i>
                         </div>
                     </div>
                 </div>`;

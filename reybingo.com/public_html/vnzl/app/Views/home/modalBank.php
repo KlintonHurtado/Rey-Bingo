@@ -1,98 +1,117 @@
 <div class="modal-dialog modal-dialog-centered max-w-50">
     <div class="modal-content">
         <div class="modal-header pb-2">
-            <h6 class="modal-title ps-2" id="bank-modal-title"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('add bank'); ?></h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <h6 class="modal-title ps-2" id="bank-modal-title"><i class="fa-duotone fa-solid fa-building-columns"></i>
+                <?= translate('add bank'); ?></h6>
+            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i
+                    class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body pt-0">
-            <?php echo form_open(site_url() . 'home/bankSubmit', array('enctype' => 'multipart/form-data', 'id' => 'bank-form'));?>
-                
-                <?= csrf_field() ?>
-                <input type="hidden" id="bank-id" name="bank-id" value="">
-                <input type="hidden" id="bank-action" name="bank-action" value="add">
+            <?php echo form_open(site_url() . 'home/bankSubmit', array('enctype' => 'multipart/form-data', 'id' => 'bank-form')); ?>
 
-                <div class="row">
-                    <div class="col-md-3 my-auto text-center">
-                        <div class="col-md-12">
-                            <div class="logo-picture">
-                                <img id="logoBankImage" src="<?= site_url('uploads/banks/image.jpg'); ?>" alt="logo banco">
-                                <label for="bankfileInput" class="edit-button logo"><i class="fa-duotone fa-edit"></i></label>
-                                <input type="file" id="bankfileInput" accept="image/*" style="display: none;" onchange="previewbanklogoImage(event)">
-                                <input type="hidden" id="bank_logo_image_input" name="bank-logo">
-                            </div>
-                        </div>
-                    </div>
+            <?= csrf_field() ?>
+            <input type="hidden" id="bank-id" name="bank-id" value="">
+            <input type="hidden" id="bank-action" name="bank-action" value="add">
 
-                    <div class="col-md-9">
-                        <div class="row">
-                            <div class="col-md-12 mb-1">
-                                <label for="name-bank" class="form-label"><?= translate('bank'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="name-bank" id="name-bank">
-                                    <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?></option>
-                                    <option value="0102 - BANCO DE VENEZUELA">0102 - BANCO DE VENEZUELA</option>
-                                    <option value="0104 - VENEZOLANO DE CRÉDITO">0104 - VENEZOLANO DE CRÉDITO</option>
-                                    <option value="0105 - BANCO MERCANTIL">0105 - BANCO MERCANTIL</option>
-                                    <option value="0108 - BANCO PROVINCIAL">0108 - BANCO PROVINCIAL</option>
-                                    <option value="0114 - BANCO DEL CARIBE">0114 - BANCO DEL CARIBE</option>
-                                    <option value="0115 - BANCO EXTERIOR">0115 - BANCO EXTERIOR</option>
-                                    <option value="0116 - BANCO OCCIDENTAL DE DESCUENTO">0116 - BANCO OCCIDENTAL DE DESCUENTO</option>
-                                    <option value="0128 - BANCO CARONI">0128 - BANCO CARONI</option>
-                                    <option value="0134 - BANESCO">0134 - BANESCO</option>
-                                    <option value="0137 - BANCO SOFITASA">0137 - BANCO SOFITASA</option>
-                                    <option value="0138 - BANCO PLAZA">0138 - BANCO PLAZA</option>
-                                    <option value="0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE">0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE</option>
-                                    <option value="0149 - BANCO DEL PUEBLO SOBERANO">0149 - BANCO DEL PUEBLO SOBERANO</option>
-                                    <option value="0151 - BFC BANCO FONDO COMUN C.A.">0151 - BFC BANCO FONDO COMUN C.A.</option>
-                                    <option value="0156 - 100%BANCO">0156 - 100%BANCO</option>
-                                    <option value="0157 - DELSUR">0157 - DELSUR</option>
-                                    <option value="0163 - BANCO DEL TESORO">0163 - BANCO DEL TESORO</option>
-                                    <option value="0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO">0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO</option>
-                                    <option value="0166 - BANCO AGRICOLA DE VENEZUELA">0166 - BANCO AGRICOLA DE VENEZUELA</option>
-                                    <option value="0168 - BANCRECER">0168 - BANCRECER</option>
-                                    <option value="0169 - R4 BANCO MICROFINANCIERO">0169 - R4 BANCO MICROFINANCIERO</option>
-                                    <option value="0171 - BANCO ACTIVO">0171 - BANCO ACTIVO</option>
-                                    <option value="0172 - BANCAMIGA">0172 - BANCAMIGA</option>
-                                    <option value="0173 - BANCO INTERNACIONAL DE DESARROLLO">0173 - BANCO INTERNACIONAL DE DESARROLLO</option>
-                                    <option value="0174 - BANPLUS">0174 - BANPLUS</option>
-                                    <option value="0175 - BANCO DIGITAL DE LOS TRABAJADORES">0175 - BANCO DIGITAL DE LOS TRABAJADORES</option>
-                                    <option value="0176 - NOVO BANCO">0176 - NOVO BANCO</option>
-                                    <option value="0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA">0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA</option>
-                                    <option value="0190 - CITIBANK N.A.">0190 - CITIBANK N.A.</option>
-                                    <option value="0191 - BANCO NACIONAL CRÉDITO">0191 - BANCO NACIONAL CRÉDITO</option>
-                                </select>
-                                <small id="name-bank-error" class="text-danger d-none"></small>
-                            </div>
-
-                            <div class="col-md-6 mb-1">
-                                <label for="account-bank" class="form-label"><?= translate('account'); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="account-bank" id="account-bank" placeholder="<?= translate('account'); ?>" autocomplete="off">
-                                <small id="account-bank-error" class="text-danger d-none"></small>
-                            </div>
-                            
-                            <div class="col-md-6 mb-1">
-                                <label for="holder-bank" class="form-label"><?= translate('holder'); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="holder-bank" id="holder-bank" placeholder="<?= translate('holder'); ?>" autocomplete="off">
-                                <small id="holder-bank-error" class="text-danger d-none"></small>
-                            </div>
-
-                            <div class="col-md-6 mb-1">
-                                <label for="document-bank" class="form-label"><?= translate('document'); ?></label>
-                                <input type="number" class="form-control form-control-lg form-bingo" name="document-bank" id="document-bank" placeholder="<?= translate('document'); ?>" autocomplete="off">
-                                <small id="document-bank-error" class="text-danger d-none"></small>
-                            </div>
-                            
-                            <div class="col-md-6 mb-1">
-                                <label for="phone-bank" class="form-label"><?= translate('phone'); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="phone-bank" id="phone-bank" placeholder="<?= translate('phone'); ?>" autocomplete="off">
-                                <small id="phone-bank-error" class="text-danger d-none"></small>
-                            </div>
-                        </div>
-                    </div>
-
+            <div class="row">
+                <div class="col-md-3 my-auto text-center">
                     <div class="col-md-12">
-                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-3" id="bank-button"><?= translate('add'); ?></button>
+                        <div class="logo-picture">
+                            <img id="logoBankImage" src="<?= site_url('uploads/banks/image.jpg'); ?>" alt="logo banco">
+                            <label for="bankfileInput" class="edit-button logo"><i
+                                    class="fa-duotone fa-edit"></i></label>
+                            <input type="file" id="bankfileInput" accept="image/*" style="display: none;"
+                                onchange="previewbanklogoImage(event)">
+                            <input type="hidden" id="bank_logo_image_input" name="bank-logo">
+                        </div>
                     </div>
                 </div>
+
+                <div class="col-md-9">
+                    <div class="row">
+                        <div class="col-md-12 mb-1">
+                            <label for="name-bank" class="form-label"><?= translate('bank'); ?></label>
+                            <select class='form-control form-control-lg form-bingo' name="name-bank" id="name-bank">
+                                <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?>
+                                </option>
+                                <option value="0102 - BANCO DE VENEZUELA">0102 - BANCO DE VENEZUELA</option>
+                                <option value="0104 - VENEZOLANO DE CRÉDITO">0104 - VENEZOLANO DE CRÉDITO</option>
+                                <option value="0105 - BANCO MERCANTIL">0105 - BANCO MERCANTIL</option>
+                                <option value="0108 - BANCO PROVINCIAL">0108 - BANCO PROVINCIAL</option>
+                                <option value="0114 - BANCO DEL CARIBE">0114 - BANCO DEL CARIBE</option>
+                                <option value="0115 - BANCO EXTERIOR">0115 - BANCO EXTERIOR</option>
+                                <option value="0116 - BANCO OCCIDENTAL DE DESCUENTO">0116 - BANCO OCCIDENTAL DE
+                                    DESCUENTO</option>
+                                <option value="0128 - BANCO CARONI">0128 - BANCO CARONI</option>
+                                <option value="0134 - BANESCO">0134 - BANESCO</option>
+                                <option value="0137 - BANCO SOFITASA">0137 - BANCO SOFITASA</option>
+                                <option value="0138 - BANCO PLAZA">0138 - BANCO PLAZA</option>
+                                <option value="0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE">0146 - BANCO DE LA GENTE
+                                    EMPRENDEDORA BANGENTE</option>
+                                <option value="0149 - BANCO DEL PUEBLO SOBERANO">0149 - BANCO DEL PUEBLO SOBERANO
+                                </option>
+                                <option value="0151 - BFC BANCO FONDO COMUN C.A.">0151 - BFC BANCO FONDO COMUN C.A.
+                                </option>
+                                <option value="0156 - 100%BANCO">0156 - 100%BANCO</option>
+                                <option value="0157 - DELSUR">0157 - DELSUR</option>
+                                <option value="0163 - BANCO DEL TESORO">0163 - BANCO DEL TESORO</option>
+                                <option value="0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO">0164 - BANCO DE
+                                    DESARROLLO DEL MICROEMPRESARIO</option>
+                                <option value="0166 - BANCO AGRICOLA DE VENEZUELA">0166 - BANCO AGRICOLA DE VENEZUELA
+                                </option>
+                                <option value="0168 - BANCRECER">0168 - BANCRECER</option>
+                                <option value="0169 - R4 BANCO MICROFINANCIERO">0169 - R4 BANCO MICROFINANCIERO</option>
+                                <option value="0171 - BANCO ACTIVO">0171 - BANCO ACTIVO</option>
+                                <option value="0172 - BANCAMIGA">0172 - BANCAMIGA</option>
+                                <option value="0173 - BANCO INTERNACIONAL DE DESARROLLO">0173 - BANCO INTERNACIONAL DE
+                                    DESARROLLO</option>
+                                <option value="0174 - BANPLUS">0174 - BANPLUS</option>
+                                <option value="0175 - BANCO DIGITAL DE LOS TRABAJADORES">0175 - BANCO DIGITAL DE LOS
+                                    TRABAJADORES</option>
+                                <option value="0176 - NOVO BANCO">0176 - NOVO BANCO</option>
+                                <option value="0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA">0177 - BANCO DE LA
+                                    FUERZA ARMADA NACIONAL BOLIVARIANA</option>
+                                <option value="0190 - CITIBANK N.A.">0190 - CITIBANK N.A.</option>
+                                <option value="0191 - BANCO NACIONAL CRÉDITO">0191 - BANCO NACIONAL CRÉDITO</option>
+                            </select>
+                            <small id="name-bank-error" class="text-danger d-none"></small>
+                        </div>
+
+                        <div class="col-md-6 mb-1">
+                            <label for="account-bank" class="form-label"><?= translate('account'); ?></label>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="account-bank"
+                                id="account-bank" placeholder="<?= translate('account'); ?>" autocomplete="off">
+                            <small id="account-bank-error" class="text-danger d-none"></small>
+                        </div>
+
+                        <div class="col-md-6 mb-1">
+                            <label for="holder-bank" class="form-label"><?= translate('holder'); ?></label>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="holder-bank"
+                                id="holder-bank" placeholder="<?= translate('holder'); ?>" autocomplete="off">
+                            <small id="holder-bank-error" class="text-danger d-none"></small>
+                        </div>
+
+                        <div class="col-md-6 mb-1">
+                            <label for="document-bank" class="form-label"><?= translate('document'); ?></label>
+                            <input type="number" class="form-control form-control-lg form-bingo" name="document-bank"
+                                id="document-bank" placeholder="<?= translate('document'); ?>" autocomplete="off">
+                            <small id="document-bank-error" class="text-danger d-none"></small>
+                        </div>
+
+                        <div class="col-md-6 mb-1">
+                            <label for="phone-bank" class="form-label"><?= translate('phone'); ?></label>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="phone-bank"
+                                id="phone-bank" placeholder="<?= translate('phone'); ?>" autocomplete="off">
+                            <small id="phone-bank-error" class="text-danger d-none"></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-3"
+                        id="bank-button"><?= translate('add'); ?></button>
+                </div>
+            </div>
             <?= form_close(); ?>
         </div>
     </div>
@@ -100,7 +119,7 @@
 
 <script type="text/javascript">
     <?php if (isset($isUpdate) && $isUpdate && $bankData): ?>
-        $(document).ready(function() {
+        $(document).ready(function () {
             $('#bank-id').val('<?= $bankData['id'] ?>');
             $('#bank-action').val('update');
             $('#name-bank').val('<?= esc($bankData['name']) ?>');
@@ -120,17 +139,17 @@
             e.preventDefault();
 
             var button = $('#bank-button');
-            button.prop("disabled", true); 
+            button.prop("disabled", true);
 
             $('.text-danger').addClass('d-none').text('');
             $('.form-control').removeClass('is-invalid');
-            
+
             $.ajax({
                 url: '<?= site_url('home/bankSubmit') ?>',
                 method: 'POST',
                 data: $(this).serialize(),
                 dataType: 'json',
-                success: function(response) {
+                success: function (response) {
                     if (response.success) {
                         $('#modalBank').modal('hide');
 
@@ -199,16 +218,16 @@
                                 stopOnFocus: true
                             }).showToast();
                         }
-                        
+
                         if (response.errors) {
-                            $.each(response.errors, function(field, message) {
+                            $.each(response.errors, function (field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
                             });
                         }
                     }
                 },
-                error: function() {
+                error: function () {
                     Toastify({
                         text: "<?= translate('there was an error in the request to the server'); ?>",
                         duration: 3000,
@@ -218,7 +237,7 @@
                         stopOnFocus: true
                     }).showToast();
                 },
-                complete: function() {
+                complete: function () {
                     button.prop("disabled", false);
                 }
             });
@@ -266,7 +285,7 @@
 
     function previewbanklogoImage(event) {
         const reader = new FileReader();
-        reader.onload = function() {
+        reader.onload = function () {
             const output = document.getElementById('logoBankImage');
             output.src = reader.result;
 
