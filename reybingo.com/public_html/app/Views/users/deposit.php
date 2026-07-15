@@ -85,21 +85,37 @@
                             <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?>
                             </option>
                             <!-- BANCOS -->
-                            <option <?= ($user['bank'] == 'BANCO PICHINCHA' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO PICHINCHA">BANCO PICHINCHA</option>
-                            <option <?= ($user['bank'] == 'BANCO GUAYAQUIL' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO GUAYAQUIL">BANCO GUAYAQUIL</option>
-                            <option <?= ($user['bank'] == 'BANCO DEL PACIFICO' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO DEL PACIFICO">BANCO DEL PACÍFICO</option>
-                            <option <?= ($user['bank'] == 'BANCO DEL AUSTRO' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO DEL AUSTRO">BANCO DEL AUSTRO</option>
-
-                            <!-- COOPERATIVAS -->
-                            <option <?= ($user['bank'] == 'COOP. JEP' && session()->get('group') != 1) ? 'selected' : '' ?>
-                                value="COOP. JEP">COOPERATIVA JEP</option>
-                            <option <?= ($user['bank'] == 'COOP. JARDIN AZUAYO' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. JARDIN AZUAYO">COOPERATIVA JARDÍN AZUAYO</option>
-                            <option <?= ($user['bank'] == 'COOP. POLICIA NACIONAL' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. POLICIA NACIONAL">COOPERATIVA DE LA POLICÍA NACIONAL
-                            </option>
-                            <option <?= ($user['bank'] == 'COOP. ALIANZA DEL VALLE' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. ALIANZA DEL VALLE">COOPERATIVA ALIANZA DEL VALLE
-                            </option>
-                            <option <?= ($user['bank'] == 'COOP. COOPERCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. COOPERCO">COOPERATIVA COOPERCO</option>
-                            <option <?= ($user['bank'] == 'COOP. MUSHUC RUNA' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. MUSHUC RUNA">COOPERATIVA MUSHUC RUNA</option>
+                            <option <?= ($user['bank'] == '0001 - BANCO CENTRAL DE VENEZUELA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0001 - BANCO CENTRAL DE VENEZUELA">0001 - BANCO CENTRAL DE VENEZUELA</option>
+                            <option <?= ($user['bank'] == '0102 - BANCO DE VENEZUELA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0102 - BANCO DE VENEZUELA">0102 - BANCO DE VENEZUELA</option>
+                            <option <?= ($user['bank'] == '0104 - VENEZOLANO DE CRÉDITO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0104 - VENEZOLANO DE CRÉDITO">0104 - VENEZOLANO DE CRÉDITO</option>
+                            <option <?= ($user['bank'] == '0105 - BANCO MERCANTIL' && session()->get('group') != 1) ? 'selected' : '' ?> value="0105 - BANCO MERCANTIL">0105 - BANCO MERCANTIL</option>
+                            <option <?= ($user['bank'] == '0108 - BANCO PROVINCIAL' && session()->get('group') != 1) ? 'selected' : '' ?> value="0108 - BANCO PROVINCIAL">0108 - BANCO PROVINCIAL</option>
+                            <option <?= ($user['bank'] == '0114 - BANCO DEL CARIBE' && session()->get('group') != 1) ? 'selected' : '' ?> value="0114 - BANCO DEL CARIBE">0114 - BANCO DEL CARIBE</option>
+                            <option <?= ($user['bank'] == '0115 - BANCO EXTERIOR' && session()->get('group') != 1) ? 'selected' : '' ?> value="0115 - BANCO EXTERIOR">0115 - BANCO EXTERIOR</option>
+                            <option <?= ($user['bank'] == '0116 - BANCO OCCIDENTAL DE DESCUENTO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0116 - BANCO OCCIDENTAL DE DESCUENTO">0116 - BANCO OCCIDENTAL DE DESCUENTO</option>
+                            <option <?= ($user['bank'] == '0128 - BANCO CARONI' && session()->get('group') != 1) ? 'selected' : '' ?> value="0128 - BANCO CARONI">0128 - BANCO CARONI</option>
+                            <option <?= ($user['bank'] == '0134 - BANESCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0134 - BANESCO">0134 - BANESCO</option>
+                            <option <?= ($user['bank'] == '0137 - BANCO SOFITASA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0137 - BANCO SOFITASA">0137 - BANCO SOFITASA</option>
+                            <option <?= ($user['bank'] == '0138 - BANCO PLAZA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0138 - BANCO PLAZA">0138 - BANCO PLAZA</option>
+                            <option <?= ($user['bank'] == '0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE' && session()->get('group') != 1) ? 'selected' : '' ?> value="0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE">0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE</option>
+                            <option <?= ($user['bank'] == '0149 - BANCO DEL PUEBLO SOBERANO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0149 - BANCO DEL PUEBLO SOBERANO">0149 - BANCO DEL PUEBLO SOBERANO</option>
+                            <option <?= ($user['bank'] == '0151 - BFC BANCO FONDO COMUN C.A.' && session()->get('group') != 1) ? 'selected' : '' ?> value="0151 - BFC BANCO FONDO COMUN C.A.">0151 - BFC BANCO FONDO COMUN C.A.</option>
+                            <option <?= ($user['bank'] == '0156 - 100%BANCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0156 - 100%BANCO">0156 - 100%BANCO</option>
+                            <option <?= ($user['bank'] == '0157 - DELSUR' && session()->get('group') != 1) ? 'selected' : '' ?> value="0157 - DELSUR">0157 - DELSUR</option>
+                            <option <?= ($user['bank'] == '0163 - BANCO DEL TESORO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0163 - BANCO DEL TESORO">0163 - BANCO DEL TESORO</option>
+                            <option <?= ($user['bank'] == '0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO">0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO</option>
+                            <option <?= ($user['bank'] == '0166 - BANCO AGRICOLA DE VENEZUELA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0166 - BANCO AGRICOLA DE VENEZUELA">0166 - BANCO AGRICOLA DE VENEZUELA</option>
+                            <option <?= ($user['bank'] == '0168 - BANCRECER' && session()->get('group') != 1) ? 'selected' : '' ?> value="0168 - BANCRECER">0168 - BANCRECER</option>
+                            <option <?= ($user['bank'] == '0169 - MI BANCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0169 - MI BANCO">0169 - MI BANCO,</option>
+                            <option <?= ($user['bank'] == '0171 - BANCO ACTIVO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0171 - BANCO ACTIVO">0171 - BANCO ACTIVO</option>
+                            <option <?= ($user['bank'] == '0172 - BANCAMIGA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0172 - BANCAMIGA">0172 - BANCAMIGA</option>
+                            <option <?= ($user['bank'] == '0173 - BANCO INTERNACIONAL DE DESARROLLO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0173 - BANCO INTERNACIONAL DE DESARROLLO">0173 - BANCO INTERNACIONAL DE DESARROLLO</option>
+                            <option <?= ($user['bank'] == '0174 - BANPLUS' && session()->get('group') != 1) ? 'selected' : '' ?> value="0174 - BANPLUS">0174 - BANPLUS</option>
+                            <option <?= ($user['bank'] == '0175 - BANCO DIGITAL DE LOS TRABAJADORES' && session()->get('group') != 1) ? 'selected' : '' ?> value="0175 - BANCO DIGITAL DE LOS TRABAJADORES">0175 - BANCO DIGITAL DE LOS TRABAJADORES</option>
+                            <option <?= ($user['bank'] == '0176 - NOVO BANCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0176 - NOVO BANCO">0176 - NOVO BANCO</option>
+                            <option <?= ($user['bank'] == '0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA">0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA</option>
+                            <option <?= ($user['bank'] == '0190 - CITIBANK N.A.' && session()->get('group') != 1) ? 'selected' : '' ?> value="0190 - CITIBANK N.A.">0190 - CITIBANK N.A.</option>
+                            <option <?= ($user['bank'] == '0191 - BANCO NACIONAL CRÉDITO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0191 - BANCO NACIONAL CRÉDITO">0191 - BANCO NACIONAL CRÉDITO</option>
                         </select>
                         <small id="deposit-bank-error" class="text-danger d-none"></small>
                     </div>
