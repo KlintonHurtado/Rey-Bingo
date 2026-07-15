@@ -1,196 +1,225 @@
 <div class="modal-dialog modal-dialog-centered max-w-40">
     <div class="modal-content">
         <div class="modal-header pb-2">
-            <h6 class="modal-title ps-2"><i class="fa-duotone fa-arrow-down-to-bracket"></i> <?= translate('deposit wallet'); ?></h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <h6 class="modal-title ps-2"><i class="fa-duotone fa-arrow-down-to-bracket"></i>
+                <?= translate('deposit wallet'); ?></h6>
+            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i
+                    class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body pt-0">
-            <?php echo form_open(site_url() . 'payments/depositSubmit', array('enctype' => 'multipart/form-data', 'id' => 'deposit-form'));?>
-                
-                <?= csrf_field() ?>
+            <?php echo form_open(site_url() . 'payments/depositSubmit', array('enctype' => 'multipart/form-data', 'id' => 'deposit-form')); ?>
 
-                <?php 
-                    $paypalCredentials = paypalCredentials();
-                    $stripeEnabled = (systemGet('activateStripe') == 1) || (systemGet('secretStripe') != '') || (env('stripe.secretKey') != '');
-                ?>
-                
-                <div class="row" id="deposit-wallet">
-                    
-                    <h6 class="help-block text-center"><?= translate('send your payment information, amount, reference and phone number'); ?></h6>
-                    <p class="text-muted small text-center mb-2">No necesitas verificación KYC para depositar. La verificación de identidad solo se solicita al retirar ganancias.</p>
+            <?= csrf_field() ?>
 
-                    <div class="row" id="step-deposit-1">
-                        <?php if (session()->get('group') == 1) : ?>
-                            <div class="col-md-12 mb-1">
-                                <label for="deposit-user" class="form-label"><?= translate('user'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="deposit-user" id="deposit-user">
-                                    <option value=""><?= translate('user'); ?></option>
-                                    <?php foreach ($users as $userOption) : ?>
+            <?php
+            $paypalCredentials = paypalCredentials();
+            $stripeEnabled = (systemGet('activateStripe') == 1) || (systemGet('secretStripe') != '') || (env('stripe.secretKey') != '');
+            ?>
+
+            <div class="row" id="deposit-wallet">
+
+                <h6 class="help-block text-center">
+                    <?= translate('send your payment information, amount, reference and phone number'); ?></h6>
+                <p class="text-muted small text-center mb-2">No necesitas verificación KYC para depositar. La
+                    verificación de identidad solo se solicita al retirar ganancias.</p>
+
+                <div class="row" id="step-deposit-1">
+                    <?php if (session()->get('group') == 1): ?>
+                        <div class="col-md-12 mb-1">
+                            <label for="deposit-user" class="form-label"><?= translate('user'); ?></label>
+                            <select class='form-control form-control-lg form-bingo' name="deposit-user" id="deposit-user">
+                                <option value=""><?= translate('user'); ?></option>
+                                <?php foreach ($users as $userOption): ?>
                                     <option value="<?= $userOption['id']; ?>" <?= ($filters['user_id'] ?? '') == $userOption['id'] ? 'selected' : ''; ?>>
                                         <?= esc($userOption['code'] . ' - ' . $userOption['firstname'] . ' ' . $userOption['lastname']); ?>
                                     </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <small id="deposit-user-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-12 mb-2 d-none" id="deposit-user-stats-wrap">
-                                <p class="small text-muted mb-2 text-center">Historial del jugador seleccionado</p>
-                                <?= view('users/partials/accreditation_user_stats', [
-                                    'userStats' => ['manual_credits' => 0, 'user_spend' => 0, 'total_prizes' => 0],
-                                    'wrapperClass' => 'user-accreditation-stats deposit-user-stats',
-                                ]) ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="col-md-12 mb-1">
-                            <label for="deposit-method" class="form-label"><?= translate('payment method'); ?></label>
-                            <select class='form-control form-control-lg form-bingo' name="deposit-method" id="deposit-method" onchange="getButtons();">
-                                <option value=""><?= translate('payment method'); ?></option>
-                                <option <?= systemGet('method') == 'transfer' ? 'selected' : '' ?> value="transfer"><?= translate('transfer'); ?></option>
-                            </select>
-                            <small id="deposit-method-error" class="text-danger d-none"></small>
-                        </div>
-
-                        <div class="col-md-12 mb-1" id="deposit-method-bank">
-                            <label for="deposit-account" class="form-label"><?= translate('bingo bank'); ?></label>
-                            <select class='form-control form-control-lg form-bingo' name="deposit-account" id="deposit-account" onchange="infobankGet();">
-                                <option value=""><?= translate('bingo bank'); ?></option>
-                                <?php foreach ($banks as $bank): ?>
-                                    <option <?= systemGet('bank') == $bank['id'] ? 'selected' : '' ?> value="<?= $bank['id'] ?>"><?= $bank['name'] ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <small id="deposit-account-error" class="text-danger d-none"></small>
+                            <small id="deposit-user-error" class="text-danger d-none"></small>
                         </div>
-
-                        <div class="col-md-12 d-flex justify-content-center" id="deposit-info-bank"></div>
-
-                        <div class="col-md-12" id="step-deposit-button">
-                            <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-3" id="deposit-step-button"><?= translate('continue'); ?></button>
+                        <div class="col-md-12 mb-2 d-none" id="deposit-user-stats-wrap">
+                            <p class="small text-muted mb-2 text-center">Historial del jugador seleccionado</p>
+                            <?= view('users/partials/accreditation_user_stats', [
+                                'userStats' => ['manual_credits' => 0, 'user_spend' => 0, 'total_prizes' => 0],
+                                'wrapperClass' => 'user-accreditation-stats deposit-user-stats',
+                            ]) ?>
                         </div>
+                    <?php endif; ?>
+
+                    <div class="col-md-12 mb-1">
+                        <label for="deposit-method" class="form-label"><?= translate('payment method'); ?></label>
+                        <select class='form-control form-control-lg form-bingo' name="deposit-method"
+                            id="deposit-method" onchange="getButtons();">
+                            <option value=""><?= translate('payment method'); ?></option>
+                            <option <?= systemGet('method') == 'transfer' ? 'selected' : '' ?> value="transfer">
+                                <?= translate('transfer'); ?></option>
+                        </select>
+                        <small id="deposit-method-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="row" id="step-deposit-2" style="display: none;">
-                        <div class="col-md-12 mb-1">
-                            <label for="deposit-bank" class="form-label"><?= translate('home bank'); ?></label>
-                            <select class='form-control form-control-lg form-bingo' name="deposit-bank" id="deposit-bank">
-                                <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?></option>
-                                <option <?= ($user['bank'] == '0102 - BANCO DE VENEZUELA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0102 - BANCO DE VENEZUELA">0102 - BANCO DE VENEZUELA</option>
-                                <option <?= ($user['bank'] == '0104 - VENEZOLANO DE CRÉDITO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0104 - VENEZOLANO DE CRÉDITO">0104 - VENEZOLANO DE CRÉDITO</option>
-                                <option <?= ($user['bank'] == '0105 - BANCO MERCANTIL' && session()->get('group') != 1) ? 'selected' : '' ?> value="0105 - BANCO MERCANTIL">0105 - BANCO MERCANTIL</option>
-                                <option <?= ($user['bank'] == '0108 - BANCO PROVINCIAL' && session()->get('group') != 1) ? 'selected' : '' ?> value="0108 - BANCO PROVINCIAL">0108 - BANCO PROVINCIAL</option>
-                                <option <?= ($user['bank'] == '0114 - BANCO DEL CARIBE' && session()->get('group') != 1) ? 'selected' : '' ?> value="0114 - BANCO DEL CARIBE">0114 - BANCO DEL CARIBE</option>
-                                <option <?= ($user['bank'] == '0115 - BANCO EXTERIOR' && session()->get('group') != 1) ? 'selected' : '' ?> value="0115 - BANCO EXTERIOR">0115 - BANCO EXTERIOR</option>
-                                <option <?= ($user['bank'] == '0116 - BANCO OCCIDENTAL DE DESCUENTO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0116 - BANCO OCCIDENTAL DE DESCUENTO">0116 - BANCO OCCIDENTAL DE DESCUENTO</option>
-                                <option <?= ($user['bank'] == '0128 - BANCO CARONI' && session()->get('group') != 1) ? 'selected' : '' ?> value="0128 - BANCO CARONI">0128 - BANCO CARONI</option>
-                                <option <?= ($user['bank'] == '0134 - BANESCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0134 - BANESCO">0134 - BANESCO</option>
-                                <option <?= ($user['bank'] == '0137 - BANCO SOFITASA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0137 - BANCO SOFITASA">0137 - BANCO SOFITASA</option>
-                                <option <?= ($user['bank'] == '0138 - BANCO PLAZA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0138 - BANCO PLAZA">0138 - BANCO PLAZA</option>
-                                <option <?= ($user['bank'] == '0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE' && session()->get('group') != 1) ? 'selected' : '' ?> value="0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE">0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE</option>
-                                <option <?= ($user['bank'] == '0149 - BANCO DEL PUEBLO SOBERANO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0149 - BANCO DEL PUEBLO SOBERANO">0149 - BANCO DEL PUEBLO SOBERANO</option>
-                                <option <?= ($user['bank'] == '0151 - BFC BANCO FONDO COMUN C.A.' && session()->get('group') != 1) ? 'selected' : '' ?> value="0151 - BFC BANCO FONDO COMUN C.A.">0151 - BFC BANCO FONDO COMUN C.A.</option>
-                                <option <?= ($user['bank'] == '0156 - 100%BANCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0156 - 100%BANCO">0156 - 100%BANCO</option>
-                                <option <?= ($user['bank'] == '0157 - DELSUR' && session()->get('group') != 1) ? 'selected' : '' ?> value="0157 - DELSUR">0157 - DELSUR</option>
-                                <option <?= ($user['bank'] == '0163 - BANCO DEL TESORO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0163 - BANCO DEL TESORO">0163 - BANCO DEL TESORO</option>
-                                <option <?= ($user['bank'] == '0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO">0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO</option>
-                                <option <?= ($user['bank'] == '0166 - BANCO AGRICOLA DE VENEZUELA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0166 - BANCO AGRICOLA DE VENEZUELA">0166 - BANCO AGRICOLA DE VENEZUELA</option>
-                                <option <?= ($user['bank'] == '0168 - BANCRECER' && session()->get('group') != 1) ? 'selected' : '' ?> value="0168 - BANCRECER">0168 - BANCRECER</option>
-                                <option <?= ($user['bank'] == '0169 - R4 BANCO MICROFINANCIERO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0169 - MI BANCO">0169 - R4 BANCO MICROFINANCIERO</option>
-                                <option <?= ($user['bank'] == '0171 - BANCO ACTIVO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0171 - BANCO ACTIVO">0171 - BANCO ACTIVO</option>
-                                <option <?= ($user['bank'] == '0172 - BANCAMIGA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0172 - BANCAMIGA">0172 - BANCAMIGA</option>
-                                <option <?= ($user['bank'] == '0173 - BANCO INTERNACIONAL DE DESARROLLO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0173 - BANCO INTERNACIONAL DE DESARROLLO">0173 - BANCO INTERNACIONAL DE DESARROLLO</option>
-                                <option <?= ($user['bank'] == '0174 - BANPLUS' && session()->get('group') != 1) ? 'selected' : '' ?> value="0174 - BANPLUS">0174 - BANPLUS</option>
-                                <option <?= ($user['bank'] == '0175 - BANCO DIGITAL DE LOS TRABAJADORES' && session()->get('group') != 1) ? 'selected' : '' ?> value="0175 - BANCO DIGITAL DE LOS TRABAJADORES">0175 - BANCO DIGITAL DE LOS TRABAJADORES</option>
-                                <option <?= ($user['bank'] == '0176 - NOVO BANCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0176 - NOVO BANCO">0176 - NOVO BANCO</option>
-                                <option <?= ($user['bank'] == '0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA' && session()->get('group') != 1) ? 'selected' : '' ?> value="0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA">0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA</option>
-                                <option <?= ($user['bank'] == '0190 - CITIBANK N.A.' && session()->get('group') != 1) ? 'selected' : '' ?> value="0190 - CITIBANK N.A.">0190 - CITIBANK N.A.</option>
-                                <option <?= ($user['bank'] == '0191 - BANCO NACIONAL CRÉDITO' && session()->get('group') != 1) ? 'selected' : '' ?> value="0191 - BANCO NACIONAL CRÉDITO">0191 - BANCO NACIONAL CRÉDITO</option>
-                            </select>
-                            <small id="deposit-bank-error" class="text-danger d-none"></small>
-                        </div>
-                        
-                        <div class="col-md-6 mb-1">
-                            <label for="deposit-document" class="form-label"><?= translate('document'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo" name="deposit-document" id="deposit-document" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('document')); ?>" autocomplete="off" value="<?= $user['document']; ?>">
-                            <small id="deposit-document-error" class="text-danger d-none"></small>
-                        </div>
-                        
-                        <div class="col-md-6 mb-1">
-                            <label for="deposit-phone" class="form-label"><?= translate('phone'); ?></label>
-                            <input type="number" class="form-control form-control-lg form-bingo" name="deposit-phone" id="deposit-phone" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('phone')); ?>" autocomplete="off" value="<?= $user['phone']; ?>">
-                            <small id="deposit-phone-error" class="text-danger d-none"></small>
-                        </div>
-
-                        <div class="col-md-6 mb-1">
-                            <label for="deposit-date" class="form-label"><?= translate('date'); ?></label>
-                            <input type="date" class="form-control form-control-lg form-bingo" name="deposit-date" id="deposit-date" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('date')); ?>" autofocus autocomplete="off" value="<?php echo date('Y-m-d'); ?>">
-                            <small id="deposit-date-error" class="text-danger d-none"></small>
-                        </div>
-
-                        <div class="col-md-6 mb-1">
-                            <label for="deposit-amount" class="form-label"><?= translate('amount'); ?></label>
-                            <input type="number" class="form-control form-control-lg form-bingo" name="deposit-amount" id="deposit-amount" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>" autocomplete="off" value="0.00">
-                            <small id="deposit-amount-error" class="text-danger d-none"></small>
-                        </div>
-                        
-                        <div class="col-md-12 mb-1 position-relative">
-                            <label for="deposit-reference" class="form-label"><?= translate('reference'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo pe-5" name="deposit-reference" id="deposit-reference" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('reference')); ?>" autocomplete="off">
-                            <span class="position-absolute top-50 mt-2 end-0 translate-middle-y me-5 text-primary cursor-pointer" style="font-size: 0.9rem;" onclick="pasteReference()"><?= translate('paste'); ?></span>
-                            <small id="deposit-reference-error" class="text-danger d-none"></small>
-                        </div>
-
-                        <div class="col-md-12 mb-1">
-                            <div class="col-md-12 mb-1 text-center">
-                                <label for="voucherfileInput" class="form-label ps-0"><?= translate('voucher'); ?></label>
-                                
-                                <div class="cover position-relative d-inline-block">
-                                    <!-- Imagen -->
-                                    <img id="voucherImage" src="<?= site_url('uploads/vouchers/image.jpg'); ?>" alt="voucher" class="img-fluid img-thumbnail mx-auto d-block">
-
-                                    <!-- Botón Editar -->
-                                    <label for="voucherfileInput" class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2 img-button"><i class="fa-duotone fa-solid fa-plus"></i></label>
-                                    <input type="file" id="voucherfileInput" accept="image/*" class="d-none" onchange="previewvoucherImage(event)">
-
-                                    <!-- Botón Eliminar (oculto si no hay imagen) -->
-                                    <button type="button" id="removeVoucherBtn" class="btn btn-sm btn-primary position-absolute bottom-0 end-0 m-2 img-button d-none" onclick="removeVoucherImage()"><i class="fa-duotone fa-trash"></i></button>
-
-                                    <input type="hidden" id="voucher_image_input" name="deposit-voucher">
-                                </div>
-                            </div>
-                        </div>
-
-                        <?php if (session()->get('group') == 1) : ?>
-                            <div class="col-md-12 mb-1">
-                                <label for="observation" class="form-label"><?= translate('observation'); ?></label>
-                                <textarea class="form-control form-control-lg form-bingo" name="observation" id="observation" rows="2" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('observation')); ?>"></textarea>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="col-md-12">
-                            <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="deposit-button"><?= translate('send'); ?></button>
-                        </div>
+                    <div class="col-md-12 mb-1" id="deposit-method-bank">
+                        <label for="deposit-account" class="form-label"><?= translate('bingo bank'); ?></label>
+                        <select class='form-control form-control-lg form-bingo' name="deposit-account"
+                            id="deposit-account" onchange="infobankGet();">
+                            <option value=""><?= translate('bingo bank'); ?></option>
+                            <?php foreach ($banks as $bank): ?>
+                                <option <?= systemGet('bank') == $bank['id'] ? 'selected' : '' ?> value="<?= $bank['id'] ?>">
+                                    <?= $bank['name'] ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small id="deposit-account-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="row" id="deposit-paypal-amount" style="display: none;">
-                        <div class="col-md-12 mb-1">
-                            <label for="deposit-amount" class="form-label"><?= translate('amount'); ?></label>
-                            <input type="number" class="form-control form-control-lg form-bingo" name="paypal-amount" id="paypal-amount" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>" autocomplete="off" min="1" step="0.01">
-                            <small id="deposit-amount-error" class="text-danger d-none"></small>
-                        </div>
-                    </div>
+                    <div class="col-md-12 d-flex justify-content-center" id="deposit-info-bank"></div>
 
-                    <div class="pt-2 text-center" id="paypal-button" style="display: none;"></div>
-                    <div class="row" id="deposit-stripe-amount" style="display: none;">
-                        <div class="col-md-12 mb-1">
-                            <label for="stripe-amount" class="form-label"><?= translate('amount'); ?></label>
-                            <input type="number" class="form-control form-control-lg form-bingo" name="stripe-amount" id="stripe-amount" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>" autocomplete="off" min="1" step="0.01">
-                            <small id="stripe-amount-error" class="text-danger d-none"></small>
-                        </div>
-                        <div class="col-md-12">
-                            <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="stripe-button">Pagar con Stripe</button>
-                        </div>
+                    <div class="col-md-12" id="step-deposit-button">
+                        <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-3"
+                            id="deposit-step-button"><?= translate('continue'); ?></button>
                     </div>
                 </div>
+
+                <div class="row" id="step-deposit-2" style="display: none;">
+                    <div class="col-md-12 mb-1">
+                        <label for="deposit-bank" class="form-label"><?= translate('home bank'); ?></label>
+                        <select class='form-control form-control-lg form-bingo' name="deposit-bank" id="deposit-bank">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?>
+                            </option>
+                            <!-- BANCOS -->
+                            <option <?= ($user['bank'] == 'BANCO PICHINCHA' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO PICHINCHA">BANCO PICHINCHA</option>
+                            <option <?= ($user['bank'] == 'BANCO GUAYAQUIL' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO GUAYAQUIL">BANCO GUAYAQUIL</option>
+                            <option <?= ($user['bank'] == 'BANCO DEL PACIFICO' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO DEL PACIFICO">BANCO DEL PACÍFICO</option>
+                            <option <?= ($user['bank'] == 'BANCO DEL AUSTRO' && session()->get('group') != 1) ? 'selected' : '' ?> value="BANCO DEL AUSTRO">BANCO DEL AUSTRO</option>
+
+                            <!-- COOPERATIVAS -->
+                            <option <?= ($user['bank'] == 'COOP. JEP' && session()->get('group') != 1) ? 'selected' : '' ?>
+                                value="COOP. JEP">COOPERATIVA JEP</option>
+                            <option <?= ($user['bank'] == 'COOP. JARDIN AZUAYO' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. JARDIN AZUAYO">COOPERATIVA JARDÍN AZUAYO</option>
+                            <option <?= ($user['bank'] == 'COOP. POLICIA NACIONAL' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. POLICIA NACIONAL">COOPERATIVA DE LA POLICÍA NACIONAL
+                            </option>
+                            <option <?= ($user['bank'] == 'COOP. ALIANZA DEL VALLE' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. ALIANZA DEL VALLE">COOPERATIVA ALIANZA DEL VALLE
+                            </option>
+                            <option <?= ($user['bank'] == 'COOP. COOPERCO' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. COOPERCO">COOPERATIVA COOPERCO</option>
+                            <option <?= ($user['bank'] == 'COOP. MUSHUC RUNA' && session()->get('group') != 1) ? 'selected' : '' ?> value="COOP. MUSHUC RUNA">COOPERATIVA MUSHUC RUNA</option>
+                        </select>
+                        <small id="deposit-bank-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-1">
+                        <label for="deposit-document" class="form-label"><?= translate('document'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="deposit-document"
+                            id="deposit-document"
+                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('document')); ?>"
+                            autocomplete="off" value="<?= $user['document']; ?>">
+                        <small id="deposit-document-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-1">
+                        <label for="deposit-phone" class="form-label"><?= translate('phone'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="deposit-phone"
+                            id="deposit-phone"
+                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('phone')); ?>"
+                            autocomplete="off" value="<?= $user['phone']; ?>">
+                        <small id="deposit-phone-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-1">
+                        <label for="deposit-date" class="form-label"><?= translate('date'); ?></label>
+                        <input type="date" class="form-control form-control-lg form-bingo" name="deposit-date"
+                            id="deposit-date"
+                            placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('date')); ?>" autofocus
+                            autocomplete="off" value="<?php echo date('Y-m-d'); ?>">
+                        <small id="deposit-date-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-1">
+                        <label for="deposit-amount" class="form-label"><?= translate('amount'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="deposit-amount"
+                            id="deposit-amount"
+                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>"
+                            autocomplete="off" value="0.00">
+                        <small id="deposit-amount-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-12 mb-1 position-relative">
+                        <label for="deposit-reference" class="form-label"><?= translate('reference'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo pe-5" name="deposit-reference"
+                            id="deposit-reference"
+                            placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('reference')); ?>"
+                            autocomplete="off">
+                        <span
+                            class="position-absolute top-50 mt-2 end-0 translate-middle-y me-5 text-primary cursor-pointer"
+                            style="font-size: 0.9rem;" onclick="pasteReference()"><?= translate('paste'); ?></span>
+                        <small id="deposit-reference-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-12 mb-1">
+                        <div class="col-md-12 mb-1 text-center">
+                            <label for="voucherfileInput" class="form-label ps-0"><?= translate('voucher'); ?></label>
+
+                            <div class="cover position-relative d-inline-block">
+                                <!-- Imagen -->
+                                <img id="voucherImage" src="<?= site_url('uploads/vouchers/image.jpg'); ?>"
+                                    alt="voucher" class="img-fluid img-thumbnail mx-auto d-block">
+
+                                <!-- Botón Editar -->
+                                <label for="voucherfileInput"
+                                    class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2 img-button"><i
+                                        class="fa-duotone fa-solid fa-plus"></i></label>
+                                <input type="file" id="voucherfileInput" accept="image/*" class="d-none"
+                                    onchange="previewvoucherImage(event)">
+
+                                <!-- Botón Eliminar (oculto si no hay imagen) -->
+                                <button type="button" id="removeVoucherBtn"
+                                    class="btn btn-sm btn-primary position-absolute bottom-0 end-0 m-2 img-button d-none"
+                                    onclick="removeVoucherImage()"><i class="fa-duotone fa-trash"></i></button>
+
+                                <input type="hidden" id="voucher_image_input" name="deposit-voucher">
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php if (session()->get('group') == 1): ?>
+                        <div class="col-md-12 mb-1">
+                            <label for="observation" class="form-label"><?= translate('observation'); ?></label>
+                            <textarea class="form-control form-control-lg form-bingo" name="observation" id="observation"
+                                rows="2"
+                                placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('observation')); ?>"></textarea>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="col-md-12">
+                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2"
+                            id="deposit-button"><?= translate('send'); ?></button>
+                    </div>
+                </div>
+
+                <div class="row" id="deposit-paypal-amount" style="display: none;">
+                    <div class="col-md-12 mb-1">
+                        <label for="deposit-amount" class="form-label"><?= translate('amount'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="paypal-amount"
+                            id="paypal-amount"
+                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>"
+                            autocomplete="off" min="1" step="0.01">
+                        <small id="deposit-amount-error" class="text-danger d-none"></small>
+                    </div>
+                </div>
+
+                <div class="pt-2 text-center" id="paypal-button" style="display: none;"></div>
+                <div class="row" id="deposit-stripe-amount" style="display: none;">
+                    <div class="col-md-12 mb-1">
+                        <label for="stripe-amount" class="form-label"><?= translate('amount'); ?></label>
+                        <input type="number" class="form-control form-control-lg form-bingo" name="stripe-amount"
+                            id="stripe-amount"
+                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>"
+                            autocomplete="off" min="1" step="0.01">
+                        <small id="stripe-amount-error" class="text-danger d-none"></small>
+                    </div>
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-2"
+                            id="stripe-button">Pagar con Stripe</button>
+                    </div>
+                </div>
+            </div>
             <?= form_close(); ?>
         </div>
     </div>
@@ -227,48 +256,48 @@
     $(document).ready(function () {
         infobankGet();
 
-        <?php if (session()->get('group') == 1) : ?>
-        function loadDepositUserStats(userId) {
-            const wrap = document.getElementById('deposit-user-stats-wrap');
-            if (!wrap) {
-                return;
+        <?php if (session()->get('group') == 1): ?>
+            function loadDepositUserStats(userId) {
+                const wrap = document.getElementById('deposit-user-stats-wrap');
+                if (!wrap) {
+                    return;
+                }
+
+                if (!userId) {
+                    wrap.classList.add('d-none');
+                    return;
+                }
+
+                fetch(`<?= site_url('payments/userAccreditationStatsGet') ?>/${userId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success || !data.stats) {
+                            wrap.classList.add('d-none');
+                            return;
+                        }
+
+                        wrap.querySelector('.stat-manual-credits').textContent = formatNumber(data.stats.manual_credits || 0);
+                        wrap.querySelector('.stat-user-spend').textContent = formatNumber(data.stats.user_spend || 0);
+                        wrap.querySelector('.stat-total-prizes').textContent = formatNumber(data.stats.total_prizes || 0);
+                        wrap.classList.remove('d-none');
+                    })
+                    .catch(() => wrap.classList.add('d-none'));
             }
 
-            if (!userId) {
-                wrap.classList.add('d-none');
-                return;
+            $('#deposit-user').on('change', function () {
+                loadDepositUserStats(this.value);
+            });
+
+            if ($('#deposit-user').val()) {
+                loadDepositUserStats($('#deposit-user').val());
             }
-
-            fetch(`<?= site_url('payments/userAccreditationStatsGet') ?>/${userId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success || !data.stats) {
-                        wrap.classList.add('d-none');
-                        return;
-                    }
-
-                    wrap.querySelector('.stat-manual-credits').textContent = formatNumber(data.stats.manual_credits || 0);
-                    wrap.querySelector('.stat-user-spend').textContent = formatNumber(data.stats.user_spend || 0);
-                    wrap.querySelector('.stat-total-prizes').textContent = formatNumber(data.stats.total_prizes || 0);
-                    wrap.classList.remove('d-none');
-                })
-                .catch(() => wrap.classList.add('d-none'));
-        }
-
-        $('#deposit-user').on('change', function() {
-            loadDepositUserStats(this.value);
-        });
-
-        if ($('#deposit-user').val()) {
-            loadDepositUserStats($('#deposit-user').val());
-        }
         <?php endif; ?>
 
-        $('#deposit-step-button').on('click', function() {
+        $('#deposit-step-button').on('click', function () {
 
             var button = $('#deposit-step-button');
-            button.prop("disabled", true); 
-    
+            button.prop("disabled", true);
+
             $('.text-danger').addClass('d-none').text('');
             $('.form-control').removeClass('is-invalid');
 
@@ -282,7 +311,7 @@
                 method: 'POST',
                 data: formData,
                 dataType: 'json',
-                success: function(response) {
+                success: function (response) {
                     if (response.success) {
                         if (response.paypal) {
                             $("#paypal-button").show();
@@ -300,14 +329,14 @@
                         }
                     } else {
                         if (response.errors) {
-                            $.each(response.errors, function(field, message) {
+                            $.each(response.errors, function (field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
                             });
                         }
                     }
                 },
-                error: function() {
+                error: function () {
                     Toastify({
                         text: "<?= translate('there was an error in the request to the server'); ?>",
                         duration: 3000,
@@ -317,7 +346,7 @@
                         stopOnFocus: true
                     }).showToast();
                 },
-                complete: function() {
+                complete: function () {
                     button.prop("disabled", false);
                 }
             });
@@ -339,7 +368,7 @@
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        
+
                         $('#modalDeposit').modal('hide');
 
                         if (response.newRecharge) {
@@ -365,14 +394,14 @@
                         }).showToast();
                     } else {
                         if (response.errors) {
-                            $.each(response.errors, function(field, message) {
+                            $.each(response.errors, function (field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
                             });
                         }
                     }
                 },
-                error: function() {
+                error: function () {
                     Toastify({
                         text: "<?= translate('there was an error in the request to the server'); ?>",
                         duration: 3000,
@@ -382,13 +411,13 @@
                         stopOnFocus: true
                     }).showToast();
                 },
-                complete: function() {
+                complete: function () {
                     button.prop("disabled", false);
                 }
             });
         });
 
-        $('#stripe-button').on('click', function() {
+        $('#stripe-button').on('click', function () {
             const button = $('#stripe-button');
             const amount = parseFloat($('#stripe-amount').val() || '0');
             $('#stripe-amount-error').addClass('d-none').text('');
@@ -407,7 +436,7 @@
                     amount: amount,
                     <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
                 },
-                success: function(response) {
+                success: function (response) {
                     if (response.success && response.url) {
                         window.location.href = response.url;
                         return;
@@ -422,7 +451,7 @@
                         stopOnFocus: true
                     }).showToast();
                 },
-                error: function(xhr) {
+                error: function (xhr) {
                     const message = xhr.responseJSON?.message || "<?= translate('there was an error in the request to the server'); ?>";
                     Toastify({
                         text: message,
@@ -433,12 +462,12 @@
                         stopOnFocus: true
                     }).showToast();
                 },
-                complete: function() {
+                complete: function () {
                     button.prop('disabled', false);
                 }
             });
         });
-  
+
         paypal.Button.render({
             env: '<?= esc($paypalCredentials['env'], 'js') ?>',
             style: {
@@ -463,7 +492,7 @@
 
             commit: true,
 
-            onError: function(err) {
+            onError: function (err) {
                 console.error('PayPal error:', err);
                 Toastify({
                     text: "No se pudo abrir PayPal. Verifica que el Client ID coincida con el modo <?= esc($paypalCredentials['env'], 'js') ?>.",
@@ -475,7 +504,7 @@
                 }).showToast();
             },
 
-            onCancel: function() {
+            onCancel: function () {
                 Toastify({
                     text: "Pago cancelado en PayPal.",
                     duration: 2500,
@@ -585,9 +614,9 @@
 
     function updateTableDeposit(payment) {
         const tbody = $('#payments-tbody');
-        
+
         $('#not-list').remove();
-        
+
         const typeIcons = {
             'deposit': '<i class="fa-duotone fa-solid fa-arrow-down-to-line text-success"></i>',
             'retire': '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
@@ -613,8 +642,8 @@
                 </td>
         `;
 
-        <?php if (session()->get('group') == 1) : ?>
-        row += `
+        <?php if (session()->get('group') == 1): ?>
+            row += `
                 <td>
                     <strong>${escapeHtml(payment.user_code)}</strong>
                     <br>
@@ -667,8 +696,8 @@
             </td>
         `;
 
-        <?php if (session()->get('group') == 1) : ?>
-        row += `
+        <?php if (session()->get('group') == 1): ?>
+            row += `
             <td class="text-center">
                 <a class="btn btn-primary btn-modal text-white" onclick="requestGet('${payment.type}', '${payment.id}')">
                     <i class="fa-duotone fa-solid fa-eye"></i>
@@ -693,11 +722,11 @@
     }
 
     function infobankGet() {
-        
+
         const bankId = document.getElementById('deposit-account').value;
 
         const infoBankDiv = document.getElementById('deposit-info-bank');
-        
+
         infoBankDiv.style.display = 'none';
 
         if (!bankId) {
@@ -705,14 +734,14 @@
             return;
         } else {
             fetch(`<?= site_url('payments/infobankGet') ?>/${bankId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('<?= translate('error getting data'); ?>');
-                }
-                return response.json();
-            })
-            .then(data => {
-                infoBankDiv.innerHTML = `
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('<?= translate('error getting data'); ?>');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    infoBankDiv.innerHTML = `
                 <div class="card shadow-sm p-3 mb-3" style="border-radius: 12px; width: 85%; background:#fff;">
                     <div class="d-flex align-items-center mb-2">
                         <!-- Logo -->
@@ -745,21 +774,21 @@
                         </div>
                     </div>
                 </div>`;
-                infoBankDiv.style.display = 'block';
-            })
-            .catch(error => {
-                Toastify({
-                    text: "<?= translate('bank details could not be loaded'); ?>",
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    style: { background: "#dc3545" },
-                    stopOnFocus: true
-                }).showToast();
-            });
-                
+                    infoBankDiv.style.display = 'block';
+                })
+                .catch(error => {
+                    Toastify({
+                        text: "<?= translate('bank details could not be loaded'); ?>",
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                });
+
             /*.then(data => {
-                document.getElementById('deposit-info-bank').innerHTML = `<div class="row"><div class="col-md-12 px-3 pt-2"><h6 class="help-block"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('bank'); ?>: ${data.bank} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6><h6 class="help-block"><?= translate('holder'); ?>: ${data.holder} - <?= translate('account'); ?>: ${data.account} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6><h6 class="help-block"><?= translate('document'); ?>: ${data.document} - <?= translate('phone'); ?>: ${data.phone} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6></div></div>`})
+                document.getElementById('deposit-info-bank').innerHTML = `<div class="row"><div class="col-md-12 px-3 pt-2"><h6 class="help-block"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('bank'); ?>: ${ data.bank } <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6 ><h6 class="help-block"><?= translate('holder'); ?>: ${data.holder} - <?= translate('account'); ?>: ${data.account} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6><h6 class="help-block"><?= translate('document'); ?>: ${data.document} - <?= translate('phone'); ?>: ${data.phone} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6></div ></div >`})
             .catch(error => {
                 Toastify({
                     text: "<?= translate('bank details could not be loaded'); ?>",
