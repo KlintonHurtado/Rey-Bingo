@@ -14,36 +14,19 @@
                         <label for="setting-bank" class="form-label"><?= translate('bank'); ?></label>
                         <select class='form-control form-control-lg form-bingo' name="setting-bank" id="setting-bank">
                             <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?></option>
-                            <option <?= $user['bank'] == '0102 - BANCO DE VENEZUELA' ? 'selected' : '' ?> value="0102 - BANCO DE VENEZUELA">0102 - BANCO DE VENEZUELA</option>
-                            <option <?= $user['bank'] == '0104 - VENEZOLANO DE CRÉDITO' ? 'selected' : '' ?> value="0104 - VENEZOLANO DE CRÉDITO">0104 - VENEZOLANO DE CRÉDITO</option>
-                            <option <?= $user['bank'] == '0105 - BANCO MERCANTIL' ? 'selected' : '' ?> value="0105 - BANCO MERCANTIL">0105 - BANCO MERCANTIL</option>
-                            <option <?= $user['bank'] == '0108 - BANCO PROVINCIAL' ? 'selected' : '' ?> value="0108 - BANCO PROVINCIAL">0108 - BANCO PROVINCIAL</option>
-                            <option <?= $user['bank'] == '0114 - BANCO DEL CARIBE' ? 'selected' : '' ?> value="0114 - BANCO DEL CARIBE">0114 - BANCO DEL CARIBE</option>
-                            <option <?= $user['bank'] == '0115 - BANCO EXTERIOR' ? 'selected' : '' ?> value="0115 - BANCO EXTERIOR">0115 - BANCO EXTERIOR</option>
-                            <option <?= $user['bank'] == '0116 - BANCO OCCIDENTAL DE DESCUENTO' ? 'selected' : '' ?> value="0116 - BANCO OCCIDENTAL DE DESCUENTO">0116 - BANCO OCCIDENTAL DE DESCUENTO</option>
-                            <option <?= $user['bank'] == '0128 - BANCO CARONI' ? 'selected' : '' ?> value="0128 - BANCO CARONI">0128 - BANCO CARONI</option>
-                            <option <?= $user['bank'] == '0134 - BANESCO' ? 'selected' : '' ?> value="0134 - BANESCO">0134 - BANESCO</option>
-                            <option <?= $user['bank'] == '0137 - BANCO SOFITASA' ? 'selected' : '' ?> value="0137 - BANCO SOFITASA">0137 - BANCO SOFITASA</option>
-                            <option <?= $user['bank'] == '0138 - BANCO PLAZA' ? 'selected' : '' ?> value="0138 - BANCO PLAZA">0138 - BANCO PLAZA</option>
-                            <option <?= $user['bank'] == '0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE' ? 'selected' : '' ?> value="0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE">0146 - BANCO DE LA GENTE EMPRENDEDORA BANGENTE</option>
-                            <option <?= $user['bank'] == '0149 - BANCO DEL PUEBLO SOBERANO' ? 'selected' : '' ?> value="0149 - BANCO DEL PUEBLO SOBERANO">0149 - BANCO DEL PUEBLO SOBERANO</option>
-                            <option <?= $user['bank'] == '0151 - BFC BANCO FONDO COMUN C.A.' ? 'selected' : '' ?> value="0151 - BFC BANCO FONDO COMUN C.A.">0151 - BFC BANCO FONDO COMUN C.A.</option>
-                            <option <?= $user['bank'] == '0156 - 100%BANCO' ? 'selected' : '' ?> value="0156 - 100%BANCO">0156 - 100%BANCO</option>
-                            <option <?= $user['bank'] == '0157 - DELSUR' ? 'selected' : '' ?> value="0157 - DELSUR">0157 - DELSUR</option>
-                            <option <?= $user['bank'] == '0163 - BANCO DEL TESORO' ? 'selected' : '' ?> value="0163 - BANCO DEL TESORO">0163 - BANCO DEL TESORO</option>
-                            <option <?= $user['bank'] == '0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO' ? 'selected' : '' ?> value="0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO">0164 - BANCO DE DESARROLLO DEL MICROEMPRESARIO</option>
-                            <option <?= $user['bank'] == '0166 - BANCO AGRICOLA DE VENEZUELA' ? 'selected' : '' ?> value="0166 - BANCO AGRICOLA DE VENEZUELA">0166 - BANCO AGRICOLA DE VENEZUELA</option>
-                            <option <?= $user['bank'] == '0168 - BANCRECER' ? 'selected' : '' ?> value="0168 - BANCRECER">0168 - BANCRECER</option>
-                            <option <?= $user['bank'] == '0169 - R4 BANCO MICROFINANCIERO' ? 'selected' : '' ?> value="0169 - R4 BANCO MICROFINANCIERO">0169 - R4 BANCO MICROFINANCIERO</option>
-                            <option <?= $user['bank'] == '0171 - BANCO ACTIVO' ? 'selected' : '' ?> value="0171 - BANCO ACTIVO">0171 - BANCO ACTIVO</option>
-                            <option <?= $user['bank'] == '0172 - BANCAMIGA' ? 'selected' : '' ?> value="0172 - BANCAMIGA">0172 - BANCAMIGA</option>
-                            <option <?= $user['bank'] == '0173 - BANCO INTERNACIONAL DE DESARROLLO' ? 'selected' : '' ?> value="0173 - BANCO INTERNACIONAL DE DESARROLLO">0173 - BANCO INTERNACIONAL DE DESARROLLO</option>
-                            <option <?= $user['bank'] == '0174 - BANPLUS' ? 'selected' : '' ?> value="0174 - BANPLUS">0174 - BANPLUS</option>
-                            <option <?= $user['bank'] == '0175 - BANCO DIGITAL DE LOS TRABAJADORES' ? 'selected' : '' ?> value="0175 - BANCO DIGITAL DE LOS TRABAJADORES">0175 - BANCO DIGITAL DE LOS TRABAJADORES</option>
-                            <option <?= $user['bank'] == '0176 - NOVO BANCO' ? 'selected' : '' ?> value="0176 - NOVO BANCO">0176 - NOVO BANCO</option>
-                            <option <?= $user['bank'] == '0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA' ? 'selected' : '' ?> value="0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA">0177 - BANCO DE LA FUERZA ARMADA NACIONAL BOLIVARIANA</option>
-                            <option <?= $user['bank'] == '0190 - CITIBANK N.A.' ? 'selected' : '' ?> value="0190 - CITIBANK N.A.">0190 - CITIBANK N.A.</option>
-                            <option <?= $user['bank'] == '0191 - BANCO NACIONAL CRÉDITO' ? 'selected' : '' ?> value="0191 - BANCO NACIONAL CRÉDITO">0191 - BANCO NACIONAL CRÉDITO</option>
+                            <!-- BANCOS -->
+                            <option <?= $user['bank'] == 'BANCO PICHINCHA' ? 'selected' : '' ?> value="BANCO PICHINCHA">BANCO PICHINCHA</option>
+                            <option <?= $user['bank'] == 'BANCO GUAYAQUIL' ? 'selected' : '' ?> value="BANCO GUAYAQUIL">BANCO GUAYAQUIL</option>
+                            <option <?= $user['bank'] == 'BANCO DEL PACIFICO' ? 'selected' : '' ?> value="BANCO DEL PACIFICO">BANCO DEL PACÍFICO</option>
+                            <option <?= $user['bank'] == 'BANCO DEL AUSTRO' ? 'selected' : '' ?> value="BANCO DEL AUSTRO">BANCO DEL AUSTRO</option>
+
+                            <!-- COOPERATIVAS -->
+                            <option <?= $user['bank'] == 'COOP. JEP' ? 'selected' : '' ?> value="COOP. JEP">COOPERATIVA JEP</option>
+                            <option <?= $user['bank'] == 'COOP. JARDIN AZUAYO' ? 'selected' : '' ?> value="COOP. JARDIN AZUAYO">COOPERATIVA JARDÍN AZUAYO</option>
+                            <option <?= $user['bank'] == 'COOP. POLICIA NACIONAL' ? 'selected' : '' ?> value="COOP. POLICIA NACIONAL">COOPERATIVA DE LA POLICÍA NACIONAL</option>
+                            <option <?= $user['bank'] == 'COOP. ALIANZA DEL VALLE' ? 'selected' : '' ?> value="COOP. ALIANZA DEL VALLE">COOPERATIVA ALIANZA DEL VALLE</option>
+                            <option <?= $user['bank'] == 'COOP. COOPERCO' ? 'selected' : '' ?> value="COOP. COOPERCO">COOPERATIVA COOPERCO</option>
+                            <option <?= $user['bank'] == 'COOP. MUSHUC RUNA' ? 'selected' : '' ?> value="COOP. MUSHUC RUNA">COOPERATIVA MUSHUC RUNA</option>
                         </select>
                         <small id="setting-bank-error" class="text-danger d-none"></small>
                     </div>

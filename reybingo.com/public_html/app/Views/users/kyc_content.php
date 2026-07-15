@@ -16,8 +16,13 @@ $kycLabels = [
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-body">
         <h6 class="mb-2"><i class="fa-duotone fa-solid fa-id-card me-2"></i> Verificación KYC</h6>
-        <p class="text-muted small mb-2">Solo es obligatoria para <strong>retirar fondos</strong>. Para depositar o jugar no necesitas completarla. Debes subir 3 fotos: frente, reverso y una selfie sosteniendo el documento en la barbilla.</p>
+        <p class="text-muted small mb-2">Por tu seguridad y la transparencia del juego, verifica tu cuenta subiendo:</p>
         <p class="mb-2">Estado: <span class="badge bg-<?= $kycClass; ?>"><?= $kycLabel; ?></span></p>
+        
+        <?php if ($kycStatus === 'verified'): ?>
+            <p class="text-success fw-bold small mt-2">¡Listo! Así de fácil cobras tus premios.</p>
+        <?php endif; ?>
+
         <?php if (! empty($user['kyc_observations'])): ?>
             <p class="small text-muted mb-2"><strong>Observaciones:</strong> <?= esc($user['kyc_observations']); ?></p>
         <?php endif; ?>
@@ -34,22 +39,21 @@ $kycLabels = [
             <?= form_open(site_url('kyc/submit'), ['enctype' => 'multipart/form-data', 'id' => 'kyc-form']); ?>
                 <?= csrf_field(); ?>
                 <div class="mb-2">
-                    <label class="form-label small">Documento (frente)</label>
+                    <label class="form-label small">Tu cédula de frente.</label>
                     <div class="d-flex gap-2 align-items-center">
                         <input type="file" id="kyc_front" name="kyc_front" class="form-control form-control-sm" accept="image/*" required <?= $isPending ? 'disabled' : ''; ?>>
                         <button type="button" id="clear-kyc-front" class="btn btn-sm btn-outline-secondary d-none" <?= $isPending ? 'disabled' : ''; ?>>Quitar</button>
                     </div>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label small">Documento (reverso)</label>
+                    <label class="form-label small">Tu cédula al reverso.</label>
                     <div class="d-flex gap-2 align-items-center">
                         <input type="file" id="kyc_back" name="kyc_back" class="form-control form-control-sm" accept="image/*" required <?= $isPending ? 'disabled' : ''; ?>>
                         <button type="button" id="clear-kyc-back" class="btn btn-sm btn-outline-secondary d-none" <?= $isPending ? 'disabled' : ''; ?>>Quitar</button>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small">Selfie con documento en la barbilla</label>
-                    <p class="text-muted small mb-1">Toma una foto de tu rostro sosteniendo el documento junto a la barbilla, con buena iluminación.</p>
+                    <label class="form-label small">Una selfie nítida.</label>
                     <div class="d-flex gap-2 align-items-center">
                         <input type="file" id="kyc_selfie" name="kyc_selfie" class="form-control form-control-sm" accept="image/*" capture="user" required <?= $isPending ? 'disabled' : ''; ?>>
                         <button type="button" id="clear-kyc-selfie" class="btn btn-sm btn-outline-secondary d-none" <?= $isPending ? 'disabled' : ''; ?>>Quitar</button>
