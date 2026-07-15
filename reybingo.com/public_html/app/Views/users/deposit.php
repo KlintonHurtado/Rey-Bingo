@@ -46,12 +46,6 @@
                             <label for="deposit-method" class="form-label"><?= translate('payment method'); ?></label>
                             <select class='form-control form-control-lg form-bingo' name="deposit-method" id="deposit-method" onchange="getButtons();">
                                 <option value=""><?= translate('payment method'); ?></option>
-                                <?php if (systemGet('activatePayPal') == 1) : ?>
-                                <option value="paypal"><?= translate('paypal'); ?></option>
-                                <?php endif; ?>
-                                <?php if ($stripeEnabled) : ?>
-                                <option value="stripe">Stripe</option>
-                                <?php endif; ?>
                                 <option <?= systemGet('method') == 'transfer' ? 'selected' : '' ?> value="transfer"><?= translate('transfer'); ?></option>
                             </select>
                             <small id="deposit-method-error" class="text-danger d-none"></small>
