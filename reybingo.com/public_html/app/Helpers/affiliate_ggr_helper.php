@@ -1375,7 +1375,10 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
 if (! function_exists('bingo_on_game_finished')) {
     function bingo_on_game_finished(int $gameId, ?int $fromUserId = null): void
     {
-        // Liquida perdedores al cierre; los ganadores se liquidan al pagar el premio.
+        // 1. Pagar premios pendientes automáticamente a los ganadores (Restaurado)
+        bingo_pay_pending_awards_for_game($gameId, $fromUserId);
+
+        // 2. Liquida perdedores al cierre; los ganadores se liquidan al pagar el premio.
         bingo_settle_game_ggr_commissions($gameId, $fromUserId, true);
     }
 }

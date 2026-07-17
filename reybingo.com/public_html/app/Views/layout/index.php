@@ -2243,6 +2243,15 @@
                 alert("🎉 ¡Aplicación instalada con éxito! Ya puedes abrirla directamente desde tu pantalla de inicio o escritorio.");
             }
         });
+
+        <?php if (systemGet('activateCron') == 1) : ?>
+        // Cron Virtual: Mantiene vivos los juegos automáticos llamando al backend
+        setInterval(() => {
+            fetch('/cron/run-auto-games', { method: 'GET', cache: 'no-store' })
+                .then(r => r.json())
+                .catch(e => console.log('Virtual Cron:', e));
+        }, 5000);
+        <?php endif; ?>
     </script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
     <script src="<?= asset_url('js/notification-dev.js') ?>"></script>

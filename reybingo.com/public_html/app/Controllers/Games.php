@@ -2245,6 +2245,12 @@ class Games extends Controller {
                 }
             }
         } else {
+            // Asegurar el estado inicial al crear
+            if ($type == '1') {
+                $gameData['status'] = 2; // Programado para juegos automáticos
+            } else {
+                $gameData['status'] = 1; // Activo para manuales
+            }
             $model->insert($gameData);
             $gameId = $model->getInsertID();
 

@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-dialog-centered max-w-75">
+<div class="modal-dialog modal-dialog-centered max-w-95">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2 text-uppercase"><i class="fa-duotone fa-solid fa-gamepad"></i> <?= $room['name']; ?></h6>

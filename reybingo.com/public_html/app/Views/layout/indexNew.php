@@ -2794,5 +2794,38 @@
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
     <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
     <?php endif; ?>
+    
+    <?php if (session()->get('group') == 1 && systemGet('activateAddGames') == 1) : ?>
+    <script>
+        function runAutoCron() {
+            fetch('<?= site_url('cron/run-autoadd-games') ?>')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Auto-cron response:', data);
+                    if (data && data.success) {
+                        if (typeof Toastify === 'function') {
+                            Toastify({
+                                text: "Juego automático programado para " + data.time,
+                                duration: 3000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#198754" },
+                                stopOnFocus: true
+                            }).showToast();
+                        }
+                        // Refresh the page or table if we are on the games list
+                        if (window.location.href.includes('games')) {
+                            setTimeout(() => location.reload(), 2000);
+                        }
+                    }
+                })
+                .catch(e => console.log('Auto-cron check failed', e));
+        }
+
+        // Ejecutar inmediatamente al cargar y luego cada 60 segundos
+        setTimeout(runAutoCron, 2000);
+        setInterval(runAutoCron, 60000);
+    </script>
+    <?php endif; ?>
 </body>
 </html>

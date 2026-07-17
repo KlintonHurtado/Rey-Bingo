@@ -143,7 +143,6 @@
     "retires": "Retiros",
     "retire ": "Retirar",
     "retire": "Retiro",
-    "type": "Tipo",
     "reference": "Referencia",
     "VERIFIED": "VERIFICADO",
     "REFUSED": "RECHAZADO",
@@ -998,7 +997,7 @@
     "commission on payments rate": "Porcentaje de comisión por pagos",
     "store payment commission description": "Por cada recarga o pago de premio que realices a un jugador, recibes una comisión según este porcentaje.",
     "prize payment commissions earned": "Comisiones por premios pagados",
-    "total commissions earned": "Total comisiones ganadas",
+    "total commissions earned": "Comisiones totales ganadas",
     "linked players": "Jugadores vinculados",
     "no linked players yet": "Aún no hay jugadores vinculados a tu punto de venta.",
     "store affiliate link description": "Comparte este enlace para que nuevos jugadores se registren con tu Punto de venta. La comisión se calcula con la misma tasa configurada en el administrador.",
@@ -1106,7 +1105,6 @@
     "operator commissions panel description": "Resumen de comisiones GGR del OPERADOR (margen = tasa total − % del PV por jugador).",
     "stores commissions panel": "Comisiones de Puntos de venta",
     "stores commissions panel description": "Resumen general de comisiones de todos sus Puntos de venta.",
-    "total commissions earned": "Comisiones totales ganadas",
     "stores commission breakdown": "Detalle por Punto de venta",
     "recent ggr commissions": "Comisiones GGR recientes",
     "player linked to store for ggr": "El jugador quedó vinculado a su Punto de venta para comisiones GGR.",
@@ -1118,5 +1116,7 @@
     "no records found": "No records found",
     "unknown": "Unknown",
     "withdraw operator earnings": "Retirar ganancias",
-    "withdraw operator earnings description": "Solicite el retiro de sus comisiones GGR acumuladas a su cuenta bancaria."
+    "withdraw operator earnings description": "Solicite el retiro de sus comisiones GGR acumuladas a su cuenta bancaria.",
+    "the game needs at least {min} players to start. current players: {current}": "The game needs at least {min} players to start. current players: {current}",
+    "the game needs at least {min} cartons to start. current cartons: {current}": "The game needs at least {min} cartons to start. current cartons: {current}"
 }

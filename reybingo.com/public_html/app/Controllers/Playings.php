@@ -127,12 +127,46 @@ class Playings extends Controller {
 
         $games = $modelGames->where('status', 1)->findAll();
 
-        foreach ($games as &$game) { 
+        $modelAwards = new AwardsModel();
+        $modelSings = new SingsModel();
+        $modelBoards = new BoardsModel();
+
+        $activeGames = [];
+        foreach ($games as $game) { 
+            // Check if game is finished
+            $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+            $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
+            $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
+            
+            $gameIsFinished = ($totalNumbersGenerated >= 75)
+                || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
+
+            // Si el juego finalizó, actualizamos su estado para no volver a consultarlo
+            if ($gameIsFinished) {
+                $modelGames->update($game['id'], ['status' => 0]);
+                continue; // Skip already played/finished games
+            }
+
+            // Ocultar juegos manuales de días anteriores que nunca iniciaron (abandonados)
+            $tz = new \DateTimeZone('America/Caracas');
+            $now = new \DateTime('now', $tz);
+            $gameDate = new \DateTime($game['date'] . ' 23:59:59', $tz);
+            if ($gameDate < $now && $totalNumbersGenerated == 0) {
+                $modelGames->update($game['id'], ['status' => 0]);
+                continue; 
+            }
+
             $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
+            if (!$room) {
+                continue; // Skip if room is not active
+            }
+
             $cartons = $modelCartons->where('user', $user['id'])->where('game', $game['id'])->countAllResults();
             $game['room'] = $room['name']; 
             $game['cartons'] = $cartons;
+            $activeGames[] = $game;
         }
+        $games = $activeGames;
 
         //$games = $modelGames->getGamesByDate(date('Y-m-d'));
 
@@ -2125,6 +2159,10 @@ class Playings extends Controller {
                 'status' => 1,
                 'notified' => json_encode([$currentUserId]),
             ]);
+            
+            // Intentar pago automático del cartón ganador
+            helper('bingo');
+            bingo_pay_sing_award((int) $singUser['id'], $currentUserId);
             $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
 
             return $this->response->setJSON([
@@ -2492,11 +2530,7 @@ class Playings extends Controller {
             return [];
         }
 
-        // En partida normal (sin transmisión en vivo) se juega con un solo cartón.
-        if (! in_array((int) ($game['type'] ?? 0), [3, 4], true)) {
-            return array_slice($cartons, 0, 1);
-        }
-
+        // Retornar todos los cartones comprados por el jugador para esta sala
         return $cartons;
     }
 }

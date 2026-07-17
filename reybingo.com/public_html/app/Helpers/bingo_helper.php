@@ -557,7 +557,8 @@ if (! function_exists('bingo_pay_sing_award')) {
         }
 
         if ($awardPerSing <= 0) {
-            return ['success' => false, 'error' => 'El premio calculado es 0.00. Verifique el tipo de premio del juego y el monto configurado en la modalidad.'];
+            $modelSings->update($singId, ['status' => 2]);
+            return ['success' => true, 'amount' => '0.00'];
         }
 
         $storeRow = null;
@@ -851,8 +852,8 @@ if (! function_exists('bingo_can_start_game')) {
             $cartonCount = bingo_count_game_cartons((int) $game['id']);
         }
 
-        return $playerCount > bingo_get_min_players($game)
-            && $cartonCount > bingo_get_min_cartons($game);
+        return $playerCount >= bingo_get_min_players($game)
+            && $cartonCount >= bingo_get_min_cartons($game);
     }
 }
 
@@ -867,8 +868,8 @@ if (! function_exists('bingo_min_players_start_message')) {
 
         return str_replace(
             ['{min}', '{current}'],
-            [(string) ($required + 1), (string) $playerCount],
-            translate('the game needs more than {min} players to start. current players: {current}')
+            [(string) $required, (string) $playerCount],
+            translate('the game needs at least {min} players to start. current players: {current}')
         );
     }
 }
@@ -884,8 +885,8 @@ if (! function_exists('bingo_min_cartons_start_message')) {
 
         return str_replace(
             ['{min}', '{current}'],
-            [(string) ($required + 1), (string) $cartonCount],
-            translate('the game needs more than {min} cartons to start. current cartons: {current}')
+            [(string) $required, (string) $cartonCount],
+            translate('the game needs at least {min} cartons to start. current cartons: {current}')
         );
     }
 }

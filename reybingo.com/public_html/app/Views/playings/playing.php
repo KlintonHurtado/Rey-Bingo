@@ -29,37 +29,62 @@
         max-width: 100%;
     }
     .container-section--playing .center-section.center-section--playing {
-        flex: 1 1 auto !important;
+        flex: 1 1 0 !important;
         min-height: 0 !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
         justify-content: flex-start !important;
-        overflow: hidden !important;
+        overflow: visible !important;
         width: 100% !important;
         font-size: inherit;
         font-weight: inherit;
     }
     .container-section--playing .cartons-section.cartons-section--playing {
-        flex: 1 1 auto !important;
+        flex: 1 1 0 !important;
         min-height: 0 !important;
-        height: auto !important;
-        max-height: 100% !important;
-        overflow-y: auto !important;
+        height: 0 !important;
+        overflow-y: scroll !important;
         overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
         align-items: center !important;
-        justify-content: center !important;
-        padding: 10px 10px calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+        justify-content: flex-start !important;
+        padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px)) !important;
     }
+    
+    /* Habilitar y estilizar scrollbar visible para PC/Web */
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar {
+        width: 8px !important;
+        display: block !important;
+    }
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.3) !important;
+        border-radius: 10px !important;
+    }
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.45) !important;
+    }
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-track {
+        background-color: rgba(0, 0, 0, 0.15) !important;
+    }
+
     /* El contenedor global usa 5 columnas; en playing debe ser 1 cartón por fila */
     .container-section--playing .content-cartons {
-        display: grid !important;
-        grid-template-columns: 1fr !important;
-        justify-items: center !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 auto !important;
         gap: 14px !important;
+    }
+    @media (min-width: 701px) {
+        .container-section--playing .content-cartons {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+            justify-items: center !important;
+            max-width: 1200px !important;
+        }
     }
     .container-section--playing .bingo-border-carton {
         width: fit-content !important;
@@ -97,8 +122,8 @@
         position: fixed;
         left: calc(10px + env(safe-area-inset-left, 0px));
         bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-        width: 60px;
-        height: 60px;
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
         background: transparent;
         display: flex;
@@ -116,10 +141,10 @@
         left: auto !important;
         right: calc(10px + env(safe-area-inset-right, 0px)) !important;
         bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-        width: 60px !important;
-        height: 60px !important;
-        min-width: 60px !important;
-        font-size: 1.8rem !important;
+        width: 80px !important;
+        height: 80px !important;
+        min-width: 80px !important;
+        font-size: 2.2rem !important;
     }
     body.chat-panel-open .btn-chat {
         z-index: 1058 !important;

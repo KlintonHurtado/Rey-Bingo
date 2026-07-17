@@ -126,14 +126,14 @@
 
     @media (min-width: 769px) {
         .play-filters-bar {
-            max-width: 720px;
+            max-width: 1100px;
             margin-bottom: 0.75rem;
             gap: 12px;
         }
 
         .play-filter-field--min {
-            flex: 0 0 160px;
-            max-width: 160px;
+            flex: 0 0 200px;
+            max-width: 200px;
         }
 
         .player-play-view .play-filter-input.form-bingo {
@@ -155,6 +155,15 @@
     .player-wallet-card {
         margin: 0.9rem 0.5rem 0.55rem !important;
         padding: 0.45rem 0.55rem !important;
+    }
+
+    @media (min-width: 769px) {
+        .player-wallet-card {
+            max-width: 1100px !important;
+            width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
     }
 
     @media (max-width: 768px) {

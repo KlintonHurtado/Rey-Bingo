@@ -1447,10 +1447,12 @@ body.modal-open {
 }
 
 .bg-gradient-bingo {
+    position: relative;
     background-color: #6236ff;
     background-image: linear-gradient(180deg, rgb(98, 54, 255) 10%, rgb(135, 103, 250) 100%);
     background-size: cover;
-    height: 100vh;
+    background-attachment: fixed;
+    min-height: 100vh;
 }
 
 .bg-gradient-bingo::before {
@@ -1459,10 +1461,11 @@ body.modal-open {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     background-image: url('../img/bg-background.jpg');
     background-size: cover;
     background-position: center;
+    background-attachment: fixed;
     opacity: 0.5;
     filter: blur(5px); 
     z-index: -1; 
@@ -1872,7 +1875,7 @@ html.reybingo-skip-preloader .preloader {
     color: #fff;
 }
 
-.one-carton, .two-cartons, .three-cartons, .four-cartons  {
+.one-carton, .two-cartons, .three-cartons, .four-cartons, .many-cartons  {
     display: grid;
     grid-gap: 5px;
     margin: auto;
@@ -1943,7 +1946,7 @@ html.reybingo-skip-preloader .preloader {
 }
 
 #cartons-container {
-    max-height: 400px;
+    max-height: 520px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -1975,22 +1978,22 @@ html.reybingo-skip-preloader .preloader {
 
     #cartons-container .bingo-carton-header,
     .content-cartons-select .bingo-carton-header {
-        width: 6.8vw !important;
-        height: 6.8vw !important;
-        max-width: 30px;
-        max-height: 30px;
+        width: 7vw !important;
+        height: 7vw !important;
+        max-width: 55px;
+        max-height: 55px;
         aspect-ratio: unset;
-        font-size: clamp(0.58rem, 3.2vw, 0.82rem) !important;
+        font-size: clamp(0.7rem, 3.2vw, 1.2rem) !important;
     }
 
     #cartons-container .bingo-carton-number,
     .content-cartons-select .bingo-carton-number {
-        width: 6.8vw !important;
-        height: 6.8vw !important;
-        max-width: 30px;
-        max-height: 30px;
+        width: 7vw !important;
+        height: 7vw !important;
+        max-width: 55px;
+        max-height: 55px;
         aspect-ratio: unset;
-        font-size: clamp(0.52rem, 2.8vw, 0.78rem) !important;
+        font-size: clamp(0.65rem, 2.8vw, 1.1rem) !important;
     }
 }
 
@@ -5733,8 +5736,9 @@ input[type=number]::-webkit-outer-spin-button {
 #text-countdown {
     color: white;
     text-align: center;
-    font-size: 1.5rem; /* Ajusta el tamaño de texto según sea necesario */
-    margin-top: 20px; /* Espaciado entre el contador y el texto */
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-top: 20px;
 }
 
 
@@ -5753,15 +5757,33 @@ input[type=number]::-webkit-outer-spin-button {
 }
 
 #finalized {
+    position: absolute;
+    top: 15%;
+    left: 0;
+    width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
     color: white;
     text-align: center;
-    font-size: 2.5rem;
+    font-size: 2.8rem;
     font-weight: bold;
-    position: relative;
     animation: pulse 1s infinite;
+}
+
+@keyframes zoomIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    #text-countdown {
+        font-size: 1.3rem;
+    }
+    #finalized {
+        font-size: 1.8rem;
+        top: 15%;
+    }
 }
 
 @keyframes pulse {
@@ -7327,17 +7349,102 @@ a {
     background: #a8a8a8;
 }
 
+@media (min-width: 769px) {
+    .sidebar.close ~ .main-content {
+        width: calc(100% - 78px);
+        left: 78px;
+    }
+}
+
+/* Aumentar el tamaño de los cartones en los modales de selección y visualización */
+@media (min-width: 701px) {
+    #cartons-container .bingo-carton,
+    .content-cartons-select .bingo-carton {
+        width: 100% !important;
+        max-width: 380px !important;
+        margin: 0 auto;
+    }
+    
+    #cartons-container .bingo-carton-header,
+    .content-cartons-select .bingo-carton-header,
+    #cartons-container .bingo-carton-number,
+    .content-cartons-select .bingo-carton-number {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 !important;
+        max-width: none !important;
+        max-height: none !important;
+        font-size: clamp(0.9rem, 2.5vw, 1.4rem) !important;
+    }
+}
+
+/* Reducir el ancho máximo del modal en pantallas grandes para que no se vea tan gigante */
+@media (min-width: 1025px) {
+    .modal-dialog.max-w-95,
+    .max-w-95 {
+        max-width: 1400px !important;
+        width: 90% !important;
+    }
+}
+
+/* Hacer más grande el buscador y el botón de favoritos en escritorio */
+@media (min-width: 769px) {
+    .carton-filters-default {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: center;
+        gap: 15px !important;
+    }
+    
+    .carton-search-wrap {
+        max-width: 450px !important;
+        flex: 1 1 auto;
+    }
+    
+    .carton-serial-search {
+        padding: 10px 18px 10px 42px !important;
+        font-size: 1.05rem !important;
+    }
+    
+    .carton-search-icon {
+        font-size: 1.1rem !important;
+        left: 15px !important;
+    }
+    
+    .carton-open-favorites-btn {
+        font-size: 1rem !important;
+        padding: 9px 20px !important;
+        white-space: nowrap !important;
+        flex: 0 0 auto;
+    }
+
+    .carton-search-results {
+        width: 100% !important;
+        text-align: center !important;
+        margin-top: -5px !important;
+    }
+}
+
 /* Jugador — vista web (móvil sin cambios) */
 @media (min-width: 769px) {
     html:has(#content-page .player-play-view) {
-        overflow: hidden;
-        height: 100%;
+        overflow-y: auto;
+        height: auto;
+    }
+
+    body:has(.player-play-view) {
+        align-items: flex-start !important;
+        height: auto !important;
+        min-height: 100dvh !important;
+        overflow-y: auto !important;
     }
 
     #content-page:has(.player-play-view) {
-        height: 100dvh;
-        max-height: 100dvh;
-        overflow: hidden;
+        min-height: 100dvh;
+        height: auto;
+        max-height: none;
+        overflow: visible;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -7345,14 +7452,14 @@ a {
 
     .player-play-view.container {
         flex: 1;
-        min-height: 0;
+        min-height: auto;
         max-width: min(1180px, 94vw);
         width: 100%;
         padding-left: 1.25rem;
         padding-right: 1.25rem;
         padding-top: 5.5rem !important;
         padding-bottom: 1rem;
-        overflow: hidden;
+        overflow: visible;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -7360,10 +7467,10 @@ a {
 
     .player-play-view > .row.d-flex {
         flex: 1;
-        min-height: 0;
+        min-height: auto;
         width: 100%;
         margin: 0;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .player-play-view > .row > div {
@@ -7466,7 +7573,7 @@ a {
 
     .player-play-view .play-rooms-carousel {
         width: 100%;
-        max-width: 720px;
+        max-width: 1100px;
         margin: 0 auto;
         flex: 1 1 auto;
         min-height: 0;
@@ -7477,7 +7584,7 @@ a {
     }
 
     .player-play-view .play-cards {
-        max-width: 720px;
+        max-width: 1100px;
         width: 100%;
         margin: 0 auto;
     }
@@ -7501,11 +7608,15 @@ a {
     }
 
     .player-play-view .play-cards--single {
-        max-width: 600px;
+        max-width: 350px;
         width: 100%;
         height: auto;
         margin: 0 auto;
         overflow: visible;
+    }
+    
+    .player-play-view .play-cards--single .play-room-slide {
+        width: 100% !important;
     }
 
     .player-play-view .play-cards .card {
@@ -7515,14 +7626,14 @@ a {
 
     .player-play-view .play-cards--single .card {
         width: 100% !important;
-        max-width: 600px !important;
+        max-width: 350px !important;
         height: auto;
         max-height: none;
         margin: 0 auto !important;
     }
 
     .player-play-view .play-cards--single .card .card-img-top {
-        max-height: 185px;
+        max-height: 120px;
         width: auto;
         margin: 0 auto;
         object-fit: contain;
@@ -7530,11 +7641,11 @@ a {
     }
 
     .player-play-view .play-cards--single .card .card-title {
-        font-size: 1.25rem !important;
+        font-size: 1.35rem !important;
     }
 
     .player-play-view .play-cards--single .card .card-body p {
-        font-size: 0.95rem !important;
+        font-size: 1rem !important;
         margin-bottom: 0.25rem !important;
     }
 
@@ -7562,16 +7673,16 @@ a {
 
     .player-play-view .play-section--multi {
         overflow-x: hidden !important;
-        overflow-y: auto !important;
+        overflow-y: visible !important;
         scroll-snap-type: none;
         padding-bottom: 0.5rem !important;
-        height: auto;
-        max-height: calc(100dvh - 260px);
+        height: auto !important;
+        max-height: none !important;
     }
 
     .player-play-view .play-cards--multi {
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
         gap: 1rem !important;
         width: 100% !important;
         max-width: 1100px !important;
@@ -7579,6 +7690,16 @@ a {
         padding: 0 !important;
         flex-direction: unset !important;
         flex-wrap: wrap !important;
+        justify-items: stretch !important;
+    }
+
+    .no_active_rooms {
+        grid-column: 1 / -1;
+        text-align: center;
+        width: 100%;
+        margin-top: 2rem;
+        font-weight: bold;
+        color: #ffffff;
     }
 
     .player-play-view .play-room-slide {
@@ -7596,7 +7717,11 @@ a {
     }
 
     .player-play-view .play-cards--multi .card .card-img-top {
-        max-height: 170px;
+        max-height: 120px;
+        width: auto;
+        margin: 0 auto;
+        object-fit: contain;
+        display: block;
     }
 
     .player-play-view .play-cards--multi .card .card-title {
@@ -7717,20 +7842,19 @@ a {
 }
 
 @media (min-width: 1200px) {
-    .player-play-view .play-cards--single .card {
-        max-width: 620px !important;
-    }
 
-    .player-play-view .play-cards--single {
-        max-width: 620px;
-    }
 
     .player-play-view .play-rooms-carousel {
-        max-width: 1100px;
+        max-width: 1180px;
+    }
+
+    .player-play-view .play-cards {
+        max-width: 1180px;
     }
 
     .player-play-view .play-cards--multi {
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)) !important;
+        justify-items: stretch !important;
     }
 }
 

@@ -602,4 +602,11 @@ class Home extends Controller {
 
         return $this->response->setJSON(['success' => false]);
     }
+
+    public function fix_currency()
+    {
+        $db = \Config\Database::connect();
+        $db->table('system')->where('key', 'currency')->update(['value' => '$']);
+        return 'Done currency fix';
+    }
 }

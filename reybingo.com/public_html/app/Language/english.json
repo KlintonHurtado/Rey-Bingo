@@ -143,7 +143,6 @@
     "retires": "Retires",
     "retire ": "Retire",
     "retire": "Retire",
-    "type": "Type",
     "reference": "Reference",
     "VERIFIED": "VERIFIED",
     "REFUSED": "REFUSED",
@@ -1109,7 +1108,6 @@
     "operator commissions panel description": "OPERATOR GGR commission summary (margin = total rate − PV % per player).",
     "stores commissions panel": "Points of sale commissions",
     "stores commissions panel description": "General summary of commissions from all your points of sale.",
-    "total commissions earned": "Total commissions earned",
     "stores commission breakdown": "Breakdown by point of sale",
     "recent ggr commissions": "Recent GGR commissions",
     "player linked to store for ggr": "The player was linked to your point of sale for GGR commissions.",
@@ -1120,5 +1118,7 @@
     "store affiliate requires operator": "Store affiliate requires operator",
     "unknown": "Unknown",
     "withdraw operator earnings": "Withdraw earnings",
-    "withdraw operator earnings description": "Request withdrawal of your accumulated GGR commissions to your bank account."
+    "withdraw operator earnings description": "Request withdrawal of your accumulated GGR commissions to your bank account.",
+    "the game needs at least {min} players to start. current players: {current}": "The game needs at least {min} players to start. current players: {current}",
+    "the game needs at least {min} cartons to start. current cartons: {current}": "The game needs at least {min} cartons to start. current cartons: {current}"
 }

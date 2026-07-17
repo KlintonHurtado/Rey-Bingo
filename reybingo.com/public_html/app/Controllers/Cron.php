@@ -538,9 +538,12 @@ class Cron extends Controller
         [$timeBallGet, $timeBallLast] = explode('-', $singBall);
         $timeBallGet = (int) $timeBallGet;
 
-        $now = date('Y-m-d H:i:s');
-        $currentDate = date('Y-m-d');
-        $currentTime = date('H:i:s');
+        $tz = new \DateTimeZone('America/Caracas');
+        $nowObj = new \DateTime('now', $tz);
+        
+        $now = $nowObj->format('Y-m-d H:i:s');
+        $currentDate = $nowObj->format('Y-m-d');
+        $currentTime = $nowObj->format('H:i:s');
 
         // 1) Iniciar juegos programados
         $gamesToStart = $modelGames->where('type', 1)
@@ -550,6 +553,38 @@ class Cron extends Controller
             ->findAll();
 
         foreach ($gamesToStart as $gameToStart) {
+            // Verificar si cumple los mínimos antes de iniciar
+            if (!bingo_can_start_game($gameToStart)) {
+                $gameId = (int)$gameToStart['id'];
+                
+                // Posponer 10 minutos
+                $newTimeObj = new \DateTime($gameToStart['date'] . ' ' . $gameToStart['time'], $tz);
+                $newTimeObj->modify('+10 minutes');
+                
+                $modelGames->update($gameId, [
+                    'date' => $newTimeObj->format('Y-m-d'),
+                    'time' => $newTimeObj->format('H:i:s'),
+                    'updated_at' => $now
+                ]);
+                
+                $minCartons = bingo_get_min_cartons($gameToStart);
+                $minPlayers = bingo_get_min_players($gameToStart);
+                
+                // Enviar notificación global a todos los usuarios
+                $modelNotifications = new NotificationsModel();
+                $modelNotifications->insert([
+                    'user' => 0, 
+                    'type' => 2,
+                    'modality' => $gameToStart['modalities'] ?? '',
+                    'title' => '⏳ PARTIDA POSPUESTA',
+                    'message' => "La partida automática se pospuso 10 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                    'created_at' => $now
+                ]);
+
+                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 10 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
+                continue; // Saltar al siguiente juego
+            }
+
             $modelGames->update($gameToStart['id'], [
                 'status' => 1,
                 'updated_at' => $now
@@ -733,7 +768,9 @@ class Cron extends Controller
             
             $totalBallsCanted += ($data['balls_canted'] ?? 0);
             
-            log_message('info', "Bola " . ($i + 1) . " cantada en secuencia: " . date('Y-m-d H:i:s'));
+            $tz = new \DateTimeZone('America/Caracas');
+            $nowStr = (new \DateTime('now', $tz))->format('Y-m-d H:i:s');
+            log_message('info', "Bola " . ($i + 1) . " cantada en secuencia: " . $nowStr);
             
             // Si no es la última bola y hay juegos activos, esperar
             if ($i < $maxBalls - 1 && $currentActiveGames > 0) {
