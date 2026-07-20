@@ -40,6 +40,13 @@
         left: auto !important;
     }
 
+    .border-carton.modality-won {
+        border-color: #9e9e9e !important;
+        box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.35) !important;
+        opacity: 0.6 !important;
+        filter: grayscale(100%) !important;
+    }
+
     .container-transmission {
         display: flex;
         flex-direction: column;
@@ -280,7 +287,7 @@
                                 $isSing = in_array($modality['id'], $singsModalities);
                                 $positions = explode(',', $modality['positions']);
                             ?>
-                            <div class="border-carton">
+                            <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
                                 <small style="font-size: .7rem"><?= translate($modality['name']); ?></small>
                                 <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
                                     <div class="card-letter B"><span>B</span></div>

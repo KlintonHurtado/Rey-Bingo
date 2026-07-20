@@ -1470,6 +1470,7 @@ function showCountdown(data, callback) {
     const cartn = $id(`modality-${data.modalityId}`);
     if (cartn) {
         cartn.classList.add('cartn-sing');
+        if (cartn.parentElement) cartn.parentElement.classList.add('modality-won');
         cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
             el.classList.add('sing');
             el.innerText = '⭐️';
@@ -1702,6 +1703,7 @@ function showGameFinalized() {
                     awardsGet();
                 }
                 container.style.display = 'none';
+                window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
             }, 5000);
         }
 

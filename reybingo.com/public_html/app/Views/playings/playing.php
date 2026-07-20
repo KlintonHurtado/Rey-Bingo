@@ -238,8 +238,10 @@
             scroll-snap-align: unset !important;
         }
         .modalities-display-container .border-carton.modality-won {
-            border-color: #28a745 !important;
-            box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.35) !important;
+            border-color: #9e9e9e !important;
+            box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.35) !important;
+            opacity: 0.6 !important;
+            filter: grayscale(100%) !important;
         }
         .modalities-display-container .border-carton .modality-name {
             color: #333 !important;
@@ -438,8 +440,10 @@
         box-shadow: 0 4px 14px rgba(98, 54, 255, 0.2) !important;
     }
     .modalities-display .border-carton.modality-won {
-        border-color: #28a745;
-        box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.35);
+        border-color: #9e9e9e !important;
+        box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.35) !important;
+        opacity: 0.6 !important;
+        filter: grayscale(100%) !important;
     }
     .modalities-display .border-carton .modality-name {
         display: block;
