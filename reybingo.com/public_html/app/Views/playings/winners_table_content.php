@@ -9,7 +9,6 @@
                 <th class="text-center"><?= translate('award'); ?></th>
                 <?php if (session()->get('group') == 1) : ?>
                 <th class="text-center"><?= translate('status'); ?></th>
-                <th class="text-center"><?= translate('option'); ?></th>
                 <?php endif; ?>
             </tr>
         </thead>
@@ -35,17 +34,12 @@
                         </td>
                         <?php if (session()->get('group') == 1) : ?>
                         <td class="text-center" id="award-<?= $sing['id'] ?>"><?= $sing['status'] ?></td>
-                        <td class="text-center">
-                            <?php if (($sing['status_raw'] ?? 0) == 1) : ?>
-                            <a class="btn btn-primary btn-modal text-white" onclick="payawardSubmit('<?= $sing['id'] ?>', '<?= $sing['user_name'] ?>', '<?= $sing['award_amount'] ?>', 'pay');"><i class="fa-duotone fa-hand-holding-dollar"></i></a>
-                            <?php endif; ?>
-                        </td>
                         <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
             <?php else : ?>
                 <tr>
-                    <td <?php if (session()->get('group') == 1) : ?> colspan="7" <?php else : ?> colspan="5" <?php endif; ?> class="text-center">
+                    <td <?php if (session()->get('group') == 1) : ?> colspan="6" <?php else : ?> colspan="5" <?php endif; ?> class="text-center">
                         <?= translate('no winners found'); ?>
                     </td>
                 </tr>

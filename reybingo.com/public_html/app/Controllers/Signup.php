@@ -698,8 +698,8 @@ class Signup extends Controller {
         }
 
         $client = new Google_Client();
-        $client->setClientId('171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com');
-        $client->setClientSecret('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');
+        $client->setClientId(env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com'));
+        $client->setClientSecret(env('GOOGLE_CLIENT_SECRET', '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'));
         $client->setRedirectUri(site_url('signup/signupGoogleSubmit'));
         $client->addScope("email");
         $client->addScope("profile");
@@ -712,8 +712,8 @@ class Signup extends Controller {
         $model = new UsersModel();
 
         $client = new Google_Client();
-        $client->setClientId('171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com');
-        $client->setClientSecret('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');
+        $client->setClientId(env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com'));
+        $client->setClientSecret(env('GOOGLE_CLIENT_SECRET', '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'));
         $client->setRedirectUri(site_url('signup/signupGoogleSubmit'));
 
         $token = $client->fetchAccessTokenWithAuthCode($this->request->getGet('code'));

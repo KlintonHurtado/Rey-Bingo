@@ -64,75 +64,15 @@
                 <div class="card-body">
                     <div id="winners-list">
                         <!-- Contenido de la tabla se cargará aquí -->
-                        <?php echo view('playings/winners_table', ['sings' => $sings]); ?>
+                        <?php echo view('playings/winners_table_content', [
+                            'sings' => $sings,
+                            'showPagination' => $showPagination ?? false,
+                            'currentPage' => $currentPage ?? 1,
+                            'per_page' => $per_page ?? 10,
+                            'totalRecords' => $totalRecords ?? 0,
+                            'totalPages' => $totalPages ?? 1
+                        ]); ?>
                     </div>
-                    <?php if ($showPagination): ?>
-                        <div class="row mt-4">
-                            <div class="col-12 col-md text-center mt-2 mb-sm-3">
-                                <span class="text-muted">
-                                    <?= translate('showing'); ?> 
-                                    <?= ($currentPage - 1) * $per_page + 1; ?> - 
-                                    <?= min($currentPage * $per_page, $totalRecords); ?> 
-                                    <?= translate('of'); ?> <?= number_format($totalRecords); ?> <?= translate('winners'); ?>
-                                </span>
-                            </div>
-                            <div class="col-12 col-md text-center">
-                                <nav class="d-flex justify-content-center align-items-center">
-                                    <ul class="pagination mb-0">
-                                        <?php if ($currentPage > 1): ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="javascript:void(0)" onclick="winnersGetPage(<?= $currentPage - 1; ?>)">
-                                                    «
-                                                </a>
-                                            </li>
-                                        <?php endif; ?>
-                                        
-                                        <?php 
-                                        $startPage = max(1, $currentPage - 2);
-                                        $endPage = min($totalPages, $currentPage + 2);
-                                        
-                                        if ($startPage > 1): ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="javascript:void(0)" onclick="winnersGetPage(1)">1</a>
-                                            </li>
-                                            <?php if ($startPage > 2): ?>
-                                                <li class="page-item disabled">
-                                                    <span class="page-link">...</span>
-                                                </li>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                        
-                                        <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                            <li class="page-item <?= $i == $currentPage ? 'active' : ''; ?>">
-                                                <a class="page-link" href="javascript:void(0)" onclick="winnersGetPage(<?= $i; ?>)">
-                                                    <?= $i; ?>
-                                                </a>
-                                            </li>
-                                        <?php endfor; ?>
-                                        
-                                        <?php if ($endPage < $totalPages): ?>
-                                            <?php if ($endPage < $totalPages - 1): ?>
-                                                <li class="page-item disabled">
-                                                    <span class="page-link">...</span>
-                                                </li>
-                                            <?php endif; ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="javascript:void(0)" onclick="winnersGetPage(<?= $totalPages; ?>)"><?= $totalPages; ?></a>
-                                            </li>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($currentPage < $totalPages): ?>
-                                            <li class="page-item">
-                                                <a class="page-link" href="javascript:void(0)" onclick="winnersGetPage(<?= $currentPage + 1; ?>)">
-                                                    »
-                                                </a>
-                                            </li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </nav>
-                            </div>
-                        </div>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>

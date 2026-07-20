@@ -2284,15 +2284,6 @@ function pollGameStatusBeforeStart() {
         $.get(site_url + 'playings/getGameStatus')
             .done(function(data) {
                 if (data && data.status === 'success') {
-                    // Si el juego inició en el servidor (status = 1)
-                    if (parseInt(data.game_status, 10) === 1) {
-                        clearInterval(gameStatusPollInterval);
-                        gameStatusPollInterval = null;
-                        console.log("Game status is now active (1). Reloading to start...");
-                        location.reload();
-                        return;
-                    }
-
                     // Si la hora/fecha del juego cambió (pospuesta)
                     const serverTimeStr = data.date + ' ' + data.time;
                     const localTargetStr = typeof window.gameDate !== 'undefined' ? window.gameDate : '';

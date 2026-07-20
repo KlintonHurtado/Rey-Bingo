@@ -762,13 +762,7 @@
 
         <h6 class="total-balls m-0"><small><?= translate('total balls'); ?></small> <br /><span id="balls-counter"><?= $totalNumbersGenerated ?> - <?= 75 - $totalNumbersGenerated ?></span></h6>
 
-        <div class="award-type-container text-center mx-2" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <small class="text-white fw-bold mb-1" style="font-size: 0.75rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);"><?= translate('type of award'); ?></small>
-            <select class="form-select form-select-sm border-white fw-bold" id="playing-award-type" style="background-color: #fff; color: #333; border-radius: 20px; font-size: 0.85rem; padding: 2px 24px 2px 12px; width: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.2); appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'><path fill=\'none\' stroke=\'%23333\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'m2 5 6 6 6-6\'/></svg>'); background-repeat: no-repeat; background-position: right 8px center; background-size: 10px 10px;">
-                <option value="1" <?= (isset($game['award']) && $game['award'] == 1) ? 'selected' : '' ?>><?= translate('accumulated'); ?></option>
-                <option value="2" <?= (isset($game['award']) && $game['award'] == 2) ? 'selected' : '' ?>><?= translate('amount'); ?></option>
-            </select>
-        </div>
+
 
         <h6 class="total-accumulated m-0"><small><?= translate('accumulated'); ?></small> <br /><span id="accumulated-counter" data-counter="0.00"><?= systemGet('currency'); ?> 0.00</span></h6>
 
