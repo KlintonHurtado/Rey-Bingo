@@ -837,8 +837,8 @@ function showCountdown(data, callback) {
     audioManager.play(audioPath + 'winner.mp3');
 
     // Actualizar cartón ganador
-    const cartn = $id(`modality-${data.modalityId}`);
-    if (cartn) {
+    const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
+    cartns.forEach(cartn => {
         cartn.classList.add('cartn-sing');
 
         // Encontrar el border-carton (puede ser padre o un nivel más arriba)
@@ -858,7 +858,7 @@ function showCountdown(data, callback) {
             el.classList.add('sing');
             el.innerText = '⭐️';
         });
-    }
+    });
 
     // Secuencia de countdown
     setTimeout(() => {
