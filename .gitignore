@@ -7,11 +7,16 @@
 *.zip
 
 # CodeIgniter 4 - carpeta writable (logs, cache, sesiones, uploads)
-reybingo.com/public_html/writable/logs/
-reybingo.com/public_html/writable/cache/
-reybingo.com/public_html/writable/session/
-reybingo.com/public_html/writable/uploads/
-reybingo.com/public_html/writable/debugbar/
+reybingo.com/public_html/writable/logs/*
+!reybingo.com/public_html/writable/logs/.gitkeep
+reybingo.com/public_html/writable/cache/*
+!reybingo.com/public_html/writable/cache/.gitkeep
+reybingo.com/public_html/writable/session/*
+!reybingo.com/public_html/writable/session/.gitkeep
+reybingo.com/public_html/writable/uploads/*
+!reybingo.com/public_html/writable/uploads/.gitkeep
+reybingo.com/public_html/writable/debugbar/*
+!reybingo.com/public_html/writable/debugbar/.gitkeep
 
 # Dependencias de Composer (se instalan con composer install)
 reybingo.com/public_html/vendor/

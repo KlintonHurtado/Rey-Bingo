@@ -1118,5 +1118,16 @@
     "withdraw operator earnings": "Retirar ganancias",
     "withdraw operator earnings description": "Solicite el retiro de sus comisiones GGR acumuladas a su cuenta bancaria.",
     "the game needs at least {min} players to start. current players: {current}": "The game needs at least {min} players to start. current players: {current}",
-    "the game needs at least {min} cartons to start. current cartons: {current}": "The game needs at least {min} cartons to start. current cartons: {current}"
+    "the game needs at least {min} cartons to start. current cartons: {current}": "The game needs at least {min} cartons to start. current cartons: {current}",
+    "auto game configuration": "Auto game configuration",
+    "hold ctrl to select multiple": "Hold ctrl to select multiple",
+    "minimum players": "Minimum players",
+    "minimum cartons": "Minimum cartons",
+    "settings for automatically created games": "Settings for automatically created games",
+    "games will be created automatically with these settings": "Games will be created automatically with these settings",
+    "rules": "Rules",
+    "schedule": "Schedule",
+    "select modalities": "Select modalities",
+    "select modality": "Select modality",
+    "selected modalities": "Selected modalities"
 }

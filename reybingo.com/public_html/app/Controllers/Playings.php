@@ -125,7 +125,7 @@ class Playings extends Controller {
 
         $lastGame = $modelGames->orderBy('created_at', 'DESC')->first();
 
-        $games = $modelGames->where('status', 1)->findAll();
+        $games = $modelGames->whereIn('status', [1, 2])->findAll();
 
         $modelAwards = new AwardsModel();
         $modelSings = new SingsModel();
@@ -148,7 +148,7 @@ class Playings extends Controller {
             }
 
             // Ocultar juegos manuales de días anteriores que nunca iniciaron (abandonados)
-            $tz = new \DateTimeZone('America/Caracas');
+            $tz = new \DateTimeZone('America/Guayaquil');
             $now = new \DateTime('now', $tz);
             $gameDate = new \DateTime($game['date'] . ' 23:59:59', $tz);
             if ($gameDate < $now && $totalNumbersGenerated == 0) {
@@ -195,7 +195,7 @@ class Playings extends Controller {
         $modelGameRooms = new GameRoomsModel();
 
         $games = $modelGames
-            ->where('status', 1)
+            ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
@@ -293,7 +293,7 @@ class Playings extends Controller {
         $contacts = $modelContacts->findAll();
         $pendingPrizes = bingo_fetch_pending_roulette_prizes((int) $user['id']);
         $games = $modelGames
-            ->where('status', 1)
+            ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
@@ -2532,5 +2532,33 @@ class Playings extends Controller {
 
         // Retornar todos los cartones comprados por el jugador para esta sala
         return $cartons;
+    }
+
+    public function getGameStatus()
+    {
+        if (!session()->get('logged_in')) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Not logged in']);
+        }
+        
+        $gameId = session()->get('game_id');
+        if (!$gameId) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'No active game session']);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        
+        if (!$game) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Game not found']);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'game_status' => (int) $game['status'],
+            'date' => $game['date'],
+            'time' => $game['time'],
+            'min_players' => (int) ($game['min_players'] ?? 10),
+            'min_cartons' => (int) ($game['min_cartons'] ?? 10)
+        ]);
     }
 }

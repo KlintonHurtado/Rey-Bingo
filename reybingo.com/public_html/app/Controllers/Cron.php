@@ -140,8 +140,21 @@ class Cron extends Controller
         }
 
         $modelGames = new GamesModel();
+        
+        // Validar máximo 2 juegos automáticos pendientes (status = 1 o 2)
+        $pendingGamesCount = $modelGames->where('type', 1)
+            ->whereIn('status', [1, 2])
+            ->countAllResults();
+
+        if ($pendingGamesCount >= 2) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Máximo de 2 juegos automáticos pendientes/activos alcanzado.'
+            ]);
+        }
+
         $addGamesTime = (int) systemGet('addGamesTime'); // Intervalo en minutos
-        $tz = new \DateTimeZone('America/Caracas');
+        $tz = new \DateTimeZone('America/Guayaquil');
         $now = new \DateTime('now', $tz);
 
          // Obtener horarios desde la configuración
@@ -204,6 +217,15 @@ class Cron extends Controller
 
         if ($result['success']) {
             log_message('info', "Juego automático creado: ID {$result['game_id']} para {$nextGame->format('Y-m-d H:i:s')}");
+            
+            // Enviar notificación Push por Firebase
+            helper('firebase_push');
+            $horaFormateada = $nextGame->format('h:i A');
+            send_firebase_push_to_all(
+                '¡Nueva partida de Bingo!', 
+                "Se ha programado una nueva partida para las {$horaFormateada}. ¡Entra y compra tus cartones!"
+            );
+
             return $this->response->setJSON($result);
         }
 
@@ -538,7 +560,7 @@ class Cron extends Controller
         [$timeBallGet, $timeBallLast] = explode('-', $singBall);
         $timeBallGet = (int) $timeBallGet;
 
-        $tz = new \DateTimeZone('America/Caracas');
+        $tz = new \DateTimeZone('America/Guayaquil');
         $nowObj = new \DateTime('now', $tz);
         
         $now = $nowObj->format('Y-m-d H:i:s');
@@ -557,9 +579,9 @@ class Cron extends Controller
             if (!bingo_can_start_game($gameToStart)) {
                 $gameId = (int)$gameToStart['id'];
                 
-                // Posponer 10 minutos
+                // Posponer 5 minutos
                 $newTimeObj = new \DateTime($gameToStart['date'] . ' ' . $gameToStart['time'], $tz);
-                $newTimeObj->modify('+10 minutes');
+                $newTimeObj->modify('+5 minutes');
                 
                 $modelGames->update($gameId, [
                     'date' => $newTimeObj->format('Y-m-d'),
@@ -577,11 +599,21 @@ class Cron extends Controller
                     'type' => 2,
                     'modality' => $gameToStart['modalities'] ?? '',
                     'title' => '⏳ PARTIDA POSPUESTA',
-                    'message' => "La partida automática se pospuso 10 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                    'message' => "La partida automática se pospuso 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
                     'created_at' => $now
                 ]);
 
-                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 10 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
+                // Notificar en tiempo real por Pusher si es posible
+                try {
+                    \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
+                        'new_time' => $newTimeObj->format('Y-m-d H:i:s'),
+                        'message' => "La partida se ha pospuesto 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos de jugadores o cartones."
+                    ]);
+                } catch (\Exception $pe) {
+                    log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
+                }
+
+                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 5 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
                 continue; // Saltar al siguiente juego
             }
 
@@ -768,7 +800,7 @@ class Cron extends Controller
             
             $totalBallsCanted += ($data['balls_canted'] ?? 0);
             
-            $tz = new \DateTimeZone('America/Caracas');
+            $tz = new \DateTimeZone('America/Guayaquil');
             $nowStr = (new \DateTime('now', $tz))->format('Y-m-d H:i:s');
             log_message('info', "Bola " . ($i + 1) . " cantada en secuencia: " . $nowStr);
             
@@ -866,7 +898,10 @@ class Cron extends Controller
             $gameId = $modelGames->getInsertID();
 
             // Crear los premios
-            $this->createGameAwards($gameId, $gameData['modalities'], $gameData['price']);
+            $awardType = (int) (systemGet('autoGameAwardType') ?: 1);
+            $awardValue = (float) (systemGet('autoGameAwardValue') ?: 100);
+            $totalPrize = ($awardType === 2) ? $awardValue : 100;
+            $this->createGameAwards($gameId, $gameData['modalities'], $totalPrize);
 
             // Generar cartones si está configurado
             /*if (systemGet('generateCartons') >= 1) {
@@ -895,21 +930,54 @@ class Cron extends Controller
     // 4) Generar datos aleatorios para el juego
     private function generateGameData($rooms, $allModalities)
     {
-        // Seleccionar sala aleatoria
-        $randomRoom = $rooms[array_rand($rooms)];
-
-        // Seleccionar entre 3 a 6 modalidades aleatorias
-        $numModalities = rand(3, 6);
-        $selectedModalities = array_rand($allModalities, min($numModalities, count($allModalities)));
-        
-        // Asegurar que sea array si solo se selecciona una modalidad
-        if (!is_array($selectedModalities)) {
-            $selectedModalities = [$selectedModalities];
+        // Seleccionar sala
+        $configuredRoom = systemGet('autoGameRoom');
+        if ($configuredRoom) {
+            $selectedRoom = null;
+            foreach ($rooms as $room) {
+                if ($room['id'] == $configuredRoom) {
+                    $selectedRoom = $room;
+                    break;
+                }
+            }
+            if (!$selectedRoom) {
+                $selectedRoom = $rooms[array_rand($rooms)];
+            }
+        } else {
+            $selectedRoom = $rooms[array_rand($rooms)];
         }
 
-        $modalityIds = [];
-        foreach ($selectedModalities as $index) {
-            $modalityIds[] = $allModalities[$index]['id'];
+        // Seleccionar modalidades
+        $configuredModalities = systemGet('autoGameModalities');
+        if ($configuredModalities) {
+            $configModIds = array_map('intval', array_filter(explode(',', $configuredModalities)));
+            $modalityIds = [];
+            foreach ($allModalities as $mod) {
+                if (in_array((int) $mod['id'], $configModIds)) {
+                    $modalityIds[] = $mod['id'];
+                }
+            }
+            if (empty($modalityIds)) {
+                $numModalities = rand(3, 6);
+                $selectedModalities = array_rand($allModalities, min($numModalities, count($allModalities)));
+                if (!is_array($selectedModalities)) {
+                    $selectedModalities = [$selectedModalities];
+                }
+                $modalityIds = [];
+                foreach ($selectedModalities as $index) {
+                    $modalityIds[] = $allModalities[$index]['id'];
+                }
+            }
+        } else {
+            $numModalities = rand(3, 6);
+            $selectedModalities = array_rand($allModalities, min($numModalities, count($allModalities)));
+            if (!is_array($selectedModalities)) {
+                $selectedModalities = [$selectedModalities];
+            }
+            $modalityIds = [];
+            foreach ($selectedModalities as $index) {
+                $modalityIds[] = $allModalities[$index]['id'];
+            }
         }
 
         // Generar precio aleatorio en rangos específicos
@@ -935,34 +1003,34 @@ class Cron extends Controller
         $gameDateTime->add(new \DateInterval('PT' . $randomMinutes . 'M'));
 
         return [
-            'user' => 1, // Usuario del sistema
-            'room' => $randomRoom['id'],
+            'user' => 1,
+            'room' => $selectedRoom['id'],
             'description' => $this->getRandomGameDescription(),
             'modalities' => implode(',', $modalityIds),
             'price' => $randomPrice,
             'date' => $gameDateTime->format('Y-m-d'),
             'time' => $gameDateTime->format('H:i:s'),
-            'award' => 1, // Siempre tipo 1
-            'type' => 1,  // Siempre automático
+            'award' => (int) (systemGet('autoGameAwardType') ?: 1),
+            'type' => 1,
             'url' => '',
             'video' => '',
-            'reset' => 2, // Siempre reset 2
+            'reset' => 2,
             'cover' => '',
-            'status' => 1
+            'min_players' => max(1, (int) (systemGet('autoGameMinPlayers') ?: 10)),
+            'min_cartons' => max(1, (int) (systemGet('autoGameMinCartons') ?: 10)),
+            'allow_roulette_cartons' => (systemGet('autoGameAllowRoulette') ?? 1) == 1 ? 1 : 0,
+            'status' => 2
         ];
     }
 
     // 5) Crear premios para el juego con distribución correcta
-    private function createGameAwards($gameId, $modalitiesString, $gamePrice)
+    private function createGameAwards($gameId, $modalitiesString, $totalPrize)
     {
         $modelAwards = new AwardsModel();
         $modelModalities = new ModalitiesModel();
         
         $modalityIds = explode(',', $modalitiesString);
         $numModalities = count($modalityIds);
-        
-        // El premio total es igual al precio del cartón (100%)
-        $totalPrize = $gamePrice;
 
         // Obtener información de las modalidades para identificar cartón lleno
         $modalities = $modelModalities->whereIn('id', $modalityIds)->findAll();
@@ -995,7 +1063,7 @@ class Cron extends Controller
         }
     }
 
-    // 6) Distribuir premios correctamente garantizando siempre 100%
+    // 6) Distribuir premios correctamente garantizando siempre $totalPrize
     private function distributePrizesCorrectly($totalPrize, $modalityIds, $hasFullCard = false, $fullCardModalityId = null)
     {
         $numModalities = count($modalityIds);
@@ -1004,21 +1072,21 @@ class Cron extends Controller
         switch ($numModalities) {
             case 2:
                 // 2 modalidades: 50% y 50%
-                $prizes[$modalityIds[0]] = 100 * 0.5;
-                $prizes[$modalityIds[1]] = 100 * 0.5;
+                $prizes[$modalityIds[0]] = $totalPrize * 0.5;
+                $prizes[$modalityIds[1]] = $totalPrize * 0.5;
                 break;
 
             case 3:
                 // 3 modalidades: 50%, 25%, 25%
-                $prizes[$modalityIds[0]] = 100 * 0.5;
-                $prizes[$modalityIds[1]] = 100 * 0.25;
-                $prizes[$modalityIds[2]] = 100 * 0.25;
+                $prizes[$modalityIds[0]] = $totalPrize * 0.5;
+                $prizes[$modalityIds[1]] = $totalPrize * 0.25;
+                $prizes[$modalityIds[2]] = $totalPrize * 0.25;
                 break;
 
             case 4:
                 // 4 modalidades: 25% cada una
                 foreach ($modalityIds as $modalityId) {
-                    $prizes[$modalityId] = 100 * 0.25;
+                    $prizes[$modalityId] = $totalPrize * 0.25;
                 }
                 break;
 
@@ -1027,15 +1095,15 @@ class Cron extends Controller
                     // 5 modalidades con cartón lleno: 50% para cartón lleno, 12.5% para las demás
                     foreach ($modalityIds as $modalityId) {
                         if ($modalityId == $fullCardModalityId) {
-                            $prizes[$modalityId] = 100 * 0.5;
+                            $prizes[$modalityId] = $totalPrize * 0.5;
                         } else {
-                            $prizes[$modalityId] = 100 * 0.125;
+                            $prizes[$modalityId] = $totalPrize * 0.125;
                         }
                     }
                 } else {
                     // 5 modalidades sin cartón lleno: 20% cada una
                     foreach ($modalityIds as $modalityId) {
-                        $prizes[$modalityId] = 100 * 0.2;
+                        $prizes[$modalityId] = $totalPrize * 0.2;
                     }
                 }
                 break;
@@ -1044,7 +1112,7 @@ class Cron extends Controller
                 // Para otros casos, distribuir equitativamente
                 $percentage = 1.0 / $numModalities;
                 foreach ($modalityIds as $modalityId) {
-                    $prizes[$modalityId] = 100 * $percentage;
+                    $prizes[$modalityId] = $totalPrize * $percentage;
                 }
                 break;
         }
@@ -1056,7 +1124,7 @@ class Cron extends Controller
 
         // Verificar que la suma sea exactamente igual al total
         $totalDistributed = array_sum($prizes);
-        $difference = round(100 - $totalDistributed, 2);
+        $difference = round($totalPrize - $totalDistributed, 2);
         
         // Si hay diferencia por redondeo, ajustar en la primera modalidad
         if ($difference != 0) {
@@ -1064,11 +1132,11 @@ class Cron extends Controller
             $prizes[$firstModalityId] = round($prizes[$firstModalityId] + $difference, 2);
         }
 
-        // Verificación final para asegurar que suma exactamente 100%
+        // Verificación final para asegurar que suma exactamente $totalPrize
         $finalTotal = array_sum($prizes);
-        if (round($finalTotal, 2) != round(100, 2)) {
+        if (round($finalTotal, 2) != round($totalPrize, 2)) {
             // Si aún hay diferencia, hacer un ajuste final
-            $finalDifference = round(100 - $finalTotal, 2);
+            $finalDifference = round($totalPrize - $finalTotal, 2);
             $firstModalityId = $modalityIds[0];
             $prizes[$firstModalityId] = round($prizes[$firstModalityId] + $finalDifference, 2);
         }

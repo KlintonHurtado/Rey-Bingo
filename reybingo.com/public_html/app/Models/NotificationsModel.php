@@ -29,7 +29,10 @@ class NotificationsModel extends Model
      */
     public function getUserNotifications($userId, $limit = 20, $offset = 0)
     {
-        return $this->where('user', $userId)
+        return $this->groupStart()
+                    ->where('user', $userId)
+                    ->orWhere('user', 0)
+                    ->groupEnd()
                     ->orderBy('created_at', 'DESC')
                     ->limit($limit, $offset)
                     ->findAll();
@@ -43,8 +46,13 @@ class NotificationsModel extends Model
      */
     public function getUnreadCount($userId)
     {
-        return $this->where('user', $userId)
+        return $this->groupStart()
+                    ->groupStart()
+                    ->where('user', $userId)
+                    ->orWhere('user', 0)
+                    ->groupEnd()
                     ->where('status', 0)
+                    ->groupEnd()
                     ->countAllResults();
     }
     

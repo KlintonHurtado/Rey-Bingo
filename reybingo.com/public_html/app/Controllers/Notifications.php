@@ -238,7 +238,7 @@ class Notifications extends Controller {
 
         $notification = $this->notificationsModel->find($id);
         
-        if (!$notification || $notification['user'] != $userId) {
+        if (!$notification || ($notification['user'] != $userId && $notification['user'] != 0)) {
             return $this->response->setJSON([
                 'success' => false, 
                 'message' => 'Notificación no encontrada o no pertenece al usuario'
@@ -267,7 +267,13 @@ class Notifications extends Controller {
             ]);
         }
 
-        $this->notificationsModel->markAllAsRead($userId);
+        $this->notificationsModel->groupStart()
+            ->where('user', $userId)
+            ->orWhere('user', 0)
+            ->groupEnd()
+            ->where('status', 0)
+            ->set(['status' => 1])
+            ->update();
         
         return $this->response->setJSON([
             'success' => true,

@@ -271,8 +271,12 @@
 
     function modalityAdd(callback) {
         $("#modalAddmodality").load(site_url + 'games/addmodality', function() {
-            $('#modalAddmodality').modal('show');
-            if (callback) callback();
+            var modal = new bootstrap.Modal(document.getElementById('modalAddmodality'));
+            modal.show();
+            document.getElementById('modalAddmodality').addEventListener('shown.bs.modal', function handler() {
+                document.getElementById('modalAddmodality').removeEventListener('shown.bs.modal', handler);
+                if (callback) callback();
+            });
         });
     }
 

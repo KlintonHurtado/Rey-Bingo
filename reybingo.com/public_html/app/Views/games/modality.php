@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-dialog-centered max-w-45">
+<div class="modal-dialog modal-dialog-centered modal-lg" style="max-width: 500px;">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2"><i class="fa-duotone fa-solid fa-chess-board"></i> <?= translate('add modality'); ?></h6>
@@ -29,7 +29,24 @@
                 </div>
 
                 <div class="col-md-12">
-                    <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-3" id="addModality"><?= translate('add'); ?></button>
+                    <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-2 mb-3" id="addModality"><?= translate('add'); ?></button>
+                </div>
+            </div>
+
+            <div id="modalModalitiesList" class="mt-2" style="display:none;">
+                <hr class="my-2">
+                <h6 class="mb-2"><i class="fa-duotone fa-solid fa-list"></i> <?= translate('game modalities'); ?></h6>
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm text-center mb-0" id="modalModalitiesTable">
+                        <thead>
+                            <tr>
+                                <th><?= translate('modality'); ?></th>
+                                <th><?= translate('award'); ?></th>
+                                <th style="width:90px;"><?= translate('options'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -37,18 +54,14 @@
 </div>
 
 <script type="text/javascript">
-    // Manager para el modal de modalidades
     window.ModalityManager = {
-        // Función principal para agregar modalidad
         addModality: function() {
             let modality = document.getElementById("modal-modality");
             let amount = document.getElementById("modal-amount");
             let observation = document.getElementById("modal-observation");
 
-            // Limpiar errores previos
             this.clearErrors();
 
-            // Validaciones
             if (!modality || !modality.value) {
                 this.showError("modality-error", "<?= translate('please select a modality'); ?>");
                 return;
@@ -77,27 +90,27 @@
             }
 
             this.clearForm();
-            this.closeModal();
             this.updateSelectOptions();
+            this.refreshModalList();
         },
 
         updateExistingRow: function(modality, amount, observation, symbol) {
-            const row = window.GameManager.editingRow;
-            
-            row.cells[0].innerHTML = modality.options[modality.selectedIndex].text +
+            const parentRow = window.GameManager.editingRow;
+
+            parentRow.cells[0].innerHTML = modality.options[modality.selectedIndex].text +
                 `<select class='hidden' name="modality[]">
                     <option value="${modality.value}" selected>${modality.options[modality.selectedIndex].text}</option>
                 </select>` +
-                (row.dataset.awardId ? `<input type="hidden" name="award_id[]" value="${row.dataset.awardId}">` : '');
+                (parentRow.dataset.awardId ? `<input type="hidden" name="award_id[]" value="${parentRow.dataset.awardId}">` : '');
 
-            row.cells[1].innerHTML = `${parseFloat(amount.value).toFixed(2)} ${symbol} 
+            parentRow.cells[1].innerHTML = `${parseFloat(amount.value).toFixed(2)} ${symbol} 
                 <input type="hidden" name="amount[]" value="${parseFloat(amount.value).toFixed(2)}">
                 <input type="hidden" name="observation[]" value="${observation.value.replace(/"/g, '"')}">`;
 
-            row.dataset.modalityId = modality.value;
-            row.dataset.modalityName = modality.options[modality.selectedIndex].text;
-            row.dataset.amount = parseFloat(amount.value).toFixed(2);
-            row.dataset.observation = observation.value;
+            parentRow.dataset.modalityId = modality.value;
+            parentRow.dataset.modalityName = modality.options[modality.selectedIndex].text;
+            parentRow.dataset.amount = parseFloat(amount.value).toFixed(2);
+            parentRow.dataset.observation = observation.value;
 
             window.GameManager.editingRow = null;
         },
@@ -174,6 +187,52 @@
             }
         },
 
+        refreshModalList: function() {
+            const modalTbody = document.querySelector("#modalModalitiesTable tbody");
+            const parentRows = document.querySelectorAll('#modalityTable tbody tr');
+            const listContainer = document.getElementById('modalModalitiesList');
+            
+            if (!modalTbody) return;
+
+            modalTbody.innerHTML = '';
+
+            if (parentRows.length === 0) {
+                if (listContainer) listContainer.style.display = 'none';
+                return;
+            }
+
+            if (listContainer) listContainer.style.display = 'block';
+
+            const awardSelect = document.getElementById('award');
+            const selectedAward = awardSelect ? awardSelect.value : '2';
+            let symbol = '';
+            if (selectedAward === '1') symbol = '%';
+            else if (selectedAward === '2') symbol = "<?= systemGet('currency'); ?>";
+
+            parentRows.forEach(function(parentRow) {
+                const name = parentRow.dataset.modalityName || '';
+                const amount = parentRow.dataset.amount || '0.00';
+                const modalityId = parentRow.dataset.modalityId || '';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${name}</td>
+                    <td>${parseFloat(amount).toFixed(2)} ${symbol}</td>
+                    <td>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-info btn-sm modal-edit-row" data-modality-id="${modalityId}" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                <i class="fa-duotone fa-solid fa-pen"></i>
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm modal-remove-row" data-modality-id="${modalityId}" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                <i class="fa-duotone fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                modalTbody.appendChild(tr);
+            });
+        },
+
         showError: function(elementId, message) {
             const errorElement = document.getElementById(elementId);
             if (errorElement) {
@@ -202,12 +261,6 @@
             if (observation) observation.value = "";
         },
 
-        closeModal: function() {
-            if (typeof $ !== 'undefined') {
-                $("#modalAddmodality").modal("hide");
-            }
-        },
-
         formatNumber: function(input) {
             if (input.value) {
                 input.value = parseFloat(input.value.replace(/,/g, "")).toFixed(2);
@@ -217,6 +270,8 @@
         },
 
         init: function() {
+            const self = this;
+
             const addButton = document.getElementById("addModality");
             if (addButton) {
                 addButton.onclick = () => this.addModality();
@@ -229,6 +284,7 @@
             });
 
             this.updateSelectOptions();
+            this.refreshModalList();
 
             const modalitySelect = document.getElementById("modal-modality");
             if (modalitySelect) {
@@ -243,6 +299,34 @@
                     document.getElementById("amount-error").classList.add('d-none');
                 });
             }
+
+            document.getElementById('modalModalitiesTable').addEventListener('click', function(e) {
+                const editBtn = e.target.closest('.modal-edit-row');
+                if (editBtn) {
+                    const modalityId = editBtn.dataset.modalityId;
+                    const parentRow = document.querySelector('#modalityTable tbody tr[data-modality-id="' + modalityId + '"]');
+                    if (parentRow) {
+                        window.GameManager.editingRow = parentRow;
+                        const modSelect = document.getElementById("modal-modality");
+                        const amountInput = document.getElementById("modal-amount");
+                        const obsInput = document.getElementById("modal-observation");
+                        if (modSelect) modSelect.value = modalityId;
+                        if (amountInput) amountInput.value = parentRow.dataset.amount;
+                        if (obsInput) obsInput.value = parentRow.dataset.observation || '';
+                        self.updateSelectOptions();
+                        modSelect.focus();
+                    }
+                }
+
+                const removeBtn = e.target.closest('.modal-remove-row');
+                if (removeBtn) {
+                    const modalityId = removeBtn.dataset.modalityId;
+                    const parentRow = document.querySelector('#modalityTable tbody tr[data-modality-id="' + modalityId + '"]');
+                    if (parentRow) parentRow.remove();
+                    self.updateSelectOptions();
+                    self.refreshModalList();
+                }
+            });
 
             this.setupRealTimeValidation();
         },

@@ -2259,10 +2259,90 @@ function setupScrollMask() {
     }
 }
 
+// Variable para controlar el intervalo del poller de estado del juego
+let gameStatusPollInterval = null;
+let lastPostponedTime = null;
+
+function pollGameStatusBeforeStart() {
+    if (hasGameStarted()) {
+        if (gameStatusPollInterval) {
+            clearInterval(gameStatusPollInterval);
+            gameStatusPollInterval = null;
+        }
+        return;
+    }
+
+    if (gameStatusPollInterval) return;
+
+    gameStatusPollInterval = setInterval(function() {
+        if (hasGameStarted()) {
+            clearInterval(gameStatusPollInterval);
+            gameStatusPollInterval = null;
+            return;
+        }
+
+        $.get(site_url + 'playings/getGameStatus')
+            .done(function(data) {
+                if (data && data.status === 'success') {
+                    // Si el juego inició en el servidor (status = 1)
+                    if (parseInt(data.game_status, 10) === 1) {
+                        clearInterval(gameStatusPollInterval);
+                        gameStatusPollInterval = null;
+                        console.log("Game status is now active (1). Reloading to start...");
+                        location.reload();
+                        return;
+                    }
+
+                    // Si la hora/fecha del juego cambió (pospuesta)
+                    const serverTimeStr = data.date + ' ' + data.time;
+                    const localTargetStr = typeof window.gameDate !== 'undefined' ? window.gameDate : '';
+                    
+                    if (localTargetStr && serverTimeStr !== localTargetStr) {
+                        const message = `La partida se ha pospuesto 5 minutos (nueva hora de inicio: ${data.time.substring(0, 5)}).`;
+                        handleGamePostponed(serverTimeStr, message);
+                    }
+                }
+            })
+            .fail(function(err) {
+                console.warn("Error polling game status:", err);
+            });
+    }, 10000); // Cada 10 segundos
+}
+
+function handleGamePostponed(newTimeStr, messageText) {
+    console.log("Game postponed received:", newTimeStr);
+    
+    // Evitar notificar múltiples veces para el mismo horario
+    if (lastPostponedTime === newTimeStr) return;
+    lastPostponedTime = newTimeStr;
+
+    // Actualizar la fecha/hora del juego globalmente
+    window.gameDate = newTimeStr;
+    
+    // Si la función de actualizar el countdown existe, reiniciarla con la nueva fecha
+    if (typeof setupGameCountdown === 'function') {
+        setupGameCountdown();
+    }
+
+    // Mostrar una alerta/notificación en el chat
+    const display = document.getElementById("message-display");
+    if (display) {
+        const bubble = document.createElement("div");
+        bubble.className = 'message-bubble system-message-postponed';
+        bubble.style.cssText = 'background: rgba(255, 107, 107, 0.15); border: 1px solid rgba(255, 107, 107, 0.3); border-left: 4px solid #ff6b6b; padding: 12px; margin: 10px 0; border-radius: 12px; color: #ffecec; font-size: 0.9rem; backdrop-filter: blur(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 4px; animation: slideIn 0.3s ease;';
+        bubble.innerHTML = `<strong>⚠️ Notificación:</strong> ${messageText || 'La partida se ha pospuesto 5 minutos.'}`;
+        display.insertBefore(bubble, display.firstChild);
+        display.scrollTop = 0;
+    }
+}
+
 // ==========================================
 // CONFIGURACIÓN DE COUNTDOWN Y GANADORES
 // ==========================================
 function setupGameCountdown() {
+    if (typeof intervalNextGame !== 'undefined' && intervalNextGame) {
+        clearInterval(intervalNextGame);
+    }
     const nextGameSpan = document.querySelector('.next-game');
     if (!nextGameSpan || typeof gameDate === 'undefined') return;
 
@@ -2686,6 +2766,28 @@ function initializeApp() {
     // Limpiar mensajes antiguos periódicamente
     intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
     
+    // Iniciar el poller de estado si el juego no ha empezado
+    if (!hasGameStarted()) {
+        pollGameStatusBeforeStart();
+    }
+
+    // Inicializar Pusher si está definido
+    if (typeof PusherClient !== 'undefined' && typeof PUSHER_KEY !== 'undefined' && PUSHER_KEY) {
+        try {
+            console.log('Instanciando PusherClient en el juego...');
+            const pusherHelper = new PusherClient(GAME_ID, USER_ID);
+            pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL);
+            pusherHelper.on('game:postponed', function(data) {
+                console.log('Pusher game:postponed received', data);
+                if (data && data.new_time) {
+                    handleGamePostponed(data.new_time, data.message);
+                }
+            });
+        } catch (pe) {
+            console.warn('Error inicializando PusherClient en juego:', pe);
+        }
+    }
+
     console.log('Bingo App with Enhanced Chat initialized successfully');
 }
 

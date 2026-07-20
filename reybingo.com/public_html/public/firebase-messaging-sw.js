@@ -11,7 +11,7 @@ firebase.initializeApp({
   storageBucket: "bingofamily-5a09a.firebasestorage.app",
   messagingSenderId: "346461010889",
   appId: "1:346461010889:web:b5a8c5beeb57ec69a18618"
-};
+});
 
 // Inicializar Firebase Messaging
 const messaging = firebase.messaging();

@@ -5,6 +5,8 @@ namespace App\Controllers;
 use App\Models\SystemModel;
 use App\Models\UsersModel;
 use App\Models\BanksModel;
+use App\Models\GameRoomsModel;
+use App\Models\ModalitiesModel;
 use CodeIgniter\Controller;
 
 class Home extends Controller {
@@ -218,6 +220,12 @@ class Home extends Controller {
 
         $data['user'] = $modelUsers->find(session()->get('id'));
 
+        $modelGameRooms = new GameRoomsModel();
+        $data['gamerooms'] = $modelGameRooms->where('status', 1)->findAll();
+
+        $modelModalities = new ModalitiesModel();
+        $data['allmodalities'] = $modelModalities->where('status', 1)->findAll();
+
         return view('home/settings', $data);
     }
 
@@ -333,6 +341,26 @@ class Home extends Controller {
             'priceRanges' => [
                 'label' => translate('game price range'),  
                 'rules' => 'required'
+            ],
+            'autoGameRoom' => [
+                'label' => translate('game room'),
+                'rules' => 'permit_empty'
+            ],
+            'autoGameMinPlayers' => [
+                'label' => translate('minimum players'),
+                'rules' => 'permit_empty|numeric|greater_than[0]'
+            ],
+            'autoGameMinCartons' => [
+                'label' => translate('minimum cartons'),
+                'rules' => 'permit_empty|numeric|greater_than[0]'
+            ],
+            'autoGameAwardType' => [
+                'label' => 'Tipo de premio automático',
+                'rules' => 'permit_empty|in_list[1,2]'
+            ],
+            'autoGameAwardValue' => [
+                'label' => 'Premio automático',
+                'rules' => 'permit_empty|numeric|greater_than_equal_to[0]'
             ],
             
             // Configuración Financiera
@@ -511,6 +539,13 @@ class Home extends Controller {
             'addGamesFrom' => $this->request->getPost('addGamesFrom'),
             'addGamesTo' => $this->request->getPost('addGamesTo'),
             'priceRanges' => $this->request->getPost('priceRanges'),
+            'autoGameRoom' => $this->request->getPost('autoGameRoom'),
+            'autoGameModalities' => implode(',', array_filter($this->request->getPost('autoGameModalities') ?? [])),
+            'autoGameMinPlayers' => max(1, (int) ($this->request->getPost('autoGameMinPlayers') ?: 10)),
+            'autoGameMinCartons' => max(1, (int) ($this->request->getPost('autoGameMinCartons') ?: 10)),
+            'autoGameAllowRoulette' => $this->request->getPost('autoGameAllowRoulette') ? '1' : '0',
+            'autoGameAwardType' => $this->request->getPost('autoGameAwardType') ?: '1',
+            'autoGameAwardValue' => $this->request->getPost('autoGameAwardValue') !== null && $this->request->getPost('autoGameAwardValue') !== '' ? $this->request->getPost('autoGameAwardValue') : '100',
             'activateAlgorithm' => $this->request->getPost('activateAlgorithm'),
             'activateCron' => $this->request->getPost('activateCron'),
             'activateRoomCards' => $this->request->getPost('activateRoomCards'),

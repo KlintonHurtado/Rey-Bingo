@@ -485,6 +485,11 @@
 
     <div id="confetti-container"></div>
     
+    <!-- Firebase para Notificaciones Push -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js"></script>
+    <script src="<?= asset_url('js/firebase-push.js') ?>"></script>
+
     <script src="<?= asset_url('js/in-app-notifications.js') ?>"></script>
     <script type="text/javascript">
         var site_url = "<?= site_url(); ?>";

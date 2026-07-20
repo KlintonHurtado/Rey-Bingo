@@ -47,7 +47,7 @@
         overflow-y: scroll !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        align-items: center !important;
+        align-items: flex-start !important;
         justify-content: flex-start !important;
         padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px)) !important;
     }
@@ -84,6 +84,174 @@
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
             justify-items: center !important;
             max-width: 1200px !important;
+        }
+
+        /* Optimización estética y de proporciones para el panel de chat en Web/PC */
+        .message-display-container {
+            width: 500px !important;
+            height: 520px !important;
+            bottom: 20px !important;
+            left: auto !important;
+            right: 20px !important;
+            border-radius: 16px !important;
+            background: linear-gradient(180deg, rgba(135, 103, 250, 0.40) 0%, rgba(98, 54, 255, 0.50) 100%) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            padding: 10px !important;
+            overflow: hidden !important;
+        }
+        .message-display-container .message-display {
+            max-height: 250px !important;
+            padding-top: 10px !important;
+        }
+        .message-display-container .emoji-message-panel .chat-quick-box {
+            padding: 8px 4px !important;
+            gap: 16px !important;
+        }
+        .message-display-container .emoji-message-panel .message-list {
+            max-height: 200px !important;
+            gap: 8px !important;
+        }
+        .message-display-container .emoji-message-panel .message-btn {
+            padding: 10px 14px !important;
+            font-size: 0.85rem !important;
+            border-radius: 12px !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            transition: all 0.2s ease !important;
+        }
+        .message-display-container .emoji-message-panel .message-btn:hover {
+            background: rgba(255, 255, 255, 0.18) !important;
+            transform: translateY(-1px);
+        }
+        .message-display-container .emoji-message-panel .emoji-grid {
+            max-height: 200px !important;
+            gap: 10px !important;
+        }
+        .message-display-container .emoji-message-panel .emoji-btn {
+            width: 44px !important;
+            height: 44px !important;
+            min-width: 44px !important;
+            font-size: 1.35rem !important;
+            background: rgba(255, 255, 255, 0.15) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-radius: 10px !important;
+            transition: all 0.2s ease !important;
+        }
+        .message-display-container .emoji-message-panel .emoji-btn:hover {
+            background: rgba(255, 255, 255, 0.18) !important;
+            transform: scale(1.1);
+        }
+        /* Barras de scroll personalizadas y modernas para los paneles de chat en escritorio */
+        .message-display-container .message-list::-webkit-scrollbar,
+        .message-display-container .emoji-grid::-webkit-scrollbar {
+            width: 6px !important;
+            display: block !important;
+        }
+        .message-display-container .message-list::-webkit-scrollbar-thumb,
+        .message-display-container .emoji-grid::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            border-radius: 4px !important;
+        }
+        .message-display-container .message-list::-webkit-scrollbar-thumb:hover,
+        .message-display-container .emoji-grid::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.35) !important;
+        }
+        .message-display-container .message-list::-webkit-scrollbar-track,
+        .message-display-container .emoji-grid::-webkit-scrollbar-track {
+            background-color: rgba(0, 0, 0, 0.1) !important;
+            border-radius: 4px !important;
+        }
+
+        /* Panel de modalidades en Web/PC: compacto en la esquina superior izquierda */
+        .modalities-display-container {
+            width: auto !important;
+            min-width: 180px !important;
+            max-width: 240px !important;
+            height: auto !important;
+            max-height: 350px !important;
+            top: calc(var(--top-section-height, 140px) + 10px) !important;
+            bottom: auto !important;
+            left: 16px !important;
+            border-radius: 14px !important;
+            background: rgba(255, 255, 255, 0.92) !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+            border: none !important;
+        }
+        .modalities-display-container .modalities-display-container__toolbar {
+            background: linear-gradient(135deg, rgba(135, 103, 250, 0.95) 0%, rgba(98, 54, 255, 1) 100%) !important;
+            border-radius: 14px 14px 0 0 !important;
+            padding: 8px 10px 6px !important;
+        }
+        .modalities-display-container .modalities-display-meta h6 {
+            color: #ffffff !important;
+            font-size: 0.85rem !important;
+        }
+        .modalities-display-container .modalities-display-meta .modalities-display__hint {
+            color: rgba(255, 255, 255, 0.85) !important;
+            font-size: 0.65rem !important;
+        }
+        /* En desktop la zona de cartones se muestra verticalmente (scroll si hay varios) */
+        .modalities-display-container .modalities-display {
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            padding: 8px 10px 10px !important;
+            scroll-snap-type: none !important;
+        }
+        .modalities-display-container .container-cartons-modalities {
+            flex-direction: column !important;
+            flex-wrap: nowrap !important;
+            gap: 10px !important;
+            width: 100% !important;
+            min-width: unset !important;
+        }
+        /* Scrollbar delgado para el panel de modalidades en PC */
+        .modalities-display-container .modalities-display::-webkit-scrollbar {
+            width: 5px !important;
+            height: auto !important;
+            display: block !important;
+        }
+        .modalities-display-container .modalities-display::-webkit-scrollbar-thumb {
+            background-color: rgba(98, 54, 255, 0.3) !important;
+            border-radius: 4px !important;
+        }
+        .modalities-display-container .modalities-display::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(98, 54, 255, 0.5) !important;
+        }
+        .modalities-display-container .modalities-display::-webkit-scrollbar-track {
+            background-color: transparent !important;
+        }
+        /* Tarjetas de modalidad en desktop: blancas y compactas */
+        .modalities-display-container .border-carton {
+            min-width: unset !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            background: #ffffff !important;
+            border: 2px solid #6236ff !important;
+            border-radius: 10px !important;
+            padding: 8px 8px 8px !important;
+            box-shadow: 0 2px 8px rgba(98, 54, 255, 0.15) !important;
+            scroll-snap-align: unset !important;
+        }
+        .modalities-display-container .border-carton.modality-won {
+            border-color: #28a745 !important;
+            box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.35) !important;
+        }
+        .modalities-display-container .border-carton .modality-name {
+            color: #333 !important;
+            font-size: 0.75rem !important;
+        }
+        .modalities-display-container .border-carton .modality-prize {
+            color: #6236ff !important;
+            font-size: 0.78rem !important;
+        }
+        .modalities-display-container .carton {
+            max-width: 150px !important;
+            width: 100% !important;
         }
     }
     .container-section--playing .bingo-border-carton {
@@ -303,13 +471,17 @@
             padding-top: 3.25rem !important;
         }
         .container-section--playing .center-section.center-section--playing {
-            flex: 1 1 auto !important;
+            flex: 1 1 0 !important;
             min-height: 0 !important;
+            height: 0 !important;
         }
         .container-section--playing .cartons-section.cartons-section--playing {
-            justify-content: flex-end !important;
-            align-items: center !important;
-            padding: 4px 10px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+            justify-content: center !important;
+            align-items: flex-start !important;
+            padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+            height: 100% !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
         }
         .container-section--playing .bingo-border-carton {
             max-width: min(318px, 86vw) !important;
@@ -503,6 +675,44 @@
         .message-display-container .emoji-message-panel .live-chat-input {
             padding-top: 4px !important;
         }
+
+        /* Estilos de alineación de scroll integrados en el contenedor principal */
+        .container-section--playing .content-cartons:not(.one-carton) {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 6px 8px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            align-items: start !important;
+        }
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-border-carton {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 4px 6px 6px !important;
+            border-radius: 10px !important;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+            margin: 0 !important;
+        }
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-border-carton .carton-serial {
+            font-size: clamp(0.5rem, 2vw, 0.65rem) !important;
+            margin-bottom: 2px !important;
+            font-weight: 700 !important;
+        }
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-carton {
+            width: 100% !important;
+            max-width: 100% !important;
+            gap: 2px !important;
+            padding: 3px 4px !important;
+        }
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-carton-number,
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-carton-header {
+            font-size: clamp(0.55rem, 2.8vw, 0.85rem) !important;
+            border-radius: 4px !important;
+        }
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-carton-number.data-position-13,
+        .container-section--playing .content-cartons:not(.one-carton) .bingo-carton-number.modality {
+            font-size: clamp(0.65rem, 3.2vw, 0.95rem) !important;
+        }
     }
 </style>
 <div class="container-section container-section--playing">
@@ -552,6 +762,14 @@
 
         <h6 class="total-balls m-0"><small><?= translate('total balls'); ?></small> <br /><span id="balls-counter"><?= $totalNumbersGenerated ?> - <?= 75 - $totalNumbersGenerated ?></span></h6>
 
+        <div class="award-type-container text-center mx-2" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <small class="text-white fw-bold mb-1" style="font-size: 0.75rem; text-shadow: 0 1px 2px rgba(0,0,0,0.5);"><?= translate('type of award'); ?></small>
+            <select class="form-select form-select-sm border-white fw-bold" id="playing-award-type" style="background-color: #fff; color: #333; border-radius: 20px; font-size: 0.85rem; padding: 2px 24px 2px 12px; width: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.2); appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'><path fill=\'none\' stroke=\'%23333\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'m2 5 6 6 6-6\'/></svg>'); background-repeat: no-repeat; background-position: right 8px center; background-size: 10px 10px;">
+                <option value="1" <?= (isset($game['award']) && $game['award'] == 1) ? 'selected' : '' ?>><?= translate('accumulated'); ?></option>
+                <option value="2" <?= (isset($game['award']) && $game['award'] == 2) ? 'selected' : '' ?>><?= translate('amount'); ?></option>
+            </select>
+        </div>
+
         <h6 class="total-accumulated m-0"><small><?= translate('accumulated'); ?></small> <br /><span id="accumulated-counter" data-counter="0.00"><?= systemGet('currency'); ?> 0.00</span></h6>
 
         <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
@@ -576,9 +794,15 @@
         <?php endif; ?>
     </div>
     <div class="center-section center-section--playing">
-        <div class="cartons-section cartons-section--playing">
+        <?php
+            $playingCartonCount = isset($cartons) ? count($cartons) : 0;
+            $cartonsSectionClass = 'cartons-section cartons-section--playing';
+            if ($playingCartonCount > 1) {
+                $cartonsSectionClass .= ' cartons-section--multi';
+            }
+        ?>
+        <div class="<?= $cartonsSectionClass; ?>">
             <?php
-                $playingCartonCount = isset($cartons) ? count($cartons) : 0;
                 $playingCartonsGridClass = 'content-cartons';
                 if ($playingCartonCount === 1) {
                     $playingCartonsGridClass .= ' one-carton';

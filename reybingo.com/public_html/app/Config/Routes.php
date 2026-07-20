@@ -135,6 +135,7 @@ $routes->get('playings/cleanExpiredCartons', 'Playings::cleanExpiredCartons');
 
 $routes->post('playings/selectCartons', 'Playings::selectCartons');
 $routes->get('playings/generateCartons/(:num)', 'Playings::generateCartons/$1');
+$routes->get('playings/getGameStatus', 'Playings::getGameStatus');
 
 $routes->get('boards', 'Boards::index');
 $routes->get('board', 'Boards::board');
