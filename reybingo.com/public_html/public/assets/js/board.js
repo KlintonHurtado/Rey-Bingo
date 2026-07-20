@@ -840,7 +840,20 @@ function showCountdown(data, callback) {
     const cartn = $id(`modality-${data.modalityId}`);
     if (cartn) {
         cartn.classList.add('cartn-sing');
-        if (cartn.parentElement) cartn.parentElement.classList.add('modality-won');
+
+        // Encontrar el border-carton (puede ser padre o un nivel más arriba)
+        let borderCarton = cartn.parentElement;
+        while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+            borderCarton = borderCarton.parentElement;
+        }
+        if (borderCarton) {
+            borderCarton.classList.add('modality-won');
+            borderCarton.style.filter = 'grayscale(100%)';
+            borderCarton.style.opacity = '0.5';
+            borderCarton.style.borderColor = '#9e9e9e';
+            borderCarton.style.boxShadow = '0 0 0 2px rgba(158,158,158,0.35)';
+        }
+
         cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
             el.classList.add('sing');
             el.innerText = '⭐️';
@@ -1229,6 +1242,26 @@ function showGameFinalized() {
                 awardsGet();
             }
             container.style.display = 'none';
+
+            // Mostrar modal con botón para volver al inicio
+            const bodyEl = document.getElementById('modalGameFinalizedBody');
+            if (bodyEl) {
+                bodyEl.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
+            }
+
+            const modalEl = document.getElementById('modalGameFinalized');
+            if (modalEl) {
+                const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+                bsModal.show();
+
+                const btnVolver = document.getElementById('btnVolverInicio');
+                if (btnVolver) {
+                    btnVolver.addEventListener('click', function() {
+                        bsModal.hide();
+                        window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
+                    }, { once: true });
+                }
+            }
         }, 5000);
     }
 

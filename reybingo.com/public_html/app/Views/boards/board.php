@@ -419,6 +419,23 @@
   </div>
 </div>
 
+<div class="modal fade" id="modalGameFinalized" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title ps-2">🎉 <?= translate('game finished!'); ?></h6>
+      </div>
+      <div class="modal-body pt-2 text-center" id="modalGameFinalizedBody">
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-primary d-block w-100 btn-bingo mt-1" id="btnVolverInicio">
+          <?= translate('Volver al Inicio'); ?>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="text/javascript">
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
@@ -452,6 +469,14 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Aplicar estilos gris a modalidades ya completadas al cargar la página
+        document.querySelectorAll('.border-carton.modality-won').forEach(function(el) {
+            el.style.filter = 'grayscale(100%)';
+            el.style.opacity = '0.5';
+            el.style.borderColor = '#9e9e9e';
+            el.style.boxShadow = '0 0 0 2px rgba(158,158,158,0.35)';
+        });
+
         let exitUrl = null;
         let allowUnload = false;
         let reloadAttempted = false;
