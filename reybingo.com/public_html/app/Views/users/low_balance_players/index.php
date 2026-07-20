@@ -148,14 +148,17 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                 const suffix = emptyRow ? '' : ' · ' + count;
                 $('#low-balance-threshold-label').text('<?= $currency ?> ' + threshold + suffix);
 
-                Toastify({
-                    text: response.message,
-                    duration: 3000,
-                    gravity: 'top',
-                    position: 'right',
-                    style: { background: '#198754' },
-                    stopOnFocus: true
-                }).showToast();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Éxito!',
+                        text: response.message,
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    alert(response.message);
+                }
 
                 lowBalancePlayersRefresh();
             } else {
@@ -193,23 +196,29 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                     if (typeof updateLowBalancePendingBadge === 'function' && response.pending_count !== undefined) {
                         updateLowBalancePendingBadge(response.pending_count);
                     }
-                    Toastify({
-                        text: response.message,
-                        duration: 3000,
-                        gravity: 'top',
-                        position: 'right',
-                        style: { background: '#198754' },
-                        stopOnFocus: true
-                    }).showToast();
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Éxito!',
+                            text: response.message,
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        alert(response.message);
+                    }
                 } else {
-                    Toastify({
-                        text: response.error || response.message,
-                        duration: 3000,
-                        gravity: 'top',
-                        position: 'right',
-                        style: { background: '#dc3545' },
-                        stopOnFocus: true
-                    }).showToast();
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.error || 'Ocurrió un error inesperado',
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        alert(response.error || 'Ocurrió un error inesperado');
+                    }
                 }
             }, 'json');
         });

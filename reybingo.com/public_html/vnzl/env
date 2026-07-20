@@ -80,3 +80,8 @@ PUSHER_USETLS=true
 # Si quieres cartón completo: 45
 # Si quieres que baste con 24 aciertos: 24
 REQUIRED_MATCHES=24
+
+
+
+GOOGLE_CLIENT_ID="4515338088-q6vrtptjlvp72t7g4ln4qclsj2r4fgsl.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="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"

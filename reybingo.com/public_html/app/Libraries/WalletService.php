@@ -47,10 +47,23 @@ class WalletService
             2
         );
 
-        $this->users->update($userId, array_merge($balances, ['wallet' => $total]));
+        $db = \Config\Database::connect();
+        $fields = $db->getFieldNames('users');
+        
+        $data = ['wallet' => $total];
+        
+        foreach (['wallet_bonus', 'wallet_recharge', 'wallet_withdraw'] as $col) {
+            if (in_array($col, $fields)) {
+                $data[$col] = $balances[$col];
+            }
+        }
+
+        $this->users->update($userId, $data);
 
         helper('bingo');
-        bingo_check_low_balance_auto_roulette($userId);
+        if (function_exists('bingo_check_low_balance_auto_roulette')) {
+            bingo_check_low_balance_auto_roulette($userId);
+        }
     }
 
     public function canAfford(array $user, float $amount): bool
