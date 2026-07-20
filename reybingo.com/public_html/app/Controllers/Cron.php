@@ -579,9 +579,9 @@ class Cron extends Controller
             if (!bingo_can_start_game($gameToStart)) {
                 $gameId = (int)$gameToStart['id'];
                 
-                // Posponer 5 minutos
-                $newTimeObj = new \DateTime($gameToStart['date'] . ' ' . $gameToStart['time'], $tz);
-                $newTimeObj->modify('+5 minutes');
+                // Posponer 4 minutos
+                $newTimeObj = new \DateTime('now', $tz);
+                $newTimeObj->modify('+4 minutes');
                 
                 $modelGames->update($gameId, [
                     'date' => $newTimeObj->format('Y-m-d'),
@@ -605,7 +605,7 @@ class Cron extends Controller
                             [$newTimeObj->format('H:i'), $minPlayers, $minCartons],
                             translate('game postponed notification')
                           )
-                        : "La partida automática se pospuso 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                        : "La partida automática se pospuso 4 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
                     'status'     => 0,
                     'created_at' => $now,
                 ]);
@@ -614,13 +614,13 @@ class Cron extends Controller
                 try {
                     \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
                         'new_time' => $newTimeObj->format('Y-m-d H:i:s'),
-                        'message' => "La partida se ha pospuesto 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos de jugadores o cartones."
+                        'message' => "La partida se ha pospuesto 4 minutos (hasta las " . $newTimeObj->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos de jugadores o cartones."
                     ]);
                 } catch (\Exception $pe) {
                     log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
                 }
 
-                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 5 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
+                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 4 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
                 continue; // Saltar al siguiente juego
             }
 

@@ -1585,13 +1585,13 @@ class Games extends Controller {
             && bingo_count_drawn_numbers((int) $game['id']) === 0
             && !bingo_can_start_game($game)) {
 
-            // Posponer 5 minutos en lugar de solo bloquear
+            // Posponer 4 minutos en lugar de solo bloquear
             $tz = new \DateTimeZone('America/Guayaquil');
             $nowObj = new \DateTime('now', $tz);
             $now = $nowObj->format('Y-m-d H:i:s');
 
             $gameDateTime = new \DateTime($game['date'] . ' ' . $game['time'], $tz);
-            $gameDateTime->modify('+5 minutes');
+            $gameDateTime->modify('+4 minutes');
 
             $modelGames->update($game_id, [
                 'date'       => $gameDateTime->format('Y-m-d'),
@@ -1618,7 +1618,7 @@ class Games extends Controller {
                         [$gameDateTime->format('H:i'), $minPlayers, $minCartons],
                         translate('game postponed notification')
                       )
-                    : "La partida se pospuso 5 minutos (hasta las " . $gameDateTime->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                    : "La partida se pospuso 4 minutos (hasta las " . $gameDateTime->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
                 'status'     => 0,
                 'created_at' => $now,
             ]);
@@ -1627,7 +1627,7 @@ class Games extends Controller {
             try {
                 \App\Libraries\PusherFactory::make()->trigger('private-game-' . $game_id, 'game:postponed', [
                     'new_time' => $gameDateTime->format('Y-m-d H:i:s'),
-                    'message'  => "La partida se ha pospuesto 5 minutos (hasta las " . $gameDateTime->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos.",
+                    'message'  => "La partida se ha pospuesto 4 minutos (hasta las " . $gameDateTime->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos.",
                 ]);
             } catch (\Exception $pe) {
                 log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
@@ -1636,7 +1636,7 @@ class Games extends Controller {
             return $this->response->setJSON([
                 'success'  => false,
                 'postponed' => true,
-                'message'  => bingo_game_start_block_message($game) . ' ' . translate('game postponed to') . ' ' . $gameDateTime->format('H:i') . '.',
+                'message'  => bingo_game_start_block_message($game) . ' La partida se ha pospuesto hasta las ' . $gameDateTime->format('H:i') . '.',
                 'new_time' => $gameDateTime->format('H:i'),
             ]);
         }

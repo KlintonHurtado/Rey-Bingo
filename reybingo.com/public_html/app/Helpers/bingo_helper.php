@@ -802,26 +802,20 @@ if (!function_exists('bingo_ensure_winners_registered')) {
 if (!function_exists('bingo_count_game_players')) {
     function bingo_count_game_players(int $gameId): int
     {
-        $modelCartons = new CartonsModel();
-
-        return (int) $modelCartons
-            ->where('game', $gameId)
-            ->where('user !=', 0)
-            ->select('user')
-            ->distinct()
-            ->countAllResults();
+        $db = \Config\Database::connect();
+        $query = $db->query("SELECT COUNT(DISTINCT user) as total FROM cartons WHERE game = ? AND user != 0", [$gameId]);
+        $row = $query->getRow();
+        return $row ? (int) $row->total : 0;
     }
 }
 
 if (!function_exists('bingo_count_game_cartons')) {
     function bingo_count_game_cartons(int $gameId): int
     {
-        $modelCartons = new CartonsModel();
-
-        return (int) $modelCartons
-            ->where('game', $gameId)
-            ->where('user !=', 0)
-            ->countAllResults();
+        $db = \Config\Database::connect();
+        $query = $db->query("SELECT COUNT(*) as total FROM cartons WHERE game = ? AND user != 0", [$gameId]);
+        $row = $query->getRow();
+        return $row ? (int) $row->total : 0;
     }
 }
 
