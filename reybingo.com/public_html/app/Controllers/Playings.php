@@ -364,6 +364,11 @@ class Playings extends Controller
         }
 
         $cartons = (int) ($roulette['cartons'] ?? 0);
+        $cartonsToUse = (int) $this->request->getPost('cartons_to_use');
+        if ($cartonsToUse < 1 || $cartonsToUse > $cartons) {
+            $cartonsToUse = $cartons; // Fallback for safety if missing
+        }
+        
         if ($cartons < 1) {
             return $this->response->setJSON(['success' => false, 'message' => 'Cantidad de cartones inválida.']);
         }
@@ -380,21 +385,36 @@ class Playings extends Controller
             ]);
         }
 
-        $assignment = bingo_generate_cartons_for_user($userId, $gameId, $cartons);
+        $assignment = bingo_generate_cartons_for_user($userId, $gameId, $cartonsToUse);
         if (!$assignment['success']) {
             return $this->response->setJSON(['success' => false, 'message' => $assignment['message']]);
         }
 
         $price = (float) $game['price'];
-        $amount = round($cartons * $price, 2);
+        $amount = round($cartonsToUse * $price, 2);
         $gameLabel = trim((string) ($game['description'] ?? ''));
 
+        // Actualizar el premio actual marcando los cartones usados
         $modelRoulettes->update($rouletteId, [
             'game' => $gameId,
+            'cartons' => $cartonsToUse,
             'price' => $price,
             'amount' => $amount,
             'status' => 1,
         ]);
+
+        // Si sobran cartones, insertar un nuevo registro de premio pendiente
+        $remainingCartons = $cartons - $cartonsToUse;
+        if ($remainingCartons > 0) {
+            $modelRoulettes->insert([
+                'user' => $userId,
+                'game' => 0,
+                'cartons' => $remainingCartons,
+                'price' => 0,
+                'amount' => 0,
+                'status' => 0,
+            ]);
+        }
 
         $modelNotifications->insert([
             'user' => $userId,
@@ -402,7 +422,7 @@ class Playings extends Controller
             'type' => 'roulette',
             'type_id' => $rouletteId,
             'title' => '🎁 Cartones asignados',
-            'message' => 'Se asignaron ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
+            'message' => 'Se asignaron ' . $cartonsToUse . ' cartón' . ($cartonsToUse === 1 ? '' : 'es')
                 . ($gameLabel !== '' ? ' para la partida "' . $gameLabel . '"' : '')
                 . '. Valor: ' . systemGet('currency') . ' ' . number_format($amount, 2) . '.',
         ]);

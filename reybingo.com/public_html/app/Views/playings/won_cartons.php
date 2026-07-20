@@ -81,18 +81,26 @@ body:has(#content-page > .won-cartons-scroll) {
                                             <span class="badge bg-primary p-2">Pendiente de asignar</span>
                                         </div>
 
-                                        <label class="form-label small">Elige partida y modalidad</label>
-                                        <select class="form-control form-bingo won-carton-game-select mb-2">
-                                            <option value="">Selecciona una partida...</option>
-                                            <?php foreach ($gameOptions as $game) : ?>
-                                                <option
-                                                    value="<?= (int) $game['id']; ?>"
-                                                    data-detail="<?= esc($game['detail'] ?? '', 'attr'); ?>"
-                                                >
-                                                    <?= esc($game['label']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <div class="row">
+                                            <div class="col-sm-6 mb-2">
+                                                <label class="form-label small">Cartones a usar (máx. <?= (int) $prize['cartons']; ?>)</label>
+                                                <input type="number" class="form-control form-bingo won-carton-amount-input" min="1" max="<?= (int) $prize['cartons']; ?>" value="<?= (int) $prize['cartons']; ?>">
+                                            </div>
+                                            <div class="col-sm-6 mb-2">
+                                                <label class="form-label small">Elige partida y modalidad</label>
+                                                <select class="form-control form-bingo won-carton-game-select">
+                                                    <option value="">Selecciona una partida...</option>
+                                                    <?php foreach ($gameOptions as $game) : ?>
+                                                        <option
+                                                            value="<?= (int) $game['id']; ?>"
+                                                            data-detail="<?= esc($game['detail'] ?? '', 'attr'); ?>"
+                                                        >
+                                                            <?= esc($game['label']); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        </div>
                                         <small class="text-muted d-block won-carton-game-info mb-3"></small>
 
                                         <button type="button" class="btn btn-primary btn-bingo assign-won-cartons-btn">
@@ -150,10 +158,24 @@ body:has(#content-page > .won-cartons-scroll) {
             const rouletteId = parseInt(card.dataset.rouletteId, 10);
             const selectEl = card.querySelector('.won-carton-game-select');
             const gameId = selectEl ? parseInt(selectEl.value, 10) : 0;
+            const amountInput = card.querySelector('.won-carton-amount-input');
+            const cartonsToUse = amountInput ? parseInt(amountInput.value, 10) : 0;
 
             if (!gameId) {
                 Toastify({
                     text: 'Selecciona la partida donde quieres usar tus cartones.',
+                    duration: 3000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' },
+                    stopOnFocus: true
+                }).showToast();
+                return;
+            }
+
+            if (cartonsToUse <= 0) {
+                Toastify({
+                    text: 'Ingresa una cantidad válida de cartones a usar.',
                     duration: 3000,
                     gravity: 'top',
                     position: 'right',
@@ -172,6 +194,7 @@ body:has(#content-page > .won-cartons-scroll) {
                 data: {
                     roulette_id: rouletteId,
                     game_id: gameId,
+                    cartons_to_use: cartonsToUse,
                     '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
                 },
                 dataType: 'json',
