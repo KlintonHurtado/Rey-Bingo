@@ -880,26 +880,32 @@ class Users extends Controller {
         helper('bingo');
         bingo_ensure_system_settings_schema();
 
-        $modelSystem = new \App\Models\SystemModel();
-        $modelSystem->updateValue('lowBalanceThreshold', number_format((float) $threshold, 2, '.', ''));
-        $modelSystem->updateValue('lowBalanceAutoRoulette', (string) $autoRoulette);
+        try {
+            $modelSystem = new \App\Models\SystemModel();
+            $modelSystem->updateValue('lowBalanceThreshold', number_format((float) $threshold, 2, '.', ''));
+            $modelSystem->updateValue('lowBalanceAutoRoulette', (string) $autoRoulette);
 
-        $autoProcessed = 0;
-        if ((int) $autoRoulette === 1) {
-            $autoProcessed = bingo_process_low_balance_auto_roulette_batch();
+            $autoProcessed = 0;
+            if ((int) $autoRoulette === 1) {
+                $autoProcessed = bingo_process_low_balance_auto_roulette_batch();
+            }
+
+            $message = translate('low balance settings saved');
+            if ($autoProcessed > 0) {
+                $message .= ' (' . $autoProcessed . ' ' . translate('players') . ')';
+            }
+
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => $message,
+                'threshold' => bingo_low_balance_threshold(),
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'Error: ' . $e->getMessage(),
+            ]);
         }
-
-        $message = translate('low balance settings saved');
-        if ($autoProcessed > 0) {
-            $message .= ' (' . $autoProcessed . ' ' . translate('players') . ')';
-        }
-
-        return $this->response->setJSON([
-            'success' => true,
-            'message' => $message,
-            'threshold' => bingo_low_balance_threshold(),
-            'auto_processed' => $autoProcessed,
-        ]);
     }
 
     public function deleteUser() {

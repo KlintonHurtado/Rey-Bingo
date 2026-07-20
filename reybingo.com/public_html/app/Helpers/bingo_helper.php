@@ -11,7 +11,7 @@ use App\Models\PaymentsModel;
 use App\Models\SingsModel;
 use App\Models\UsersModel;
 
-if (! function_exists('bingo_get_ordered_drawn_numbers')) {
+if (!function_exists('bingo_get_ordered_drawn_numbers')) {
     function bingo_get_ordered_drawn_numbers(int $gameId): array
     {
         $model = new BoardsModel();
@@ -25,14 +25,14 @@ if (! function_exists('bingo_get_ordered_drawn_numbers')) {
     }
 }
 
-if (! function_exists('bingo_count_drawn_numbers')) {
+if (!function_exists('bingo_count_drawn_numbers')) {
     function bingo_count_drawn_numbers(int $gameId): int
     {
         return count(bingo_get_ordered_drawn_numbers($gameId));
     }
 }
 
-if (! function_exists('bingo_sync_drawn_marks_for_user')) {
+if (!function_exists('bingo_sync_drawn_marks_for_user')) {
     function bingo_sync_drawn_marks_for_user(int $userId, int $gameId, array $drawnNumbers): void
     {
         if (empty($drawnNumbers)) {
@@ -44,7 +44,7 @@ if (! function_exists('bingo_sync_drawn_marks_for_user')) {
         foreach ($drawnNumbers as $drawnNumber) {
             $existingNumbers = $modelNumbersCartons->getNumbersByUserAndGame($userId, $gameId, (int) $drawnNumber);
 
-            if (! empty($existingNumbers)) {
+            if (!empty($existingNumbers)) {
                 $ids = array_column($existingNumbers, 'id');
                 $modelNumbersCartons->whereIn('id', $ids)->set(['status' => 1])->update();
             }
@@ -52,7 +52,7 @@ if (! function_exists('bingo_sync_drawn_marks_for_user')) {
     }
 }
 
-if (! function_exists('bingo_get_modality_match_result')) {
+if (!function_exists('bingo_get_modality_match_result')) {
     function bingo_get_modality_match_result(array $requiredPositions, array $cartonNumbers, array $drawnNumbersArray): array
     {
         $required = array_values(array_unique(array_map('intval', array_filter($requiredPositions, static function ($position) {
@@ -94,7 +94,7 @@ if (! function_exists('bingo_get_modality_match_result')) {
     }
 }
 
-if (! function_exists('bingo_get_game_modalities')) {
+if (!function_exists('bingo_get_game_modalities')) {
     function bingo_get_game_modalities(array $game): array
     {
         $modelModalities = new ModalitiesModel();
@@ -118,7 +118,7 @@ if (! function_exists('bingo_get_game_modalities')) {
     }
 }
 
-if (! function_exists('bingo_get_number_sings_limit')) {
+if (!function_exists('bingo_get_number_sings_limit')) {
     function bingo_get_number_sings_limit(): int
     {
         $limit = (int) systemGet('numberSings');
@@ -127,7 +127,7 @@ if (! function_exists('bingo_get_number_sings_limit')) {
     }
 }
 
-if (! function_exists('bingo_filter_first_sing_per_modality')) {
+if (!function_exists('bingo_filter_first_sing_per_modality')) {
     function bingo_filter_first_sing_per_modality(array $sings): array
     {
         $seen = [];
@@ -147,7 +147,7 @@ if (! function_exists('bingo_filter_first_sing_per_modality')) {
     }
 }
 
-if (! function_exists('bingo_get_official_sings_for_game')) {
+if (!function_exists('bingo_get_official_sings_for_game')) {
     function bingo_get_official_sings_for_game(int $gameId, bool $includePending = false): array
     {
         $modelSings = new SingsModel();
@@ -166,7 +166,7 @@ if (! function_exists('bingo_get_official_sings_for_game')) {
     }
 }
 
-if (! function_exists('bingo_finalize_game_when_complete')) {
+if (!function_exists('bingo_finalize_game_when_complete')) {
     function bingo_finalize_game_when_complete(int $gameId): bool
     {
         if ($gameId < 1) {
@@ -199,7 +199,7 @@ if (! function_exists('bingo_finalize_game_when_complete')) {
     }
 }
 
-if (! function_exists('bingo_register_sing_if_missing')) {
+if (!function_exists('bingo_register_sing_if_missing')) {
     function bingo_register_sing_if_missing(
         int $gameId,
         int $userId,
@@ -255,7 +255,7 @@ if (! function_exists('bingo_register_sing_if_missing')) {
     }
 }
 
-if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
+if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
     function bingo_resolve_missed_bingos_for_game(int $gameId, bool $finalize = false): int
     {
         $modelBoards = new BoardsModel();
@@ -263,12 +263,12 @@ if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
         $game = $modelGames->find($gameId);
-        if (! $game) {
+        if (!$game) {
             return 0;
         }
 
         $lastBall = $modelBoards->where('game', $gameId)->orderBy('created_at', 'DESC')->first();
-        if (! $lastBall) {
+        if (!$lastBall) {
             return 0;
         }
 
@@ -288,7 +288,7 @@ if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
         foreach ($cartons as $carton) {
             $userId = (int) $carton['user'];
 
-            if (! isset($syncedUsers[$userId])) {
+            if (!isset($syncedUsers[$userId])) {
                 bingo_sync_drawn_marks_for_user($userId, $gameId, $drawnNumbersArray);
                 $syncedUsers[$userId] = true;
             }
@@ -311,7 +311,7 @@ if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
                 $userId = (int) $carton['user'];
                 $cartonId = (int) $carton['id'];
 
-                if (! $finalize && $singBingoOnlyLastBall) {
+                if (!$finalize && $singBingoOnlyLastBall) {
                     $singLastNumber = (new SingsModel())
                         ->where('game', $gameId)
                         ->where('modality', $modality['id'])
@@ -332,25 +332,27 @@ if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
                 }
 
                 $matchResult = bingo_get_modality_match_result($requiredPositions, $cartonNumbers, $drawnNumbersArray);
-                if (! $matchResult['complete']) {
+                if (!$matchResult['complete']) {
                     continue;
                 }
 
                 $winningNumbers = $matchResult['winningNumbers'];
 
-                if (! $finalize && $singBingoOnlyLastBall && ! in_array($lastValidNumber, $winningNumbers, true)) {
+                if (!$finalize && $singBingoOnlyLastBall && !in_array($lastValidNumber, $winningNumbers, true)) {
                     continue;
                 }
 
-                if (bingo_register_sing_if_missing(
-                    $gameId,
-                    $userId,
-                    $cartonId,
-                    $modality,
-                    $winningNumbers,
-                    $lastBallNumber,
-                    $finalize
-                )) {
+                if (
+                    bingo_register_sing_if_missing(
+                        $gameId,
+                        $userId,
+                        $cartonId,
+                        $modality,
+                        $winningNumbers,
+                        $lastBallNumber,
+                        $finalize
+                    )
+                ) {
                     $registered++;
                     break;
                 }
@@ -361,7 +363,7 @@ if (! function_exists('bingo_resolve_missed_bingos_for_game')) {
     }
 }
 
-if (! function_exists('bingo_calculate_award_per_sing')) {
+if (!function_exists('bingo_calculate_award_per_sing')) {
     function bingo_calculate_award_per_sing(array $game, array $award, int $gameId, int $modalityId): float
     {
         $modelSings = new SingsModel();
@@ -380,7 +382,7 @@ if (! function_exists('bingo_calculate_award_per_sing')) {
     }
 }
 
-if (! function_exists('bingo_enrich_winner_sings')) {
+if (!function_exists('bingo_enrich_winner_sings')) {
     /**
      * @param list<array> $sings
      * @return list<array>
@@ -452,7 +454,7 @@ if (! function_exists('bingo_enrich_winner_sings')) {
     }
 }
 
-if (! function_exists('bingo_summarize_player_prizes')) {
+if (!function_exists('bingo_summarize_player_prizes')) {
     /**
      * @return array{count:int,total:float,total_formatted:string,items:list<array>}
      */
@@ -460,10 +462,10 @@ if (! function_exists('bingo_summarize_player_prizes')) {
     {
         if ($userId <= 0) {
             return [
-                'count'           => 0,
-                'total'           => 0.0,
+                'count' => 0,
+                'total' => 0.0,
                 'total_formatted' => number_format(0, 2),
-                'items'           => [],
+                'items' => [],
             ];
         }
 
@@ -488,25 +490,25 @@ if (! function_exists('bingo_summarize_player_prizes')) {
 
             $total += $amount;
             $items[] = [
-                'id'              => (int) ($sing['id'] ?? 0),
-                'game'            => (string) ($sing['game_description'] ?? ''),
-                'modality'        => (string) ($sing['modality_name'] ?? ''),
-                'amount'          => $amount,
-                'amount_formatted'=> number_format($amount, 2),
-                'status_raw'      => (int) ($sing['status_raw'] ?? 0),
+                'id' => (int) ($sing['id'] ?? 0),
+                'game' => (string) ($sing['game_description'] ?? ''),
+                'modality' => (string) ($sing['modality_name'] ?? ''),
+                'amount' => $amount,
+                'amount_formatted' => number_format($amount, 2),
+                'status_raw' => (int) ($sing['status_raw'] ?? 0),
             ];
         }
 
         return [
-            'count'           => count($items),
-            'total'           => round($total, 2),
+            'count' => count($items),
+            'total' => round($total, 2),
             'total_formatted' => number_format($total, 2),
-            'items'           => $items,
+            'items' => $items,
         ];
     }
 }
 
-if (! function_exists('bingo_pay_sing_award')) {
+if (!function_exists('bingo_pay_sing_award')) {
     /**
      * @return array{success:bool,error?:string,amount?:string,store_balance?:float}
      */
@@ -523,12 +525,12 @@ if (! function_exists('bingo_pay_sing_award')) {
         $modelModalities = new \App\Models\ModalitiesModel();
 
         $sing = $modelSings->find($singId);
-        if (! $sing) {
+        if (!$sing) {
             return ['success' => false, 'error' => translate('sing not found')];
         }
 
         $game = $modelGames->find($sing['game']);
-        if (! $game) {
+        if (!$game) {
             return ['success' => false, 'error' => translate('game not found')];
         }
 
@@ -537,13 +539,13 @@ if (! function_exists('bingo_pay_sing_award')) {
             ->where('status', 1)
             ->first();
 
-        if (! $award) {
+        if (!$award) {
             return ['success' => false, 'error' => translate('award not found')];
         }
 
         $awardPerSing = bingo_calculate_award_per_sing($game, $award, (int) $sing['game'], (int) $sing['modality']);
         $user = $modelUsers->find($sing['user']);
-        if (! $user) {
+        if (!$user) {
             return ['success' => false, 'error' => translate('user not found')];
         }
 
@@ -569,12 +571,12 @@ if (! function_exists('bingo_pay_sing_award')) {
             }
 
             $storeRow = $modelUsers->find($storeId);
-            if (! $storeRow || (int) ($storeRow['group'] ?? -1) !== bingo_group_store()) {
+            if (!$storeRow || (int) ($storeRow['group'] ?? -1) !== bingo_group_store()) {
                 return ['success' => false, 'error' => translate('unauthorized')];
             }
 
             $store = wallet_service()->normalizeUser($storeRow);
-            if (! $store) {
+            if (!$store) {
                 return ['success' => false, 'error' => translate('store not found')];
             }
 
@@ -582,7 +584,7 @@ if (! function_exists('bingo_pay_sing_award')) {
                 return ['success' => false, 'error' => translate('insufficient store balance request admin first')];
             }
 
-            if (! wallet_deduct_recharge($storeId, $awardPerSing)) {
+            if (!wallet_deduct_recharge($storeId, $awardPerSing)) {
                 return ['success' => false, 'error' => translate('insufficient store balance request admin first')];
             }
         }
@@ -591,21 +593,21 @@ if (! function_exists('bingo_pay_sing_award')) {
         $modelSings->update($singId, ['status' => 2]);
 
         $modelPayments->insert([
-            'user'    => (int) $sing['user'],
-            'type'    => 'award',
+            'user' => (int) $sing['user'],
+            'type' => 'award',
             'type_id' => $singId,
-            'amount'  => $awardPerSing,
-            'status'  => 2,
+            'amount' => $awardPerSing,
+            'status' => 2,
         ]);
         $paymentId = (int) $modelPayments->insertID();
 
         if ($debitStore) {
             $modelPayments->insert([
-                'user'    => $storeId,
-                'type'    => 'store_award',
+                'user' => $storeId,
+                'type' => 'store_award',
                 'type_id' => $singId,
-                'amount'  => $awardPerSing,
-                'status'  => 2,
+                'amount' => $awardPerSing,
+                'status' => 2,
             ]);
         }
 
@@ -629,7 +631,7 @@ if (! function_exists('bingo_pay_sing_award')) {
 
         $result = [
             'success' => true,
-            'amount'  => number_format($awardPerSing, 2, '.', ''),
+            'amount' => number_format($awardPerSing, 2, '.', ''),
         ];
 
         if ($debitStore) {
@@ -644,7 +646,7 @@ if (! function_exists('bingo_pay_sing_award')) {
     }
 }
 
-if (! function_exists('bingo_notify_award_payment')) {
+if (!function_exists('bingo_notify_award_payment')) {
     function bingo_notify_award_payment(
         array $user,
         array $game,
@@ -672,7 +674,7 @@ if (! function_exists('bingo_notify_award_payment')) {
     }
 }
 
-if (! function_exists('bingo_pay_pending_awards_for_game')) {
+if (!function_exists('bingo_pay_pending_awards_for_game')) {
     function bingo_pay_pending_awards_for_game(int $gameId, ?int $fromUserId = null): int
     {
         if ($gameId < 1) {
@@ -687,7 +689,7 @@ if (! function_exists('bingo_pay_pending_awards_for_game')) {
         $modelModalities = new ModalitiesModel();
 
         $game = $modelGames->find($gameId);
-        if (! $game) {
+        if (!$game) {
             return 0;
         }
 
@@ -729,7 +731,7 @@ if (! function_exists('bingo_pay_pending_awards_for_game')) {
                 ->where('status', 1)
                 ->first();
 
-            if (! $award) {
+            if (!$award) {
                 continue;
             }
 
@@ -745,7 +747,7 @@ if (! function_exists('bingo_pay_pending_awards_for_game')) {
             }
 
             $user = $modelUsers->find($sing['user']);
-            if (! $user) {
+            if (!$user) {
                 continue;
             }
 
@@ -774,7 +776,7 @@ if (! function_exists('bingo_pay_pending_awards_for_game')) {
     }
 }
 
-if (! function_exists('bingo_ensure_winners_registered')) {
+if (!function_exists('bingo_ensure_winners_registered')) {
     function bingo_ensure_winners_registered(int $gameId): void
     {
         if ($gameId < 1) {
@@ -797,7 +799,7 @@ if (! function_exists('bingo_ensure_winners_registered')) {
     }
 }
 
-if (! function_exists('bingo_count_game_players')) {
+if (!function_exists('bingo_count_game_players')) {
     function bingo_count_game_players(int $gameId): int
     {
         $modelCartons = new CartonsModel();
@@ -811,7 +813,7 @@ if (! function_exists('bingo_count_game_players')) {
     }
 }
 
-if (! function_exists('bingo_count_game_cartons')) {
+if (!function_exists('bingo_count_game_cartons')) {
     function bingo_count_game_cartons(int $gameId): int
     {
         $modelCartons = new CartonsModel();
@@ -823,7 +825,7 @@ if (! function_exists('bingo_count_game_cartons')) {
     }
 }
 
-if (! function_exists('bingo_get_min_players')) {
+if (!function_exists('bingo_get_min_players')) {
     function bingo_get_min_players(array $game): int
     {
         $min = (int) ($game['min_players'] ?? 10);
@@ -832,7 +834,7 @@ if (! function_exists('bingo_get_min_players')) {
     }
 }
 
-if (! function_exists('bingo_get_min_cartons')) {
+if (!function_exists('bingo_get_min_cartons')) {
     function bingo_get_min_cartons(array $game): int
     {
         $min = (int) ($game['min_cartons'] ?? 10);
@@ -841,7 +843,7 @@ if (! function_exists('bingo_get_min_cartons')) {
     }
 }
 
-if (! function_exists('bingo_can_start_game')) {
+if (!function_exists('bingo_can_start_game')) {
     function bingo_can_start_game(array $game, ?int $playerCount = null, ?int $cartonCount = null): bool
     {
         if ($playerCount === null) {
@@ -857,7 +859,7 @@ if (! function_exists('bingo_can_start_game')) {
     }
 }
 
-if (! function_exists('bingo_min_players_start_message')) {
+if (!function_exists('bingo_min_players_start_message')) {
     function bingo_min_players_start_message(array $game, ?int $playerCount = null): string
     {
         if ($playerCount === null) {
@@ -874,7 +876,7 @@ if (! function_exists('bingo_min_players_start_message')) {
     }
 }
 
-if (! function_exists('bingo_min_cartons_start_message')) {
+if (!function_exists('bingo_min_cartons_start_message')) {
     function bingo_min_cartons_start_message(array $game, ?int $cartonCount = null): string
     {
         if ($cartonCount === null) {
@@ -891,7 +893,7 @@ if (! function_exists('bingo_min_cartons_start_message')) {
     }
 }
 
-if (! function_exists('bingo_game_start_block_message')) {
+if (!function_exists('bingo_game_start_block_message')) {
     function bingo_game_start_block_message(array $game, ?int $playerCount = null, ?int $cartonCount = null): string
     {
         if ($playerCount === null) {
@@ -916,7 +918,7 @@ if (! function_exists('bingo_game_start_block_message')) {
     }
 }
 
-if (! function_exists('bingo_calculate_game_prize_pool')) {
+if (!function_exists('bingo_calculate_game_prize_pool')) {
     function bingo_calculate_game_prize_pool(array $game, int $cartonCount): float
     {
         $accumulated = $cartonCount * (float) ($game['price'] ?? 0);
@@ -925,7 +927,7 @@ if (! function_exists('bingo_calculate_game_prize_pool')) {
     }
 }
 
-if (! function_exists('bingo_calculate_game_award_total')) {
+if (!function_exists('bingo_calculate_game_award_total')) {
     function bingo_calculate_game_award_total(array $game, int $cartonCount, array $awards, bool $forDisplay = false): float
     {
         if (empty($awards)) {
@@ -959,7 +961,7 @@ if (! function_exists('bingo_calculate_game_award_total')) {
     }
 }
 
-if (! function_exists('bingo_get_game_award_total_for_display')) {
+if (!function_exists('bingo_get_game_award_total_for_display')) {
     function bingo_get_game_award_total_for_display(array $game, int $cartonCount): float
     {
         $awardModel = new AwardsModel();
@@ -969,35 +971,35 @@ if (! function_exists('bingo_get_game_award_total_for_display')) {
     }
 }
 
-if (! function_exists('bingo_group_player')) {
+if (!function_exists('bingo_group_player')) {
     function bingo_group_player(): int
     {
         return 0;
     }
 }
 
-if (! function_exists('bingo_group_admin')) {
+if (!function_exists('bingo_group_admin')) {
     function bingo_group_admin(): int
     {
         return 1;
     }
 }
 
-if (! function_exists('bingo_group_store')) {
+if (!function_exists('bingo_group_store')) {
     function bingo_group_store(): int
     {
         return 2;
     }
 }
 
-if (! function_exists('bingo_group_operator')) {
+if (!function_exists('bingo_group_operator')) {
     function bingo_group_operator(): int
     {
         return 3;
     }
 }
 
-if (! function_exists('bingo_is_store')) {
+if (!function_exists('bingo_is_store')) {
     function bingo_is_store(?int $group = null): bool
     {
         if ($group === null) {
@@ -1008,7 +1010,7 @@ if (! function_exists('bingo_is_store')) {
     }
 }
 
-if (! function_exists('bingo_is_operator')) {
+if (!function_exists('bingo_is_operator')) {
     function bingo_is_operator(?int $group = null): bool
     {
         if ($group === null) {
@@ -1019,14 +1021,14 @@ if (! function_exists('bingo_is_operator')) {
     }
 }
 
-if (! function_exists('bingo_get_acting_store_id')) {
+if (!function_exists('bingo_get_acting_store_id')) {
     function bingo_get_acting_store_id(): int
     {
         return (int) (session()->get('acting_store_id') ?? 0);
     }
 }
 
-if (! function_exists('bingo_set_acting_store_id')) {
+if (!function_exists('bingo_set_acting_store_id')) {
     function bingo_set_acting_store_id(int $storeId): void
     {
         if ($storeId > 0) {
@@ -1037,7 +1039,7 @@ if (! function_exists('bingo_set_acting_store_id')) {
     }
 }
 
-if (! function_exists('bingo_operator_can_access_store')) {
+if (!function_exists('bingo_operator_can_access_store')) {
     function bingo_operator_can_access_store(int $operatorId, int $storeId): bool
     {
         if ($operatorId <= 0 || $storeId <= 0) {
@@ -1059,7 +1061,7 @@ if (! function_exists('bingo_operator_can_access_store')) {
     }
 }
 
-if (! function_exists('bingo_list_operators')) {
+if (!function_exists('bingo_list_operators')) {
     function bingo_list_operators(bool $activeOnly = true): array
     {
         $modelUsers = new \App\Models\UsersModel();
@@ -1076,7 +1078,7 @@ if (! function_exists('bingo_list_operators')) {
     }
 }
 
-if (! function_exists('bingo_assign_store_operator')) {
+if (!function_exists('bingo_assign_store_operator')) {
     function bingo_assign_store_operator(int $storeId, ?int $operatorId): void
     {
         bingo_ensure_users_schema();
@@ -1092,7 +1094,7 @@ if (! function_exists('bingo_assign_store_operator')) {
     }
 }
 
-if (! function_exists('bingo_sync_operator_stores')) {
+if (!function_exists('bingo_sync_operator_stores')) {
     function bingo_sync_operator_stores(int $operatorId, array $storeIds): void
     {
         bingo_ensure_users_schema();
@@ -1131,7 +1133,7 @@ if (! function_exists('bingo_sync_operator_stores')) {
     }
 }
 
-if (! function_exists('bingo_operator_store_count')) {
+if (!function_exists('bingo_operator_store_count')) {
     function bingo_operator_store_count(int $operatorId): int
     {
         bingo_ensure_users_schema();
@@ -1150,7 +1152,7 @@ if (! function_exists('bingo_operator_store_count')) {
     }
 }
 
-if (! function_exists('bingo_generate_operator_username')) {
+if (!function_exists('bingo_generate_operator_username')) {
     function bingo_generate_operator_username(string $email, \App\Models\UsersModel $model, ?int $excludeId = null): string
     {
         $local = strstr($email, '@', true) ?: 'operador';
@@ -1164,7 +1166,7 @@ if (! function_exists('bingo_generate_operator_username')) {
             if ($excludeId) {
                 $builder = $builder->where('id !=', $excludeId);
             }
-            if (! $builder->first()) {
+            if (!$builder->first()) {
                 return $candidate;
             }
             $candidate = $base . $suffix;
@@ -1173,7 +1175,7 @@ if (! function_exists('bingo_generate_operator_username')) {
     }
 }
 
-if (! function_exists('bingo_enrich_stores_with_operator')) {
+if (!function_exists('bingo_enrich_stores_with_operator')) {
     function bingo_enrich_stores_with_operator(array $stores): array
     {
         bingo_ensure_users_schema();
@@ -1187,7 +1189,7 @@ if (! function_exists('bingo_enrich_stores_with_operator')) {
                 continue;
             }
 
-            if (! isset($operatorCache[$operatorId])) {
+            if (!isset($operatorCache[$operatorId])) {
                 $operator = $modelUsers->find($operatorId);
                 $operatorCache[$operatorId] = $operator
                     ? trim(($operator['firstname'] ?? '') . ' ' . ($operator['lastname'] ?? ''))
@@ -1201,20 +1203,20 @@ if (! function_exists('bingo_enrich_stores_with_operator')) {
     }
 }
 
-if (! function_exists('bingo_user_requires_kyc')) {
+if (!function_exists('bingo_user_requires_kyc')) {
     function bingo_user_requires_kyc(?array $user = null): bool
     {
         if ($user !== null) {
             $group = (int) ($user['group'] ?? -1);
 
-            return ! bingo_is_store($group) && ! bingo_is_operator($group);
+            return !bingo_is_store($group) && !bingo_is_operator($group);
         }
 
-        return ! bingo_is_store() && ! bingo_is_operator();
+        return !bingo_is_store() && !bingo_is_operator();
     }
 }
 
-if (! function_exists('bingo_is_admin')) {
+if (!function_exists('bingo_is_admin')) {
     function bingo_is_admin(?int $group = null): bool
     {
         if ($group === null) {
@@ -1225,7 +1227,7 @@ if (! function_exists('bingo_is_admin')) {
     }
 }
 
-if (! function_exists('bingo_is_player')) {
+if (!function_exists('bingo_is_player')) {
     function bingo_is_player(?int $group = null): bool
     {
         if ($group === null) {
@@ -1236,7 +1238,7 @@ if (! function_exists('bingo_is_player')) {
     }
 }
 
-if (! function_exists('bingo_ensure_deposits_schema')) {
+if (!function_exists('bingo_ensure_deposits_schema')) {
     function bingo_ensure_deposits_schema(): void
     {
         static $ensured = false;
@@ -1247,33 +1249,33 @@ if (! function_exists('bingo_ensure_deposits_schema')) {
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('deposits')) {
+            if (!$db->tableExists('deposits')) {
                 return;
             }
 
             $forge = \Config\Database::forge();
 
-            if (! $db->fieldExists('store', 'deposits')) {
+            if (!$db->fieldExists('store', 'deposits')) {
                 $forge->addColumn('deposits', [
                     'store' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'user',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'user',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('commission_amount', 'deposits')) {
+            if (!$db->fieldExists('commission_amount', 'deposits')) {
                 $forge->addColumn('deposits', [
                     'commission_amount' => [
-                        'type'       => 'DECIMAL',
+                        'type' => 'DECIMAL',
                         'constraint' => '12,2',
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'amount',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'amount',
                     ],
                 ]);
             }
@@ -1283,7 +1285,7 @@ if (! function_exists('bingo_ensure_deposits_schema')) {
     }
 }
 
-if (! function_exists('bingo_ensure_games_schema')) {
+if (!function_exists('bingo_ensure_games_schema')) {
     function bingo_ensure_games_schema(): void
     {
         static $ensured = false;
@@ -1294,49 +1296,49 @@ if (! function_exists('bingo_ensure_games_schema')) {
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('games')) {
+            if (!$db->tableExists('games')) {
                 return;
             }
 
             $forge = \Config\Database::forge();
 
-            if (! $db->fieldExists('min_players', 'games')) {
+            if (!$db->fieldExists('min_players', 'games')) {
                 $forge->addColumn('games', [
                     'min_players' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'default'    => 10,
-                        'null'       => false,
-                        'after'      => 'price',
+                        'unsigned' => true,
+                        'default' => 10,
+                        'null' => false,
+                        'after' => 'price',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('min_cartons', 'games')) {
+            if (!$db->fieldExists('min_cartons', 'games')) {
                 $after = $db->fieldExists('min_players', 'games') ? 'min_players' : 'price';
                 $forge->addColumn('games', [
                     'min_cartons' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'default'    => 10,
-                        'null'       => false,
-                        'after'      => $after,
+                        'unsigned' => true,
+                        'default' => 10,
+                        'null' => false,
+                        'after' => $after,
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('allow_roulette_cartons', 'games')) {
+            if (!$db->fieldExists('allow_roulette_cartons', 'games')) {
                 $after = $db->fieldExists('min_cartons', 'games') ? 'min_cartons' : 'price';
                 $forge->addColumn('games', [
                     'allow_roulette_cartons' => [
-                        'type'       => 'TINYINT',
+                        'type' => 'TINYINT',
                         'constraint' => 1,
-                        'unsigned'   => true,
-                        'default'    => 1,
-                        'null'       => false,
-                        'after'      => $after,
+                        'unsigned' => true,
+                        'default' => 1,
+                        'null' => false,
+                        'after' => $after,
                     ],
                 ]);
             }
@@ -1346,10 +1348,10 @@ if (! function_exists('bingo_ensure_games_schema')) {
     }
 }
 
-if (! function_exists('bingo_game_allows_roulette_cartons')) {
+if (!function_exists('bingo_game_allows_roulette_cartons')) {
     function bingo_game_allows_roulette_cartons(?array $game): bool
     {
-        if (! $game) {
+        if (!$game) {
             return false;
         }
 
@@ -1357,7 +1359,7 @@ if (! function_exists('bingo_game_allows_roulette_cartons')) {
     }
 }
 
-if (! function_exists('bingo_ensure_users_schema')) {
+if (!function_exists('bingo_ensure_users_schema')) {
     function bingo_ensure_users_schema(): void
     {
         static $ensured = false;
@@ -1368,109 +1370,109 @@ if (! function_exists('bingo_ensure_users_schema')) {
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('users')) {
+            if (!$db->tableExists('users')) {
                 return;
             }
 
             $forge = \Config\Database::forge();
 
-            if (! $db->fieldExists('business_name', 'users')) {
+            if (!$db->fieldExists('business_name', 'users')) {
                 $forge->addColumn('users', [
                     'business_name' => [
-                        'type'       => 'VARCHAR',
+                        'type' => 'VARCHAR',
                         'constraint' => 255,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'lastname',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'lastname',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('store_commission_rate', 'users')) {
+            if (!$db->fieldExists('store_commission_rate', 'users')) {
                 $forge->addColumn('users', [
                     'store_commission_rate' => [
-                        'type'       => 'DECIMAL',
+                        'type' => 'DECIMAL',
                         'constraint' => '8,4',
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'business_name',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'business_name',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('store_prize_commission_rate', 'users')) {
+            if (!$db->fieldExists('store_prize_commission_rate', 'users')) {
                 $forge->addColumn('users', [
                     'store_prize_commission_rate' => [
-                        'type'       => 'DECIMAL',
+                        'type' => 'DECIMAL',
                         'constraint' => '8,4',
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'store_commission_rate',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'store_commission_rate',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('low_balance_alert', 'users')) {
+            if (!$db->fieldExists('low_balance_alert', 'users')) {
                 $forge->addColumn('users', [
                     'low_balance_alert' => [
-                        'type'       => 'TINYINT',
+                        'type' => 'TINYINT',
                         'constraint' => 1,
-                        'unsigned'   => true,
-                        'null'       => false,
-                        'default'    => 0,
-                        'after'      => 'roulette',
+                        'unsigned' => true,
+                        'null' => false,
+                        'default' => 0,
+                        'after' => 'roulette',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('referred_store_id', 'users')) {
+            if (!$db->fieldExists('referred_store_id', 'users')) {
                 $forge->addColumn('users', [
                     'referred_store_id' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'referred_code',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'referred_code',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('operator_id', 'users')) {
+            if (!$db->fieldExists('operator_id', 'users')) {
                 $forge->addColumn('users', [
                     'operator_id' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'referred_store_id',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'referred_store_id',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('referred_operator_id', 'users')) {
+            if (!$db->fieldExists('referred_operator_id', 'users')) {
                 $forge->addColumn('users', [
                     'referred_operator_id' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'operator_id',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'operator_id',
                     ],
                 ]);
             }
 
-            if (! $db->fieldExists('affiliate_signup_store_id', 'users')) {
+            if (!$db->fieldExists('affiliate_signup_store_id', 'users')) {
                 $forge->addColumn('users', [
                     'affiliate_signup_store_id' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'referred_store_id',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'referred_store_id',
                     ],
                 ]);
             }
@@ -1480,7 +1482,7 @@ if (! function_exists('bingo_ensure_users_schema')) {
     }
 }
 
-if (! function_exists('bingo_ensure_system_settings_schema')) {
+if (!function_exists('bingo_ensure_system_settings_schema')) {
     function bingo_ensure_system_settings_schema(): void
     {
         static $ensured = false;
@@ -1491,13 +1493,13 @@ if (! function_exists('bingo_ensure_system_settings_schema')) {
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('system')) {
+            if (!$db->tableExists('system')) {
                 return;
             }
 
             if ($db->table('system')->where('key', 'rateStoreCommission')->countAllResults() === 0) {
                 $db->table('system')->insert([
-                    'key'   => 'rateStoreCommission',
+                    'key' => 'rateStoreCommission',
                     'value' => '0',
                 ]);
             }
@@ -1505,35 +1507,35 @@ if (! function_exists('bingo_ensure_system_settings_schema')) {
             if ($db->table('system')->where('key', 'rateStoreGgrCommission')->countAllResults() === 0) {
                 $existingStoreRate = $db->table('system')->where('key', 'rateStoreCommission')->get()->getRowArray();
                 $db->table('system')->insert([
-                    'key'   => 'rateStoreGgrCommission',
+                    'key' => 'rateStoreGgrCommission',
                     'value' => (string) ($existingStoreRate['value'] ?? '0'),
                 ]);
             }
 
             if ($db->table('system')->where('key', 'rateStorePrizeCommission')->countAllResults() === 0) {
                 $db->table('system')->insert([
-                    'key'   => 'rateStorePrizeCommission',
+                    'key' => 'rateStorePrizeCommission',
                     'value' => '0',
                 ]);
             }
 
             if ($db->table('system')->where('key', 'rateOperatorCommission')->countAllResults() === 0) {
                 $db->table('system')->insert([
-                    'key'   => 'rateOperatorCommission',
+                    'key' => 'rateOperatorCommission',
                     'value' => '0',
                 ]);
             }
 
             if ($db->table('system')->where('key', 'lowBalanceThreshold')->countAllResults() === 0) {
                 $db->table('system')->insert([
-                    'key'   => 'lowBalanceThreshold',
+                    'key' => 'lowBalanceThreshold',
                     'value' => '',
                 ]);
             }
 
             if ($db->table('system')->where('key', 'lowBalanceAutoRoulette')->countAllResults() === 0) {
                 $db->table('system')->insert([
-                    'key'   => 'lowBalanceAutoRoulette',
+                    'key' => 'lowBalanceAutoRoulette',
                     'value' => '0',
                 ]);
             }
@@ -1543,7 +1545,7 @@ if (! function_exists('bingo_ensure_system_settings_schema')) {
     }
 }
 
-if (! function_exists('bingo_store_display_name')) {
+if (!function_exists('bingo_store_display_name')) {
     function bingo_store_display_name(array $user): string
     {
         $business = trim((string) ($user['business_name'] ?? ''));
@@ -1555,7 +1557,7 @@ if (! function_exists('bingo_store_display_name')) {
     }
 }
 
-if (! function_exists('bingo_generate_store_username')) {
+if (!function_exists('bingo_generate_store_username')) {
     function bingo_generate_store_username(string $email, UsersModel $model, ?int $excludeId = null): string
     {
         $local = strstr($email, '@', true) ?: 'tienda';
@@ -1569,7 +1571,7 @@ if (! function_exists('bingo_generate_store_username')) {
             if ($excludeId) {
                 $builder = $builder->where('id !=', $excludeId);
             }
-            if (! $builder->first()) {
+            if (!$builder->first()) {
                 return $candidate;
             }
             $candidate = $base . $suffix;
@@ -1578,7 +1580,7 @@ if (! function_exists('bingo_generate_store_username')) {
     }
 }
 
-if (! function_exists('bingo_deposit_is_store_funding')) {
+if (!function_exists('bingo_deposit_is_store_funding')) {
     function bingo_deposit_is_store_funding(array $deposit): bool
     {
         return ($deposit['method'] ?? '') === 'store funding request'
@@ -1586,14 +1588,14 @@ if (! function_exists('bingo_deposit_is_store_funding')) {
     }
 }
 
-if (! function_exists('bingo_deposit_is_store_player_recharge')) {
+if (!function_exists('bingo_deposit_is_store_player_recharge')) {
     function bingo_deposit_is_store_player_recharge(array $deposit): bool
     {
-        return ! empty($deposit['store']) && ! bingo_deposit_is_store_funding($deposit);
+        return !empty($deposit['store']) && !bingo_deposit_is_store_funding($deposit);
     }
 }
 
-if (! function_exists('bingo_normalize_commission_rate')) {
+if (!function_exists('bingo_normalize_commission_rate')) {
     /**
      * Acepta tasas en decimal (0.05) o porcentaje entero mal guardado (5).
      */
@@ -1611,7 +1613,7 @@ if (! function_exists('bingo_normalize_commission_rate')) {
     }
 }
 
-if (! function_exists('bingo_store_commission_rate')) {
+if (!function_exists('bingo_store_commission_rate')) {
     function bingo_store_commission_rate(array $store): float
     {
         bingo_ensure_users_schema();
@@ -1625,7 +1627,7 @@ if (! function_exists('bingo_store_commission_rate')) {
     }
 }
 
-if (! function_exists('bingo_operator_commission_rate')) {
+if (!function_exists('bingo_operator_commission_rate')) {
     function bingo_operator_commission_rate(?array $operator = null): float
     {
         if ($operator !== null) {
@@ -1639,7 +1641,7 @@ if (! function_exists('bingo_operator_commission_rate')) {
     }
 }
 
-if (! function_exists('bingo_store_prize_commission_rate')) {
+if (!function_exists('bingo_store_prize_commission_rate')) {
     function bingo_store_prize_commission_rate(array $store): float
     {
         bingo_ensure_users_schema();
@@ -1653,7 +1655,7 @@ if (! function_exists('bingo_store_prize_commission_rate')) {
     }
 }
 
-if (! function_exists('bingo_calculate_store_prize_commission')) {
+if (!function_exists('bingo_calculate_store_prize_commission')) {
     function bingo_calculate_store_prize_commission(float $amount, array $store): float
     {
         if ($amount <= 0) {
@@ -1669,7 +1671,7 @@ if (! function_exists('bingo_calculate_store_prize_commission')) {
     }
 }
 
-if (! function_exists('bingo_calculate_store_commission')) {
+if (!function_exists('bingo_calculate_store_commission')) {
     function bingo_calculate_store_commission(float $amount, array $store): float
     {
         if ($amount <= 0) {
@@ -1685,7 +1687,7 @@ if (! function_exists('bingo_calculate_store_commission')) {
     }
 }
 
-if (! function_exists('bingo_credit_store_operation_commission')) {
+if (!function_exists('bingo_credit_store_operation_commission')) {
     /**
      * Acredita comisión del PV por recargas o pagos de premios a jugadores.
      */
@@ -1711,7 +1713,7 @@ if (! function_exists('bingo_credit_store_operation_commission')) {
             $store = $modelUsers->find($storeId);
         }
 
-        if (! $store || (int) ($store['group'] ?? -1) !== bingo_group_store()) {
+        if (!$store || (int) ($store['group'] ?? -1) !== bingo_group_store()) {
             return 0.0;
         }
 
@@ -1725,11 +1727,11 @@ if (! function_exists('bingo_credit_store_operation_commission')) {
         wallet_credit_commission_earnings($storeId, $commission);
 
         $modelPayments->insert([
-            'user'    => $storeId,
-            'type'    => $paymentType,
+            'user' => $storeId,
+            'type' => $paymentType,
             'type_id' => $typeId,
-            'amount'  => $commission,
-            'status'  => 2,
+            'amount' => $commission,
+            'status' => 2,
         ]);
         $paymentId = (int) $modelPayments->getInsertID();
 
@@ -1737,11 +1739,11 @@ if (! function_exists('bingo_credit_store_operation_commission')) {
         if ($paymentId > 0) {
             $modelNotifications = new \App\Models\NotificationsModel();
             $modelNotifications->insert([
-                'user'    => $storeId,
-                'from'    => $fromUserId > 0 ? $fromUserId : $storeId,
-                'type'    => 'payment',
+                'user' => $storeId,
+                'from' => $fromUserId > 0 ? $fromUserId : $storeId,
+                'type' => 'payment',
                 'type_id' => $paymentId,
-                'title'   => '💰 ' . translate('store commission credited'),
+                'title' => '💰 ' . translate('store commission credited'),
                 'message' => translate('store commission credited') . ': '
                     . systemGet('currency') . ' ' . number_format($commission, 2),
             ]);
@@ -1751,7 +1753,7 @@ if (! function_exists('bingo_credit_store_operation_commission')) {
     }
 }
 
-if (! function_exists('bingo_parse_store_commission_rate_post')) {
+if (!function_exists('bingo_parse_store_commission_rate_post')) {
     function bingo_parse_store_commission_rate_post($input): ?float
     {
         if ($input === null || $input === '') {
@@ -1762,7 +1764,7 @@ if (! function_exists('bingo_parse_store_commission_rate_post')) {
     }
 }
 
-if (! function_exists('bingo_ensure_store_affiliate_code')) {
+if (!function_exists('bingo_ensure_store_affiliate_code')) {
     function bingo_ensure_store_affiliate_code(array $store): string
     {
         bingo_ensure_users_schema();
@@ -1790,7 +1792,7 @@ if (! function_exists('bingo_ensure_store_affiliate_code')) {
     }
 }
 
-if (! function_exists('bingo_find_store_by_affiliate_code')) {
+if (!function_exists('bingo_find_store_by_affiliate_code')) {
     function bingo_find_store_by_affiliate_code(string $code): ?array
     {
         $code = trim($code);
@@ -1804,8 +1806,8 @@ if (! function_exists('bingo_find_store_by_affiliate_code')) {
             ->where('deleted', 0)
             ->where('status', 1)
             ->groupStart()
-                ->where('referred_code', $code)
-                ->orWhere('code', $code)
+            ->where('referred_code', $code)
+            ->orWhere('code', $code)
             ->groupEnd()
             ->first();
 
@@ -1813,7 +1815,7 @@ if (! function_exists('bingo_find_store_by_affiliate_code')) {
     }
 }
 
-if (! function_exists('bingo_store_affiliate_link')) {
+if (!function_exists('bingo_store_affiliate_link')) {
     function bingo_store_affiliate_link(array $store): string
     {
         $code = bingo_ensure_store_affiliate_code($store);
@@ -1826,7 +1828,7 @@ if (! function_exists('bingo_store_affiliate_link')) {
     }
 }
 
-if (! function_exists('bingo_ensure_operator_affiliate_code')) {
+if (!function_exists('bingo_ensure_operator_affiliate_code')) {
     function bingo_ensure_operator_affiliate_code(array $operator): string
     {
         bingo_ensure_users_schema();
@@ -1854,7 +1856,7 @@ if (! function_exists('bingo_ensure_operator_affiliate_code')) {
     }
 }
 
-if (! function_exists('bingo_find_operator_by_affiliate_code')) {
+if (!function_exists('bingo_find_operator_by_affiliate_code')) {
     function bingo_find_operator_by_affiliate_code(string $code): ?array
     {
         $code = strtoupper(trim($code));
@@ -1868,8 +1870,8 @@ if (! function_exists('bingo_find_operator_by_affiliate_code')) {
             ->where('deleted', 0)
             ->where('status', 1)
             ->groupStart()
-                ->where('referred_code', $code)
-                ->orWhere('code', $code)
+            ->where('referred_code', $code)
+            ->orWhere('code', $code)
             ->groupEnd()
             ->first();
 
@@ -1877,7 +1879,7 @@ if (! function_exists('bingo_find_operator_by_affiliate_code')) {
     }
 }
 
-if (! function_exists('bingo_operator_affiliate_link')) {
+if (!function_exists('bingo_operator_affiliate_link')) {
     /** Enlace para registrar un Punto de venta bajo este OPERADOR. */
     function bingo_operator_affiliate_link(array $operator): string
     {
@@ -1885,7 +1887,7 @@ if (! function_exists('bingo_operator_affiliate_link')) {
     }
 }
 
-if (! function_exists('bingo_operator_store_signup_link')) {
+if (!function_exists('bingo_operator_store_signup_link')) {
     /** Enlace para registrar un nuevo Punto de venta bajo este OPERADOR. */
     function bingo_operator_store_signup_link(array $operator): string
     {
@@ -1899,7 +1901,7 @@ if (! function_exists('bingo_operator_store_signup_link')) {
     }
 }
 
-if (! function_exists('bingo_set_store_signup_session')) {
+if (!function_exists('bingo_set_store_signup_session')) {
     function bingo_set_store_signup_session(?array $operator, ?array $referrerStore = null): void
     {
         session()->remove('referred_code');
@@ -1911,7 +1913,7 @@ if (! function_exists('bingo_set_store_signup_session')) {
         $validReferrerStore = $referrerStore
             && (int) ($referrerStore['group'] ?? -1) === bingo_group_store();
 
-        if (! $validOperator && ! $validReferrerStore) {
+        if (!$validOperator && !$validReferrerStore) {
             session()->remove('signup_as_store');
             session()->remove('store_signup_operator_id');
             session()->remove('store_signup_referrer_id');
@@ -1935,7 +1937,7 @@ if (! function_exists('bingo_set_store_signup_session')) {
     }
 }
 
-if (! function_exists('bingo_clear_store_signup_session')) {
+if (!function_exists('bingo_clear_store_signup_session')) {
     function bingo_clear_store_signup_session(): void
     {
         session()->remove('signup_as_store');
@@ -1944,7 +1946,7 @@ if (! function_exists('bingo_clear_store_signup_session')) {
     }
 }
 
-if (! function_exists('bingo_bootstrap_store_player_affiliate_signup')) {
+if (!function_exists('bingo_bootstrap_store_player_affiliate_signup')) {
     /** Prepara sesión para registrar un jugador afiliado a un Punto de venta. */
     function bingo_bootstrap_store_player_affiliate_signup(array $store): bool
     {
@@ -1962,21 +1964,21 @@ if (! function_exists('bingo_bootstrap_store_player_affiliate_signup')) {
     }
 }
 
-if (! function_exists('bingo_apply_store_signup_operator')) {
+if (!function_exists('bingo_apply_store_signup_operator')) {
     function bingo_apply_store_signup_operator(int $newStoreId): void
     {
         bingo_apply_store_signup_affiliation($newStoreId);
     }
 }
 
-if (! function_exists('bingo_resolve_player_affiliate_signup_commission')) {
+if (!function_exists('bingo_resolve_player_affiliate_signup_commission')) {
     function bingo_resolve_player_affiliate_signup_commission(array $store): float
     {
         return 0.0;
     }
 }
 
-if (! function_exists('bingo_pay_store_player_affiliate_commission_on_signup')) {
+if (!function_exists('bingo_pay_store_player_affiliate_commission_on_signup')) {
     /**
      * Comisión por afiliar jugador deshabilitada.
      *
@@ -1988,7 +1990,7 @@ if (! function_exists('bingo_pay_store_player_affiliate_commission_on_signup')) 
     }
 }
 
-if (! function_exists('bingo_player_eligible_for_signup_affiliate_commission')) {
+if (!function_exists('bingo_player_eligible_for_signup_affiliate_commission')) {
     function bingo_player_eligible_for_signup_affiliate_commission(int $playerId, int $storeId): bool
     {
         if ($playerId <= 0 || $storeId <= 0) {
@@ -2000,7 +2002,7 @@ if (! function_exists('bingo_player_eligible_for_signup_affiliate_commission')) 
         $modelUsers = new \App\Models\UsersModel();
         $player = $modelUsers->find($playerId);
 
-        if (! $player) {
+        if (!$player) {
             return false;
         }
 
@@ -2016,7 +2018,7 @@ if (! function_exists('bingo_player_eligible_for_signup_affiliate_commission')) 
     }
 }
 
-if (! function_exists('bingo_sync_store_player_affiliate_commissions')) {
+if (!function_exists('bingo_sync_store_player_affiliate_commissions')) {
     /** Comisiones por afiliación de jugadores deshabilitadas. */
     function bingo_sync_store_player_affiliate_commissions(int $storeId): int
     {
@@ -2024,14 +2026,14 @@ if (! function_exists('bingo_sync_store_player_affiliate_commissions')) {
     }
 }
 
-if (! function_exists('bingo_resolve_store_referral_signup_commission')) {
+if (!function_exists('bingo_resolve_store_referral_signup_commission')) {
     function bingo_resolve_store_referral_signup_commission(array $referrerStore): float
     {
         return 0.0;
     }
 }
 
-if (! function_exists('bingo_pay_store_referred_store_commission')) {
+if (!function_exists('bingo_pay_store_referred_store_commission')) {
     /**
      * Comisión por afiliar PV deshabilitada.
      *
@@ -2043,7 +2045,7 @@ if (! function_exists('bingo_pay_store_referred_store_commission')) {
     }
 }
 
-if (! function_exists('bingo_apply_store_signup_affiliation')) {
+if (!function_exists('bingo_apply_store_signup_affiliation')) {
     function bingo_apply_store_signup_affiliation(int $newStoreId): void
     {
         bingo_ensure_users_schema();
@@ -2077,14 +2079,14 @@ if (! function_exists('bingo_apply_store_signup_affiliation')) {
     }
 }
 
-if (! function_exists('bingo_resolve_operator_store_signup_commission')) {
+if (!function_exists('bingo_resolve_operator_store_signup_commission')) {
     function bingo_resolve_operator_store_signup_commission(array $operator): float
     {
         return 0.0;
     }
 }
 
-if (! function_exists('bingo_pay_operator_referred_store_commission')) {
+if (!function_exists('bingo_pay_operator_referred_store_commission')) {
     /**
      * Comisión al operador por afiliar PV deshabilitada.
      *
@@ -2096,7 +2098,7 @@ if (! function_exists('bingo_pay_operator_referred_store_commission')) {
     }
 }
 
-if (! function_exists('bingo_sync_operator_store_affiliate_commissions')) {
+if (!function_exists('bingo_sync_operator_store_affiliate_commissions')) {
     /** Comisiones por afiliación de PV al operador deshabilitadas. */
     function bingo_sync_operator_store_affiliate_commissions(int $operatorId): int
     {
@@ -2104,7 +2106,7 @@ if (! function_exists('bingo_sync_operator_store_affiliate_commissions')) {
     }
 }
 
-if (! function_exists('bingo_sum_operator_store_affiliate_commissions')) {
+if (!function_exists('bingo_sum_operator_store_affiliate_commissions')) {
     function bingo_sum_operator_store_affiliate_commissions(int $operatorId, ?int $storeId = null): float
     {
         if ($operatorId <= 0) {
@@ -2131,7 +2133,7 @@ if (! function_exists('bingo_sum_operator_store_affiliate_commissions')) {
     }
 }
 
-if (! function_exists('bingo_fetch_store_referred_players')) {
+if (!function_exists('bingo_fetch_store_referred_players')) {
     function bingo_fetch_store_referred_players(int $storeId, int $limit = 50): array
     {
         if ($storeId <= 0) {
@@ -2157,7 +2159,7 @@ if (! function_exists('bingo_fetch_store_referred_players')) {
         $commissionByPlayer = [];
         foreach ($cpaRows as $row) {
             $playerKey = (int) $row['type_id'];
-            if (! isset($commissionByPlayer[$playerKey])) {
+            if (!isset($commissionByPlayer[$playerKey])) {
                 $commissionByPlayer[$playerKey] = $row;
             }
         }
@@ -2175,7 +2177,7 @@ if (! function_exists('bingo_fetch_store_referred_players')) {
     }
 }
 
-if (! function_exists('bingo_fetch_store_referred_stores')) {
+if (!function_exists('bingo_fetch_store_referred_stores')) {
     function bingo_fetch_store_referred_stores(int $storeId, int $limit = 50): array
     {
         if ($storeId <= 0) {
@@ -2218,7 +2220,7 @@ if (! function_exists('bingo_fetch_store_referred_stores')) {
     }
 }
 
-if (! function_exists('bingo_sum_store_affiliate_commissions')) {
+if (!function_exists('bingo_sum_store_affiliate_commissions')) {
     function bingo_sum_store_affiliate_commissions(int $storeId): float
     {
         if ($storeId <= 0) {
@@ -2242,7 +2244,7 @@ if (! function_exists('bingo_sum_store_affiliate_commissions')) {
     }
 }
 
-if (! function_exists('bingo_sum_store_recharge_commissions')) {
+if (!function_exists('bingo_sum_store_recharge_commissions')) {
     function bingo_sum_store_recharge_commissions(int $storeId): float
     {
         if ($storeId <= 0) {
@@ -2266,7 +2268,7 @@ if (! function_exists('bingo_sum_store_recharge_commissions')) {
     }
 }
 
-if (! function_exists('bingo_sum_store_prize_commissions')) {
+if (!function_exists('bingo_sum_store_prize_commissions')) {
     function bingo_sum_store_prize_commissions(int $storeId): float
     {
         if ($storeId <= 0) {
@@ -2290,7 +2292,7 @@ if (! function_exists('bingo_sum_store_prize_commissions')) {
     }
 }
 
-if (! function_exists('bingo_sum_store_payment_commissions')) {
+if (!function_exists('bingo_sum_store_payment_commissions')) {
     function bingo_sum_store_payment_commissions(int $storeId): float
     {
         return round(
@@ -2300,7 +2302,7 @@ if (! function_exists('bingo_sum_store_payment_commissions')) {
     }
 }
 
-if (! function_exists('bingo_fetch_operator_store_ids')) {
+if (!function_exists('bingo_fetch_operator_store_ids')) {
     function bingo_fetch_operator_store_ids(int $operatorId): array
     {
         if ($operatorId <= 0) {
@@ -2318,14 +2320,14 @@ if (! function_exists('bingo_fetch_operator_store_ids')) {
     }
 }
 
-if (! function_exists('bingo_set_operator_signup_session')) {
+if (!function_exists('bingo_set_operator_signup_session')) {
     function bingo_set_operator_signup_session(?array $operator): void
     {
         session()->remove('referred_code');
         session()->remove('referred_store_id');
         bingo_clear_store_signup_session();
 
-        if (! $operator || (int) ($operator['group'] ?? -1) !== bingo_group_operator()) {
+        if (!$operator || (int) ($operator['group'] ?? -1) !== bingo_group_operator()) {
             session()->remove('signup_as_operator');
             session()->remove('referred_operator_id');
 
@@ -2337,7 +2339,7 @@ if (! function_exists('bingo_set_operator_signup_session')) {
     }
 }
 
-if (! function_exists('bingo_clear_operator_signup_session')) {
+if (!function_exists('bingo_clear_operator_signup_session')) {
     function bingo_clear_operator_signup_session(): void
     {
         session()->remove('signup_as_operator');
@@ -2345,7 +2347,7 @@ if (! function_exists('bingo_clear_operator_signup_session')) {
     }
 }
 
-if (! function_exists('bingo_apply_operator_signup_referral')) {
+if (!function_exists('bingo_apply_operator_signup_referral')) {
     function bingo_apply_operator_signup_referral(int $newOperatorId): void
     {
         bingo_ensure_users_schema();
@@ -2365,7 +2367,7 @@ if (! function_exists('bingo_apply_operator_signup_referral')) {
             ->where('status', 1)
             ->first();
 
-        if (! $referrer) {
+        if (!$referrer) {
             return;
         }
 
@@ -2373,10 +2375,10 @@ if (! function_exists('bingo_apply_operator_signup_referral')) {
     }
 }
 
-if (! function_exists('bingo_set_signup_referrer_session')) {
+if (!function_exists('bingo_set_signup_referrer_session')) {
     function bingo_set_signup_referrer_session(?array $referrer, string $referredCode): void
     {
-        if (! $referrer) {
+        if (!$referrer) {
             session()->remove('referred_code');
             session()->remove('referred_store_id');
             bingo_clear_operator_signup_session();
@@ -2398,7 +2400,7 @@ if (! function_exists('bingo_set_signup_referrer_session')) {
     }
 }
 
-if (! function_exists('bingo_apply_signup_referral')) {
+if (!function_exists('bingo_apply_signup_referral')) {
     function bingo_apply_signup_referral(int $newUserId): void
     {
         bingo_ensure_users_schema();
@@ -2409,12 +2411,14 @@ if (! function_exists('bingo_apply_signup_referral')) {
         $referredStoreId = (int) (session()->get('referred_store_id') ?? 0);
         if ($referredStoreId > 0) {
             $store = $modelUsers->find($referredStoreId);
-            if ($store
+            if (
+                $store
                 && (int) ($store['group'] ?? -1) === bingo_group_store()
                 && (int) ($store['deleted'] ?? 0) === 0
-                && (int) ($store['status'] ?? 0) === 1) {
+                && (int) ($store['status'] ?? 0) === 1
+            ) {
                 $modelUsers->update($newUserId, [
-                    'referred_store_id'         => $referredStoreId,
+                    'referred_store_id' => $referredStoreId,
                     'affiliate_signup_store_id' => $referredStoreId,
                 ]);
             }
@@ -2434,7 +2438,7 @@ if (! function_exists('bingo_apply_signup_referral')) {
             $modelReferrals->insert([
                 'id_referred' => $referrer['id'],
                 'id_referrer' => $newUserId,
-                'status'      => 1,
+                'status' => 1,
             ]);
         }
 
@@ -2442,7 +2446,7 @@ if (! function_exists('bingo_apply_signup_referral')) {
     }
 }
 
-if (! function_exists('bingo_link_player_to_store_for_affiliation')) {
+if (!function_exists('bingo_link_player_to_store_for_affiliation')) {
     /**
      * Vincula un jugador al PV cuando es recargado por primera vez sin referente.
      *
@@ -2458,15 +2462,17 @@ if (! function_exists('bingo_link_player_to_store_for_affiliation')) {
 
         $modelUsers = new \App\Models\UsersModel();
         $player = $modelUsers->find($playerId);
-        if (! $player || (int) ($player['group'] ?? -1) !== bingo_group_player()) {
+        if (!$player || (int) ($player['group'] ?? -1) !== bingo_group_player()) {
             return ['linked' => false, 'store_id' => 0, 'newly_linked' => false];
         }
 
         $store = $modelUsers->find($storeId);
-        if (! $store
+        if (
+            !$store
             || (int) ($store['group'] ?? -1) !== bingo_group_store()
             || (int) ($store['deleted'] ?? 0) !== 0
-            || (int) ($store['status'] ?? 0) !== 1) {
+            || (int) ($store['status'] ?? 0) !== 1
+        ) {
             return ['linked' => false, 'store_id' => 0, 'newly_linked' => false];
         }
 
@@ -2480,7 +2486,7 @@ if (! function_exists('bingo_link_player_to_store_for_affiliation')) {
         }
 
         $modelUsers->update($playerId, [
-            'referred_store_id'         => $storeId,
+            'referred_store_id' => $storeId,
             'affiliate_signup_store_id' => $storeId,
         ]);
 
@@ -2488,7 +2494,7 @@ if (! function_exists('bingo_link_player_to_store_for_affiliation')) {
     }
 }
 
-if (! function_exists('bingo_pay_store_affiliate_commission')) {
+if (!function_exists('bingo_pay_store_affiliate_commission')) {
     /**
      * @deprecated La comisión % del PV solo aplica en recargas y pagos de premios desde el panel del PV.
      * @return array{paid:bool,amount:float,store_id?:int}
@@ -2499,7 +2505,7 @@ if (! function_exists('bingo_pay_store_affiliate_commission')) {
     }
 }
 
-if (! function_exists('bingo_build_carton_numbers_data')) {
+if (!function_exists('bingo_build_carton_numbers_data')) {
     function bingo_build_carton_numbers_data(int $cartonId): array
     {
         $numbersData = [];
@@ -2564,7 +2570,7 @@ if (! function_exists('bingo_build_carton_numbers_data')) {
     }
 }
 
-if (! function_exists('bingo_generate_cartons_for_user')) {
+if (!function_exists('bingo_generate_cartons_for_user')) {
     function bingo_generate_cartons_for_user(int $userId, int $gameId, int $count): array
     {
         if ($count < 1) {
@@ -2576,7 +2582,7 @@ if (! function_exists('bingo_generate_cartons_for_user')) {
         $modelGames = new \App\Models\GamesModel();
 
         $game = $modelGames->find($gameId);
-        if (! $game || (int) $game['status'] !== 1) {
+        if (!$game || (int) $game['status'] !== 1) {
             return ['success' => false, 'message' => translate('game not found'), 'carton_ids' => []];
         }
 
@@ -2599,8 +2605,8 @@ if (! function_exists('bingo_generate_cartons_for_user')) {
 
             for ($i = 0; $i < $count; $i++) {
                 $modelCartons->insert([
-                    'user'   => $userId,
-                    'game'   => $gameId,
+                    'user' => $userId,
+                    'game' => $gameId,
                     'status' => 1,
                 ]);
 
@@ -2625,24 +2631,24 @@ if (! function_exists('bingo_generate_cartons_for_user')) {
             }
 
             return [
-                'success'    => true,
-                'message'    => translate('cartons assigned successfully'),
+                'success' => true,
+                'message' => translate('cartons assigned successfully'),
                 'carton_ids' => $cartonIds,
-                'game'       => $game,
+                'game' => $game,
             ];
         } catch (\Throwable $e) {
             $db->transRollback();
 
             return [
-                'success'    => false,
-                'message'    => $e->getMessage(),
+                'success' => false,
+                'message' => $e->getMessage(),
                 'carton_ids' => [],
             ];
         }
     }
 }
 
-if (! function_exists('bingo_game_roulette_payload')) {
+if (!function_exists('bingo_game_roulette_payload')) {
     function bingo_game_roulette_payload(array $game, ?array $room = null): array
     {
         $modelModalities = new \App\Models\ModalitiesModel();
@@ -2658,32 +2664,32 @@ if (! function_exists('bingo_game_roulette_payload')) {
         }
 
         $awards = $modelAwards->where('game', $game['id'])->where('status', 1)->findAll();
-        $awardTotal = array_sum(array_map(static fn ($row) => (float) ($row['amount'] ?? 0), $awards));
+        $awardTotal = array_sum(array_map(static fn($row) => (float) ($row['amount'] ?? 0), $awards));
         $currency = systemGet('currency');
         $price = (float) ($game['price'] ?? 0);
         $roomName = trim((string) ($room['name'] ?? ''));
         $when = trim(date('d/m/Y H:i', strtotime(($game['date'] ?? '') . ' ' . ($game['time'] ?? '00:00:00'))));
 
         return [
-            'id'              => (int) $game['id'],
-            'description'     => (string) ($game['description'] ?? ''),
-            'date'            => (string) ($game['date'] ?? ''),
-            'time'            => (string) ($game['time'] ?? ''),
-            'price'           => $price,
-            'room'            => $roomName,
-            'modalities'      => $modalityNames,
+            'id' => (int) $game['id'],
+            'description' => (string) ($game['description'] ?? ''),
+            'date' => (string) ($game['date'] ?? ''),
+            'time' => (string) ($game['time'] ?? ''),
+            'price' => $price,
+            'room' => $roomName,
+            'modalities' => $modalityNames,
             'modalities_text' => implode(', ', $modalityNames),
-            'award_total'     => $awardTotal,
+            'award_total' => $awardTotal,
             'allows_roulette' => bingo_game_allows_roulette_cartons($game),
-            'label'           => trim($roomName . ' - ' . ($game['description'] ?? '') . ' (' . $when . ') - ' . $currency . ' ' . number_format($price, 2)),
-            'detail'          => ($modalityNames !== [] ? 'Modalidades: ' . implode(', ', $modalityNames) . '. ' : '')
+            'label' => trim($roomName . ' - ' . ($game['description'] ?? '') . ' (' . $when . ') - ' . $currency . ' ' . number_format($price, 2)),
+            'detail' => ($modalityNames !== [] ? 'Modalidades: ' . implode(', ', $modalityNames) . '. ' : '')
                 . 'Precio por cartón: ' . $currency . ' ' . number_format($price, 2)
                 . ($awardTotal > 0 ? '. Premios configurados: ' . $currency . ' ' . number_format($awardTotal, 2) : ''),
         ];
     }
 }
 
-if (! function_exists('bingo_low_balance_threshold')) {
+if (!function_exists('bingo_low_balance_threshold')) {
     /**
      * Saldo máximo (inclusive) para considerar a un jugador con poco saldo.
      * Usa lowBalanceThreshold del sistema o el precio de la partida activa más barata.
@@ -2706,7 +2712,7 @@ if (! function_exists('bingo_low_balance_threshold')) {
     }
 }
 
-if (! function_exists('bingo_fetch_low_balance_players')) {
+if (!function_exists('bingo_fetch_low_balance_players')) {
     /**
      * @return array{players: list<array>, threshold: float}
      */
@@ -2745,13 +2751,13 @@ if (! function_exists('bingo_fetch_low_balance_players')) {
         $list = bingo_attach_latest_low_balance_grants($list);
 
         return [
-            'players'   => $list,
+            'players' => $list,
             'threshold' => $threshold,
         ];
     }
 }
 
-if (! function_exists('bingo_low_balance_roulette_pending_count')) {
+if (!function_exists('bingo_low_balance_roulette_pending_count')) {
     /** Jugadores con poco saldo que aún no tienen ruleta disponible (roulette = 1). */
     function bingo_low_balance_roulette_pending_count(): int
     {
@@ -2768,7 +2774,7 @@ if (! function_exists('bingo_low_balance_roulette_pending_count')) {
     }
 }
 
-if (! function_exists('bingo_low_balance_auto_enabled')) {
+if (!function_exists('bingo_low_balance_auto_enabled')) {
     function bingo_low_balance_auto_enabled(): bool
     {
         bingo_ensure_system_settings_schema();
@@ -2778,7 +2784,7 @@ if (! function_exists('bingo_low_balance_auto_enabled')) {
     }
 }
 
-if (! function_exists('bingo_grant_player_roulette')) {
+if (!function_exists('bingo_grant_player_roulette')) {
     function bingo_grant_player_roulette(int $userId, string $notificationMessage, bool $force = false): bool
     {
         $modelUsers = new \App\Models\UsersModel();
@@ -2788,11 +2794,11 @@ if (! function_exists('bingo_grant_player_roulette')) {
             ->where('deleted', 0)
             ->first();
 
-        if (! $player) {
+        if (!$player) {
             return false;
         }
 
-        if (! $force && (int) ($player['roulette'] ?? 1) === 0) {
+        if (!$force && (int) ($player['roulette'] ?? 1) === 0) {
             return false;
         }
 
@@ -2800,25 +2806,25 @@ if (! function_exists('bingo_grant_player_roulette')) {
 
         $modelNotifications = new \App\Models\NotificationsModel();
         $modelNotifications->insert([
-            'user'    => $userId,
-            'type'    => 'roulette',
-            'title'   => '🎁 ' . translate('roulette'),
+            'user' => $userId,
+            'type' => 'roulette',
+            'title' => '🎁 ' . translate('roulette'),
             'message' => $notificationMessage,
-            'status'  => 0,
+            'status' => 0,
         ]);
 
         return true;
     }
 }
 
-if (! function_exists('bingo_check_low_balance_auto_roulette')) {
+if (!function_exists('bingo_check_low_balance_auto_roulette')) {
     /**
      * Si el saldo cae al umbral configurado, notifica al jugador y otorga la ruleta.
      * Vuelve a otorgar cuando ya usó la ruleta y sigue con poco saldo (hasta que recargue).
      */
     function bingo_check_low_balance_auto_roulette(int $userId): void
     {
-        if ($userId <= 0 || ! bingo_low_balance_auto_enabled()) {
+        if ($userId <= 0 || !bingo_low_balance_auto_enabled()) {
             return;
         }
 
@@ -2827,10 +2833,12 @@ if (! function_exists('bingo_check_low_balance_auto_roulette')) {
         $modelUsers = new \App\Models\UsersModel();
         $user = $modelUsers->find($userId);
 
-        if (! $user
+        if (
+            !$user
             || (int) ($user['group'] ?? -1) !== bingo_group_player()
             || (int) ($user['deleted'] ?? 0) !== 0
-            || (int) ($user['status'] ?? 0) !== 1) {
+            || (int) ($user['status'] ?? 0) !== 1
+        ) {
             return;
         }
 
@@ -2853,7 +2861,7 @@ if (! function_exists('bingo_check_low_balance_auto_roulette')) {
         $alreadyAlerted = (int) ($user['low_balance_alert'] ?? 0) === 1;
 
         // Ya alertado y aún tiene ruleta pendiente de girar.
-        if ($alreadyAlerted && ! $rouletteUsed) {
+        if ($alreadyAlerted && !$rouletteUsed) {
             return;
         }
 
@@ -2865,7 +2873,7 @@ if (! function_exists('bingo_check_low_balance_auto_roulette')) {
             $grantedRoulette = true;
         }
 
-        if (! $alreadyAlerted || $grantedRoulette) {
+        if (!$alreadyAlerted || $grantedRoulette) {
             $message = translate('low balance limit reached notification');
             $message = str_replace(
                 [':currency', ':amount', ':balance'],
@@ -2878,11 +2886,11 @@ if (! function_exists('bingo_check_low_balance_auto_roulette')) {
             }
 
             $modelNotifications->insert([
-                'user'    => $userId,
-                'type'    => 'low_balance',
-                'title'   => '⚠️ ' . translate('low balance alert'),
+                'user' => $userId,
+                'type' => 'low_balance',
+                'title' => '⚠️ ' . translate('low balance alert'),
                 'message' => $message,
-                'status'  => 0,
+                'status' => 0,
             ]);
         }
 
@@ -2894,11 +2902,11 @@ if (! function_exists('bingo_check_low_balance_auto_roulette')) {
     }
 }
 
-if (! function_exists('bingo_process_low_balance_auto_roulette_batch')) {
+if (!function_exists('bingo_process_low_balance_auto_roulette_batch')) {
     /** Revisa todos los jugadores con poco saldo y aplica la ruleta automática. */
     function bingo_process_low_balance_auto_roulette_batch(): int
     {
-        if (! bingo_low_balance_auto_enabled()) {
+        if (!bingo_low_balance_auto_enabled()) {
             return 0;
         }
 
@@ -2919,7 +2927,7 @@ if (! function_exists('bingo_process_low_balance_auto_roulette_batch')) {
     }
 }
 
-if (! function_exists('bingo_ensure_low_balance_grants_schema')) {
+if (!function_exists('bingo_ensure_low_balance_grants_schema')) {
     function bingo_ensure_low_balance_grants_schema(): void
     {
         static $ensured = false;
@@ -2930,6 +2938,11 @@ if (! function_exists('bingo_ensure_low_balance_grants_schema')) {
 
         try {
             $db = \Config\Database::connect();
+
+            try {
+                $db->query("ALTER TABLE `notifications` MODIFY COLUMN `type` ENUM('message','sing','system','low_balance','deposit','withdraw','purchase') NOT NULL DEFAULT 'system'");
+            } catch (\Exception $e) {}
+
             if ($db->tableExists('low_balance_roulette_grants')) {
                 return;
             }
@@ -2937,36 +2950,36 @@ if (! function_exists('bingo_ensure_low_balance_grants_schema')) {
             $forge = \Config\Database::forge();
             $forge->addField([
                 'id' => [
-                    'type'           => 'INT',
-                    'constraint'     => 11,
-                    'unsigned'       => true,
+                    'type' => 'INT',
+                    'constraint' => 11,
+                    'unsigned' => true,
                     'auto_increment' => true,
                 ],
                 'user' => [
-                    'type'       => 'INT',
+                    'type' => 'INT',
                     'constraint' => 11,
-                    'unsigned'   => true,
+                    'unsigned' => true,
                 ],
                 'granted_by' => [
-                    'type'       => 'INT',
+                    'type' => 'INT',
                     'constraint' => 11,
-                    'unsigned'   => true,
-                    'null'       => true,
+                    'unsigned' => true,
+                    'null' => true,
                 ],
                 'source' => [
-                    'type'       => 'VARCHAR',
+                    'type' => 'VARCHAR',
                     'constraint' => 20,
-                    'default'    => 'manual',
+                    'default' => 'manual',
                 ],
                 'balance' => [
-                    'type'       => 'DECIMAL',
+                    'type' => 'DECIMAL',
                     'constraint' => '12,2',
-                    'default'    => 0,
+                    'default' => 0,
                 ],
                 'threshold' => [
-                    'type'       => 'DECIMAL',
+                    'type' => 'DECIMAL',
                     'constraint' => '12,2',
-                    'default'    => 0,
+                    'default' => 0,
                 ],
                 'created_at' => [
                     'type' => 'DATETIME',
@@ -2983,7 +2996,7 @@ if (! function_exists('bingo_ensure_low_balance_grants_schema')) {
     }
 }
 
-if (! function_exists('bingo_log_low_balance_roulette_grant')) {
+if (!function_exists('bingo_log_low_balance_roulette_grant')) {
     function bingo_log_low_balance_roulette_grant(
         int $userId,
         string $source,
@@ -2994,7 +3007,7 @@ if (! function_exists('bingo_log_low_balance_roulette_grant')) {
         bingo_ensure_low_balance_grants_schema();
 
         $db = \Config\Database::connect();
-        if (! $db->tableExists('low_balance_roulette_grants')) {
+        if (!$db->tableExists('low_balance_roulette_grants')) {
             return;
         }
 
@@ -3010,17 +3023,17 @@ if (! function_exists('bingo_log_low_balance_roulette_grant')) {
         }
 
         $db->table('low_balance_roulette_grants')->insert([
-            'user'        => $userId,
-            'granted_by'  => $grantedBy,
-            'source'      => in_array($source, ['manual', 'auto'], true) ? $source : 'manual',
-            'balance'     => round((float) $balance, 2),
-            'threshold'   => round((float) $threshold, 2),
-            'created_at'  => date('Y-m-d H:i:s'),
+            'user' => $userId,
+            'granted_by' => $grantedBy,
+            'source' => in_array($source, ['manual', 'auto'], true) ? $source : 'manual',
+            'balance' => round((float) $balance, 2),
+            'threshold' => round((float) $threshold, 2),
+            'created_at' => date('Y-m-d H:i:s'),
         ]);
     }
 }
 
-if (! function_exists('bingo_fetch_low_balance_roulette_history')) {
+if (!function_exists('bingo_fetch_low_balance_roulette_history')) {
     /**
      * @return list<array>
      */
@@ -3029,7 +3042,7 @@ if (! function_exists('bingo_fetch_low_balance_roulette_history')) {
         bingo_ensure_low_balance_grants_schema();
 
         $db = \Config\Database::connect();
-        if (! $db->tableExists('low_balance_roulette_grants')) {
+        if (!$db->tableExists('low_balance_roulette_grants')) {
             return [];
         }
 
@@ -3057,7 +3070,7 @@ if (! function_exists('bingo_fetch_low_balance_roulette_history')) {
     }
 }
 
-if (! function_exists('bingo_attach_latest_low_balance_grants')) {
+if (!function_exists('bingo_attach_latest_low_balance_grants')) {
     function bingo_attach_latest_low_balance_grants(array $players): array
     {
         if ($players === []) {
@@ -3067,11 +3080,11 @@ if (! function_exists('bingo_attach_latest_low_balance_grants')) {
         bingo_ensure_low_balance_grants_schema();
 
         $db = \Config\Database::connect();
-        if (! $db->tableExists('low_balance_roulette_grants')) {
+        if (!$db->tableExists('low_balance_roulette_grants')) {
             return $players;
         }
 
-        $userIds = array_map(static fn (array $p): int => (int) $p['id'], $players);
+        $userIds = array_map(static fn(array $p): int => (int) $p['id'], $players);
 
         $grants = $db->table('low_balance_roulette_grants')
             ->whereIn('user', $userIds)
@@ -3082,7 +3095,7 @@ if (! function_exists('bingo_attach_latest_low_balance_grants')) {
         $latestByUser = [];
         foreach ($grants as $grant) {
             $uid = (int) $grant['user'];
-            if (! isset($latestByUser[$uid])) {
+            if (!isset($latestByUser[$uid])) {
                 $latestByUser[$uid] = $grant;
             }
         }
@@ -3095,7 +3108,7 @@ if (! function_exists('bingo_attach_latest_low_balance_grants')) {
     }
 }
 
-if (! function_exists('bingo_fetch_pending_roulette_prizes')) {
+if (!function_exists('bingo_fetch_pending_roulette_prizes')) {
     /**
      * Premios de ruleta reclamados pero aún sin partida asignada.
      *
@@ -3120,7 +3133,7 @@ if (! function_exists('bingo_fetch_pending_roulette_prizes')) {
     }
 }
 
-if (! function_exists('bingo_count_pending_roulette_cartons')) {
+if (!function_exists('bingo_count_pending_roulette_cartons')) {
     function bingo_count_pending_roulette_cartons(?int $userId = null): int
     {
         $total = 0;
@@ -3133,7 +3146,7 @@ if (! function_exists('bingo_count_pending_roulette_cartons')) {
     }
 }
 
-if (! function_exists('bingo_ensure_roulettes_schema')) {
+if (!function_exists('bingo_ensure_roulettes_schema')) {
     function bingo_ensure_roulettes_schema(): void
     {
         static $ensured = false;
@@ -3144,20 +3157,20 @@ if (! function_exists('bingo_ensure_roulettes_schema')) {
 
         try {
             $db = \Config\Database::connect();
-            if (! $db->tableExists('roulettes')) {
+            if (!$db->tableExists('roulettes')) {
                 return;
             }
 
-            if (! $db->fieldExists('game', 'roulettes')) {
+            if (!$db->fieldExists('game', 'roulettes')) {
                 $forge = \Config\Database::forge();
                 $forge->addColumn('roulettes', [
                     'game' => [
-                        'type'       => 'INT',
+                        'type' => 'INT',
                         'constraint' => 11,
-                        'unsigned'   => true,
-                        'null'       => true,
-                        'default'    => null,
-                        'after'      => 'user',
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'user',
                     ],
                 ]);
             }

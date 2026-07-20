@@ -19,17 +19,20 @@ use App\Models\RoulettesModel;
 use App\Models\GameRoomsModel;
 use CodeIgniter\Controller;
 
-class Playings extends Controller {
-    public function __construct() {
+class Playings extends Controller
+{
+    public function __construct()
+    {
         helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo']);
         session();
     }
-    
-    public function index() {
+
+    public function index()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelBoards = new BoardsModel();
@@ -40,15 +43,15 @@ class Playings extends Controller {
         $modelContacts = new ContactsModel();
 
         $contacts = $modelContacts->findAll();
-    
+
         $game = $modelGames->find(session()->get('game_id'));
-    
+
         if (!$game) {
             return redirect()->to('/signin');
         }
-    
+
         $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
-    
+
         if (empty($cartons)) {
             return redirect()->to('/signin');
         }
@@ -64,7 +67,7 @@ class Playings extends Controller {
         $selectedNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->findAll();
         $selectedNumbers = array_column($selectedNumbers, 'number');
 
-        $getClass = function($number) {
+        $getClass = function ($number) {
             if ($number <= 15) {
                 return 'b-col';
             } elseif ($number <= 30) {
@@ -77,7 +80,7 @@ class Playings extends Controller {
                 return 'o-col';
             }
         };
-    
+
         $cartonData = [];
         foreach ($cartons as $carton) {
             $numbers = $modelNumbersCartons->where('carton', $carton['id'])->orderBy('position', 'ASC')->findAll();
@@ -90,27 +93,28 @@ class Playings extends Controller {
         $user = $modelUsers->find(session()->get('id'));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-    
+
         $data = [
             'page' => [
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('playings/index', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'imagePath' => $imagePath]) 
+            'contentPage' => view('playings/index', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'imagePath' => $imagePath])
         ];
-    
+
         if ($this->request->isAJAX()) {
             return $this->response->setBody($data['contentPage']);
         } else {
             return view('layout/index', $data);
         }
     }
-    
-    public function play() {
+
+    public function play()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
@@ -132,12 +136,12 @@ class Playings extends Controller {
         $modelBoards = new BoardsModel();
 
         $activeGames = [];
-        foreach ($games as $game) { 
+        foreach ($games as $game) {
             // Check if game is finished
             $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
             $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
             $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-            
+
             $gameIsFinished = ($totalNumbersGenerated >= 75)
                 || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
 
@@ -153,7 +157,7 @@ class Playings extends Controller {
             $gameDate = new \DateTime($game['date'] . ' 23:59:59', $tz);
             if ($gameDate < $now && $totalNumbersGenerated == 0) {
                 $modelGames->update($game['id'], ['status' => 0]);
-                continue; 
+                continue;
             }
 
             $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
@@ -162,7 +166,7 @@ class Playings extends Controller {
             }
 
             $cartons = $modelCartons->where('user', $user['id'])->where('game', $game['id'])->countAllResults();
-            $game['room'] = $room['name']; 
+            $game['room'] = $room['name'];
             $game['cartons'] = $cartons;
             $activeGames[] = $game;
         }
@@ -187,7 +191,7 @@ class Playings extends Controller {
 
     public function rouletteGames()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
             return $this->response->setJSON(['success' => false, 'message' => 'No autorizado']);
         }
 
@@ -209,12 +213,13 @@ class Playings extends Controller {
 
         return $this->response->setJSON([
             'success' => true,
-            'games'   => $payload,
+            'games' => $payload,
         ]);
     }
 
-    public function claimPrize() {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+    public function claimPrize()
+    {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'No autorizado']);
         }
 
@@ -233,7 +238,7 @@ class Playings extends Controller {
         $modelNotifications = new NotificationsModel();
 
         $user = $modelUsers->find(session()->get('id'));
-        if (! $user) {
+        if (!$user) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('user not found')]);
         }
 
@@ -244,39 +249,39 @@ class Playings extends Controller {
         $modelUsers->update($user['id'], ['roulette' => 1]);
 
         $modelRoulettes->insert([
-            'user'    => $user['id'],
-            'game'    => null,
+            'user' => $user['id'],
+            'game' => null,
             'cartons' => $cartons,
-            'price'   => 0,
-            'amount'  => 0,
-            'status'  => 0,
+            'price' => 0,
+            'amount' => 0,
+            'status' => 0,
         ]);
 
         $rouletteId = $modelRoulettes->getInsertID();
 
         $modelNotifications->insert([
-            'user'    => $user['id'],
-            'from'    => 0,
-            'type'    => 'roulette',
+            'user' => $user['id'],
+            'from' => 0,
+            'type' => 'roulette',
             'type_id' => $rouletteId,
-            'title'   => '🎁 ' . translate('roulette'),
+            'title' => '🎁 ' . translate('roulette'),
             'message' => 'Reclamaste ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
                 . ' en la ruleta. Entra a "Mis cartones ganados" para elegir la partida y modalidad.',
         ]);
 
         return $this->response->setJSON([
-            'status'              => 'success',
-            'message'             => '¡Premio reclamado! Tus ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
+            'status' => 'success',
+            'message' => '¡Premio reclamado! Tus ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
                 . ' están listos para asignar.',
-            'cartons'             => $cartons,
-            'pending_cartons'     => bingo_count_pending_roulette_cartons((int) $user['id']),
-            'redirect_url'        => site_url('playings/wonCartons'),
+            'cartons' => $cartons,
+            'pending_cartons' => bingo_count_pending_roulette_cartons((int) $user['id']),
+            'redirect_url' => site_url('playings/wonCartons'),
         ]);
     }
 
     public function wonCartons()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
             return redirect()->to('/signin');
         }
 
@@ -286,7 +291,7 @@ class Playings extends Controller {
         $modelContacts = new ContactsModel();
 
         $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
-        if (! $user) {
+        if (!$user) {
             return redirect()->to('/signin');
         }
 
@@ -305,7 +310,7 @@ class Playings extends Controller {
             $gameOptions[] = bingo_game_roulette_payload($game, $room ?: null);
         }
 
-        $imagePath = ! empty($user['image'])
+        $imagePath = !empty($user['image'])
             ? site_url('uploads/users/' . $user['image'])
             : site_url('assets/img/avatar.jpg');
 
@@ -314,15 +319,15 @@ class Playings extends Controller {
                 'title' => 'Mis cartones ganados',
             ],
             'validation' => \Config\Services::validation(),
-            'user'       => $user,
-            'contacts'   => $contacts,
-            'imagePath'  => $imagePath,
+            'user' => $user,
+            'contacts' => $contacts,
+            'imagePath' => $imagePath,
             'contentPage' => view('playings/won_cartons', [
                 'pendingPrizes' => $pendingPrizes,
-                'gameOptions'   => $gameOptions,
-                'pendingTotal'  => bingo_count_pending_roulette_cartons((int) $user['id']),
-                'user'          => $user,
-                'imagePath'     => $imagePath,
+                'gameOptions' => $gameOptions,
+                'pendingTotal' => bingo_count_pending_roulette_cartons((int) $user['id']),
+                'user' => $user,
+                'imagePath' => $imagePath,
             ]),
         ];
 
@@ -335,7 +340,7 @@ class Playings extends Controller {
 
     public function assignWonCartons()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
             return $this->response->setJSON(['success' => false, 'message' => 'No autorizado']);
         }
 
@@ -354,7 +359,7 @@ class Playings extends Controller {
         $userId = (int) session()->get('id');
         $roulette = $modelRoulettes->find($rouletteId);
 
-        if (! $roulette || (int) $roulette['user'] !== $userId || (int) ($roulette['status'] ?? 1) !== 0) {
+        if (!$roulette || (int) $roulette['user'] !== $userId || (int) ($roulette['status'] ?? 1) !== 0) {
             return $this->response->setJSON(['success' => false, 'message' => 'Premio no disponible para asignar.']);
         }
 
@@ -364,11 +369,11 @@ class Playings extends Controller {
         }
 
         $game = $modelGames->find($gameId);
-        if (! $game || (int) $game['status'] !== 1) {
+        if (!$game || (int) $game['status'] !== 1) {
             return $this->response->setJSON(['success' => false, 'message' => translate('game not found')]);
         }
 
-        if (! bingo_game_allows_roulette_cartons($game)) {
+        if (!bingo_game_allows_roulette_cartons($game)) {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('roulette cartons not allowed in this game'),
@@ -376,7 +381,7 @@ class Playings extends Controller {
         }
 
         $assignment = bingo_generate_cartons_for_user($userId, $gameId, $cartons);
-        if (! $assignment['success']) {
+        if (!$assignment['success']) {
             return $this->response->setJSON(['success' => false, 'message' => $assignment['message']]);
         }
 
@@ -385,18 +390,18 @@ class Playings extends Controller {
         $gameLabel = trim((string) ($game['description'] ?? ''));
 
         $modelRoulettes->update($rouletteId, [
-            'game'   => $gameId,
-            'price'  => $price,
+            'game' => $gameId,
+            'price' => $price,
             'amount' => $amount,
             'status' => 1,
         ]);
 
         $modelNotifications->insert([
-            'user'    => $userId,
-            'from'    => 0,
-            'type'    => 'roulette',
+            'user' => $userId,
+            'from' => 0,
+            'type' => 'roulette',
             'type_id' => $rouletteId,
-            'title'   => '🎁 Cartones asignados',
+            'title' => '🎁 Cartones asignados',
             'message' => 'Se asignaron ' . $cartons . ' cartón' . ($cartons === 1 ? '' : 'es')
                 . ($gameLabel !== '' ? ' para la partida "' . $gameLabel . '"' : '')
                 . '. Valor: ' . systemGet('currency') . ' ' . number_format($amount, 2) . '.',
@@ -405,26 +410,27 @@ class Playings extends Controller {
         session()->set('game_id', $gameId);
 
         return $this->response->setJSON([
-            'success'          => true,
-            'message'          => 'Cartones asignados correctamente.',
-            'pending_cartons'  => bingo_count_pending_roulette_cartons($userId),
-            'redirect_url'     => site_url('play'),
+            'success' => true,
+            'message' => 'Cartones asignados correctamente.',
+            'pending_cartons' => bingo_count_pending_roulette_cartons($userId),
+            'redirect_url' => site_url('play'),
         ]);
     }
 
     public function pendingWonCartonsCountGet()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== bingo_group_player()) {
             return $this->response->setJSON(['success' => false, 'count' => 0]);
         }
 
         return $this->response->setJSON([
             'success' => true,
-            'count'   => bingo_count_pending_roulette_cartons((int) session()->get('id')),
+            'count' => bingo_count_pending_roulette_cartons((int) session()->get('id')),
         ]);
     }
 
-    public function totalCartonsGet($id) {
+    public function totalCartonsGet($id)
+    {
         $modelCartons = new CartonsModel();
         $totalCartons = $modelCartons->where('user', session()->get('id'))->where('game', $id)->countAllResults();
 
@@ -433,7 +439,8 @@ class Playings extends Controller {
         ]);
     }
 
-    public function generateCartonsGet($gameId) {
+    public function generateCartonsGet($gameId)
+    {
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
@@ -448,7 +455,7 @@ class Playings extends Controller {
 
         $perPage = 20;
         $page = $this->request->getGet('page') ?? 1;
-        
+
         $cartons = $modelCartons->where('game', $game['id'])->where('user', 0)->paginate($perPage, 'default', $page);
 
         $cartonData = [];
@@ -461,7 +468,7 @@ class Playings extends Controller {
             ];
         }
 
-        $data['room'] = $room; 
+        $data['room'] = $room;
         $data['cartons'] = $cartonData;
         $data['pager'] = $modelCartons->pager;
         $data['currentPage'] = $page;
@@ -470,7 +477,8 @@ class Playings extends Controller {
         return view('playings/selectCartons', $data);
     }
 
-    public function saveCartons() {
+    public function saveCartons()
+    {
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
@@ -479,7 +487,7 @@ class Playings extends Controller {
 
         // Obtener datos del request
         $data = $this->request->getJSON(true);
-        
+
         $userId = session()->get('id') ?? null;
         $gameId = $data['game_id'] ?? null;
         $cartonData = $data['carton_data'] ?? null; // Datos completos de los cartones generados en el frontend
@@ -517,17 +525,17 @@ class Playings extends Controller {
         if ($totalDeposits == 0 && systemGet('activateMinimumDeposit') == 1) {
             return $this->response->setJSON([
                 'success' => false,
-                'message'  => 'Para poder jugar debes realizar una recarga mínima de ' . systemGet('minimumDeposit')
+                'message' => 'Para poder jugar debes realizar una recarga mínima de ' . systemGet('minimumDeposit')
             ]);
         }
 
         $totalSelectedCartons = count($cartonData);
-        
+
         // Validar límite máximo de cartones
         $maxCartons = systemGet('maxCartons');
         $existingCartons = $modelCartons->where('user', $userId)->where('game', $gameId)->countAllResults();
         $totalCartons = $existingCartons + $totalSelectedCartons;
-        
+
         if ($totalCartons > $maxCartons) {
             return $this->response->setJSON([
                 'success' => false,
@@ -540,7 +548,7 @@ class Playings extends Controller {
 
         // Verificar saldo suficiente
         $user = wallet_service()->normalizeUser($user);
-        if (! wallet_service()->canAfford($user, $totalCost)) {
+        if (!wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('insufficient wallet balance')
@@ -553,7 +561,7 @@ class Playings extends Controller {
 
         try {
             $savedCartonIds = [];
-            
+
             // Procesar cada cartón seleccionado
             foreach ($cartonData as $cartonInfo) {
                 // Insertar cartón en la base de datos
@@ -563,7 +571,7 @@ class Playings extends Controller {
                     'serial' => $cartonInfo['serial'],
                     'status' => 1
                 ];
-                
+
                 $modelCartons->insert($cartonInsertData);
                 $cartonId = $modelCartons->insertID();
                 $savedCartonIds[] = $cartonId;
@@ -589,14 +597,14 @@ class Playings extends Controller {
                         ];
                     }
                 }
-                
+
                 // Insertar todos los números del cartón
                 if (!empty($numbersData)) {
                     $modelNumbersCartons->insertBatch($numbersData);
                 }
             }
 
-            if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+            if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
                 throw new \Exception(translate('insufficient wallet balance'));
             }
 
@@ -627,7 +635,7 @@ class Playings extends Controller {
 
         } catch (\Exception $e) {
             $db->transRollback();
-            
+
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('error processing payment') . ': ' . $e->getMessage()
@@ -635,7 +643,8 @@ class Playings extends Controller {
         }
     }
 
-    public function availableCartonsGet($gameId) {
+    public function availableCartonsGet($gameId)
+    {
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
@@ -650,7 +659,7 @@ class Playings extends Controller {
 
         $perPage = 20;
         $page = $this->request->getGet('page') ?? 1;
-        
+
         $cartons = $modelCartons->where('game', $game['id'])->where('user', 0)->paginate($perPage, 'default', $page);
 
         $cartonData = [];
@@ -663,7 +672,7 @@ class Playings extends Controller {
             ];
         }
 
-        $data['room'] = $room; 
+        $data['room'] = $room;
         $data['cartons'] = $cartonData;
         $data['pager'] = $modelCartons->pager;
         $data['currentPage'] = $page;
@@ -672,13 +681,14 @@ class Playings extends Controller {
         return view('playings/availablecartons', $data);
     }
 
-    public function loadMoreCartons() {
+    public function loadMoreCartons()
+    {
         $gameId = $this->request->getPost('game_id');
         $page = $this->request->getPost('page');
-        
+
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
-        
+
         $perPage = 20;
         $cartons = $modelCartons->where('game', $gameId)->where('user', 0)->paginate($perPage, 'default', $page);
 
@@ -709,7 +719,7 @@ class Playings extends Controller {
         }
 
         $serials = is_array($serialsRaw) ? $serialsRaw : json_decode((string) $serialsRaw, true);
-        if (! is_array($serials)) {
+        if (!is_array($serials)) {
             $serials = [];
         }
 
@@ -735,8 +745,8 @@ class Playings extends Controller {
             $numbers = $modelNumbersCartons->where('carton', $carton['id'])->orderBy('position', 'ASC')->findAll();
             $cartonData[] = [
                 'cartonId' => $carton['id'],
-                'serial'   => $carton['serial'],
-                'numbers'  => $numbers,
+                'serial' => $carton['serial'],
+                'numbers' => $numbers,
             ];
         }
 
@@ -746,11 +756,12 @@ class Playings extends Controller {
         ]);
     }
 
-    public function selectCarton() {
+    public function selectCarton()
+    {
         $modelGames = new GamesModel();
         $modelTempCartons = new TempCartonsModel();
         $modelDeposits = new DepositsModel();
-        
+
         $cartonId = $this->request->getPost('carton_id');
         $gameId = $this->request->getPost('game_id');
         $userId = session()->get('id');
@@ -760,69 +771,71 @@ class Playings extends Controller {
         if ($totalDeposits == 0 && systemGet('activateMinimumDeposit') == 1) {
             $response = [
                 'success' => false,
-                'message'  => 'Para poder jugar debes realizar una recarga mínima de ' + systemGet('minimumDeposit')
+                'message' => 'Para poder jugar debes realizar una recarga mínima de ' + systemGet('minimumDeposit')
             ];
 
             return $this->response->setJSON($response);
         }
-        
+
         $existing = $modelTempCartons->where('carton', $cartonId)->first();
-        
+
         if ($existing) {
             return $this->response->setJSON([
                 'success' => false,
                 'message' => 'Cartón ya seleccionado'
             ]);
         }
-        
+
         $data = [
             'carton' => $cartonId,
             'user' => $userId,
             'game' => $gameId
         ];
-        
+
         if ($modelTempCartons->insert($data)) {
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Cartón seleccionado correctamente'
             ]);
         }
-        
+
         return $this->response->setJSON([
             'success' => false,
             'message' => 'Error al seleccionar cartón'
         ]);
     }
 
-    public function deselectCarton() {
+    public function deselectCarton()
+    {
         $modelTempCartons = new TempCartonsModel();
-        
+
         $cartonId = $this->request->getPost('carton_id');
         $userId = session()->get('id');
-        
+
         $deleted = $modelTempCartons->where('carton', $cartonId)->where('user', $userId)->delete();
-        
+
         if ($deleted) {
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Cartón deseleccionado'
             ]);
         }
-        
+
         return $this->response->setJSON([
             'success' => false,
             'message' => 'Error al deseleccionar cartón'
         ]);
     }
 
-    public function getSelectedCartons($gameId) {
+    public function getSelectedCartons($gameId)
+    {
         $modelTempCartons = new TempCartonsModel();
         $userId = session()->get('id');
-        
+
         $userSelectedCartons = $modelTempCartons->where('user', $userId)->where('game', $gameId)->findAll();
-        
+
         $otherUsersCartons = $modelTempCartons->where('user !=', $userId)->where('game', $gameId)->findAll();
-        
+
         return $this->response->setJSON([
             'success' => true,
             'userCartons' => $userSelectedCartons,
@@ -830,25 +843,26 @@ class Playings extends Controller {
         ]);
     }
 
-    public function getCartonsStatus() {
+    public function getCartonsStatus()
+    {
         $modelTempCartons = new TempCartonsModel();
         $gameId = $this->request->getPost('game_id');
         $userId = session()->get('id');
-        
+
         $fiveMinutesAgo = date('Y-m-d H:i:s', strtotime('-5 minutes'));
         $expiredCartons = $modelTempCartons->select('carton')->where('game', $gameId)->where('created_at <', $fiveMinutesAgo)->findAll();
         $expiredIds = array_column($expiredCartons, 'carton');
-        
+
         if (!empty($expiredIds)) {
             $modelTempCartons->whereIn('carton', $expiredIds)->delete();
         }
 
         $userSelectedCartons = $modelTempCartons->select('carton')->where('user', $userId)->where('game', $gameId)->findAll();
         $otherUsersCartons = $modelTempCartons->select('carton')->where('user !=', $userId)->where('game', $gameId)->findAll();
-        
+
         $userCartonIds = array_column($userSelectedCartons, 'carton');
         $otherUsersCartonIds = array_column($otherUsersCartons, 'carton');
-        
+
         return $this->response->setJSON([
             'success' => true,
             'userCartons' => $userCartonIds,
@@ -857,11 +871,12 @@ class Playings extends Controller {
         ]);
     }
 
-    public function cleanExpiredCartons() {
+    public function cleanExpiredCartons()
+    {
         $modelTempCartons = new TempCartonsModel();
-        
+
         $deleted = $modelTempCartons->cleanExpired(5);
-        
+
         return $this->response->setJSON([
             'success' => true,
             'message' => "Se eliminaron {$deleted} cartones expirados",
@@ -869,29 +884,31 @@ class Playings extends Controller {
         ]);
     }
 
-    public function checkExpiredCartons() {
+    public function checkExpiredCartons()
+    {
         $modelTempCartons = new TempCartonsModel();
-        
+
         $gameId = $this->request->getPost('game_id');
         $userId = session()->get('id');
-        
+
         $fiveMinutesAgo = date('Y-m-d H:i:s', strtotime('-5 minutes'));
-        
+
         $expiredCartons = $modelTempCartons->select('carton')->where('user', $userId)->where('game', $gameId)->where('created_at <', $fiveMinutesAgo)->findAll();
-        
+
         $expiredIds = array_column($expiredCartons, 'carton');
-        
+
         if (!empty($expiredIds)) {
             $modelTempCartons->whereIn('carton', $expiredIds)->where('user', $userId)->delete();
         }
-        
+
         return $this->response->setJSON([
             'success' => true,
             'expiredCartons' => $expiredIds
         ]);
     }
 
-    public function getRealTimeCartonsStatus() {
+    public function getRealTimeCartonsStatus()
+    {
         // Verificar que el usuario esté logueado
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return $this->response->setJSON([
@@ -903,7 +920,7 @@ class Playings extends Controller {
         $modelTempCartons = new TempCartonsModel();
         $gameId = $this->request->getPost('game_id');
         $userId = session()->get('id');
-        
+
         // Validar que se envió el game_id
         if (!$gameId) {
             return $this->response->setJSON([
@@ -911,29 +928,29 @@ class Playings extends Controller {
                 'message' => 'Game ID is required'
             ]);
         }
-        
+
         try {
             // Limpiar cartones expirados automáticamente (más de 5 minutos)
             $fiveMinutesAgo = date('Y-m-d H:i:s', strtotime('-5 minutes'));
             $modelTempCartons->where('created_at <', $fiveMinutesAgo)->delete();
-            
+
             // Obtener todos los cartones seleccionados en este juego
             $allSelectedCartons = $modelTempCartons->select('carton, user, created_at')
-                                                  ->where('game', $gameId)
-                                                  ->findAll();
-            
+                ->where('game', $gameId)
+                ->findAll();
+
             $userCartons = [];
             $otherUsersCartons = [];
-            
+
             // Separar cartones por usuario
             foreach ($allSelectedCartons as $selection) {
                 if ($selection['user'] == $userId) {
-                    $userCartons[] = (int)$selection['carton'];
+                    $userCartons[] = (int) $selection['carton'];
                 } else {
-                    $otherUsersCartons[] = (int)$selection['carton'];
+                    $otherUsersCartons[] = (int) $selection['carton'];
                 }
             }
-            
+
             return $this->response->setJSON([
                 'success' => true,
                 'timestamp' => time(),
@@ -943,10 +960,10 @@ class Playings extends Controller {
                 'totalOtherCartons' => count($otherUsersCartons),
                 'gameId' => $gameId
             ]);
-            
+
         } catch (\Exception $e) {
             log_message('error', 'Error in getRealTimeCartonsStatus: ' . $e->getMessage());
-            
+
             return $this->response->setJSON([
                 'success' => false,
                 'message' => 'Error retrieving cartons status',
@@ -955,11 +972,12 @@ class Playings extends Controller {
         }
     }
 
-    public function playing() {
+    public function playing()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelBoards = new BoardsModel();
@@ -971,9 +989,9 @@ class Playings extends Controller {
         $modelContacts = new ContactsModel();
 
         $contacts = $modelContacts->findAll();
-    
+
         $game = $modelGames->find(session()->get('game_id'));
-    
+
         if (!$game) {
             return redirect()->to('/play');
         }
@@ -986,19 +1004,19 @@ class Playings extends Controller {
         $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
         $gameIsFinished = ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
-    
+
         $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
-    
+
         if (empty($cartons)) {
             return redirect()->to('/play');
         }
 
         $modalities = $modelModalities->whereIn('id', explode(',', $game['modalities']))->findAll();
 
-        foreach ($modalities as &$modality) { 
+        foreach ($modalities as &$modality) {
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
 
-            $modality['amount'] = $award['amount'] ?? 0; 
+            $modality['amount'] = $award['amount'] ?? 0;
         }
 
         $user = $modelUsers->find(session()->get('id'));
@@ -1008,11 +1026,11 @@ class Playings extends Controller {
             $user['autodial'] = 1;
         }
 
-        if (! empty($drawnNumbersOrdered)) {
+        if (!empty($drawnNumbersOrdered)) {
             $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersOrdered);
         }
 
-        $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();  
+        $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();
 
         $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
         array_shift($fourNumbers);
@@ -1035,7 +1053,7 @@ class Playings extends Controller {
             $winner['modality'] = translate($wmodality['name']);
         }
 
-        $getClass = function($number) {
+        $getClass = function ($number) {
             if ($number <= 15) {
                 return 'B';
             } elseif ($number <= 30) {
@@ -1048,7 +1066,7 @@ class Playings extends Controller {
                 return 'O';
             }
         };
-    
+
         $cartonData = [];
         foreach ($cartons as $carton) {
             $numbers = $modelNumbersCartons->where('carton', $carton['id'])->orderBy('position', 'ASC')->findAll();
@@ -1060,7 +1078,7 @@ class Playings extends Controller {
         }
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-    
+
         $data = [
             'page' => [
                 'title' => $game['description']
@@ -1068,7 +1086,7 @@ class Playings extends Controller {
             'validation' => \Config\Services::validation(),
             'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'gameIsFinished' => $gameIsFinished, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
         ];
-    
+
         if ($this->request->isAJAX()) {
             return $this->response->setBody($data['contentPage']);
         } else {
@@ -1076,11 +1094,12 @@ class Playings extends Controller {
         }
     }
 
-    public function playSubmit() {
+    public function playSubmit()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
@@ -1091,32 +1110,32 @@ class Playings extends Controller {
         $modelDeposits = new DepositsModel();
 
         $maxCartons = systemGet('maxCartons');
-        
+
         $validationRules = [
             'game' => [
                 'label' => translate('game'),
                 'rules' => 'required'
             ],
             'cartons' => [
-                'label' => translate('no. of cartons'), 
+                'label' => translate('no. of cartons'),
                 'rules' => "required|greater_than_equal_to[1]|less_than_equal_to[$maxCartons]"
             ]
         ];
-    
+
         if (!$this->validate($validationRules)) {
             $errors = $this->validator->getErrors();
             $response = [
                 'success' => false,
-                'errors' => $errors 
+                'errors' => $errors
             ];
             return $this->response->setJSON($response);
         }
-    
+
         $cartons = $this->request->getPost('cartons');
         $gameId = $this->request->getPost('game');
 
         session()->set('game_id', $gameId);
-    
+
         $game = $modelGames->find(session()->get('game_id'));
 
         if (!$game) {
@@ -1134,7 +1153,7 @@ class Playings extends Controller {
         $totalCartons = $modelCartons->where('user', $user['id'])->where('game', $game['id'])->countAllResults();
 
         $toGenerate = $cartons - $totalCartons;
-    
+
         /*if ($user['wallet'] == 0) {
             $response = [
                 'success' => false,
@@ -1150,8 +1169,8 @@ class Playings extends Controller {
         if ($totalDeposits == 0 && systemGet('activateMinimumDeposit') == 1) {
             $response = [
                 'success' => false,
-                'amount'  => systemGet('minimumDeposit'),
-                'payments'=> true
+                'amount' => systemGet('minimumDeposit'),
+                'payments' => true
             ];
 
             return $this->response->setJSON($response);
@@ -1218,7 +1237,7 @@ class Playings extends Controller {
                 }
 
                 $cartonData = [];
-                
+
                 for ($i = 0; $i < $toGenerate; $i++) {
                     $cartonData[] = [
                         'user' => $user['id'],
@@ -1226,11 +1245,11 @@ class Playings extends Controller {
                         'status' => 1
                     ];
                 }
-            
+
                 $modelCartons->insertBatch($cartonData);
-                $insertedCartons = $modelCartons->insertID(); 
+                $insertedCartons = $modelCartons->insertID();
                 $cartonIds = range($insertedCartons, $insertedCartons + $toGenerate - 1);
-            
+
                 $numbersData = [];
                 foreach ($cartonIds as $cartonId) {
 
@@ -1242,18 +1261,18 @@ class Playings extends Controller {
 
                     $modelCartons->update($cartonId, ['serial' => $serial]);
 
-                    $bColumn = range(1, 15);  
+                    $bColumn = range(1, 15);
                     $iColumn = range(16, 30);
-                    $nColumn = range(31, 45); 
-                    $gColumn = range(46, 60); 
-                    $oColumn = range(61, 75); 
-            
+                    $nColumn = range(31, 45);
+                    $gColumn = range(46, 60);
+                    $oColumn = range(61, 75);
+
                     shuffle($bColumn);
                     shuffle($iColumn);
                     shuffle($nColumn);
                     shuffle($gColumn);
                     shuffle($oColumn);
-            
+
                     for ($pos = 0; $pos < 5; $pos++) {
                         $numbersData[] = [
                             'carton' => $cartonId,
@@ -1262,7 +1281,7 @@ class Playings extends Controller {
                             'status' => 0
                         ];
                     }
-            
+
                     for ($pos = 0; $pos < 5; $pos++) {
                         $numbersData[] = [
                             'carton' => $cartonId,
@@ -1271,7 +1290,7 @@ class Playings extends Controller {
                             'status' => 0
                         ];
                     }
-            
+
                     for ($pos = 0; $pos < 5; $pos++) {
                         $numbersData[] = [
                             'carton' => $cartonId,
@@ -1289,7 +1308,7 @@ class Playings extends Controller {
                             'status' => 0
                         ];
                     }
-            
+
                     for ($pos = 0; $pos < 5; $pos++) {
                         $numbersData[] = [
                             'carton' => $cartonId,
@@ -1299,7 +1318,7 @@ class Playings extends Controller {
                         ];
                     }
                 }
-            
+
                 $modelNumbersCartons->insertBatch($numbersData);
 
                 $genCost = $toGenerate * $game['price'];
@@ -1307,13 +1326,13 @@ class Playings extends Controller {
                 if ($genCost > 0) {
                     bingo_after_carton_purchase((int) $user['id'], (int) $game['id'], (float) $genCost);
                 }
-            }        
-                
+            }
+
             $response = [
                 'success' => true,
                 'redirect' => site_url('/playing')
             ];
-            
+
             return $this->response->setJSON($response);
         } elseif ($totalNumbersGenerated >= 75 || $SingsCount >= $AwardsCount) {
             $response = [
@@ -1341,7 +1360,7 @@ class Playings extends Controller {
                 return $this->response->setJSON($response);
             }
         } elseif ($totalNumbersGenerated == 75) {
-             $response = [
+            $response = [
                 'success' => false,
                 'finished' => true
             ];
@@ -1350,11 +1369,12 @@ class Playings extends Controller {
         }
     }
 
-    public function playGame() {
+    public function playGame()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
@@ -1432,7 +1452,7 @@ class Playings extends Controller {
 
         // Validar pagos mínimos
         $totalDeposits = $modelDeposits->where('user', $userId)->where('status', 2)->countAllResults();
-        
+
         if ($totalDeposits == 0 && systemGet('activateMinimumDeposit') == 1) {
             return $this->response->setJSON([
                 'success' => false,
@@ -1456,7 +1476,7 @@ class Playings extends Controller {
         $totalCost = $totalSelectedCartons * $game['price'];
 
         $user = wallet_service()->normalizeUser($user);
-        if (! wallet_service()->canAfford($user, $totalCost)) {
+        if (!wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => ['wallet' => translate('insufficient wallet balance')]
@@ -1470,7 +1490,7 @@ class Playings extends Controller {
         $awardsCount = $modelAwards->where('game', $gameId)->where('status', 1)->countAllResults();
 
         if ($totalNumbersGenerated == 0) {
-            
+
             $cartonIds = array_column($selectedCartons, 'carton');
             $unavailableCartons = $modelCartons->whereIn('id', $cartonIds)->where('user !=', 0)->findAll();
 
@@ -1492,7 +1512,7 @@ class Playings extends Controller {
                     ]);
                 }
 
-                if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+                if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
                     throw new \Exception(translate('insufficient wallet balance'));
                 }
 
@@ -1523,7 +1543,7 @@ class Playings extends Controller {
 
             } catch (\Exception $e) {
                 $db->transRollback();
-                
+
                 return $this->response->setJSON([
                     'success' => false,
                     'errors' => ['general' => translate('error processing payment')]
@@ -1531,7 +1551,7 @@ class Playings extends Controller {
             }
 
         } elseif ($totalNumbersGenerated >= 75 || $singsCount >= $awardsCount) {
-          
+
             return $this->response->setJSON([
                 'success' => false,
                 'finished' => true,
@@ -1557,11 +1577,12 @@ class Playings extends Controller {
         }
     }
 
-    public function playCartonsGame() {
+    public function playCartonsGame()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
@@ -1639,7 +1660,7 @@ class Playings extends Controller {
 
         // Validar pagos mínimos
         $totalDeposits = $modelDeposits->where('user', $userId)->where('status', 2)->countAllResults();
-        
+
         if ($totalDeposits == 0 && systemGet('activateMinimumDeposit') == 1) {
             return $this->response->setJSON([
                 'success' => false,
@@ -1663,7 +1684,7 @@ class Playings extends Controller {
         $totalCost = $totalSelectedCartons * $game['price'];
 
         $user = wallet_service()->normalizeUser($user);
-        if (! wallet_service()->canAfford($user, $totalCost)) {
+        if (!wallet_service()->canAfford($user, $totalCost)) {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => ['wallet' => translate('insufficient wallet balance')]
@@ -1677,7 +1698,7 @@ class Playings extends Controller {
         $awardsCount = $modelAwards->where('game', $gameId)->where('status', 1)->countAllResults();
 
         if ($totalNumbersGenerated == 0) {
-            
+
             $cartonIds = array_column($selectedCartons, 'carton');
             $unavailableCartons = $modelCartons->whereIn('id', $cartonIds)->where('user !=', 0)->findAll();
 
@@ -1699,7 +1720,7 @@ class Playings extends Controller {
                     ]);
                 }
 
-                if ($totalCost > 0 && ! wallet_deduct_purchase($userId, $totalCost)) {
+                if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
                     throw new \Exception(translate('insufficient wallet balance'));
                 }
 
@@ -1730,7 +1751,7 @@ class Playings extends Controller {
 
             } catch (\Exception $e) {
                 $db->transRollback();
-                
+
                 return $this->response->setJSON([
                     'success' => false,
                     'errors' => ['general' => translate('error processing payment')]
@@ -1738,7 +1759,7 @@ class Playings extends Controller {
             }
 
         } elseif ($totalNumbersGenerated >= 75 || $singsCount >= $awardsCount) {
-          
+
             return $this->response->setJSON([
                 'success' => false,
                 'finished' => true,
@@ -1764,11 +1785,12 @@ class Playings extends Controller {
         }
     }
 
-    public function numberGet() {
+    public function numberGet()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-        
+
         $modelUsers = new UsersModel();
         $modelBoards = new BoardsModel();
         $modelModalities = new ModalitiesModel();
@@ -1806,7 +1828,7 @@ class Playings extends Controller {
         $totalNumbersGenerated = count($drawnNumbers);
 
         $user = $modelUsers->find(session()->get('id'));
-        if (! empty($drawnNumbers)) {
+        if (!empty($drawnNumbers)) {
             $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbers);
         }
 
@@ -1832,10 +1854,10 @@ class Playings extends Controller {
 
         // Buscar sings pendientes de notificar a otros jugadores (no al ganador)
         $pendingSings = $modelSings->where('game', $game['id'])->orderBy('created_at', 'DESC')->findAll();
-        
+
         foreach ($pendingSings as $sing) {
             $notified = json_decode($sing['notified'] ?? '[]', true);
-            if (! is_array($notified)) {
+            if (!is_array($notified)) {
                 $notified = [];
             }
 
@@ -1914,60 +1936,62 @@ class Playings extends Controller {
         ]);
     }
 
-    public function dialNumber() {
+    public function dialNumber()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
-    
+
         $number = $this->request->getPost('number');
-    
+
         $modelBoards = new BoardsModel();
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
-    
+
         $game = $modelGames->find(session()->get('game_id'));
-    
+
         if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
-    
+
         $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
-    
+
         if (empty($cartons)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('the user does not have cards')]);
         }
-    
+
         $cartonIds = array_column($cartons, 'id');
-    
+
         $existingNumbers = $modelNumbersCartons->getNumbersByUserAndGame(session()->get('id'), $game['id'], $number);
-    
+
         if (empty($existingNumbers)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('the number does not belong to your active cards for this game')]);
         }
 
         $numeroExistente = $modelBoards->getNumberByBoard($game['id'], $number);
-    
+
         if (empty($numeroExistente)) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('the number has not been generated, it cannot be marked')]);
         }
-    
+
         $db = \Config\Database::connect();
         $db->transStart();
-    
+
         $ids = array_column($existingNumbers, 'id');
         $modelNumbersCartons->whereIn('id', $ids)->set(['status' => 1])->update();
-    
+
         $db->transComplete();
-    
+
         if ($db->transStatus() === FALSE) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('error updating numbers')]);
         }
-    
+
         return $this->response->setJSON(['status' => 'success', 'message' => translate('number marked correctly on all cards')]);
     }
 
-    public function singBingo() {
+    public function singBingo()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
@@ -2005,7 +2029,7 @@ class Playings extends Controller {
 
         $userSing = $modelUsers->find(session()->get('id'));
 
-        if (! empty($drawnNumbersArray)) {
+        if (!empty($drawnNumbersArray)) {
             $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersArray);
         }
 
@@ -2015,14 +2039,14 @@ class Playings extends Controller {
             $lastBall['number']
         );
 
-        if (! empty($lastBallOnCards)) {
+        if (!empty($lastBallOnCards)) {
             $lastNumber = $modelNumbersCartons->getMarkedNumberByUserAndGame(
                 session()->get('id'),
                 $game['id'],
                 $lastBall['number']
             );
 
-            if (! $lastNumber) {
+            if (!$lastNumber) {
                 return $this->response->setJSON([
                     'status' => 'error',
                     'message' => translate('you cant sing bingo, the last number is not marked on your card')
@@ -2031,7 +2055,7 @@ class Playings extends Controller {
         }
         $imagePath = !empty($userSing['image']) ? site_url('uploads/users/' . $userSing['image']) : site_url('assets/img/avatar.jpg');
 
-        $lastValidNumber = end($drawnNumbersArray); 
+        $lastValidNumber = end($drawnNumbersArray);
 
         $singBingoOnlyLastBall = systemGet('singBingoOnlyLastBall');
 
@@ -2058,7 +2082,7 @@ class Playings extends Controller {
                     $singLastNumber = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->first();
                     if ($singLastNumber) {
                         if ($singLastNumber['lastnumber'] != $lastBall['number']) {
-                            continue; 
+                            continue;
                         }
                     }
                 }
@@ -2066,7 +2090,7 @@ class Playings extends Controller {
                 $userAlreadySang = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->where('user', session()->get('id'))->countAllResults();
 
                 if ($userAlreadySang > 0) {
-                    continue; 
+                    continue;
                 }
 
                 $cartonNumbers = $modelNumbersCartons
@@ -2080,7 +2104,7 @@ class Playings extends Controller {
 
                     if ($singBingoOnlyLastBall == 1) {
                         if (!in_array((int) $lastValidNumber, $winningNumbers, true)) {
-                            continue; 
+                            continue;
                         }
                     }
 
@@ -2094,7 +2118,7 @@ class Playings extends Controller {
                         false
                     );
 
-                    if (! $registered) {
+                    if (!$registered) {
                         continue;
                     }
 
@@ -2105,7 +2129,7 @@ class Playings extends Controller {
                         ->orderBy('id', 'DESC')
                         ->first()['id'] ?? null;
 
-                    if (! $id) {
+                    if (!$id) {
                         continue;
                     }
 
@@ -2159,7 +2183,7 @@ class Playings extends Controller {
                 'status' => 1,
                 'notified' => json_encode([$currentUserId]),
             ]);
-            
+
             // Intentar pago automático del cartón ganador
             helper('bingo');
             bingo_pay_sing_award((int) $singUser['id'], $currentUserId);
@@ -2201,22 +2225,23 @@ class Playings extends Controller {
         bingo_ensure_winners_registered($gameId);
     }
 
-    public function awardsGet() {
+    public function awardsGet()
+    {
         if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
 
         $modelGames = new GamesModel();
         $modelSings = new SingsModel();
-        $modelUsers = new UsersModel();  
-        $modelModalities = new ModalitiesModel(); 
+        $modelUsers = new UsersModel();
+        $modelModalities = new ModalitiesModel();
         $modelAwards = new AwardsModel();
         $modelCartons = new CartonsModel();
 
         $game = $modelGames->find(session()->get('game_id'));
         $data['game'] = $game;
 
-        if (! $game) {
+        if (!$game) {
             $data['sings'] = [];
             return view('playings/awards', $data);
         }
@@ -2272,14 +2297,15 @@ class Playings extends Controller {
         return view('playings/awards', $data);
     }
 
-    public function messageSubmit() {
+    public function messageSubmit()
+    {
         $modelGames = new GamesModel();
         $modelMessages = new MessagesModel();
 
         $game = $modelGames->find(session()->get('game_id'));
 
         $message = $this->request->getPost('message');
-        
+
         if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
@@ -2289,21 +2315,34 @@ class Playings extends Controller {
 
         if (!$isAdmin && !in_array((int) $game['type'], [3, 4], true)) {
             $allowedReactions = [
-                '¡Oe, me falta solo una! 😱', '¡Bravo, salió mi número! 🥳', '¡Este premio es mío! 🤑', '¡Suerte para todos! 🍀', '¡Mi Rey, Bingo! 👑',
-                '🥳', '🎉', '😎', '🍀', '🤑', '🌟', '😡', '🔥', '👑', '💵'
+                '¡Oe, me falta solo una! 😱',
+                '¡Bravo, salió mi número! 🥳',
+                '¡Este premio es mío! 🤑',
+                '¡Suerte para todos! 🍀',
+                '¡Mi Rey, Bingo! 👑',
+                '🥳',
+                '🎉',
+                '😎',
+                '🍀',
+                '🤑',
+                '🌟',
+                '😡',
+                '🔥',
+                '👑',
+                '💵'
             ];
             if (!in_array($message, $allowedReactions, true)) {
                 return $this->response->setJSON(['status' => 'error', 'message' => 'Solo se permiten reacciones predeterminadas en este modo.']);
             }
         }
-    
+
         $data = [
             'user' => session()->get('id'),
             'game' => $game['id'],
             'message' => $message,
             'status' => 1
         ];
-    
+
         $insertId = $modelMessages->insert($data, true);
 
         return $this->response->setJSON([
@@ -2313,7 +2352,8 @@ class Playings extends Controller {
         ]);
     }
 
-    public function messageGet() {
+    public function messageGet()
+    {
         $modelMessages = new MessagesModel();
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
@@ -2321,7 +2361,8 @@ class Playings extends Controller {
         $game = $modelGames->find(session()->get('game_id'));
         if (!$game) {
             return $this->response->setStatusCode(404)->setJSON([
-                'status' => 'stop', 'message' => translate('there are no active games')
+                'status' => 'stop',
+                'message' => translate('there are no active games')
             ]);
         }
 
@@ -2373,7 +2414,8 @@ class Playings extends Controller {
         ]);
     }
 
-    public function volumeSubmit() {
+    public function volumeSubmit()
+    {
         $modelUsers = new UsersModel();
 
         $user = $modelUsers->getUserById(session()->get('id'));
@@ -2384,12 +2426,13 @@ class Playings extends Controller {
             $data['sounds'] = 1;
         }
 
-        $modelUsers->update(session()->get('id'), $data);     
+        $modelUsers->update(session()->get('id'), $data);
 
         return $this->response->setJSON(['status' => 'success']);
     }
 
-    public function microphoneSubmit() {
+    public function microphoneSubmit()
+    {
         $modelUsers = new UsersModel();
 
         $user = $modelUsers->getUserById(session()->get('id'));
@@ -2400,12 +2443,13 @@ class Playings extends Controller {
             $data['narration'] = 1;
         }
 
-        $modelUsers->update(session()->get('id'), $data);     
+        $modelUsers->update(session()->get('id'), $data);
 
         return $this->response->setJSON(['status' => 'success']);
     }
 
-    public function checkSubmit() {
+    public function checkSubmit()
+    {
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
         $modelBoards = new BoardsModel();
@@ -2417,7 +2461,7 @@ class Playings extends Controller {
         $modelUsers->update(session()->get('id'), ['autodial' => $newAutodial]);
 
         $response = [
-            'status'   => 'success',
+            'status' => 'success',
             'autodial' => $newAutodial,
         ];
 
@@ -2427,7 +2471,7 @@ class Playings extends Controller {
             if ($game) {
                 $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
 
-                if (! empty($drawnNumbers)) {
+                if (!empty($drawnNumbers)) {
                     $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbers);
                 }
 
@@ -2447,7 +2491,7 @@ class Playings extends Controller {
     {
         $drawnNumbers = $this->getOrderedDrawnNumbers($gameId);
 
-        if (! empty($drawnNumbers)) {
+        if (!empty($drawnNumbers)) {
             $this->syncAutoDialMarks((int) session()->get('id'), $gameId, $drawnNumbers);
         }
 
@@ -2466,14 +2510,14 @@ class Playings extends Controller {
 
     public function winnersGet()
     {
-        if (! session()->get('logged_in') || session()->get('group') != 0) {
+        if (!session()->get('logged_in') || session()->get('group') != 0) {
             return redirect()->to('/signin');
         }
 
         $modelGames = new GamesModel();
         $game = $modelGames->find(session()->get('game_id'));
 
-        if (! $game) {
+        if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
 
@@ -2508,7 +2552,7 @@ class Playings extends Controller {
                 'player' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
                 'modality' => translate($wmodality['name'] ?? ''),
                 'modalityId' => (int) ($row['modality'] ?? 0),
-                'image' => ! empty($user['image'])
+                'image' => !empty($user['image'])
                     ? site_url('uploads/users/' . $user['image'])
                     : site_url('assets/img/avatar.jpg'),
             ];
@@ -2539,7 +2583,7 @@ class Playings extends Controller {
         if (!session()->get('logged_in')) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Not logged in']);
         }
-        
+
         $gameId = session()->get('game_id');
         if (!$gameId) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'No active game session']);
@@ -2547,7 +2591,7 @@ class Playings extends Controller {
 
         $modelGames = new GamesModel();
         $game = $modelGames->find($gameId);
-        
+
         if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Game not found']);
         }
