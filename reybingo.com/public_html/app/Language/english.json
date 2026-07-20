@@ -1131,5 +1131,8 @@
     "schedule": "Schedule",
     "select modalities": "Select modalities",
     "select modality": "Select modality",
-    "selected modalities": "Selected modalities"
+    "selected modalities": "Selected modalities",
+    "game postponed": "GAME POSTPONED",
+    "game postponed notification": "The automatic game was postponed 5 minutes (until :time) because the minimum requirements of :players player(s) and :cartons carton(s) were not met.",
+    "game postponed to": "Game was postponed until"
 }

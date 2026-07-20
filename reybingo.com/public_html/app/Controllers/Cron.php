@@ -595,12 +595,19 @@ class Cron extends Controller
                 // Enviar notificación global a todos los usuarios
                 $modelNotifications = new NotificationsModel();
                 $modelNotifications->insert([
-                    'user' => 0, 
-                    'type' => 2,
-                    'modality' => $gameToStart['modalities'] ?? '',
-                    'title' => '⏳ PARTIDA POSPUESTA',
-                    'message' => "La partida automática se pospuso 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
-                    'created_at' => $now
+                    'user'       => 0,
+                    'type'       => 'system',
+                    'game'       => $gameId,
+                    'title'      => '⏳ ' . translate('game postponed'),
+                    'message'    => translate('game postponed notification')
+                        ? str_replace(
+                            [':time', ':players', ':cartons'],
+                            [$newTimeObj->format('H:i'), $minPlayers, $minCartons],
+                            translate('game postponed notification')
+                          )
+                        : "La partida automática se pospuso 5 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                    'status'     => 0,
+                    'created_at' => $now,
                 ]);
 
                 // Notificar en tiempo real por Pusher si es posible

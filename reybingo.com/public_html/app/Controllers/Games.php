@@ -1584,16 +1584,67 @@ class Games extends Controller {
         if (session()->get('group') == 1
             && bingo_count_drawn_numbers((int) $game['id']) === 0
             && !bingo_can_start_game($game)) {
+
+            // Posponer 5 minutos en lugar de solo bloquear
+            $tz = new \DateTimeZone('America/Guayaquil');
+            $nowObj = new \DateTime('now', $tz);
+            $now = $nowObj->format('Y-m-d H:i:s');
+
+            $gameDateTime = new \DateTime($game['date'] . ' ' . $game['time'], $tz);
+            $gameDateTime->modify('+5 minutes');
+
+            $modelGames->update($game_id, [
+                'date'       => $gameDateTime->format('Y-m-d'),
+                'time'       => $gameDateTime->format('H:i:s'),
+                'status'     => 2, // Mantener en estado "pendiente"
+                'updated_at' => $now,
+            ]);
+
+            // Recargar datos del juego para el mensaje
+            helper(['bingo']);
+            $minCartons = bingo_get_min_cartons($game);
+            $minPlayers = bingo_get_min_players($game);
+
+            // Notificación global para todos los usuarios
+            $modelNotifications = new \App\Models\NotificationsModel();
+            $modelNotifications->insert([
+                'user'       => 0,
+                'type'       => 'system',
+                'game'       => (int) $game_id,
+                'title'      => '⏳ ' . translate('game postponed'),
+                'message'    => translate('game postponed notification')
+                    ? str_replace(
+                        [':time', ':players', ':cartons'],
+                        [$gameDateTime->format('H:i'), $minPlayers, $minCartons],
+                        translate('game postponed notification')
+                      )
+                    : "La partida se pospuso 5 minutos (hasta las " . $gameDateTime->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
+                'status'     => 0,
+                'created_at' => $now,
+            ]);
+
+            // Notificar en tiempo real por Pusher si es posible
+            try {
+                \App\Libraries\PusherFactory::make()->trigger('private-game-' . $game_id, 'game:postponed', [
+                    'new_time' => $gameDateTime->format('Y-m-d H:i:s'),
+                    'message'  => "La partida se ha pospuesto 5 minutos (hasta las " . $gameDateTime->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos.",
+                ]);
+            } catch (\Exception $pe) {
+                log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
+            }
+
             return $this->response->setJSON([
-                'success' => false,
-                'message' => bingo_game_start_block_message($game),
+                'success'  => false,
+                'postponed' => true,
+                'message'  => bingo_game_start_block_message($game) . ' ' . translate('game postponed to') . ' ' . $gameDateTime->format('H:i') . '.',
+                'new_time' => $gameDateTime->format('H:i'),
             ]);
         }
 
         session()->set('game_id', $game_id);
 
         return $this->response->setJSON([
-            'success' => true,
+            'success'  => true,
             'redirect' => site_url('/live'),
         ]);
     }
@@ -2553,12 +2604,23 @@ class Games extends Controller {
         $modelUsers = new UsersModel(); 
         $modelModalities = new ModalitiesModel();
         $modelAwards = new AwardsModel();
+        $modelCartons = new CartonsModel();
         
         $game = $modelGames->find($game_id);
 
         $data['game'] = $game;
 
         $sings = $modelSings->where('game', $game['id'])->findAll();
+
+        $cartonsCount = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+
+        // Contar ganadores por modalidad para dividir el premio en caso de empate
+        $winnersCountByModality = [];
+        foreach ($sings as $s) {
+            $winnersCountByModality[$s['modality']] = ($winnersCountByModality[$s['modality']] ?? 0) + 1;
+        }
+
+        helper('bingo');
 
         foreach ($sings as &$sing) {
             $user = $modelUsers->find($sing['user']);
@@ -2568,7 +2630,11 @@ class Games extends Controller {
 
             $sing['user_name'] = $user ? $user['name'] : translate('user not found');
             $sing['modality_name'] = $modality ? $modality['name'] : translate('mode not found');
-            $sing['award_amount'] = $award ? $award['amount'] : translate('amount not available'); 
+
+            $totalAmount = bingo_calculate_single_award_amount($game, $award ?? [], $cartonsCount);
+            $dividedAmount = $totalAmount / max(1, $winnersCountByModality[$sing['modality']]);
+
+            $sing['award_amount'] = number_format($dividedAmount, 2, '.', ''); 
 
             if ($sing['status'] == 1) {
                 $sing['status'] = '<span class="badge bg-warning text-muted">' . translate('EARRING') . '</span>';

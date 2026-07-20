@@ -220,6 +220,22 @@
         .then(data => {
             if (data.success) {
                 window.location.href = data.redirect;
+            } else if (data.postponed) {
+                // Partida pospuesta: mostrar en naranja y refrescar la lista
+                Toastify({
+                    text: '⏳ ' + (data.message || '<?= translate('game postponed'); ?>'),
+                    duration: 6000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#f59e0b" },
+                    stopOnFocus: true
+                }).showToast();
+                // Refrescar la lista para mostrar la nueva hora
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 1500);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 1500);
+                }
             } else {
                 Toastify({
                     text: data.message || "<?= translate('the game could not be started. try again'); ?>",

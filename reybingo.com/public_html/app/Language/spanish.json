@@ -1129,5 +1129,8 @@
     "schedule": "Schedule",
     "select modalities": "Select modalities",
     "select modality": "Select modality",
-    "selected modalities": "Selected modalities"
+    "selected modalities": "Selected modalities",
+    "game postponed": "PARTIDA POSPUESTA",
+    "game postponed notification": "La partida automática se pospuso 5 minutos (hasta las :time) porque no se cumplieron los requisitos mínimos de :players jugador(es) y :cartons cartón(es).",
+    "game postponed to": "La partida fue pospuesta hasta las"
 }

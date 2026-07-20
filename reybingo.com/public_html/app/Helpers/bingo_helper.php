@@ -906,11 +906,11 @@ if (!function_exists('bingo_game_start_block_message')) {
 
         $messages = [];
 
-        if ($playerCount <= bingo_get_min_players($game)) {
+        if ($playerCount < bingo_get_min_players($game)) {
             $messages[] = bingo_min_players_start_message($game, $playerCount);
         }
 
-        if ($cartonCount <= bingo_get_min_cartons($game)) {
+        if ($cartonCount < bingo_get_min_cartons($game)) {
             $messages[] = bingo_min_cartons_start_message($game, $cartonCount);
         }
 
@@ -947,7 +947,7 @@ if (!function_exists('bingo_calculate_game_award_total')) {
 
         $poolCartons = $cartonCount;
         if ($forDisplay && $poolCartons === 0) {
-            $poolCartons = bingo_get_min_cartons($game) + 1;
+            $poolCartons = bingo_get_min_cartons($game);
         }
 
         $prizePool = bingo_calculate_game_prize_pool($game, $poolCartons);
@@ -968,6 +968,25 @@ if (!function_exists('bingo_get_game_award_total_for_display')) {
         $awards = $awardModel->where('game', (int) $game['id'])->where('status', 1)->findAll();
 
         return bingo_calculate_game_award_total($game, $cartonCount, $awards, true);
+    }
+}
+
+if (!function_exists('bingo_calculate_single_award_amount')) {
+    function bingo_calculate_single_award_amount(array $game, array $award, int $cartonCount): float
+    {
+        if (empty($award)) {
+            return 0.0;
+        }
+
+        $awardType = (int) ($game['award'] ?? 1);
+
+        if ($awardType === 2) { // Fijo
+            return (float) ($award['amount'] ?? 0);
+        }
+
+        // Acumulado
+        $prizePool = bingo_calculate_game_prize_pool($game, $cartonCount);
+        return $prizePool * ((float) ($award['amount'] ?? 0) / 100);
     }
 }
 
@@ -1493,6 +1512,11 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
 
         try {
             $db = \Config\Database::connect();
+            
+            try {
+                $db->query("ALTER TABLE `notifications` MODIFY COLUMN `type` ENUM('message','sing','system','low_balance','deposit','withdraw','purchase') NOT NULL DEFAULT 'system'");
+            } catch (\Exception $e) {}
+
             if (!$db->tableExists('system')) {
                 return;
             }

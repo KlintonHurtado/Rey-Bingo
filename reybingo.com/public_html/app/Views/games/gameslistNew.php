@@ -279,10 +279,24 @@
         .then(data => {
             if (data.success) {
                 window.location.href = data.redirect;
+            } else if (data.postponed) {
+                Toastify({
+                    text: '⏳ ' + (data.message || '<?= translate('game postponed'); ?>'),
+                    duration: 6000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#f59e0b" },
+                    stopOnFocus: true
+                }).showToast();
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 1500);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 1500);
+                }
             } else {
                 console.error('error when starting the game:', data.message || 'unknown error');
                 Toastify({
-                    text: "<?= translate('the game could not be started. try again'); ?>",
+                    text: data.message || "<?= translate('the game could not be started. try again'); ?>",
                     duration: 3000,
                     gravity: "top",
                     position: "right",
