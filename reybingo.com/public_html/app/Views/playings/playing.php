@@ -165,54 +165,73 @@
             border-radius: 4px !important;
         }
 
-        /* Panel de modalidades en Web/PC: compacto en la esquina superior izquierda */
+        /* Panel de modalidades en Web/PC: barra horizontal en la parte inferior */
         .modalities-display-container {
-            width: auto !important;
-            min-width: 180px !important;
-            max-width: 240px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: unset !important;
             height: auto !important;
-            max-height: 350px !important;
-            top: calc(var(--top-section-height, 140px) + 10px) !important;
-            bottom: auto !important;
-            left: 16px !important;
-            border-radius: 14px !important;
-            background: rgba(255, 255, 255, 0.92) !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+            max-height: 180px !important;
+            top: auto !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            border-radius: 16px 16px 0 0 !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
             border: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        /* Ocultar el botón de cerrar en escritorio ya que será una barra fija */
+        .modalities-display-container .modalities-display-close {
+            display: none !important;
         }
         .modalities-display-container .modalities-display-container__toolbar {
             background: linear-gradient(135deg, rgba(135, 103, 250, 0.95) 0%, rgba(98, 54, 255, 1) 100%) !important;
-            border-radius: 14px 14px 0 0 !important;
-            padding: 8px 10px 6px !important;
+            border-radius: 16px 16px 0 0 !important;
+            padding: 8px 16px !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+        .modalities-display-container .modalities-display-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .modalities-display-container .modalities-display-meta h6 {
             color: #ffffff !important;
-            font-size: 0.85rem !important;
+            font-size: 0.95rem !important;
+            margin: 0 !important;
         }
         .modalities-display-container .modalities-display-meta .modalities-display__hint {
             color: rgba(255, 255, 255, 0.85) !important;
-            font-size: 0.65rem !important;
+            font-size: 0.75rem !important;
+            margin: 0 !important;
         }
-        /* En desktop la zona de cartones se muestra verticalmente (scroll si hay varios) */
+        /* En desktop la zona de modalidades se muestra horizontalmente */
         .modalities-display-container .modalities-display {
-            overflow-x: hidden !important;
-            overflow-y: auto !important;
-            padding: 8px 10px 10px !important;
-            scroll-snap-type: none !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            padding: 12px 16px !important;
+            scroll-snap-type: x mandatory !important;
+            display: flex !important;
         }
         .modalities-display-container .container-cartons-modalities {
-            flex-direction: column !important;
+            flex-direction: row !important;
             flex-wrap: nowrap !important;
-            gap: 10px !important;
-            width: 100% !important;
+            gap: 12px !important;
+            width: auto !important;
             min-width: unset !important;
+            display: flex !important;
         }
-        /* Scrollbar delgado para el panel de modalidades en PC */
+        /* Scrollbar horizontal para el panel de modalidades en PC */
         .modalities-display-container .modalities-display::-webkit-scrollbar {
-            width: 5px !important;
-            height: auto !important;
+            height: 6px !important;
+            width: auto !important;
             display: block !important;
         }
         .modalities-display-container .modalities-display::-webkit-scrollbar-thumb {
@@ -225,17 +244,18 @@
         .modalities-display-container .modalities-display::-webkit-scrollbar-track {
             background-color: transparent !important;
         }
-        /* Tarjetas de modalidad en desktop: blancas y compactas */
+        /* Tarjetas de modalidad en desktop: blancas y compactas (verticales) */
         .modalities-display-container .border-carton {
-            min-width: unset !important;
-            max-width: 100% !important;
-            width: 100% !important;
+            min-width: 140px !important;
+            max-width: 160px !important;
+            width: auto !important;
             background: #ffffff !important;
             border: 2px solid #6236ff !important;
             border-radius: 10px !important;
-            padding: 8px 8px 8px !important;
+            padding: 8px !important;
             box-shadow: 0 2px 8px rgba(98, 54, 255, 0.15) !important;
-            scroll-snap-align: unset !important;
+            scroll-snap-align: start !important;
+            flex: 0 0 auto !important;
         }
         .modalities-display-container .border-carton.modality-won {
             border-color: #9e9e9e !important;
@@ -245,15 +265,24 @@
         }
         .modalities-display-container .border-carton .modality-name {
             color: #333 !important;
-            font-size: 0.75rem !important;
+            font-size: 0.8rem !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .modalities-display-container .border-carton .modality-prize {
             color: #6236ff !important;
-            font-size: 0.78rem !important;
+            font-size: 0.85rem !important;
+            font-weight: bold !important;
         }
         .modalities-display-container .carton {
-            max-width: 150px !important;
+            max-width: 100% !important;
             width: 100% !important;
+            aspect-ratio: 1;
+        }
+        /* Añadir padding inferior al contenedor de cartones para que no quede detrás del panel */
+        .container-section--playing {
+            padding-bottom: 200px !important;
         }
     }
     .container-section--playing .bingo-border-carton {
