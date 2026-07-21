@@ -165,25 +165,19 @@
             border-radius: 4px !important;
         }
 
-        /* Panel de modalidades en Web/PC: Estilo idéntico al Chat pero a la izquierda */
+        /* Panel de modalidades en Web/PC: Estilo base (móvil) ubicado en la esquina inferior izquierda */
         .modalities-display-container {
-            width: 450px !important;
-            height: 520px !important;
-            max-height: calc(100vh - 120px) !important;
+            width: 100% !important;
+            max-width: 450px !important; /* Ancho fijo en PC */
+            height: auto !important;
+            max-height: 280px !important;
             top: auto !important;
             bottom: 20px !important; 
             left: 20px !important; 
             right: auto !important;
             transform: none !important;
-            border-radius: 16px !important;
-            background: linear-gradient(180deg, rgba(135, 103, 250, 0.40) 0%, rgba(98, 54, 255, 0.50) 100%) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
-            border: 1px solid rgba(255, 255, 255, 0.25) !important;
-            flex-direction: column !important;
-            z-index: 1060 !important;
-            display: none; /* Por defecto oculto */
+            border-radius: 16px !important; /* Bordes redondeados completos en PC */
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
         }
         /* Para que funcione el toggle al dar click */
         .modalities-display-container.is-open {
@@ -191,119 +185,47 @@
         }
 
         .modalities-display-container .modalities-display-container__toolbar {
-            background: transparent !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
-            border-radius: 0 !important;
-            padding: 12px 16px !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            align-items: center !important;
+            padding: 8px 16px !important;
         }
-        .modalities-display-container .modalities-display-meta {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .modalities-display-container .modalities-display-meta h6 {
-            color: #ffffff !important;
-            font-size: 1rem !important;
-            margin: 0 !important;
-        }
+        
         .modalities-display-container .modalities-display-meta .modalities-display__hint {
-            display: none !important; /* Ocultamos el hint de "desliza ->" porque ahora es vertical */
-        }
-        /* En desktop la zona de modalidades se muestra VERTICALMENTE (como el chat) */
-        .modalities-display-container .modalities-display {
-            overflow-x: hidden !important;
-            overflow-y: auto !important;
-            padding: 16px !important;
-            scroll-snap-type: none !important;
             display: block !important;
         }
+
+        /* En desktop la zona de modalidades se muestra horizontalmente (igual que móvil) */
+        .modalities-display-container .modalities-display {
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            padding: 12px 16px !important;
+            display: flex !important;
+        }
         .modalities-display-container .container-cartons-modalities {
-            flex-direction: column !important;
+            flex-direction: row !important;
             flex-wrap: nowrap !important;
-            gap: 16px !important;
-            width: 100% !important;
+            gap: 12px !important;
+            width: auto !important;
             min-width: unset !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: stretch !important;
         }
-        /* Scrollbar vertical tipo chat */
+        
+        /* Scrollbar horizontal para el panel de modalidades en PC */
         .modalities-display-container .modalities-display::-webkit-scrollbar {
-            width: 6px !important;
-            height: auto !important;
+            height: 6px !important;
             display: block !important;
         }
         .modalities-display-container .modalities-display::-webkit-scrollbar-thumb {
-            background-color: rgba(255, 255, 255, 0.2) !important;
+            background-color: rgba(255, 255, 255, 0.45) !important;
             border-radius: 4px !important;
         }
-        .modalities-display-container .modalities-display::-webkit-scrollbar-thumb:hover {
-            background-color: rgba(255, 255, 255, 0.4) !important;
-        }
-        .modalities-display-container .modalities-display::-webkit-scrollbar-track {
-            background-color: transparent !important;
-        }
-        /* Tarjetas de modalidad en desktop: transparentes tipo glassmorphism */
+        
+        /* Tarjetas de modalidad en desktop: iguales al móvil pero ajustadas a PC */
         .modalities-display-container .border-carton {
-            min-width: 280px !important;
-            max-width: 320px !important;
-            width: 100% !important;
-            background: rgba(255, 255, 255, 0.1) !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            border-radius: 12px !important;
-            padding: 16px !important;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
-            scroll-snap-align: unset !important;
+            min-width: 150px !important;
+            max-width: 180px !important;
+            width: auto !important;
+            padding: 8px !important;
             flex: 0 0 auto !important;
-            backdrop-filter: blur(5px) !important;
-        }
-        .modalities-display-container .border-carton.modality-won {
-            background: rgba(0, 0, 0, 0.5) !important;
-            border-color: rgba(255, 255, 255, 0.2) !important;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3) !important;
-            opacity: 1 !important;
-        }
-        .modalities-display-container .border-carton.modality-won .modality-name,
-        .modalities-display-container .border-carton.modality-won .modality-prize {
-            color: #ffffff !important;
-        }
-        .modalities-display-container .border-carton .modality-name {
-            color: #ffffff !important;
-            font-size: 0.95rem !important;
-            font-weight: bold !important;
-            text-align: center;
-            display: block;
-            margin-bottom: 12px;
-        }
-        .modalities-display-container .border-carton .modality-prize {
-            color: #a3ffb4 !important;
-            font-size: 0.95rem !important;
-            font-weight: bold !important;
-            text-align: center;
-            display: block;
-            margin-top: 12px;
-        }
-        .modalities-display-container .carton {
-            max-width: 100% !important;
-            width: 100% !important;
-            aspect-ratio: 1;
-        }
-        .modalities-display-container .carton .card-letter {
-            background: rgba(255, 255, 255, 0.95) !important;
-            color: #000 !important;
-            border: 1px solid rgba(0, 0, 0, 0.1) !important;
-        }
-        .modalities-display-container .carton .card-number {
-            background: rgba(255, 255, 255, 0.8) !important;
-            color: #000 !important;
-            border: 1px solid rgba(0, 0, 0, 0.1) !important;
-        }
-        .modalities-display-container .carton .card-number.modality-sing {
-            background: #6236ff !important;
-            color: #fff !important;
-            border: 1px solid #4e2bc7 !important;
         }
 
     }
