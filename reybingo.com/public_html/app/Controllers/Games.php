@@ -1521,8 +1521,8 @@ class Games extends Controller {
                 ]);
             }
 
-            // Para juegos LIVE (type=3) el admin controla el inicio manualmente, sin mínimos
-            $isLive = ((int) ($game['type'] ?? 0)) === 3;
+            // Para juegos LIVE (type=3) o STREAM (type=4) el admin controla el inicio manualmente, sin mínimos
+            $isLive = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
             if (!$isLive && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
                 return $this->response->setJSON([
                     'success' => false,
@@ -1586,9 +1586,9 @@ class Games extends Controller {
         if (session()->get('group') == 1
             && bingo_count_drawn_numbers((int) $game['id']) === 0) {
 
-            // Para juegos tipo LIVE (type=3), el admin inicia manualmente y controla
+            // Para juegos tipo LIVE (type=3 o type=4), el admin inicia manualmente y controla
             // la partida en tiempo real, por lo que no se aplica la validación de mínimos.
-            $isLiveGame = ((int) ($game['type'] ?? 0)) === 3;
+            $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
 
             if (!$isLiveGame) {
                 // Calcular jugadores y cartones incluyendo los que están en el lobby (temp_cartons)
@@ -2565,7 +2565,7 @@ class Games extends Controller {
                     ? "gameGet('" . $game['id'] . "');"
                     : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
 
-                if ($game['type'] != 3) {
+                if ($game['type'] != 3 && $game['type'] != 4) {
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
                     // Juego LIVE: el botón de escritorio (desktop) SIEMPRE puede iniciar, sin validación de mínimos
