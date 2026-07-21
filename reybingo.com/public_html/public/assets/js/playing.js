@@ -1478,11 +1478,6 @@ function showCountdown(data, callback) {
         }
         if (borderCarton) {
             borderCarton.classList.add('modality-won');
-            // Aplicar estilos inline para garantizar visibilidad gris
-            borderCarton.style.filter = 'grayscale(100%)';
-            borderCarton.style.opacity = '0.5';
-            borderCarton.style.borderColor = '#9e9e9e';
-            borderCarton.style.boxShadow = '0 0 0 2px rgba(158,158,158,0.35)';
         }
 
         cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {

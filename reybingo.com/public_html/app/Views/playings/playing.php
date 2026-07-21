@@ -258,10 +258,14 @@
             flex: 0 0 auto !important;
         }
         .modalities-display-container .border-carton.modality-won {
-            border-color: #9e9e9e !important;
-            box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.35) !important;
-            opacity: 0.6 !important;
-            filter: grayscale(100%) !important;
+            background: #222222 !important;
+            border-color: #000000 !important;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important;
+            opacity: 0.9 !important;
+        }
+        .modalities-display-container .border-carton.modality-won .modality-name,
+        .modalities-display-container .border-carton.modality-won .modality-prize {
+            color: #ffffff !important;
         }
         .modalities-display-container .border-carton .modality-name {
             color: #333 !important;
@@ -469,10 +473,14 @@
         box-shadow: 0 4px 14px rgba(98, 54, 255, 0.2) !important;
     }
     .modalities-display .border-carton.modality-won {
-        border-color: #9e9e9e !important;
-        box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.35) !important;
-        opacity: 0.6 !important;
-        filter: grayscale(100%) !important;
+        background: #222222 !important;
+        border-color: #000000 !important;
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important;
+        opacity: 0.9 !important;
+    }
+    .modalities-display .border-carton.modality-won .modality-name,
+    .modalities-display .border-carton.modality-won .modality-prize {
+        color: #ffffff !important;
     }
     .modalities-display .border-carton .modality-name {
         display: block;
@@ -1131,13 +1139,9 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        // Aplicar estilos gris a modalidades ya completadas al cargar la página
-        document.querySelectorAll('.border-carton.modality-won').forEach(function(el) {
-            el.style.filter = 'grayscale(100%)';
-            el.style.opacity = '0.5';
-            el.style.borderColor = '#9e9e9e';
-            el.style.boxShadow = '0 0 0 2px rgba(158,158,158,0.35)';
-        });
+        // La clase .modality-won ya aplica el estilo negro mediante CSS, no se necesitan estilos inline
+        // document.querySelectorAll('.border-carton.modality-won').forEach(...)
+
 
         let exitUrl = null;
         let allowUnload = window.allowGameUnload === true;
