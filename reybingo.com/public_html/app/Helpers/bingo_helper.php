@@ -867,7 +867,7 @@ if (!function_exists('bingo_can_start_game')) {
         }
 
         // Permitir que el admin inicie cualquier partida manualmente, saltando el bloqueo
-        if (session()->has('logged_in') && session()->get('group') == 1) {
+        if (session()->get('logged_in') && session()->get('group') == 1) {
             return true;
         }
 

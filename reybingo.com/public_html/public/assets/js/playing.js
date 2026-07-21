@@ -846,6 +846,27 @@ function mergeWinnersFromServer(serverWinners) {
         })) {
             winners.push({ player: player, modality: modality });
         }
+
+        // Apply won styling to modality in real-time
+        if (winner.modalityId) {
+            const cartns = document.querySelectorAll(`[id="modality-${winner.modalityId}"]`);
+            cartns.forEach(cartn => {
+                cartn.classList.add('cartn-sing');
+
+                let borderCarton = cartn.parentElement;
+                while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+                    borderCarton = borderCarton.parentElement;
+                }
+                if (borderCarton) {
+                    borderCarton.classList.add('modality-won');
+                }
+
+                cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+                    el.classList.add('sing');
+                    el.innerText = '⭐️';
+                });
+            });
+        }
     });
 }
 
