@@ -888,8 +888,10 @@ if (!function_exists('bingo_can_start_game')) {
             $cartonCount = bingo_count_game_cartons((int) $game['id']);
         }
 
+        // Se permite iniciar si cumple el mínimo de jugadores O el mínimo de cartones,
+        // para soportar casos donde un Punto de Venta compra múltiples cartones para varios jugadores físicos.
         return $playerCount >= bingo_get_min_players($game)
-            && $cartonCount >= bingo_get_min_cartons($game);
+            || $cartonCount >= bingo_get_min_cartons($game);
     }
 }
 
@@ -940,11 +942,9 @@ if (!function_exists('bingo_game_start_block_message')) {
 
         $messages = [];
 
-        if ($playerCount < bingo_get_min_players($game)) {
+        // Si la partida NO puede iniciar (es decir, falló en AMBOS requisitos), mostramos los mensajes
+        if ($playerCount < bingo_get_min_players($game) && $cartonCount < bingo_get_min_cartons($game)) {
             $messages[] = bingo_min_players_start_message($game, $playerCount);
-        }
-
-        if ($cartonCount < bingo_get_min_cartons($game)) {
             $messages[] = bingo_min_cartons_start_message($game, $cartonCount);
         }
 

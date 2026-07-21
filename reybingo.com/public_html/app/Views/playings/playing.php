@@ -307,15 +307,16 @@
         }
 
         .modalities-display-container .border-carton.modality-won {
-            background: #222222 !important;
-            border-color: #000000 !important;
-            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important;
-            opacity: 0.9 !important;
+            background: #f5f5f5 !important;
+            border-color: #cccccc !important;
+            box-shadow: none !important;
+            filter: grayscale(100%) opacity(0.7) !important;
+            pointer-events: none;
         }
 
         .modalities-display-container .border-carton.modality-won .modality-name,
         .modalities-display-container .border-carton.modality-won .modality-prize {
-            color: #ffffff !important;
+            color: #555555 !important;
         }
 
         .modalities-display-container .border-carton .modality-name {
@@ -556,15 +557,16 @@
     }
 
     .modalities-display .border-carton.modality-won {
-        background: #222222 !important;
-        border-color: #000000 !important;
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important;
-        opacity: 0.9 !important;
+        background: #f5f5f5 !important;
+        border-color: #cccccc !important;
+        box-shadow: none !important;
+        filter: grayscale(100%) opacity(0.7) !important;
+        pointer-events: none;
     }
 
     .modalities-display .border-carton.modality-won .modality-name,
     .modalities-display .border-carton.modality-won .modality-prize {
-        color: #ffffff !important;
+        color: #555555 !important;
     }
 
     .modalities-display .border-carton .modality-name {
