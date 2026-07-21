@@ -165,30 +165,32 @@
             border-radius: 4px !important;
         }
 
-        /* Panel de modalidades en Web/PC: barra horizontal en la parte inferior */
+        /* Panel de modalidades en Web/PC: ventana emergente flotante inferior */
         .modalities-display-container {
-            width: 100% !important;
-            max-width: 100% !important;
-            min-width: unset !important;
+            width: auto !important;
+            max-width: 95vw !important;
+            min-width: 320px !important;
             height: auto !important;
-            max-height: 180px !important;
+            max-height: 250px !important;
             top: auto !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            border-radius: 16px 16px 0 0 !important;
+            bottom: 100px !important; /* Subido para que no tape los botones ni la parte inferior */
+            left: 50% !important;     /* Centrado horizontalmente */
+            transform: translateX(-50%) !important;
+            right: auto !important;
+            border-radius: 16px !important; /* Bordes redondeados completos */
             background: rgba(255, 255, 255, 0.95) !important;
             backdrop-filter: blur(10px) !important;
             -webkit-backdrop-filter: blur(10px) !important;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
-            border: none !important;
-            display: flex !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
             flex-direction: column !important;
+            z-index: 1060 !important;
         }
-        /* Ocultar el botón de cerrar en escritorio ya que será una barra fija */
-        .modalities-display-container .modalities-display-close {
-            display: none !important;
+        /* Para que funcione el toggle al dar click */
+        .modalities-display-container.is-open {
+            display: flex !important;
         }
+
         .modalities-display-container .modalities-display-container__toolbar {
             background: linear-gradient(135deg, rgba(135, 103, 250, 0.95) 0%, rgba(98, 54, 255, 1) 100%) !important;
             border-radius: 16px 16px 0 0 !important;
@@ -284,10 +286,7 @@
             width: 100% !important;
             aspect-ratio: 1;
         }
-        /* Añadir padding inferior al contenedor de cartones para que no quede detrás del panel */
-        .container-section--playing {
-            padding-bottom: 200px !important;
-        }
+
     }
     .container-section--playing .bingo-border-carton {
         width: fit-content !important;
