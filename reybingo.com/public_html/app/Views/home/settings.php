@@ -318,15 +318,13 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="autoGameModalities" class="form-label"><?= translate('modality'); ?></label>
-                                <select class="form-control form-control-lg form-bingo" name="autoGameModalities[]" id="autoGameModalities">
-                                    <option value=""><?= translate('select modality') ?: 'Seleccionar modalidad'; ?></option>
+                                <select class="form-control form-control-lg form-bingo" name="autoGameModalities[]" id="autoGameModalities" multiple="multiple" style="height: 120px;">
                                     <?php if (!empty($allmodalities)): ?>
                                         <?php 
                                         $selectedModalities = array_filter(explode(',', systemGet('autoGameModalities') ?? ''));
-                                        $currentModality = reset($selectedModalities) ?: '';
                                         ?>
                                         <?php foreach ($allmodalities as $mod): ?>
-                                            <option value="<?= $mod['id'] ?>" <?= (string)$mod['id'] === (string)$currentModality ? 'selected' : '' ?>><?= $mod['name'] ?></option>
+                                            <option value="<?= $mod['id'] ?>" <?= in_array((string)$mod['id'], $selectedModalities) ? 'selected' : '' ?>><?= $mod['name'] ?></option>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
                                 </select>

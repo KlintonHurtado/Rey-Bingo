@@ -154,6 +154,9 @@ class Cron extends Controller
         }
 
         $addGamesTime = (int) systemGet('addGamesTime'); // Intervalo en minutos
+        if ($addGamesTime <= 0) {
+            $addGamesTime = 30;
+        }
         $tz = new \DateTimeZone('America/Guayaquil');
         $now = new \DateTime('now', $tz);
 
