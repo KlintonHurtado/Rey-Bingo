@@ -310,7 +310,7 @@ function handleNumberDrawn(data) {
 }
 
 function handleWinnerClaimed(data) {
-    const { playerName, modality, image } = data;
+    const { playerName, modality, image, modalityId } = data;
     
     // Agregar ganador a la lista
     winners.push({
@@ -318,6 +318,18 @@ function handleWinnerClaimed(data) {
         modality: modality,
         image: image
     });
+
+    // Convertir visualmente la modalidad a "ganada" en tiempo real en el admin
+    if (modalityId) {
+        const modalityElement = document.getElementById(`modality-${modalityId}`);
+        if (modalityElement) {
+            modalityElement.classList.add('cartn-sing');
+            const parentBorder = modalityElement.closest('.border-carton');
+            if (parentBorder) {
+                parentBorder.classList.add('modality-won');
+            }
+        }
+    }
     
     // Mostrar notificaci\u00f3n de ganador
     showWinnerNotification(playerName, modality, image);

@@ -70,6 +70,142 @@
         opacity: 0.85 !important;
         box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.15) !important;
     }
+    .message-btn:hover {
+        background: #f0f0f0 !important;
+    }
+    
+    /* Panel de modalidades: Estilo chat pero con colores móviles */
+    .modalities-display-container {
+        width: 450px !important;
+        height: 520px !important;
+        max-height: calc(100vh - 120px) !important;
+        top: auto !important;
+        bottom: 20px !important;
+        left: 20px !important;
+        right: auto !important;
+        transform: none !important;
+        border-radius: 16px !important;
+        background: linear-gradient(180deg, rgba(24, 10, 84, 0.22) 0%, rgba(33, 16, 95, 0.72) 28%, rgba(55, 29, 146, 0.96) 100%) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
+        border: none !important;
+        flex-direction: column !important;
+        z-index: 1060 !important;
+        display: none;
+    }
+
+    .modalities-display-container.is-open {
+        display: flex !important;
+    }
+
+    .modalities-display-container .modalities-display-container__toolbar {
+        background: transparent !important;
+        border-bottom: none !important;
+        border-radius: 0 !important;
+        padding: 12px 16px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .modalities-display-container .modalities-display-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .modalities-display-container .modalities-display-meta h6 {
+        color: #ffffff !important;
+        font-size: 1rem !important;
+        margin: 0 !important;
+    }
+
+    .modalities-display-container .modalities-display-meta .modalities-display__hint {
+        display: none !important;
+    }
+
+    .modalities-display-container .modalities-display {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        padding: 16px !important;
+        scroll-snap-type: none !important;
+        display: block !important;
+    }
+
+    .modalities-display-container .container-cartons-modalities {
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        gap: 16px !important;
+        width: 100% !important;
+        min-width: unset !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .modalities-display-container .modalities-display::-webkit-scrollbar {
+        width: 6px !important;
+        height: auto !important;
+        display: block !important;
+    }
+
+    .modalities-display-container .modalities-display::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.45) !important;
+        border-radius: 4px !important;
+    }
+
+    .modalities-display-container .border-carton {
+        min-width: 280px !important;
+        max-width: 320px !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        border: 2px solid #6236ff !important;
+        border-radius: 12px !important;
+        padding: 16px !important;
+        box-shadow: 0 4px 14px rgba(98, 54, 255, 0.2) !important;
+        scroll-snap-align: unset !important;
+        flex: 0 0 auto !important;
+        backdrop-filter: none !important;
+    }
+
+    .modalities-display-container .border-carton.modality-won {
+        background: #f5f5f5 !important;
+        border-color: #cccccc !important;
+        box-shadow: none !important;
+        filter: grayscale(100%) opacity(0.7) !important;
+        pointer-events: none;
+    }
+
+    .modalities-display-container .border-carton.modality-won .modality-name,
+    .modalities-display-container .border-carton.modality-won .modality-prize {
+        color: #555555 !important;
+    }
+
+    .modalities-display-container .border-carton .modality-name {
+        color: #333 !important;
+        font-size: 0.95rem !important;
+        font-weight: bold !important;
+        text-align: center;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .modalities-display-container .border-carton .modality-prize {
+        color: #6236ff !important;
+        font-size: 0.95rem !important;
+        font-weight: bold !important;
+        text-align: center;
+        display: block;
+        margin-top: 12px;
+    }
+
+    .modalities-display-container .carton {
+        max-width: 100% !important;
+        width: 100% !important;
+        aspect-ratio: 1;
+    }
+
     .board-admin-chat .message-bubble span.emoji-message {
         font-size: 1.5rem !important;
     }
@@ -173,7 +309,7 @@
         <?php $class = $lastNumber ? $getClass($lastNumber) : 'STOP'; ?> <?php $letter = $lastNumber ? $getClass($lastNumber) : ''; ?>
         <div class="bingo-ball <?= $class ?> size-100" id="last-number"><small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;"><?= $letter ?></small><span><?= $lastNumber ? $lastNumber : 'STOP'; ?></span></div>
         <div class="last-numbers">
-            <button class="btn btn-small btn-cells size-40" onclick="modalitiesGet();"><i class="fa-duotone fa-solid fa-table-cells"></i></button>
+            <button class="btn btn-small btn-cells size-40" id="toggle-modalities-btn" aria-label="<?= translate('modalities'); ?>" aria-expanded="false"><i class="fa-duotone fa-solid fa-table-cells"></i></button>
             <span id="last-five-numbers">
                 <?php foreach ($fourNumbers as $number): ?>
                     <?php $class = in_array($number, $fourNumbers) ? $getClass($number) : ''; ?>
@@ -324,61 +460,74 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalModalities" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered max-w-30">
-        <div class="modal-content">
-            <div class="modal-header text-center">
-                <h6 class="modal-title ps-2"><i class="fa-duotone fa-solid fa-chess-board"></i> <?= translate('modalities'); ?></h6>
-                <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body pt-0 text-center">
-                <?php if (!empty($modalities)): ?>
-                    <?php
-                        $count = count($modalities);
-                        $columns = $count >= 3 ? 3 : $count;
-                        $gridStyle = "grid-template-columns: repeat($columns, 1fr); width: 110px;";
-                    ?>
-                    <div class="container-cartons-modalities" style="<?= $gridStyle; ?>">
-                        <?php foreach ($modalities as $modality): ?>
+<?php if (!empty($modalities)): ?>
+<div class="modalities-display-container board-admin-chat" id="playing-modalities-panel" role="region" aria-label="<?= translate('modalities'); ?>" aria-hidden="true">
+    <div class="modalities-display-container__toolbar">
+        <div class="modalities-display-meta">
+            <h6><img src="<?= site_url('assets/img/modalidades.png'); ?>" alt="<?= translate('modalities'); ?>" style="width: 20px; height: 20px; object-fit: contain; margin-right: 6px; vertical-align: middle; filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.25));"> <?= translate('modalities'); ?></h6>
+            <span class="modalities-display__hint"><?= count($modalities); ?> <?= count($modalities) === 1 ? 'modalidad' : 'modalidades'; ?></span>
+        </div>
+        <button type="button" class="modalities-display-close" id="modalities-panel-close" aria-label="<?= translate('close'); ?>">
+            <i class="fa-duotone fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="modalities-display">
+        <?php
+            $count = count($modalities);
+            $columns = $count >= 3 ? 3 : $count;
+            $gridStyle = "grid-template-columns: repeat($columns, 1fr); width: 110px;";
+        ?>
+        <div class="container-cartons-modalities<?= count($modalities) === 1 ? ' container-cartons-modalities--solo' : '' ?>" style="<?= $gridStyle; ?>">
+            <?php foreach ($modalities as $modality): ?>
+                <?php
+                    $isSing = in_array($modality['id'], $singsModalities);
+                    $positions = explode(',', $modality['positions']);
+                ?>
+                <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
+                    <span class="modality-name"><?= translate($modality['name']); ?></span>
+                    <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                        <div class="card-letter B"><span>B</span></div>
+                        <div class="card-letter I"><span>I</span></div>
+                        <div class="card-letter N"><span>N</span></div>
+                        <div class="card-letter G"><span>G</span></div>
+                        <div class="card-letter O"><span>O</span></div>
+                        <?php for ($i = 1; $i <= 25; $i++): ?>
                             <?php
-                                $isSing = in_array($modality['id'], $singsModalities);
-                                $positions = explode(',', $modality['positions']);
+                                $isMarked = in_array($i, $positions);
+                                $showStar = $isSing && $isMarked || $i == 13;
                             ?>
-                            <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
-                                <small style="font-size: .7rem"><?= translate($modality['name']); ?></small>
-                                <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
-                                    <div class="card-letter B"><span>B</span></div>
-                                    <div class="card-letter I"><span>I</span></div>
-                                    <div class="card-letter N"><span>N</span></div>
-                                    <div class="card-letter G"><span>G</span></div>
-                                    <div class="card-letter O"><span>O</span></div>
-                                    <?php for ($i = 1; $i <= 25; $i++): ?>
-                                        <?php
-                                            $isMarked = in_array($i, $positions);
-                                            $showStar = $isSing && $isMarked || $i == 13;
-                                        ?>
-                                        <?php if ($i == 13): ?>
-                                            <div class="card-number" data-position="13" >⭐️</div>
-                                        <?php else: ?>
-                                            <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                        <?php endif; ?>
-                                    <?php endfor; ?>
-                                </div>
-                                <?php if ($game['award'] == 2) : ?>
-                                    <small style="font-size: .8rem" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></small>
-                                <?php else: ?>
-                                    <small style="font-size: .8rem" id="modality-amount-<?= $modality['id']; ?>"></small>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
+                            <?php if ($i == 13): ?>
+                                <div class="card-number" data-position="13" >⭐️</div>
+                            <?php else: ?>
+                                <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                            <?php endif; ?>
+                        <?php endfor; ?>
                     </div>
-                <?php else: ?>
-                    <p><?= translate('there are no modalities available'); ?></p>
-                <?php endif; ?>
-            </div>
+                    <?php if ($game['award'] == 2) : ?>
+                        <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                    <?php else: ?>
+                        <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
         </div>
     </div>
 </div>
+<?php else: ?>
+<div class="modalities-display-container board-admin-chat" id="playing-modalities-panel" role="region" aria-label="<?= translate('modalities'); ?>" aria-hidden="true">
+    <div class="modalities-display-container__toolbar">
+        <div class="modalities-display-meta">
+            <h6><img src="<?= site_url('assets/img/modalidades.png'); ?>" alt="<?= translate('modalities'); ?>" style="width: 20px; height: 20px; object-fit: contain; margin-right: 6px; vertical-align: middle; filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.25));"> <?= translate('modalities'); ?></h6>
+        </div>
+        <button type="button" class="modalities-display-close" id="modalities-panel-close" aria-label="<?= translate('close'); ?>">
+            <i class="fa-duotone fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="modalities-display" style="display: flex; align-items: center; justify-content: center; height: 100%;">
+        <p style="color: white; text-align: center;"><?= translate('there are no modalities available'); ?></p>
+    </div>
+</div>
+<?php endif; ?>
 
 <div id="countdown-container" style="position: fixed; display: none;">
     <div class="countdown-container"> 
@@ -577,4 +726,42 @@
     });
 </script>
 
-<script src="<?= site_url('assets/js/board.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/board-optimized.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const btnModalities = document.getElementById("toggle-modalities-btn");
+    const panelModalities = document.getElementById("playing-modalities-panel");
+    const btnCloseModalities = document.getElementById("modalities-panel-close");
+
+    if (btnModalities && panelModalities) {
+        btnModalities.addEventListener("click", function (event) {
+            event.stopPropagation();
+            panelModalities.classList.toggle("is-open");
+            document.body.classList.toggle("modalities-panel-open", panelModalities.classList.contains("is-open"));
+            
+            // Si se abre este, cerrar chat si estuviere abierto
+            const chatPanel = document.getElementById("message-display-container");
+            if (chatPanel && panelModalities.classList.contains("is-open")) {
+                chatPanel.classList.remove("is-open");
+                document.body.classList.remove("chat-panel-open");
+            }
+        });
+
+        if (btnCloseModalities) {
+            btnCloseModalities.addEventListener("click", function () {
+                panelModalities.classList.remove("is-open");
+                document.body.classList.remove("modalities-panel-open");
+            });
+        }
+        
+        // Cerrar panel al hacer click afuera
+        document.addEventListener("click", function (event) {
+            if (panelModalities.classList.contains("is-open") && !panelModalities.contains(event.target) && !btnModalities.contains(event.target)) {
+                panelModalities.classList.remove("is-open");
+                document.body.classList.remove("modalities-panel-open");
+            }
+        });
+    }
+});
+</script>

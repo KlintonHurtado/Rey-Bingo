@@ -315,6 +315,16 @@ function handleWinnerClaimed(data) {
     // Agregar modalidad a las ya cantadas
     if (!claimedModalities.includes(modalityId)) {
         claimedModalities.push(modalityId);
+        
+        // Convertir visualmente la modalidad a "ganada" en tiempo real
+        const modalityElement = document.getElementById(`modality-${modalityId}`);
+        if (modalityElement) {
+            modalityElement.classList.add('cartn-sing');
+            const parentBorder = modalityElement.closest('.border-carton');
+            if (parentBorder) {
+                parentBorder.classList.add('modality-won');
+            }
+        }
     }
     
     // Mostrar notificaci\u00f3n de ganador
@@ -595,7 +605,6 @@ function claimBingo(cartonId, modalityId) {
     // Agregar a modalidades cantadas localmente
     claimedModalities.push(modalityId);
     
-    // Enviar al servidor
     $.post(site_url + 'playings/singSubmit', {
         carton: cartonId,
         modality: modalityId
@@ -604,6 +613,16 @@ function claimBingo(cartonId, modalityId) {
         if (response.status === 'success') {
             showNotification('\u00a1BINGO! Has ganado', 'success');
             highlightWinningCarton(cartonId);
+            
+            // Convertir visualmente la modalidad a "ganada" en tiempo real
+            const modalityElement = document.getElementById(`modality-${modalityId}`);
+            if (modalityElement) {
+                modalityElement.classList.add('cartn-sing');
+                const parentBorder = modalityElement.closest('.border-carton');
+                if (parentBorder) {
+                    parentBorder.classList.add('modality-won');
+                }
+            }
         } else {
             // Remover de modalidades cantadas si fall\u00f3
             const index = claimedModalities.indexOf(modalityId);

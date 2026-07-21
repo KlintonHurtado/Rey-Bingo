@@ -800,62 +800,42 @@ if (!function_exists('bingo_ensure_winners_registered')) {
 }
 
 if (!function_exists('bingo_count_game_players')) {
-    /**
-     * Cuenta jugadores únicos con cartones confirmados (tabla cartons).
-     * Para modo LIVE también incluye jugadores con cartones en temp_cartons.
-     */
     function bingo_count_game_players(int $gameId): int
     {
         $db = \Config\Database::connect();
 
-        // Jugadores con cartones ya confirmados
-        $query = $db->query("SELECT COUNT(DISTINCT user) as total FROM cartons WHERE game = ? AND user != 0", [$gameId]);
-        $row   = $query->getRow();
-        $confirmed = $row ? (int) $row->total : 0;
-
-        // Jugadores con cartones en selección temporal (lobby LIVE)
-        $queryTemp = $db->query("SELECT COUNT(DISTINCT user) as total FROM temp_cartons WHERE game = ?", [$gameId]);
-        $rowTemp   = $queryTemp->getRow();
-        $temp = $rowTemp ? (int) $rowTemp->total : 0;
-
-        // Unión de ambos conjuntos para no duplicar
-        if ($temp > 0) {
-            $queryUnion = $db->query(
-                "SELECT COUNT(DISTINCT user) as total FROM (
-                    SELECT user FROM cartons WHERE game = ? AND user != 0
-                    UNION
-                    SELECT user FROM temp_cartons WHERE game = ?
-                ) AS all_players",
-                [$gameId, $gameId]
-            );
-            $rowUnion = $queryUnion->getRow();
-            return $rowUnion ? (int) $rowUnion->total : $confirmed;
+        $c = $db->table('cartons')->where('game', $gameId)->select('user')->distinct()->get()->getResultArray();
+        $t = $db->table('temp_cartons')->where('game', $gameId)->select('user')->distinct()->get()->getResultArray();
+        
+        $users = [];
+        foreach ($c as $row) {
+            if (!empty($row['user'])) {
+                $users[] = $row['user'];
+            }
         }
-
-        return $confirmed;
+        foreach ($t as $row) {
+            if (!empty($row['user'])) {
+                $users[] = $row['user'];
+            }
+        }
+        
+        return count(array_unique($users));
     }
 }
 
 if (!function_exists('bingo_count_game_cartons')) {
     /**
-     * Cuenta cartones activos (tabla cartons) con usuario asignado.
+     * Cuenta cartones activos (tabla cartons).
      * Para modo LIVE también incluye cartones en selección temporal (temp_cartons).
      */
     function bingo_count_game_cartons(int $gameId): int
     {
         $db = \Config\Database::connect();
 
-        // Cartones ya confirmados
-        $query = $db->query("SELECT COUNT(*) as total FROM cartons WHERE game = ? AND user != 0", [$gameId]);
-        $row   = $query->getRow();
-        $confirmed = $row ? (int) $row->total : 0;
+        $c = $db->table('cartons')->where('game', $gameId)->countAllResults();
+        $t = $db->table('temp_cartons')->where('game', $gameId)->countAllResults();
 
-        // Cartones en selección temporal (lobby LIVE)
-        $queryTemp = $db->query("SELECT COUNT(*) as total FROM temp_cartons WHERE game = ?", [$gameId]);
-        $rowTemp   = $queryTemp->getRow();
-        $temp = $rowTemp ? (int) $rowTemp->total : 0;
-
-        return $confirmed + $temp;
+        return $c + $t;
     }
 }
 
