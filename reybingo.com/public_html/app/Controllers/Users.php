@@ -13,6 +13,7 @@ use App\Models\ReferralsModel;
 use App\Models\RoulettesModel;
 use App\Models\GamesModel;
 use App\Models\CartonsModel;
+use App\Models\TempCartonsModel;
 use App\Models\AwardsModel;
 use App\Models\SingsModel;
 use App\Models\GameRoomsModel;
@@ -22,7 +23,7 @@ use CodeIgniter\Controller;
 
 class Users extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo']);
         session();
     }
 
@@ -1836,11 +1837,13 @@ class Users extends Controller {
 
                 foreach ($games as $game) {
                     $numbers = $modelBoards->where('game', $game['id'])->countAllResults();
-                    $players = $modelCartons->where('game', $game['id'])->where('user !=', 0)->select('user')->distinct()->countAllResults();
+                    // Incluir jugadores con cartones en temp_cartons (lobby LIVE) para mostrar conteo real
+                    $players = bingo_count_game_players((int) $game['id']);
                     $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
                     $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-                    $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+                    // Incluir cartones en temp_cartons para mostrar conteo real
+                    $cartons = bingo_count_game_cartons((int) $game['id']);
                     $accumulated = $cartons * $game['price'];
                     $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
                     
