@@ -669,6 +669,21 @@ function autoDrawNumber() {
         });
 }
 
+function startAutomaticGeneration() {
+    intervalManager.clear('generation');
+    let delay = typeof timeBallGet !== 'undefined' ? timeBallGet : 3000;
+    intervalManager.set('generation', autoDrawNumber, delay);
+}
+
+function stopAutomaticGeneration() {
+    intervalManager.clear('generation');
+}
+
+function sendSystemMessage(text, type = null) {
+    $.post(site_url + 'playings/messageSubmit', { message: text, type: type })
+        .fail((error) => console.error('Error sending system message:', error));
+}
+
 function resetGame() {
     if (!confirm('\u00bfEst\u00e1s seguro de reiniciar el juego?')) return;
     
@@ -746,15 +761,58 @@ $(document).ready(function() {
     const pusherInitialized = initializePusher();
     
     if (!pusherInitialized) {
-        console.error('\u274c Failed to initialize Pusher - falling back to polling');
-        // Aqu\u00ed podr\u00edas implementar un fallback al sistema de polling anterior
-        return;
+        console.error('\u274c Failed to initialize Pusher - falling back to polling/manual');
     }
     
     // Precargar audios
     if (typeof audioPath !== 'undefined') {
         audioManager.preloadAll(audioPath);
     }
+    
+    // Event listeners para botones de control del juego
+    $('#start-button').on('click', () => {
+        $('#start-button').hide();
+        $('#stop-button, #next-number-button').show();
+        sendSystemMessage((typeof __ !== 'undefined' && __['game started!'] ? __['game started!'] : '\u00a1JUEGO INICIADO!') + ' \ud83d\ude0e', 26);
+
+        if (!gameStarted) {
+            gameStarted = true;
+            startGameTimer();
+        }
+
+        setTimeout(() => {
+            autoDrawNumber();
+            startAutomaticGeneration();
+        }, 2000);
+    });
+
+    $('#next-number-button').on('click', () => {
+        stopAutomaticGeneration();
+        autoDrawNumber();
+        startAutomaticGeneration();
+    });
+
+    $('#stop-button').on('click', () => {
+        stopAutomaticGeneration();
+        $('#stop-button, #next-number-button').hide();
+        $('#play-button').show();
+    });
+
+    $('#play-button').on('click', () => {
+        startAutomaticGeneration();
+        $('#play-button').hide();
+        $('#stop-button, #next-number-button').show();
+    });
+
+    $('.btn-microphone').on('click', function() {
+        if (typeof narrationPlaying !== 'undefined') {
+            narrationPlaying = !narrationPlaying;
+            $(this).html(narrationPlaying ? 
+                '<i class="fa-duotone fa-solid fa-microphone"></i>' : 
+                '<i class="fa-duotone fa-solid fa-microphone-slash"></i>'
+            );
+        }
+    });
     
     // Event listeners para botones
     $('#btn-auto-draw').on('click', autoDrawNumber);

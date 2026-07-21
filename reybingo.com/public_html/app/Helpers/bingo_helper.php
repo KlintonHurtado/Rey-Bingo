@@ -860,6 +860,17 @@ if (!function_exists('bingo_get_min_cartons')) {
 if (!function_exists('bingo_can_start_game')) {
     function bingo_can_start_game(array $game, ?int $playerCount = null, ?int $cartonCount = null): bool
     {
+        // Para juegos tipo LIVE (type=3 o type=4), el admin controla todo manualmente
+        $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
+        if ($isLiveGame) {
+            return true;
+        }
+
+        // Permitir que el admin inicie cualquier partida manualmente, saltando el bloqueo
+        if (session()->has('logged_in') && session()->get('group') == 1) {
+            return true;
+        }
+
         if ($playerCount === null) {
             $playerCount = bingo_count_game_players((int) $game['id']);
         }

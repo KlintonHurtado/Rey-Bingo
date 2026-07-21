@@ -726,6 +726,12 @@
     });
 </script>
 
+<script>
+    window.PUSHER_KEY = '<?= env("PUSHER_KEY") ?>';
+    window.PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
+    window.GAME_ID = '<?= $game['id'] ?>';
+</script>
+
 <script src="<?= site_url('assets/js/board-optimized.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 
 <script>

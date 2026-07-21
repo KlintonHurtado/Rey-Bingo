@@ -1543,6 +1543,27 @@ function showOtherPlayerBingoNotice(data, callback) {
     if (nextGameSpan) {
         nextGameSpan.textContent = `GANADOR: ${data.player} - ${data.modality}`;
     }
+    
+    // Convertir visualmente la modalidad a "ganada" en tiempo real para todos los jugadores
+    if (data.modalityId) {
+        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
+        cartns.forEach(cartn => {
+            cartn.classList.add('cartn-sing');
+
+            let borderCarton = cartn.parentElement;
+            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+                borderCarton = borderCarton.parentElement;
+            }
+            if (borderCarton) {
+                borderCarton.classList.add('modality-won');
+            }
+
+            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+                el.classList.add('sing');
+                el.innerText = '⭐️';
+            });
+        });
+    }
 
     startWinnerSlider();
 
