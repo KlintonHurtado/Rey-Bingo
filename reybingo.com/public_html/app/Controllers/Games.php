@@ -1681,6 +1681,8 @@ class Games extends Controller {
             return redirect()->to('/signin');
         }
 
+        bingo_ensure_games_schema();
+
         $model = new GamesModel();
         $modelCartons = new CartonsModel();
         $modelNumbersCartons = new NumbersCartonsModel();
@@ -1699,7 +1701,7 @@ class Games extends Controller {
             ],
             'price' => [
                 'label' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton'),
-                'rules' => 'required'
+                'rules' => 'required|decimal|greater_than[0]|less_than_equal_to[9999]'
             ],
             'min_players' => [
                 'label' => translate('minimum players to start'),
@@ -1819,16 +1821,24 @@ class Games extends Controller {
 
         $md = implode(',', $modalities);
 
+        $price = round((float) str_replace(',', '.', (string) $this->request->getPost('price')), 2);
+        if ($price <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors'  => ['price' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton')]
+            ]);
+        }
+
         $gameData = [
             'user' => session()->get('id'),
             'room' => $this->request->getPost('room'),
             'description' => $this->request->getPost('description'),
-            'price' => $this->request->getPost('price'),
+            'price' => $price,
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
             'allow_roulette_cartons' => (
                 $this->request->getPost('allow_roulette_cartons')
-                && abs((float) $this->request->getPost('price') - bingo_roulette_carton_price()) < 0.001
+                && abs($price - bingo_roulette_carton_price()) < 0.001
             ) ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
@@ -2076,7 +2086,7 @@ class Games extends Controller {
             ],
             'price' => [
                 'label' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton'),
-                'rules' => 'required'
+                'rules' => 'required|decimal|greater_than[0]|less_than_equal_to[9999]'
             ],
             'min_players' => [
                 'label' => translate('minimum players to start'),
@@ -2196,16 +2206,24 @@ class Games extends Controller {
 
         $md = implode(',', $modalities);
 
+        $price = round((float) str_replace(',', '.', (string) $this->request->getPost('price')), 2);
+        if ($price <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors'  => ['price' => translate('price') . ' ' . translate('of the') . ' ' . translate('carton')]
+            ]);
+        }
+
         $gameData = [
             'user' => session()->get('id'),
             'room' => $this->request->getPost('room'),
             'description' => $this->request->getPost('description'),
-            'price' => $this->request->getPost('price'),
+            'price' => $price,
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
             'allow_roulette_cartons' => (
                 $this->request->getPost('allow_roulette_cartons')
-                && abs((float) $this->request->getPost('price') - bingo_roulette_carton_price()) < 0.001
+                && abs($price - bingo_roulette_carton_price()) < 0.001
             ) ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),

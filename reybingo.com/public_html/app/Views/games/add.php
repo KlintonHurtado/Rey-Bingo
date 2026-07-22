@@ -30,7 +30,7 @@
 
                     <div class="col-md-4 mb-1">
                         <label for="price" class="form-label"><?= translate('price of the carton'); ?></label>
-                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?>" autocomplete="off" value="0.00">
+                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?>" autocomplete="off" value="0.25" min="0.01" max="9999" step="0.01" inputmode="decimal">
                         <small id="price-error" class="text-danger d-none"></small>
                     </div>
 
@@ -456,11 +456,14 @@
     }
 
     $(document).ready(function() {
+        $('#game-form').attr('novalidate', 'novalidate');
+
         $(document).on('change', '.format', function() {
             if (this.value) {
-                this.value = parseFloat(this.value.replace(/,/g, "")).toFixed(2);
+                const parsed = parseFloat(String(this.value).replace(/,/g, ''));
+                this.value = Number.isFinite(parsed) ? parsed.toFixed(2) : '0.25';
             } else {
-                $(this).val('0.00');
+                $(this).val('0.25');
             }
         });
 

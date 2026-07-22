@@ -1478,6 +1478,21 @@ if (!function_exists('bingo_ensure_games_schema')) {
                     ],
                 ]);
             }
+
+            // Asegurar que price acepte centavos (0.25, 0.50, etc.)
+            if ($db->fieldExists('price', 'games')) {
+                $priceField = null;
+                foreach ($db->getFieldData('games') as $field) {
+                    if (($field->name ?? '') === 'price') {
+                        $priceField = $field;
+                        break;
+                    }
+                }
+                $priceType = strtolower((string) ($priceField->type ?? ''));
+                if ($priceType !== '' && !preg_match('/decimal|numeric|float|double/', $priceType)) {
+                    $db->query('ALTER TABLE `games` MODIFY `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00');
+                }
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de games: ' . $e->getMessage());
         }

@@ -46,7 +46,7 @@
 
                                     <div class="col-md-5 mb-1">
                                         <label for="price" class="form-label"><?= translate('price'); ?> <?= translate('of the'); ?> <?= translate('carton'); ?></label>
-                                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?> <?= translate('of the'); ?> <?= translate('carton'); ?>" autofocus autocomplete="off" value="0.00">
+                                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?> <?= translate('of the'); ?> <?= translate('carton'); ?>" autofocus autocomplete="off" value="0.25" min="0.01" max="9999" step="0.01" inputmode="decimal">
                                         <small id="price-error" class="text-danger d-none"></small>
                                     </div>
                                     
@@ -240,6 +240,8 @@
         
         gamesGet();
 
+        $('#game-form').attr('novalidate', 'novalidate');
+
         $('#game-form').on('submit', function(e) {
             e.preventDefault();
     
@@ -371,9 +373,10 @@
 
     $('.format').change(function() {
         if (this.value) {
-            this.value = parseFloat(this.value.replace(/,/g, "")).toFixed(2);
+            const parsed = parseFloat(String(this.value).replace(/,/g, ''));
+            this.value = Number.isFinite(parsed) ? parsed.toFixed(2) : '0.25';
         } else {
-            $(this).val('0').toFixed(2);
+            $(this).val('0.25');
         }
     });
 </script>

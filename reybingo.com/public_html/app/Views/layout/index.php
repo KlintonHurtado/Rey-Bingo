@@ -1273,6 +1273,9 @@
             }
 
             function updateGames(games) {
+                if (!Array.isArray(games)) {
+                    return;
+                }
                 if (games.length <= 0) {
                     $('.play-cards').html(`<h3 class="no_active_rooms"><?= translate('there are no active rooms'); ?></h3>`);
                 } else {
@@ -1281,6 +1284,10 @@
                 <?php if ($page['title'] == translate('start game')) : ?>
                     <?php if (systemGet('activateRoomCards') == 0) : ?>
                         const select = document.getElementById('game');
+                        if (!select) {
+                            return;
+                        }
+                        const currentIds = new Set(games.map(g => String(g.id)));
                         games.forEach(game => {
                             if (!select.querySelector(`option[value="${game.id}"]`)) {
                                 const option = document.createElement('option');
@@ -1289,8 +1296,16 @@
                                 select.appendChild(option);
                             }
                         });
+                        Array.from(select.querySelectorAll('option[value]')).forEach(option => {
+                            if (option.value && !currentIds.has(String(option.value))) {
+                                option.remove();
+                            }
+                        });
                     <?php else : ?>
                         const cardsContainer = document.querySelector('.play-cards');
+                        if (!cardsContainer) {
+                            return;
+                        }
 
                         games.forEach(game => renderOrUpdateCard(game, cardsContainer));
 

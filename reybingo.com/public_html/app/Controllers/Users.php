@@ -1798,11 +1798,17 @@ class Users extends Controller {
         ];
 
         if (session()->get('group') == 0) {
-            $games = $modelGames->where('status', 1)->findAll();
+            // Misma lógica que Playings::play: salas pendientes (2) y listas (1).
+            // Las partidas automáticas se crean con status=2; si solo se poll'ean status=1,
+            // las cards aparecen al recargar y desaparecen al primer updateGames().
+            $games = $modelGames->whereIn('status', [1, 2])->orderBy('date', 'ASC')->orderBy('time', 'ASC')->findAll();
 
             $formattedGames = [];
-            foreach ($games as $index => $game) { 
+            foreach ($games as $index => $game) {
                 $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
+                if (!$room) {
+                    continue;
+                }
 
                 $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
                 $accumulated = $cartons * $game['price'];
