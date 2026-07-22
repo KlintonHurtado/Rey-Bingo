@@ -291,18 +291,17 @@
                             <div class="col-12 mt-3 mb-2">
                                 <h6 class="text-muted border-bottom pb-2"><i class="fa-duotone fa-solid fa-robot"></i> <?= translate('auto game configuration'); ?></h6>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameRoom" class="form-label"><?= translate('game room'); ?></label>
-                                <select class="form-control form-control-lg form-bingo" name="autoGameRoom" id="autoGameRoom">
-                                    <option value=""><?= translate('game room'); ?></option>
-                                    <?php if (!empty($gamerooms)): ?>
-                                        <?php foreach ($gamerooms as $gameroom): ?>
-                                            <option <?= systemGet('autoGameRoom') == $gameroom['id'] ? 'selected' : '' ?> value="<?= $gameroom['id'] ?>"><?= esc($gameroom['name']) ?></option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                                <small id="autoGameRoom-error" class="text-danger d-none"></small>
-                            </div>
+                            <input type="hidden" name="autoGameRoom" value="<?= esc(systemGet('autoGameRoom') ?? ''); ?>">
+                            <?php
+                                $selectedModalities = array_values(array_filter(explode(',', (string) (systemGet('autoGameModalities') ?? ''))));
+                                if (empty($selectedModalities)) {
+                                    echo '<input type="hidden" name="autoGameModalities[]" value="">';
+                                } else {
+                                    foreach ($selectedModalities as $modId) {
+                                        echo '<input type="hidden" name="autoGameModalities[]" value="' . esc($modId) . '">';
+                                    }
+                                }
+                            ?>
                             <div class="col-md-4 mb-3">
                                 <label for="autoGameAwardType" class="form-label"><?= translate('award type'); ?></label>
                                 <select class="form-control form-control-lg form-bingo" name="autoGameAwardType" id="autoGameAwardType">
@@ -315,23 +314,6 @@
                                 <label for="autoGameAwardValue" class="form-label"><?= translate('amount'); ?></label>
                                 <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="autoGameAwardValue" id="autoGameAwardValue" placeholder="<?= translate('amount'); ?>" value="<?= esc(systemGet('autoGameAwardValue') !== null ? systemGet('autoGameAwardValue') : '100'); ?>">
                                 <small id="autoGameAwardValue-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameModalities" class="form-label"><?= translate('modality'); ?></label>
-                                <?php
-                                    $selectedModalities = array_values(array_filter(explode(',', (string) (systemGet('autoGameModalities') ?? ''))));
-                                    $selectedModality = $selectedModalities[0] ?? '';
-                                ?>
-                                <select class="form-control form-control-lg form-bingo" name="autoGameModalities[]" id="autoGameModalities">
-                                    <option value=""><?= translate('select modality'); ?></option>
-                                    <?php if (!empty($allmodalities)): ?>
-                                        <?php foreach ($allmodalities as $mod): ?>
-                                            <?php $modId = (string) $mod['id']; ?>
-                                            <option value="<?= esc($modId); ?>" <?= $selectedModality === $modId ? 'selected' : ''; ?>><?= esc($mod['name']); ?></option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                                <small id="autoGameModalities-error" class="text-danger d-none"></small>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label for="autoGameMinPlayers" class="form-label"><?= translate('minimum players'); ?></label>
