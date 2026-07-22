@@ -2054,30 +2054,41 @@ class Games extends Controller {
                 $results = $pushService->sendToUser($user['id'], $pushPayload);
                 
                 // Log de resultados para debugging
-                foreach ($results as $result) {
-                    if (!$result['success']) {
-                        log_message('error', 'Push notification failed: ' . json_encode($result));
+                if (is_array($results)) {
+                    foreach ($results as $result) {
+                        if (is_array($result) && empty($result['success'])) {
+                            log_message('error', 'Push notification failed: ' . json_encode($result));
+                        }
                     }
                 }
             }
         }
 
-        // Al agregar/actualizar: si ya es hora y no hay mínimos, posponer 5 minutos
-        $game = $model->find($gameId);
+        // Al agregar/actualizar: si ya es hora y no hay mínimos, posponer 5 minutos.
+        // Nunca tumbar la creación si la posposición falla (Pusher/DB/etc).
         $postponedPayload = null;
-        if (
-            $game
-            && bingo_count_drawn_numbers((int) $game['id']) === 0
-            && bingo_game_is_due($game)
-            && ! bingo_can_start_game($game, null, null, false)
-        ) {
-            $postpone = bingo_postpone_game($game);
-            if (! empty($postpone['postponed'])) {
-                $postponedPayload = $postpone;
-                $game = $model->find($gameId) ?: $game;
-                $gameData['date'] = $game['date'];
-                $gameData['time'] = $game['time'];
+        try {
+            $game = $model->find($gameId);
+            if (
+                $game
+                && function_exists('bingo_count_drawn_numbers')
+                && function_exists('bingo_game_is_due')
+                && function_exists('bingo_can_start_game')
+                && function_exists('bingo_postpone_game')
+                && bingo_count_drawn_numbers((int) $game['id']) === 0
+                && bingo_game_is_due($game)
+                && ! bingo_can_start_game($game, null, null, false)
+            ) {
+                $postpone = bingo_postpone_game($game);
+                if (! empty($postpone['postponed'])) {
+                    $postponedPayload = $postpone;
+                    $game = $model->find($gameId) ?: $game;
+                    $gameData['date'] = $game['date'];
+                    $gameData['time'] = $game['time'];
+                }
             }
+        } catch (\Throwable $e) {
+            log_message('error', 'addgameSubmit postpone: ' . $e->getMessage());
         }
 
         $response = [

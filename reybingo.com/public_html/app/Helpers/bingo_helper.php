@@ -832,18 +832,27 @@ if (!function_exists('bingo_count_game_cartons')) {
      */
     function bingo_count_game_cartons(int $gameId): int
     {
-        $db = \Config\Database::connect();
+        try {
+            $db = \Config\Database::connect();
 
-        $sold = (int) $db->table('cartons')
-            ->where('game', $gameId)
-            ->where('user !=', 0)
-            ->countAllResults();
+            $sold = (int) $db->table('cartons')
+                ->where('game', $gameId)
+                ->where('user !=', 0)
+                ->countAllResults();
 
-        $temp = (int) $db->table('temp_cartons')
-            ->where('game', $gameId)
-            ->countAllResults();
+            $temp = 0;
+            if ($db->tableExists('temp_cartons')) {
+                $temp = (int) $db->table('temp_cartons')
+                    ->where('game', $gameId)
+                    ->countAllResults();
+            }
 
-        return $sold + $temp;
+            return $sold + $temp;
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_count_game_cartons: ' . $e->getMessage());
+
+            return 0;
+        }
     }
 }
 
@@ -979,16 +988,18 @@ if (!function_exists('bingo_postpone_game')) {
                 'status' => 0,
                 'created_at' => $now,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             log_message('error', 'Error al guardar notificación de posposición: ' . $e->getMessage());
         }
 
         try {
-            \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
-                'new_time' => $baseTime->format('Y-m-d H:i:s'),
-                'message' => $postponeMsg,
-            ]);
-        } catch (\Exception $pe) {
+            if (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
+                \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
+                    'new_time' => $baseTime->format('Y-m-d H:i:s'),
+                    'message' => $postponeMsg,
+                ]);
+            }
+        } catch (\Throwable $pe) {
             log_message('error', 'Error al notificar posposición por Pusher: ' . $pe->getMessage());
         }
 
