@@ -1910,6 +1910,13 @@ class Games extends Controller {
                 }
             }
         } else {
+            // Asegurar el estado inicial al crear (igual que startgameSubmit)
+            if ((string) $type === '1') {
+                $gameData['status'] = 2; // Programado: el cron valida mínimos y pospone si falta
+            } else {
+                $gameData['status'] = 1;
+            }
+
             $model->insert($gameData);
             $gameId = $model->getInsertID();
 
@@ -2055,12 +2062,38 @@ class Games extends Controller {
             }
         }
 
-        return $this->response->setJSON([
+        // Al agregar/actualizar: si ya es hora y no hay mínimos, posponer 5 minutos
+        $game = $model->find($gameId);
+        $postponedPayload = null;
+        if (
+            $game
+            && bingo_count_drawn_numbers((int) $game['id']) === 0
+            && bingo_game_is_due($game)
+            && ! bingo_can_start_game($game, null, null, false)
+        ) {
+            $postpone = bingo_postpone_game($game);
+            if (! empty($postpone['postponed'])) {
+                $postponedPayload = $postpone;
+                $game = $model->find($gameId) ?: $game;
+                $gameData['date'] = $game['date'];
+                $gameData['time'] = $game['time'];
+            }
+        }
+
+        $response = [
             'success' => true,
             'message' => ($action === 'update') ? translate('game updated successfully') : translate('game added successfully'),
             'date'    => $gameData['date'],
-            'dateText'=> translate_date($gameData['date'])
-        ]);
+            'dateText'=> translate_date($gameData['date']),
+        ];
+
+        if ($postponedPayload) {
+            $response['postponed'] = true;
+            $response['new_time'] = $postponedPayload['new_time'] ?? null;
+            $response['message'] = $response['message'] . '. ' . ($postponedPayload['message'] ?: translate('game postponed'));
+        }
+
+        return $this->response->setJSON($response);
     }
 
     public function startgameSubmit() {
@@ -2455,6 +2488,7 @@ class Games extends Controller {
                 'postponed' => true,
                 'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
                 'new_time' => $postpone['new_time'] ?? null,
+                'date' => $postpone['new_datetime'] ?? null,
             ]);
         }
 

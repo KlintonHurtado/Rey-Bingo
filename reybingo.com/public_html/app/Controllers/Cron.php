@@ -584,6 +584,7 @@ class Cron extends Controller
             // Validar mínimos sin bypass
             $postpone = bingo_postpone_game($gameToStart);
             if ($postpone['postponed']) {
+                log_message('info', "Juego {$gameToStart['id']} pospuesto automáticamente: {$postpone['message']}");
                 continue;
             }
 
@@ -609,6 +610,16 @@ class Cron extends Controller
         foreach ($activeGames as $game) {
             $gameId = (int)$game['id'];
             $gamesProcessed[] = $gameId;
+
+            // Antes de la primera bola: revalidar mínimos (por si quedó en status=1 sin cumplir)
+            $numbersDrawn = $modelBoards->where('game', $gameId)->countAllResults();
+            if ($numbersDrawn === 0) {
+                $postpone = bingo_postpone_game($game);
+                if ($postpone['postponed']) {
+                    log_message('info', "Juego {$gameId} pospuesto antes de cantar (sin mínimos): {$postpone['message']}");
+                    continue;
+                }
+            }
 
             // VERIFICACIÓN CRÍTICA: Comprobar si el juego debe finalizar ANTES de cantar
             if ($this->isGameCompleted($gameId)) {

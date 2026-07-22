@@ -376,11 +376,21 @@
 
                     Toastify({
                         text: response.message,
-                        duration: 3000, gravity: "top", position: "right",
-                        style: { background: "#198754" }, stopOnFocus: true
+                        duration: response.postponed ? 6000 : 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: response.postponed ? "#f59e0b" : "#198754" },
+                        stopOnFocus: true
                     }).showToast();
                 } else {
-                    if (response.errors) {
+                    if (response.postponed) {
+                        Toastify({
+                            text: '⏳ ' + (response.message || '<?= translate('game postponed'); ?>'),
+                            duration: 6000, gravity: "top", position: "right",
+                            style: { background: "#f59e0b" }, stopOnFocus: true
+                        }).showToast();
+                        if (typeof gameslistGet === 'function') setTimeout(gameslistGet, 800);
+                    } else if (response.errors) {
                         $.each(response.errors, function(field, message) {
                             $('#' + field + '-error').text(message).removeClass('d-none');
                             $('#' + field).addClass('is-invalid');
@@ -426,6 +436,16 @@
             success: function(response) {
                 if (response.success) {
                     window.location.href = response.redirect;
+                } else if (response.postponed) {
+                    Toastify({
+                        text: '⏳ ' + (response.message || '<?= translate('game postponed'); ?>'),
+                        duration: 6000, gravity: "top", position: "right",
+                        style: { background: "#f59e0b" }, stopOnFocus: true
+                    }).showToast();
+                    $('#modalAddgame').modal('hide');
+                    if (typeof gameslistGet === 'function') {
+                        setTimeout(gameslistGet, 800);
+                    }
                 } else {
                     if (response.message) {
                         Toastify({

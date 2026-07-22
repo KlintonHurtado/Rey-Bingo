@@ -825,17 +825,25 @@ if (!function_exists('bingo_count_game_players')) {
 
 if (!function_exists('bingo_count_game_cartons')) {
     /**
-     * Cuenta cartones activos (tabla cartons).
-     * Para modo LIVE también incluye cartones en selección temporal (temp_cartons).
+     * Cuenta cartones comprados/asignados (user != 0).
+     * No cuenta cartones disponibles sin vender (user = 0), porque eso
+     * hacía pasar el mínimo de cartones y saltarse la posposición.
+     * En modo LIVE también incluye selección temporal (temp_cartons).
      */
     function bingo_count_game_cartons(int $gameId): int
     {
         $db = \Config\Database::connect();
 
-        $c = $db->table('cartons')->where('game', $gameId)->countAllResults();
-        $t = $db->table('temp_cartons')->where('game', $gameId)->countAllResults();
+        $sold = (int) $db->table('cartons')
+            ->where('game', $gameId)
+            ->where('user !=', 0)
+            ->countAllResults();
 
-        return $c + $t;
+        $temp = (int) $db->table('temp_cartons')
+            ->where('game', $gameId)
+            ->countAllResults();
+
+        return $sold + $temp;
     }
 }
 
@@ -859,8 +867,8 @@ if (!function_exists('bingo_get_min_cartons')) {
 
 if (!function_exists('bingo_can_start_game')) {
     /**
+     * Debe cumplir mínimo de jugadores Y mínimo de cartones.
      * @param bool $allowAdminBypass Si es true, un admin logueado puede iniciar sin mínimos.
-     *                               Por defecto false: valida en automática, live y manual.
      */
     function bingo_can_start_game(array $game, ?int $playerCount = null, ?int $cartonCount = null, bool $allowAdminBypass = false): bool
     {
@@ -876,10 +884,29 @@ if (!function_exists('bingo_can_start_game')) {
             $cartonCount = bingo_count_game_cartons((int) $game['id']);
         }
 
-        // Se permite iniciar si cumple el mínimo de jugadores O el mínimo de cartones,
-        // para soportar casos donde un Punto de Venta compra múltiples cartones para varios jugadores físicos.
         return $playerCount >= bingo_get_min_players($game)
-            || $cartonCount >= bingo_get_min_cartons($game);
+            && $cartonCount >= bingo_get_min_cartons($game);
+    }
+}
+
+if (!function_exists('bingo_game_is_due')) {
+    /** True si la fecha/hora programada ya llegó (zona app). */
+    function bingo_game_is_due(array $game): bool
+    {
+        $tzName = function_exists('app_timezone') ? app_timezone() : (config('App')->appTimezone ?? 'America/Guayaquil');
+        $tz = new \DateTimeZone($tzName);
+        $nowObj = new \DateTime('now', $tz);
+
+        try {
+            $gameDateTime = new \DateTime(
+                ($game['date'] ?? $nowObj->format('Y-m-d')) . ' ' . ($game['time'] ?? $nowObj->format('H:i:s')),
+                $tz
+            );
+        } catch (\Exception $e) {
+            return true;
+        }
+
+        return $gameDateTime <= $nowObj;
     }
 }
 
@@ -1025,9 +1052,11 @@ if (!function_exists('bingo_game_start_block_message')) {
 
         $messages = [];
 
-        // Si la partida NO puede iniciar (es decir, falló en AMBOS requisitos), mostramos los mensajes
-        if ($playerCount < bingo_get_min_players($game) && $cartonCount < bingo_get_min_cartons($game)) {
+        // Si la partida NO puede iniciar, mostrar los requisitos que faltan
+        if ($playerCount < bingo_get_min_players($game)) {
             $messages[] = bingo_min_players_start_message($game, $playerCount);
+        }
+        if ($cartonCount < bingo_get_min_cartons($game)) {
             $messages[] = bingo_min_cartons_start_message($game, $cartonCount);
         }
 
