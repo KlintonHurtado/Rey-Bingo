@@ -564,14 +564,16 @@ class Cron extends Controller
         [$timeBallGet, $timeBallLast] = explode('-', $singBall);
         $timeBallGet = (int) $timeBallGet;
 
-        $tz = new \DateTimeZone('America/Guayaquil');
+        $tzName = function_exists('app_timezone') ? app_timezone() : (config('App')->appTimezone ?? 'America/Guayaquil');
+        $tz = new \DateTimeZone($tzName);
         $nowObj = new \DateTime('now', $tz);
         
         $now = $nowObj->format('Y-m-d H:i:s');
         $currentDate = $nowObj->format('Y-m-d');
         $currentTime = $nowObj->format('H:i:s');
 
-        // 1) Iniciar juegos programados
+        // 1) Iniciar solo juegos automáticos programados (type=1).
+        // Live/manual se validan al abrir board/live por el admin.
         $gamesToStart = $modelGames->where('type', 1)
             ->where('status', 2)
             ->where('date', $currentDate)
@@ -579,53 +581,10 @@ class Cron extends Controller
             ->findAll();
 
         foreach ($gamesToStart as $gameToStart) {
-            // Verificar si cumple los mínimos antes de iniciar
-            if (!bingo_can_start_game($gameToStart)) {
-                $gameId = (int)$gameToStart['id'];
-                
-                // Posponer 4 minutos
-                $newTimeObj = new \DateTime('now', $tz);
-                $newTimeObj->modify('+4 minutes');
-                
-                $modelGames->update($gameId, [
-                    'date' => $newTimeObj->format('Y-m-d'),
-                    'time' => $newTimeObj->format('H:i:s'),
-                    'updated_at' => $now
-                ]);
-                
-                $minCartons = bingo_get_min_cartons($gameToStart);
-                $minPlayers = bingo_get_min_players($gameToStart);
-                
-                // Enviar notificación global a todos los usuarios
-                $modelNotifications = new NotificationsModel();
-                $modelNotifications->insert([
-                    'user'       => 0,
-                    'type'       => 'system',
-                    'game'       => $gameId,
-                    'title'      => '⏳ ' . translate('game postponed'),
-                    'message'    => translate('game postponed notification')
-                        ? str_replace(
-                            [':time', ':players', ':cartons'],
-                            [$newTimeObj->format('H:i'), $minPlayers, $minCartons],
-                            translate('game postponed notification')
-                          )
-                        : "La partida automática se pospuso 4 minutos (hasta las " . $newTimeObj->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
-                    'status'     => 0,
-                    'created_at' => $now,
-                ]);
-
-                // Notificar en tiempo real por Pusher si es posible
-                try {
-                    \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
-                        'new_time' => $newTimeObj->format('Y-m-d H:i:s'),
-                        'message' => "La partida se ha pospuesto 4 minutos (hasta las " . $newTimeObj->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos de jugadores o cartones."
-                    ]);
-                } catch (\Exception $pe) {
-                    log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
-                }
-
-                log_message('info', "Juego {$gameId} NO se inició: faltan jugadores o cartones. Se pospuso 4 minutos hasta las " . $newTimeObj->format('Y-m-d H:i:s'));
-                continue; // Saltar al siguiente juego
+            // Validar mínimos sin bypass
+            $postpone = bingo_postpone_game($gameToStart);
+            if ($postpone['postponed']) {
+                continue;
             }
 
             $modelGames->update($gameToStart['id'], [

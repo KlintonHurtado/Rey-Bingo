@@ -1521,12 +1521,22 @@ class Games extends Controller {
                 ]);
             }
 
-            // Para juegos LIVE (type=3) o STREAM (type=4) el admin controla el inicio manualmente, sin mínimos
-            $isLive = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
-            if (!$isLive && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
+            // Validar mínimos en automática, live y manual (sin bypass de admin)
+            if (bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game, null, null, false)) {
+                $postpone = bingo_postpone_game($game);
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => bingo_game_start_block_message($game),
+                    'postponed' => true,
+                    'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
+                    'new_time' => $postpone['new_time'] ?? null,
+                ]);
+            }
+
+            // Si estaba pospuesta (status 2), activarla al iniciar
+            if ((int) ($game['status'] ?? 0) === 2) {
+                $modelGames->update($game_id, [
+                    'status' => 1,
+                    'updated_at' => date('Y-m-d H:i:s'),
                 ]);
             }
 
@@ -1586,69 +1596,24 @@ class Games extends Controller {
         if (session()->get('group') == 1
             && bingo_count_drawn_numbers((int) $game['id']) === 0) {
 
-            // Para juegos tipo LIVE (type=3 o type=4), el admin inicia manualmente y controla
-            // la partida en tiempo real, por lo que no se aplica la validación de mínimos.
-            $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
-
-            if (!$isLiveGame) {
-                // Calcular jugadores y cartones incluyendo los que están en el lobby (temp_cartons)
-                $playerCount = bingo_count_game_players((int) $game['id']);
-                $cartonCount = bingo_count_game_cartons((int) $game['id']);
-
-                if (!bingo_can_start_game($game, $playerCount, $cartonCount)) {
-                    // Posponer 4 minutos en lugar de solo bloquear
-                    $tz = new \DateTimeZone('America/Guayaquil');
-                    $nowObj = new \DateTime('now', $tz);
-                    $now = $nowObj->format('Y-m-d H:i:s');
-
-                    $gameDateTime = new \DateTime($game['date'] . ' ' . $game['time'], $tz);
-                    $gameDateTime->modify('+4 minutes');
-
-                    $modelGames->update($game_id, [
-                        'date'       => $gameDateTime->format('Y-m-d'),
-                        'time'       => $gameDateTime->format('H:i:s'),
-                        'status'     => 2,
-                        'updated_at' => $now,
-                    ]);
-
-                    helper(['bingo']);
-                    $minCartons = bingo_get_min_cartons($game);
-                    $minPlayers = bingo_get_min_players($game);
-
-                    $modelNotifications = new \App\Models\NotificationsModel();
-                    $modelNotifications->insert([
-                        'user'       => 0,
-                        'type'       => 'system',
-                        'game'       => (int) $game_id,
-                        'title'      => '⏳ ' . translate('game postponed'),
-                        'message'    => translate('game postponed notification')
-                            ? str_replace(
-                                [':time', ':players', ':cartons'],
-                                [$gameDateTime->format('H:i'), $minPlayers, $minCartons],
-                                translate('game postponed notification')
-                              )
-                            : "La partida se pospuso 4 minutos (hasta las " . $gameDateTime->format('H:i') . ") porque no se cumplieron los requisitos mínimos de {$minPlayers} jugador(es) y {$minCartons} cartón(es).",
-                        'status'     => 0,
-                        'created_at' => $now,
-                    ]);
-
-                    try {
-                        \App\Libraries\PusherFactory::make()->trigger('private-game-' . $game_id, 'game:postponed', [
-                            'new_time' => $gameDateTime->format('Y-m-d H:i:s'),
-                            'message'  => "La partida se ha pospuesto 4 minutos (hasta las " . $gameDateTime->format('H:i') . ") debido a que no se cumplieron los requisitos mínimos.",
-                        ]);
-                    } catch (\Exception $pe) {
-                        log_message('error', "Error al notificar posposición por Pusher: " . $pe->getMessage());
-                    }
-
-                    return $this->response->setJSON([
-                        'success'   => false,
-                        'postponed' => true,
-                        'message'   => bingo_game_start_block_message($game, $playerCount, $cartonCount) . ' La partida se ha pospuesto hasta las ' . $gameDateTime->format('H:i') . '.',
-                        'new_time'  => $gameDateTime->format('H:i'),
-                    ]);
-                }
+            // Validar mínimos también en live/manual (sin bypass de admin)
+            $postpone = bingo_postpone_game($game);
+            if ($postpone['postponed']) {
+                return $this->response->setJSON([
+                    'success'   => false,
+                    'postponed' => true,
+                    'message'   => $postpone['message'],
+                    'new_time'  => $postpone['new_time'],
+                ]);
             }
+        }
+
+        // Si estaba pospuesta (status 2), activarla al iniciar
+        if ((int) ($game['status'] ?? 0) === 2) {
+            $modelGames->update($game_id, [
+                'status' => 1,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
         }
 
         session()->set('game_id', $game_id);
@@ -2465,10 +2430,20 @@ class Games extends Controller {
 
         $game = $model->find($gameId);
 
-        if ($game && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game)) {
+        if ($game && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game, null, null, false)) {
+            $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
                 'success' => false,
-                'message' => bingo_game_start_block_message($game),
+                'postponed' => true,
+                'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
+                'new_time' => $postpone['new_time'] ?? null,
+            ]);
+        }
+
+        if ($game && (int) ($game['status'] ?? 0) === 2) {
+            $model->update($gameId, [
+                'status' => 1,
+                'updated_at' => date('Y-m-d H:i:s'),
             ]);
         }
 
@@ -2561,7 +2536,7 @@ class Games extends Controller {
 
             $buttons = '';
             $canView = ($game['numbers'] == 75 || $SingsCount >= $AwardsCount);
-            $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players'], (int) $cartons);
+            $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players'], (int) $cartons, false);
             $startBlockMessage = esc(bingo_game_start_block_message($game, (int) $game['players'], (int) $cartons), 'attr');
 
             if (session()->get('group') == 1) {
@@ -2574,9 +2549,12 @@ class Games extends Controller {
                 if ($game['type'] != 3 && $game['type'] != 4) {
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
-                    // Juego LIVE: el botón de escritorio (desktop) SIEMPRE puede iniciar, sin validación de mínimos
-                    $liveButtonAction = "liveGet('" . $game['id'] . "');";
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-primary btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    // LIVE: también exige mínimos de jugadores/cartones
+                    $liveButtonAction = ($canView || $canStart)
+                        ? "liveGet('" . $game['id'] . "');"
+                        : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
+                    $liveButtonClass = $canView ? 'primary' : ($canStart ? 'primary' : 'secondary');
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
             } else {
                 if ($canView) {

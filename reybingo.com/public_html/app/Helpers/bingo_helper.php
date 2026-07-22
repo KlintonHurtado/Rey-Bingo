@@ -858,16 +858,13 @@ if (!function_exists('bingo_get_min_cartons')) {
 }
 
 if (!function_exists('bingo_can_start_game')) {
-    function bingo_can_start_game(array $game, ?int $playerCount = null, ?int $cartonCount = null): bool
+    /**
+     * @param bool $allowAdminBypass Si es true, un admin logueado puede iniciar sin mínimos.
+     *                               Por defecto false: valida en automática, live y manual.
+     */
+    function bingo_can_start_game(array $game, ?int $playerCount = null, ?int $cartonCount = null, bool $allowAdminBypass = false): bool
     {
-        // Para juegos tipo LIVE (type=3 o type=4), el admin controla todo manualmente
-        $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
-        if ($isLiveGame) {
-            return true;
-        }
-
-        // Permitir que el admin inicie cualquier partida manualmente, saltando el bloqueo
-        if (session()->get('logged_in') && session()->get('group') == 1) {
+        if ($allowAdminBypass && session()->get('logged_in') && (int) session()->get('group') === 1) {
             return true;
         }
 
@@ -883,6 +880,101 @@ if (!function_exists('bingo_can_start_game')) {
         // para soportar casos donde un Punto de Venta compra múltiples cartones para varios jugadores físicos.
         return $playerCount >= bingo_get_min_players($game)
             || $cartonCount >= bingo_get_min_cartons($game);
+    }
+}
+
+if (!function_exists('bingo_postpone_game')) {
+    /**
+     * Pospone una partida 5 minutos si no cumple mínimos.
+     * @return array{postponed:bool,new_time:?string,message:string,player_count:int,carton_count:int}
+     */
+    function bingo_postpone_game(array $game, ?int $playerCount = null, ?int $cartonCount = null): array
+    {
+        if ($playerCount === null) {
+            $playerCount = bingo_count_game_players((int) $game['id']);
+        }
+        if ($cartonCount === null) {
+            $cartonCount = bingo_count_game_cartons((int) $game['id']);
+        }
+
+        if (bingo_can_start_game($game, $playerCount, $cartonCount, false)) {
+            return [
+                'postponed' => false,
+                'new_time' => null,
+                'message' => '',
+                'player_count' => $playerCount,
+                'carton_count' => $cartonCount,
+            ];
+        }
+
+        $tzName = function_exists('app_timezone') ? app_timezone() : (config('App')->appTimezone ?? 'America/Guayaquil');
+        $tz = new \DateTimeZone($tzName);
+        $nowObj = new \DateTime('now', $tz);
+        $now = $nowObj->format('Y-m-d H:i:s');
+
+        try {
+            $gameDateTime = new \DateTime(($game['date'] ?? $nowObj->format('Y-m-d')) . ' ' . ($game['time'] ?? $nowObj->format('H:i:s')), $tz);
+        } catch (\Exception $e) {
+            $gameDateTime = clone $nowObj;
+        }
+
+        $baseTime = $gameDateTime > $nowObj ? clone $gameDateTime : clone $nowObj;
+        $baseTime->modify('+5 minutes');
+
+        $gameId = (int) ($game['id'] ?? 0);
+        $updateData = [
+            'date' => $baseTime->format('Y-m-d'),
+            'time' => $baseTime->format('H:i:s'),
+            'updated_at' => $now,
+            // Queda programada hasta que cumpla mínimos e inicie de nuevo
+            'status' => 2,
+        ];
+
+        $modelGames = new \App\Models\GamesModel();
+        $modelGames->update($gameId, $updateData);
+
+        $minPlayers = bingo_get_min_players($game);
+        $minCartons = bingo_get_min_cartons($game);
+        $postponeMsg = str_replace(
+            [':time', ':players', ':cartons'],
+            [$baseTime->format('H:i'), $minPlayers, $minCartons],
+            translate('game postponed notification')
+        );
+
+        try {
+            $modelNotifications = new \App\Models\NotificationsModel();
+            $modelNotifications->insert([
+                'user' => 0,
+                'type' => 'system',
+                'game' => $gameId,
+                'title' => '⏳ ' . translate('game postponed'),
+                'message' => $postponeMsg,
+                'status' => 0,
+                'created_at' => $now,
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error al guardar notificación de posposición: ' . $e->getMessage());
+        }
+
+        try {
+            \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
+                'new_time' => $baseTime->format('Y-m-d H:i:s'),
+                'message' => $postponeMsg,
+            ]);
+        } catch (\Exception $pe) {
+            log_message('error', 'Error al notificar posposición por Pusher: ' . $pe->getMessage());
+        }
+
+        log_message('info', "Juego {$gameId} pospuesto 5 minutos hasta " . $baseTime->format('Y-m-d H:i:s') . " (jugadores={$playerCount}/{$minPlayers}, cartones={$cartonCount}/{$minCartons})");
+
+        return [
+            'postponed' => true,
+            'new_time' => $baseTime->format('H:i'),
+            'new_datetime' => $baseTime->format('Y-m-d H:i:s'),
+            'message' => trim(bingo_game_start_block_message($game, $playerCount, $cartonCount) . ' ' . translate('game postponed to') . ' ' . $baseTime->format('H:i') . '.'),
+            'player_count' => $playerCount,
+            'carton_count' => $cartonCount,
+        ];
     }
 }
 

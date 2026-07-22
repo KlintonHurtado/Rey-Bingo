@@ -303,10 +303,13 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
 
-        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, false)) {
+            $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
                 'status' => 'error',
-                'message' => bingo_game_start_block_message($game),
+                'postponed' => true,
+                'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
+                'new_time' => $postpone['new_time'] ?? null,
             ]);
         }
 
@@ -416,10 +419,13 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
 
-        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game)) {
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, false)) {
+            $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
                 'status' => 'error',
-                'message' => bingo_game_start_block_message($game),
+                'postponed' => true,
+                'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
+                'new_time' => $postpone['new_time'] ?? null,
             ]);
         }
 
