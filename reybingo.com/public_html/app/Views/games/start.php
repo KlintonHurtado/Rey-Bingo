@@ -46,7 +46,7 @@
 
                                     <div class="col-md-5 mb-1">
                                         <label for="price" class="form-label"><?= translate('price'); ?> <?= translate('of the'); ?> <?= translate('carton'); ?></label>
-                                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?> <?= translate('of the'); ?> <?= translate('carton'); ?>" autofocus autocomplete="off" value="0.25" min="0.01" max="9999" step="0.01" inputmode="decimal">
+                                        <input type="number" class="form-control form-control-lg form-bingo format" name="price" id="price" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('price')); ?> <?= translate('of the'); ?> <?= translate('carton'); ?>" autofocus autocomplete="off" value="0" min="0" max="9999" step="0.01" inputmode="decimal">
                                         <small id="price-error" class="text-danger d-none"></small>
                                     </div>
                                     
@@ -372,11 +372,11 @@
     }
 
     $('.format').change(function() {
-        if (this.value) {
+        if (this.value !== '' && this.value !== null) {
             const parsed = parseFloat(String(this.value).replace(/,/g, ''));
-            this.value = Number.isFinite(parsed) ? parsed.toFixed(2) : '0.25';
+            this.value = Number.isFinite(parsed) ? parsed.toFixed(2) : '0.00';
         } else {
-            $(this).val('0.25');
+            $(this).val('0.00');
         }
     });
 </script>
