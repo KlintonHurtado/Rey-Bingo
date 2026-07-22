@@ -671,53 +671,67 @@
 </div>
 
 <style>
+    /* Modalidad auto-game: panel tipo mockup (2 columnas + checks circulares) */
     .auto-modalities-panel {
         width: 90%;
+        max-width: 520px;
         margin: 0 auto;
-        background: #fff;
-        border: 4px solid #6236ff;
-        border-radius: 18px;
-        box-shadow: 0 0 0 0.15rem rgba(135, 103, 250, 0.18);
-        padding: 10px;
-        max-height: 260px;
+        background: #f7f6fb;
+        border: 3px solid rgba(255, 255, 255, 0.85);
+        border-radius: 22px;
+        box-shadow: 0 8px 22px rgba(40, 20, 90, 0.18);
+        padding: 12px;
+        max-height: 280px;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+    }
+
+    .auto-modalities-panel::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .auto-modalities-panel::-webkit-scrollbar-thumb {
+        background: rgba(98, 54, 255, 0.35);
+        border-radius: 999px;
     }
 
     .auto-modalities-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        gap: 10px 12px;
     }
 
     .auto-modality-item {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         margin: 0;
-        padding: 10px 12px;
-        border-radius: 12px;
-        background: #f4f2ff;
-        border: 1px solid rgba(98, 54, 255, 0.18);
-        color: #2f2a55;
-        font-weight: 600;
-        font-size: 0.88rem;
-        line-height: 1.2;
+        padding: 11px 14px;
+        border-radius: 999px;
+        background: #ebe9f4;
+        border: 1px solid transparent;
+        color: #3a3560;
+        font-weight: 700;
+        font-size: 0.86rem;
+        line-height: 1.15;
         cursor: pointer;
         user-select: none;
-        transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        min-height: 44px;
+        transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
     }
 
     .auto-modality-item:hover {
-        background: #ebe6ff;
-        border-color: rgba(98, 54, 255, 0.35);
+        background: #e1ddf3;
+    }
+
+    .auto-modality-item:active {
+        transform: scale(0.98);
     }
 
     .auto-modality-item.is-checked {
         background: linear-gradient(145deg, #7a57ff, #6236ff);
-        border-color: transparent;
         color: #fff;
-        box-shadow: 0 4px 12px rgba(98, 54, 255, 0.28);
+        box-shadow: 0 4px 14px rgba(98, 54, 255, 0.3);
     }
 
     .auto-modality-item input {
@@ -727,30 +741,31 @@
     }
 
     .auto-modality-check {
-        flex: 0 0 18px;
-        width: 18px;
-        height: 18px;
-        border-radius: 6px;
-        border: 2px solid rgba(98, 54, 255, 0.55);
+        flex: 0 0 20px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid #8b84b8;
         background: #fff;
         position: relative;
+        box-sizing: border-box;
     }
 
     .auto-modality-item.is-checked .auto-modality-check {
         border-color: #fff;
-        background: rgba(255, 255, 255, 0.2);
+        background: #fff;
     }
 
     .auto-modality-item.is-checked .auto-modality-check::after {
         content: '';
         position: absolute;
-        left: 5px;
-        top: 1px;
-        width: 5px;
+        left: 50%;
+        top: 50%;
+        width: 10px;
         height: 10px;
-        border: solid #fff;
-        border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
+        border-radius: 50%;
+        background: #6236ff;
+        transform: translate(-50%, -50%);
     }
 
     .auto-modality-name {
@@ -764,10 +779,11 @@
     .auto-modalities-hint {
         display: block;
         width: 90%;
-        margin: 6px auto 0;
-        padding-left: 8px;
+        max-width: 520px;
+        margin: 8px auto 0;
+        padding-left: 4px;
         font-size: 0.78rem;
-        color: rgba(255, 255, 255, 0.75);
+        color: rgba(255, 255, 255, 0.8);
     }
 
     .auto-modalities-empty {
@@ -776,20 +792,45 @@
         color: #6e707e;
     }
 
+    #game .form-label[for="autoGameModalitiesPanel"] {
+        width: 90%;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 8px;
+    }
+
     @media (max-width: 576px) {
         .auto-modalities-panel,
         .auto-modalities-hint,
-        .auto-modalities-empty {
+        .auto-modalities-empty,
+        #game .form-label[for="autoGameModalitiesPanel"] {
             width: 100%;
+            max-width: none;
         }
 
+        /* En teléfono se mantienen 2 columnas, como el mockup */
         .auto-modalities-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 8px;
         }
 
         .auto-modality-item {
-            font-size: 0.92rem;
-            padding: 12px 14px;
+            font-size: 0.78rem;
+            padding: 10px 10px;
+            gap: 8px;
+            min-height: 42px;
+        }
+
+        .auto-modality-check {
+            flex: 0 0 18px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .auto-modality-item.is-checked .auto-modality-check::after {
+            width: 8px;
+            height: 8px;
         }
     }
 </style>
