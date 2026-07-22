@@ -316,33 +316,21 @@
                                 <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="autoGameAwardValue" id="autoGameAwardValue" placeholder="<?= translate('amount'); ?>" value="<?= esc(systemGet('autoGameAwardValue') !== null ? systemGet('autoGameAwardValue') : '100'); ?>">
                                 <small id="autoGameAwardValue-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-12 mb-3">
-                                <label class="form-label" for="autoGameModalitiesPanel"><?= translate('modality'); ?></label>
+                            <div class="col-md-4 mb-3">
+                                <label for="autoGameModalities" class="form-label"><?= translate('modality'); ?></label>
                                 <?php
-                                    $selectedModalities = array_filter(explode(',', (string) (systemGet('autoGameModalities') ?? '')));
+                                    $selectedModalities = array_values(array_filter(explode(',', (string) (systemGet('autoGameModalities') ?? ''))));
+                                    $selectedModality = $selectedModalities[0] ?? '';
                                 ?>
-                                <div class="auto-modalities-panel" id="autoGameModalitiesPanel">
+                                <select class="form-control form-control-lg form-bingo" name="autoGameModalities[]" id="autoGameModalities">
+                                    <option value=""><?= translate('select modality'); ?></option>
                                     <?php if (!empty($allmodalities)): ?>
-                                        <div class="auto-modalities-grid">
-                                            <?php foreach ($allmodalities as $mod): ?>
-                                                <?php $modId = (string) $mod['id']; ?>
-                                                <label class="auto-modality-item<?= in_array($modId, $selectedModalities, true) ? ' is-checked' : ''; ?>">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="autoGameModalities[]"
-                                                        value="<?= esc($modId); ?>"
-                                                        <?= in_array($modId, $selectedModalities, true) ? 'checked' : ''; ?>
-                                                    >
-                                                    <span class="auto-modality-check" aria-hidden="true"></span>
-                                                    <span class="auto-modality-name"><?= esc($mod['name']); ?></span>
-                                                </label>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <p class="auto-modalities-empty mb-0"><?= translate('there are no modalities available'); ?></p>
+                                        <?php foreach ($allmodalities as $mod): ?>
+                                            <?php $modId = (string) $mod['id']; ?>
+                                            <option value="<?= esc($modId); ?>" <?= $selectedModality === $modId ? 'selected' : ''; ?>><?= esc($mod['name']); ?></option>
+                                        <?php endforeach; ?>
                                     <?php endif; ?>
-                                </div>
-                                <small class="auto-modalities-hint"><?= translate('select one or more modalities'); ?></small>
+                                </select>
                                 <small id="autoGameModalities-error" class="text-danger d-none"></small>
                             </div>
                             <div class="col-md-4 mb-3">
@@ -705,193 +693,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    /* Modalidad auto-game: panel tipo mockup (2 columnas + checks circulares) */
-    .auto-modalities-panel {
-        width: 90%;
-        max-width: 520px;
-        margin: 0 auto;
-        background: #f7f6fb;
-        border: 3px solid rgba(255, 255, 255, 0.85);
-        border-radius: 22px;
-        box-shadow: 0 8px 22px rgba(40, 20, 90, 0.18);
-        padding: 12px;
-        max-height: 280px;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .auto-modalities-panel::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .auto-modalities-panel::-webkit-scrollbar-thumb {
-        background: rgba(98, 54, 255, 0.35);
-        border-radius: 999px;
-    }
-
-    .auto-modalities-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px 12px;
-    }
-
-    .auto-modality-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin: 0;
-        padding: 11px 14px;
-        border-radius: 999px;
-        background: #ebe9f4;
-        border: 1px solid transparent;
-        color: #3a3560;
-        font-weight: 700;
-        font-size: 0.86rem;
-        line-height: 1.15;
-        cursor: pointer;
-        user-select: none;
-        min-height: 44px;
-        transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
-    }
-
-    .auto-modality-item:hover {
-        background: #e1ddf3;
-    }
-
-    .auto-modality-item:active {
-        transform: scale(0.98);
-    }
-
-    .auto-modality-item.is-checked {
-        background: linear-gradient(145deg, #7a57ff, #6236ff);
-        color: #fff;
-        box-shadow: 0 4px 14px rgba(98, 54, 255, 0.3);
-    }
-
-    .auto-modality-item input {
-        position: absolute;
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    .auto-modality-check {
-        flex: 0 0 20px;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 2px solid #8b84b8;
-        background: #fff;
-        position: relative;
-        box-sizing: border-box;
-    }
-
-    .auto-modality-item.is-checked .auto-modality-check {
-        border-color: #fff;
-        background: #fff;
-    }
-
-    .auto-modality-item.is-checked .auto-modality-check::after {
-        content: '';
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #6236ff;
-        transform: translate(-50%, -50%);
-    }
-
-    .auto-modality-name {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .auto-modalities-empty,
-    .auto-modalities-hint {
-        display: block;
-        width: 90%;
-        max-width: 520px;
-        margin: 8px auto 0;
-        padding-left: 4px;
-        font-size: 0.78rem;
-        color: rgba(255, 255, 255, 0.8);
-    }
-
-    .auto-modalities-empty {
-        text-align: center;
-        padding: 18px 8px;
-        color: #6e707e;
-    }
-
-    #game .form-label[for="autoGameModalitiesPanel"] {
-        width: 90%;
-        max-width: 520px;
-        margin-left: auto;
-        margin-right: auto;
-        padding-left: 8px;
-    }
-
-    @media (max-width: 576px) {
-        .auto-modalities-panel,
-        .auto-modalities-hint,
-        .auto-modalities-empty,
-        #game .form-label[for="autoGameModalitiesPanel"] {
-            width: 100%;
-            max-width: none;
-        }
-
-        /* En teléfono se mantienen 2 columnas, como el mockup */
-        .auto-modalities-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px 8px;
-        }
-
-        .auto-modality-item {
-            font-size: 0.78rem;
-            padding: 10px 10px;
-            gap: 8px;
-            min-height: 42px;
-        }
-
-        .auto-modality-check {
-            flex: 0 0 18px;
-            width: 18px;
-            height: 18px;
-        }
-
-        .auto-modality-item.is-checked .auto-modality-check::after {
-            width: 8px;
-            height: 8px;
-        }
-    }
-</style>
-
-<script type="text/javascript">
-    (function () {
-        const panel = document.getElementById('autoGameModalitiesPanel');
-        if (!panel) {
-            return;
-        }
-
-        panel.querySelectorAll('.auto-modality-item').forEach(function (item) {
-            const input = item.querySelector('input[type="checkbox"]');
-            if (!input) {
-                return;
-            }
-
-            const sync = function () {
-                item.classList.toggle('is-checked', input.checked);
-            };
-
-            input.addEventListener('change', sync);
-        });
-    })();
-</script>
 
 <script type="text/javascript">
     $(document).ready(function () {
