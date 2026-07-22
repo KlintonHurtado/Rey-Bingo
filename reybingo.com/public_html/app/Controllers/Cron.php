@@ -157,7 +157,8 @@ class Cron extends Controller
         if ($addGamesTime <= 0) {
             $addGamesTime = 30;
         }
-        $tz = new \DateTimeZone('America/Guayaquil');
+        $tzName = function_exists('app_timezone') ? app_timezone() : (config('App')->appTimezone ?? 'America/Guayaquil');
+        $tz = new \DateTimeZone($tzName);
         $now = new \DateTime('now', $tz);
 
          // Obtener horarios desde la configuración
@@ -232,10 +233,10 @@ class Cron extends Controller
             return $this->response->setJSON($result);
         }
 
-        log_message('error', "runAutoAddGames: error al crear juego para {$nextGame->format('Y-m-d H:i:s')}");
+        log_message('error', "runAutoAddGames: error al crear juego para {$nextGame->format('Y-m-d H:i:s')}: " . ($result['message'] ?? 'sin detalle'));
         return $this->response->setJSON([
             'success' => false,
-            'message' => 'Error al crear el juego automático'
+            'message' => $result['message'] ?? 'Error al crear el juego automático'
         ]);
     }
 
@@ -959,50 +960,37 @@ class Cron extends Controller
 
         // Seleccionar modalidades
         $configuredModalities = systemGet('autoGameModalities');
+        $modalityIds = [];
         if ($configuredModalities) {
             $configModIds = array_map('intval', array_filter(explode(',', $configuredModalities)));
-            $modalityIds = [];
             foreach ($allModalities as $mod) {
-                if (in_array((int) $mod['id'], $configModIds)) {
+                if (in_array((int) $mod['id'], $configModIds, true)) {
                     $modalityIds[] = $mod['id'];
                 }
             }
-            if (empty($modalityIds)) {
-                $numModalities = rand(3, 6);
-                $selectedModalities = array_rand($allModalities, min($numModalities, count($allModalities)));
-                if (!is_array($selectedModalities)) {
-                    $selectedModalities = [$selectedModalities];
-                }
-                $modalityIds = [];
-                foreach ($selectedModalities as $index) {
-                    $modalityIds[] = $allModalities[$index]['id'];
-                }
-            }
-        } else {
-            $numModalities = rand(3, 6);
-            $selectedModalities = array_rand($allModalities, min($numModalities, count($allModalities)));
-            if (!is_array($selectedModalities)) {
+        }
+
+        if ($modalityIds === []) {
+            $numModalities = min(rand(3, 6), count($allModalities));
+            $selectedModalities = array_rand($allModalities, $numModalities);
+            if (! is_array($selectedModalities)) {
                 $selectedModalities = [$selectedModalities];
             }
-            $modalityIds = [];
             foreach ($selectedModalities as $index) {
                 $modalityIds[] = $allModalities[$index]['id'];
             }
         }
 
-        // Generar precio aleatorio en rangos específicos
-        if (systemGet('priceRanges') == 1) {
-            $priceRanges = [10, 15, 20, 25, 30, 35, 40, 45, 50];
-        } else if (systemGet('priceRanges') == 2) {
-            $priceRanges = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
-        } else if (systemGet('priceRanges') == 3) {
-            $priceRanges = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120, 130, 140, 150];
-        } else if (systemGet('priceRanges') == 4) {
-            $priceRanges = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120, 130, 140, 150, 155, 160, 165, 170, 175, 180, 185, 190, 195, 200];
-        } else if (systemGet('priceRanges') == 5) {
-            $priceRanges = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500];
-        }
-
+        // Generar precio aleatorio en rangos específicos (0.25 a 5)
+        $priceRangeMap = [
+            1 => [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3, 3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5],
+            2 => [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3],
+            3 => [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 4.5, 5],
+            4 => [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            5 => [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 4.5, 5],
+        ];
+        $priceRangeKey = (int) (systemGet('priceRanges') ?: 1);
+        $priceRanges = $priceRangeMap[$priceRangeKey] ?? $priceRangeMap[1];
         $randomPrice = $priceRanges[array_rand($priceRanges)];
 
         // Generar fecha y hora (entre 5 minutos y 2 horas desde ahora)
@@ -1011,6 +999,10 @@ class Cron extends Controller
         $randomMinutes = rand($minMinutes, $maxMinutes);
         $gameDateTime = new \DateTime();
         $gameDateTime->add(new \DateInterval('PT' . $randomMinutes . 'M'));
+
+        $roulettePrice = function_exists('bingo_roulette_carton_price')
+            ? bingo_roulette_carton_price()
+            : 0.25;
 
         return [
             'user' => 1,
@@ -1028,7 +1020,10 @@ class Cron extends Controller
             'cover' => '',
             'min_players' => max(1, (int) (systemGet('autoGameMinPlayers') ?: 10)),
             'min_cartons' => max(1, (int) (systemGet('autoGameMinCartons') ?: 10)),
-            'allow_roulette_cartons' => (systemGet('autoGameAllowRoulette') ?? 1) == 1 ? 1 : 0,
+            'allow_roulette_cartons' => (
+                (systemGet('autoGameAllowRoulette') ?? 1) == 1
+                && abs((float) $randomPrice - $roulettePrice) < 0.001
+            ) ? 1 : 0,
             'status' => 2
         ];
     }
@@ -1039,8 +1034,12 @@ class Cron extends Controller
         $modelAwards = new AwardsModel();
         $modelModalities = new ModalitiesModel();
         
-        $modalityIds = explode(',', $modalitiesString);
+        $modalityIds = array_values(array_filter(array_map('intval', explode(',', (string) $modalitiesString))));
         $numModalities = count($modalityIds);
+
+        if ($numModalities === 0) {
+            return;
+        }
 
         // Obtener información de las modalidades para identificar cartón lleno
         $modalities = $modelModalities->whereIn('id', $modalityIds)->findAll();

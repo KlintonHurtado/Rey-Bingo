@@ -1392,6 +1392,14 @@ if (!function_exists('bingo_ensure_games_schema')) {
     }
 }
 
+if (!function_exists('bingo_roulette_carton_price')) {
+    /** Precio de cartón requerido para usar premios de ruleta. */
+    function bingo_roulette_carton_price(): float
+    {
+        return 0.25;
+    }
+}
+
 if (!function_exists('bingo_game_allows_roulette_cartons')) {
     function bingo_game_allows_roulette_cartons(?array $game): bool
     {
@@ -1399,7 +1407,12 @@ if (!function_exists('bingo_game_allows_roulette_cartons')) {
             return false;
         }
 
-        return (int) ($game['allow_roulette_cartons'] ?? 1) === 1;
+        if ((int) ($game['allow_roulette_cartons'] ?? 1) !== 1) {
+            return false;
+        }
+
+        // Solo salas con cartones a 0.25
+        return abs((float) ($game['price'] ?? 0) - bingo_roulette_carton_price()) < 0.001;
     }
 }
 

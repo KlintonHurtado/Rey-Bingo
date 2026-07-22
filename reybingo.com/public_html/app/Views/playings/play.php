@@ -167,154 +167,207 @@
     }
 
     @media (max-width: 768px) {
-    .player-play-view .play-section--multi {
-        height: auto;
-        min-height: 0;
-        max-height: none;
-        width: 100%;
-        overflow-x: auto !important;
-        overflow-y: visible;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x mandatory;
-        scrollbar-width: none;
-        align-items: flex-start;
-        justify-content: flex-start;
-        padding-top: 0.25rem !important;
-        padding-bottom: 5rem !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
+        /* Teléfono: rejilla 2 columnas (como mockup), sin carrusel horizontal */
+        .player-play-view .play-rooms-carousel {
+            overflow: visible;
+        }
 
-    .player-play-view .play-section--multi::-webkit-scrollbar {
-        display: none;
-    }
+        .player-play-view .play-rooms-scroll-hint,
+        .player-play-view .play-rooms-scroll-hint.is-visible {
+            display: none !important;
+        }
 
-    .player-play-view .play-cards--multi {
-        display: flex !important;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        align-items: stretch;
-        gap: 0;
-        width: max-content;
-        min-width: 100%;
-        max-width: none !important;
-        margin: 0;
-        padding: 0 0 8px;
-        grid-template-columns: unset !important;
-    }
+        .player-play-view .play-rooms-carousel.has-scroll-right::after,
+        .player-play-view .play-rooms-carousel.has-scroll-left::before {
+            display: none !important;
+        }
 
-    .player-play-view .play-room-slide {
-        flex: 0 0 var(--play-room-slide-step, 100%);
-        width: var(--play-room-slide-step, 100%);
-        min-width: var(--play-room-slide-step, 100%);
-        max-width: var(--play-room-slide-step, 100%);
-        display: flex;
-        justify-content: center;
-        align-items: stretch;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
-        box-sizing: border-box;
-    }
+        .player-play-view .play-section--rooms,
+        .player-play-view .play-section--multi,
+        .player-play-view .play-section--single {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: calc(100dvh - 220px) !important;
+            width: 100% !important;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: none !important;
+            display: block !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
+            padding: 0.15rem 6px 5rem !important;
+        }
 
-    .player-play-view .play-cards--multi .card {
-        flex: 0 0 auto;
-        width: var(--play-room-slide-width, min(300px, 74vw)) !important;
-        min-width: var(--play-room-slide-width, min(300px, 74vw));
-        max-width: var(--play-room-slide-width, min(300px, 74vw)) !important;
-        margin: 0 !important;
-    }
+        .player-play-view .play-cards,
+        .player-play-view .play-cards--multi,
+        .player-play-view .play-cards--single {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            justify-items: stretch !important;
+            align-items: stretch !important;
+            flex-direction: unset !important;
+            flex-wrap: unset !important;
+        }
 
-    .player-play-view .play-cards--multi .card .card-img-top {
-        max-height: 120px;
-        width: auto;
-        margin: 0 auto;
-        object-fit: contain;
-    }
+        .player-play-view .play-room-slide {
+            flex: none !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            display: flex !important;
+            justify-content: stretch;
+            align-items: stretch;
+            scroll-snap-align: none !important;
+            scroll-snap-stop: normal !important;
+            box-sizing: border-box;
+        }
 
-    .player-play-view .play-cards--multi .card .card-title,
-    .player-play-view .play-cards--multi .card .card-body p {
-        font-size: 0.9rem;
-        margin: 2px 0;
-    }
+        .player-play-view .play-cards .card,
+        .player-play-view .play-cards--multi .card,
+        .player-play-view .play-cards--single .card {
+            flex: 1 1 auto !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            border-radius: 16px !important;
+            overflow: hidden;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+            color: #fff;
+        }
 
-    .player-play-view .play-cards--multi .card .list-group-flush li {
-        padding: 2px 6px !important;
-        font-size: 0.8rem !important;
-    }
+        .player-play-view .play-cards .card > .text-end {
+            position: absolute;
+            top: 34px;
+            left: 6px;
+            z-index: 4;
+            padding: 0 !important;
+        }
 
-    .player-play-view .play-cards--multi .card .card-body {
-        padding: 6px 8px !important;
-    }
+        .player-play-view .play-cards .favorite-game-btn {
+            width: 24px;
+            height: 24px;
+            font-size: 0.72rem;
+        }
 
-    .player-play-view .play-cards--multi .card .btn {
-        padding: 6px 10px;
-        font-size: 0.82rem;
-        margin-bottom: 4px !important;
-    }
+        .player-play-view .play-cards .card .card-img-top {
+            max-height: 52px !important;
+            width: auto !important;
+            max-width: 72% !important;
+            margin: 28px auto 2px !important;
+            padding: 0 !important;
+            object-fit: contain;
+            display: block;
+        }
 
-    .player-play-view .play-cards--multi .card-hour {
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        top: 8px;
-        left: 8px;
-    }
+        .player-play-view .play-cards .card .card-title {
+            font-size: 0.92rem !important;
+            letter-spacing: 0.02em;
+            margin: 0 0 1px !important;
+            color: #fff;
+            font-weight: 800;
+        }
 
-    .player-play-view .play-cards--multi .card-price {
-        font-size: 0.75rem;
-        padding: 5px 32px;
-        top: 28px;
-        right: -44px;
-    }
+        .player-play-view .play-cards .card .card-body p,
+        .player-play-view .play-cards .card .scrolling-text {
+            font-size: 0.72rem !important;
+            margin: 0 !important;
+            opacity: 0.95;
+            color: #fff;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
-    .player-play-view .play-section--single {
-        max-height: calc(100dvh - 230px);
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0 !important;
-    }
+        .player-play-view .play-cards .list-group,
+        .player-play-view .play-cards .list-group-flush {
+            background: transparent !important;
+            border: 0 !important;
+        }
 
-    .player-play-view .play-cards--single {
-        grid-template-columns: repeat(1, 1fr) !important;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-    }
+        .player-play-view .play-cards .card .list-group-flush li {
+            padding: 1px 6px !important;
+            font-size: 0.72rem !important;
+            color: #fff !important;
+            background: transparent !important;
+            border: 0 !important;
+            font-weight: 600;
+        }
 
-    .player-play-view .play-cards--single .card {
-        width: 60vw !important;
-        max-width: 300px !important;
-        margin: 0 auto;
-    }
+        .player-play-view .play-cards .bingo-bg-warning,
+        .player-play-view .play-cards .bingo-bg-warning .card-title,
+        .player-play-view .play-cards .bingo-bg-warning .list-group-flush li,
+        .player-play-view .play-cards .bingo-bg-white,
+        .player-play-view .play-cards .bingo-bg-white .card-title,
+        .player-play-view .play-cards .bingo-bg-white .list-group-flush li {
+            color: #fff !important;
+        }
 
-    .player-play-view .play-cards--single .card .card-img-top {
-        max-height: 110px;
-        width: auto;
-        margin: 0 auto;
-        object-fit: contain;
-    }
+        .player-play-view .play-cards .card .card-body {
+            padding: 2px 6px 6px !important;
+        }
 
-    .player-play-view .play-cards--single .card .card-title {
-        font-size: 0.9rem;
-        margin: 2px 0;
-    }
+        .player-play-view .play-cards .card .btn {
+            padding: 5px 8px !important;
+            font-size: 0.72rem !important;
+            margin-bottom: 4px !important;
+            border-radius: 10px !important;
+            font-weight: 700;
+            line-height: 1.2;
+        }
 
-    .player-play-view .play-cards--single .card .list-group-flush li {
-        padding: 2px 4px !important;
-        font-size: 0.8rem !important;
-    }
+        .player-play-view .play-cards .card .btn:disabled,
+        .player-play-view .play-cards .card .btn.disabled {
+            opacity: 0.85;
+            background: rgba(60, 70, 90, 0.75) !important;
+            color: #e8e8e8 !important;
+        }
 
-    .player-play-view .play-cards--single .card .card-body {
-        padding: 6px 8px !important;
-    }
+        .player-play-view .play-cards .card-hour {
+            top: 8px !important;
+            left: 8px !important;
+            right: auto !important;
+            font-size: 0.62rem !important;
+            padding: 3px 7px !important;
+            border-radius: 999px !important;
+            background: #ffeb3b !important;
+            color: #111 !important;
+            z-index: 5;
+            white-space: nowrap;
+        }
 
-    .player-play-view .play-cards--single .card .btn {
-        padding: 6px 10px;
-        font-size: 0.82rem;
-        margin-bottom: 4px !important;
-    }
+        .player-play-view .play-cards .card-price {
+            top: 18px !important;
+            right: -42px !important;
+            font-size: 0.58rem !important;
+            padding: 4px 34px !important;
+            background: #e53935 !important;
+            color: #fff !important;
+            z-index: 5;
+            white-space: nowrap;
+        }
+
+        .player-play-view .play-cards .card-time-display {
+            font-size: 0.58rem !important;
+            padding: 2px 6px !important;
+            margin-top: 2px;
+            background: rgba(0, 0, 0, 0.35);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .player-play-view .play-filters-bar {
+            max-width: 100%;
+            margin-bottom: 0.45rem;
+            padding: 0 6px;
+        }
 
         body:has(.player-play-view) {
             align-items: flex-start !important;
@@ -326,14 +379,6 @@
 
         .player-play-view {
             padding-top: 5.85rem;
-        }
-
-        .player-play-view .play-section--single {
-            max-height: calc(100dvh - 262px);
-        }
-
-        .player-play-view .play-filters-bar {
-            margin-bottom: 0.58rem;
         }
     }
 
@@ -774,23 +819,8 @@
     <?php endif; ?>
 
     window.setPlayRoomSlideWidths = function setPlayRoomSlideWidths() {
-        if (window.innerWidth >= 769) {
-            return;
-        }
-
-        const playSection = document.querySelector('.play-section--rooms.play-section--multi');
-        const cardsContainer = playSection ? playSection.querySelector('.play-cards--multi') : null;
-        if (!playSection || !cardsContainer) {
-            return;
-        }
-
-        const viewport = playSection.clientWidth;
-        const cardWidth = Math.min(300, Math.max(230, Math.round(viewport * 0.74)));
-
-        playSection.style.setProperty('--play-room-slide-width', cardWidth + 'px');
-        playSection.style.setProperty('--play-room-slide-step', viewport + 'px');
-        cardsContainer.style.paddingLeft = '0';
-        cardsContainer.style.paddingRight = '0';
+        // En teléfono usamos grid 2 columnas; el carrusel horizontal solo aplica en desktop.
+        return;
     };
 
     window.updatePlayRoomsScrollHints = function updatePlayRoomsScrollHints() {
@@ -803,21 +833,8 @@
             return;
         }
 
-        if (window.innerWidth >= 769) {
-            prevBtn.classList.remove('is-visible');
-            nextBtn.classList.remove('is-visible');
-            carousel.classList.remove('has-scroll-right', 'has-scroll-left');
-            return;
-        }
-
-        if (typeof window.setPlayRoomSlideWidths === 'function') {
-            window.setPlayRoomSlideWidths();
-        }
-
-        const canScroll = playSection.classList.contains('play-section--multi')
-            && playSection.scrollWidth > playSection.clientWidth + 4;
-
-        if (!canScroll) {
+        // Teléfono: grid vertical, sin flechas de scroll horizontal.
+        if (window.innerWidth < 769) {
             prevBtn.classList.remove('is-visible');
             nextBtn.classList.remove('is-visible');
             carousel.classList.remove('has-scroll-right', 'has-scroll-left');
@@ -826,16 +843,11 @@
             return;
         }
 
-        const maxScroll = playSection.scrollWidth - playSection.clientWidth;
-        const atStart = playSection.scrollLeft <= 4;
-        const atEnd = playSection.scrollLeft >= maxScroll - 4;
-
-        prevBtn.classList.toggle('is-visible', !atStart);
-        nextBtn.classList.toggle('is-visible', !atEnd);
-        carousel.classList.toggle('has-scroll-right', !atEnd);
-        carousel.classList.toggle('has-scroll-left', !atStart);
-        prevBtn.setAttribute('aria-hidden', atStart ? 'true' : 'false');
-        nextBtn.setAttribute('aria-hidden', atEnd ? 'true' : 'false');
+        prevBtn.classList.remove('is-visible');
+        nextBtn.classList.remove('is-visible');
+        carousel.classList.remove('has-scroll-right', 'has-scroll-left');
+        prevBtn.setAttribute('aria-hidden', 'true');
+        nextBtn.setAttribute('aria-hidden', 'true');
     };
 
     window.initPlayRoomsScrollHints = function initPlayRoomsScrollHints() {

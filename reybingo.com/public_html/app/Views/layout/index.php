@@ -2252,10 +2252,37 @@
         <?php if (systemGet('activateCron') == 1) : ?>
         // Cron Virtual: Mantiene vivos los juegos automáticos llamando al backend
         setInterval(() => {
-            fetch('/cron/run-auto-games', { method: 'GET', cache: 'no-store' })
+            fetch('<?= site_url('cron/run-auto-games') ?>', { method: 'GET', cache: 'no-store' })
                 .then(r => r.json())
                 .catch(e => console.log('Virtual Cron:', e));
         }, 5000);
+        <?php endif; ?>
+
+        <?php if (session()->get('group') == 1 && systemGet('activateAddGames') == 1) : ?>
+        function runAutoAddGamesCron() {
+            fetch('<?= site_url('cron/run-autoadd-games') ?>', { method: 'GET', cache: 'no-store' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Auto-add games:', data);
+                    if (data && data.success && typeof Toastify === 'function') {
+                        Toastify({
+                            text: 'Juego automático programado' + (data.time ? (' para ' + data.time) : ''),
+                            duration: 3000,
+                            gravity: 'top',
+                            position: 'right',
+                            style: { background: '#198754' },
+                            stopOnFocus: true
+                        }).showToast();
+                        if (window.location.href.includes('games')) {
+                            setTimeout(() => location.reload(), 2000);
+                        }
+                    }
+                })
+                .catch(e => console.log('Auto-add games failed', e));
+        }
+
+        setTimeout(runAutoAddGamesCron, 2000);
+        setInterval(runAutoAddGamesCron, 60000);
         <?php endif; ?>
     </script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>

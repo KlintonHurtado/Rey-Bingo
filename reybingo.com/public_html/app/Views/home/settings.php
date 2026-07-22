@@ -279,11 +279,11 @@
                             <div class="col-md-4 mb-3">
                                 <label for="priceRanges" class="form-label"><?= translate('game price range'); ?></label>
                                 <select class='form-control form-control-lg form-bingo' name="priceRanges" id="priceRanges">
-                                    <option <?= systemGet('priceRanges') == 1 ? 'selected' : '' ?> value="1"><?= systemGet('currency'); ?> 10 a <?= systemGet('currency'); ?> 60</option>
-                                    <option <?= systemGet('priceRanges') == 2 ? 'selected' : '' ?> value="2"><?= systemGet('currency'); ?> 10 a <?= systemGet('currency'); ?> 100</option>
-                                    <option <?= systemGet('priceRanges') == 3 ? 'selected' : '' ?> value="3"><?= systemGet('currency'); ?> 10 a <?= systemGet('currency'); ?> 150</option>
-                                    <option <?= systemGet('priceRanges') == 4 ? 'selected' : '' ?> value="4"><?= systemGet('currency'); ?> 10 a <?= systemGet('currency'); ?> 200</option>
-                                    <option <?= systemGet('priceRanges') == 5 ? 'selected' : '' ?> value="5"><?= systemGet('currency'); ?> 50 a <?= systemGet('currency'); ?> 500</option>
+                                    <option <?= systemGet('priceRanges') == 1 ? 'selected' : '' ?> value="1"><?= systemGet('currency'); ?> 0.25 a <?= systemGet('currency'); ?> 5</option>
+                                    <option <?= systemGet('priceRanges') == 2 ? 'selected' : '' ?> value="2"><?= systemGet('currency'); ?> 0.25 a <?= systemGet('currency'); ?> 3</option>
+                                    <option <?= systemGet('priceRanges') == 3 ? 'selected' : '' ?> value="3"><?= systemGet('currency'); ?> 0.5 a <?= systemGet('currency'); ?> 5</option>
+                                    <option <?= systemGet('priceRanges') == 4 ? 'selected' : '' ?> value="4"><?= systemGet('currency'); ?> 0.25 a <?= systemGet('currency'); ?> 2</option>
+                                    <option <?= systemGet('priceRanges') == 5 ? 'selected' : '' ?> value="5"><?= systemGet('currency'); ?> 1 a <?= systemGet('currency'); ?> 5</option>
                                 </select>
                                 <small id="priceRanges-error" class="text-danger d-none"></small>
                             </div>
@@ -291,32 +291,7 @@
                             <div class="col-12 mt-3 mb-2">
                                 <h6 class="text-muted border-bottom pb-2"><i class="fa-duotone fa-solid fa-robot"></i> <?= translate('auto game configuration'); ?></h6>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameRoom" class="form-label"><?= translate('game room'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="autoGameRoom" id="autoGameRoom">
-                                    <option value=""><?= translate('game room'); ?></option>
-                                    <?php if (!empty($gamerooms)): ?>
-                                        <?php foreach ($gamerooms as $gameroom): ?>
-                                            <option <?= systemGet('autoGameRoom') == $gameroom['id'] ? 'selected' : '' ?> value="<?= $gameroom['id'] ?>"><?= $gameroom['name'] ?></option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                                <small id="autoGameRoom-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameAwardType" class="form-label"><?= translate('type of award'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="autoGameAwardType" id="autoGameAwardType">
-                                    <option <?= systemGet('autoGameAwardType') == 1 ? 'selected' : '' ?> value="1"><?= translate('accumulated'); ?></option>
-                                    <option <?= systemGet('autoGameAwardType') == 2 ? 'selected' : '' ?> value="2"><?= translate('amount'); ?></option>
-                                </select>
-                                <small id="autoGameAwardType-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameAwardValue" class="form-label">Premio</label>
-                                <input type="number" class="form-control form-control-lg form-bingo" name="autoGameAwardValue" id="autoGameAwardValue" placeholder="Valor del premio" value="<?= systemGet('autoGameAwardValue') !== null ? systemGet('autoGameAwardValue') : 100 ?>">
-                                <small id="autoGameAwardValue-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label for="autoGameModalities" class="form-label"><?= translate('modality'); ?></label>
                                 <select class="form-control form-control-lg form-bingo" name="autoGameModalities[]" id="autoGameModalities" multiple="multiple" style="height: 120px;">
                                     <?php if (!empty($allmodalities)): ?>
@@ -330,29 +305,12 @@
                                 </select>
                                 <small id="autoGameModalities-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameMinPlayers" class="form-label"><?= translate('minimum players'); ?></label>
-                                <input type="number" class="form-control form-control-lg form-bingo" name="autoGameMinPlayers" id="autoGameMinPlayers" min="1" max="9999" value="<?= systemGet('autoGameMinPlayers') ?: 10 ?>">
-                                <small id="autoGameMinPlayers-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameMinCartons" class="form-label"><?= translate('minimum cartons'); ?></label>
-                                <input type="number" class="form-control form-control-lg form-bingo" name="autoGameMinCartons" id="autoGameMinCartons" min="1" max="99999" value="<?= systemGet('autoGameMinCartons') ?: 10 ?>">
-                                <small id="autoGameMinCartons-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="autoGameAllowRoulette" class="form-label"><?= translate('allow roulette cartons'); ?></label>
-                                <div class="form-check mt-2" style="padding-left: 20px;">
-                                    <style>
-                                        #autoGameAllowRoulette:checked {
-                                            background-color: #6236ff !important;
-                                            border-color: #6236ff !important;
-                                        }
-                                    </style>
-                                    <input class="form-check-input" type="checkbox" name="autoGameAllowRoulette" id="autoGameAllowRoulette" value="1" <?= (systemGet('autoGameAllowRoulette') ?? 1) == 1 ? 'checked' : '' ?> style="width: 24px; height: 24px; border: 3px solid #6236ff; border-radius: 6px; cursor: pointer;">
-                                </div>
-                                <small id="autoGameAllowRoulette-error" class="text-danger d-none"></small>
-                            </div>
+                            <input type="hidden" name="autoGameRoom" value="<?= esc(systemGet('autoGameRoom') ?? ''); ?>">
+                            <input type="hidden" name="autoGameAwardType" value="<?= esc(systemGet('autoGameAwardType') ?: '1'); ?>">
+                            <input type="hidden" name="autoGameAwardValue" value="<?= esc(systemGet('autoGameAwardValue') !== null ? systemGet('autoGameAwardValue') : '100'); ?>">
+                            <input type="hidden" name="autoGameMinPlayers" value="<?= esc(systemGet('autoGameMinPlayers') ?: '10'); ?>">
+                            <input type="hidden" name="autoGameMinCartons" value="<?= esc(systemGet('autoGameMinCartons') ?: '10'); ?>">
+                            <input type="hidden" name="autoGameAllowRoulette" value="<?= (systemGet('autoGameAllowRoulette') ?? 1) == 1 ? '1' : '0'; ?>">
                         </div>
                     </div>
 

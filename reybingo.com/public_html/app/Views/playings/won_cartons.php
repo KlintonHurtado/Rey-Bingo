@@ -56,7 +56,7 @@ body:has(#content-page > .won-cartons-scroll) {
                         <div>
                             <h5 class="mb-1"><i class="fa-duotone fa-solid fa-ticket"></i> Mis cartones ganados</h5>
                             <p class="text-muted small mb-0">
-                                Aquí aparecen los cartones que reclamaste en la ruleta. Elige la partida y modalidad donde quieres usarlos.
+                                Aquí aparecen los cartones que reclamaste en la ruleta. Solo puedes usarlos en partidas con cartón a <?= $currency; ?> 0.25.
                             </p>
                         </div>
                         <?php if ($pendingTotal > 0) : ?>
@@ -119,7 +119,7 @@ body:has(#content-page > .won-cartons-scroll) {
 
                         <?php if (! empty($pendingPrizes) && empty($gameOptions)) : ?>
                             <div class="alert alert-warning mt-3 mb-0">
-                                Tienes cartones pendientes, pero ninguna partida activa permite usarlos por ahora.
+                                Tienes cartones pendientes, pero no hay partidas activas con cartón a <?= $currency; ?> 0.25.
                             </div>
                         <?php endif; ?>
                     </div>

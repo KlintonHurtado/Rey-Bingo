@@ -201,12 +201,16 @@ class Playings extends Controller
         $games = $modelGames
             ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
+            ->where('price', bingo_roulette_carton_price())
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
             ->findAll();
 
         $payload = [];
         foreach ($games as $game) {
+            if (! bingo_game_allows_roulette_cartons($game)) {
+                continue;
+            }
             $room = $modelGameRooms->find($game['room']);
             $payload[] = bingo_game_roulette_payload($game, $room ?: null);
         }
@@ -300,12 +304,16 @@ class Playings extends Controller
         $games = $modelGames
             ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
+            ->where('price', bingo_roulette_carton_price())
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
             ->findAll();
 
         $gameOptions = [];
         foreach ($games as $game) {
+            if (! bingo_game_allows_roulette_cartons($game)) {
+                continue;
+            }
             $room = $modelGameRooms->find($game['room']);
             $gameOptions[] = bingo_game_roulette_payload($game, $room ?: null);
         }
@@ -381,7 +389,8 @@ class Playings extends Controller
         if (!bingo_game_allows_roulette_cartons($game)) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => translate('roulette cartons not allowed in this game'),
+                'message' => translate('roulette cartons only for price games') . ' '
+                    . systemGet('currency') . ' ' . number_format(bingo_roulette_carton_price(), 2),
             ]);
         }
 

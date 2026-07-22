@@ -1861,7 +1861,10 @@ class Games extends Controller {
             'price' => $this->request->getPost('price'),
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
-            'allow_roulette_cartons' => $this->request->getPost('allow_roulette_cartons') ? 1 : 0,
+            'allow_roulette_cartons' => (
+                $this->request->getPost('allow_roulette_cartons')
+                && abs((float) $this->request->getPost('price') - bingo_roulette_carton_price()) < 0.001
+            ) ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),
@@ -2235,7 +2238,10 @@ class Games extends Controller {
             'price' => $this->request->getPost('price'),
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
-            'allow_roulette_cartons' => $this->request->getPost('allow_roulette_cartons') ? 1 : 0,
+            'allow_roulette_cartons' => (
+                $this->request->getPost('allow_roulette_cartons')
+                && abs((float) $this->request->getPost('price') - bingo_roulette_carton_price()) < 0.001
+            ) ? 1 : 0,
             'modalities' => $md,
             'date' => $this->request->getPost('date'),
             'time' => $this->request->getPost('time'),

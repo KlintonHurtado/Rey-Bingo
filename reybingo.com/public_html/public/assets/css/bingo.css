@@ -6587,98 +6587,90 @@ input[type=number]::-webkit-outer-spin-button {
     }
 
     .play-cards {
-        grid-template-columns: 1fr !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         max-width: 100%;
-        padding: 0 8px;
+        padding: 0 6px;
+        gap: 10px;
+        width: 100%;
+        justify-items: stretch;
     }
 
-    .player-play-view .play-cards--multi {
-        display: flex !important;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 0;
-        width: max-content;
-        min-width: 100%;
-        max-width: none !important;
-        padding: 0 0 8px;
-        grid-template-columns: unset !important;
+    .player-play-view .play-cards,
+    .player-play-view .play-cards--multi,
+    .player-play-view .play-cards--single {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex-direction: unset !important;
+        flex-wrap: unset !important;
     }
 
     .player-play-view .play-room-slide {
-        flex: 0 0 var(--play-room-slide-step, 100%);
-        width: var(--play-room-slide-step, 100%);
-        min-width: var(--play-room-slide-step, 100%);
-        max-width: var(--play-room-slide-step, 100%);
+        flex: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
         display: flex;
-        justify-content: center;
+        justify-content: stretch;
         align-items: stretch;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
+        scroll-snap-align: none;
         box-sizing: border-box;
     }
 
-    .player-play-view .play-cards--multi .card {
-        flex: 0 0 auto;
-        width: var(--play-room-slide-width, min(300px, 74vw)) !important;
-        min-width: var(--play-room-slide-width, min(300px, 74vw));
-        max-width: var(--play-room-slide-width, min(300px, 74vw)) !important;
-        margin: 0 !important;
-    }
-
-    .player-play-view .play-section--multi {
+    .player-play-view .play-section--multi,
+    .player-play-view .play-section--single,
+    .player-play-view .play-section--rooms {
         width: 100%;
         height: auto !important;
-        max-height: none !important;
-        overflow-x: auto !important;
-        overflow-y: visible !important;
+        max-height: calc(100dvh - 220px) !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x mandatory;
-        scrollbar-width: none;
-        align-items: flex-start !important;
-        padding-bottom: 5rem !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
+        scroll-snap-type: none !important;
+        align-items: stretch !important;
+        padding: 0.15rem 6px 5rem !important;
+        display: block !important;
     }
 
-    .player-play-view .play-section--multi::-webkit-scrollbar {
-        display: none;
-    }
-
-    .play-cards .card {
-        width: min(100%, 380px) !important;
-        max-width: 380px !important;
-        margin: 0 auto !important;
-    }
-
-    .player-play-view .play-cards--multi .card {
-        width: var(--play-room-slide-width, min(300px, 74vw)) !important;
-        max-width: var(--play-room-slide-width, min(300px, 74vw)) !important;
+    .play-cards .card,
+    .player-play-view .play-cards .card,
+    .player-play-view .play-cards--multi .card,
+    .player-play-view .play-cards--single .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
         margin: 0 !important;
+        border-radius: 16px !important;
     }
 
     .card-hour {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        top: 8px;
+        left: 8px;
         background: #ffeb3b;
         color: #000;
         font-weight: bold;
-        padding: 3px 6px;
-        border-radius: 8px;
-        font-size: 0.7rem;
+        padding: 3px 7px;
+        border-radius: 999px;
+        font-size: 0.62rem;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
 
     .card-price {
         position: absolute;
-        top: 30px;
-        right: -55px;
-        background: #e91e63;
+        top: 18px;
+        right: -42px;
+        background: #e53935;
         color: #fff;
         font-weight: bold;
-        padding: 5px 35px;
+        padding: 4px 34px;
         transform: rotate(45deg);
-        font-size: 0.7rem;
+        font-size: 0.58rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.25);
     }
 
