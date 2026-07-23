@@ -2791,7 +2791,8 @@ if (!function_exists('bingo_generate_cartons_for_user')) {
         $modelGames = new \App\Models\GamesModel();
 
         $game = $modelGames->find($gameId);
-        if (!$game || (int) $game['status'] !== 1) {
+        // Permitir partidas activas (1) y programadas/pospuestas (2)
+        if (!$game || ! in_array((int) ($game['status'] ?? -1), [1, 2], true)) {
             return ['success' => false, 'message' => translate('game not found'), 'carton_ids' => []];
         }
 

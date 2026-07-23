@@ -382,7 +382,8 @@ class Playings extends Controller
         }
 
         $game = $modelGames->find($gameId);
-        if (!$game || (int) $game['status'] !== 1) {
+        // status 1 = activa, 2 = programada/pospuesta (misma lista que wonCartons/rouletteGames)
+        if (!$game || ! in_array((int) ($game['status'] ?? -1), [1, 2], true)) {
             return $this->response->setJSON(['success' => false, 'message' => translate('game not found')]);
         }
 
