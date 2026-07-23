@@ -1314,7 +1314,7 @@ class Cron extends Controller
             ->where('status', 1)
             ->countAllResults();
 
-        $isCompleted = $SingsCount >= $AwardsCount;
+        $isCompleted = $AwardsCount > 0 && $SingsCount >= $AwardsCount;
         
         if ($isCompleted) {
             log_message('info', "Juego {$gameId} completado: Todos los premios cantados ({$SingsCount}/{$AwardsCount}). Pendientes de pago manual.");

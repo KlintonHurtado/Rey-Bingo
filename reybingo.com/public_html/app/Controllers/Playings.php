@@ -1032,8 +1032,18 @@ class Playings extends Controller
 
         $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-        $gameIsFinished = ($totalNumbersGenerated >= 75)
+        $gameIsFinished = ((int) ($game['status'] ?? 0) === 0)
+            || ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
+
+        // Partida programada (2) con cartones del jugador: activar al entrar a jugar
+        if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
+            $modelGames->update((int) $game['id'], [
+                'status' => 1,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            $game['status'] = 1;
+        }
 
         $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
 
@@ -1364,7 +1374,7 @@ class Playings extends Controller
             ];
 
             return $this->response->setJSON($response);
-        } elseif ($totalNumbersGenerated >= 75 || $SingsCount >= $AwardsCount) {
+        } elseif ($totalNumbersGenerated >= 75 || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
             $response = [
                 'success' => false,
                 'finished' => true,
@@ -1580,7 +1590,7 @@ class Playings extends Controller
                 ]);
             }
 
-        } elseif ($totalNumbersGenerated >= 75 || $singsCount >= $awardsCount) {
+        } elseif ($totalNumbersGenerated >= 75 || ($awardsCount > 0 && $singsCount >= $awardsCount)) {
 
             return $this->response->setJSON([
                 'success' => false,
@@ -1788,7 +1798,7 @@ class Playings extends Controller
                 ]);
             }
 
-        } elseif ($totalNumbersGenerated >= 75 || $singsCount >= $awardsCount) {
+        } elseif ($totalNumbersGenerated >= 75 || ($awardsCount > 0 && $singsCount >= $awardsCount)) {
 
             return $this->response->setJSON([
                 'success' => false,
@@ -1834,7 +1844,10 @@ class Playings extends Controller
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
 
-        if ((int) ($game['status'] ?? 0) !== 1) {
+        $gameStatus = (int) ($game['status'] ?? 0);
+
+        // status 0 = finalizada. status 2 = programada/pospuesta (sigue jugable; no marcar terminada).
+        if ($gameStatus === 0) {
             bingo_ensure_winners_registered((int) $game['id']);
 
             return $this->response->setJSON([
@@ -1846,6 +1859,15 @@ class Playings extends Controller
                 'number' => '',
                 'player' => '',
             ]);
+        }
+
+        // Si está programada (2) pero ya hay bolas o el jugador entró a jugar, activarla
+        if ($gameStatus === 2) {
+            $modelGames->update((int) $game['id'], [
+                'status' => 1,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            $game['status'] = 1;
         }
 
         $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
@@ -1910,7 +1932,7 @@ class Playings extends Controller
             $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
 
             $game = $modelGames->find($game['id']);
-            $gameCompleted = (int) ($game['status'] ?? 0) !== 1;
+            $gameCompleted = (int) ($game['status'] ?? 0) === 0;
 
             return $this->response->setJSON([
                 'status' => 'pause',
@@ -1937,7 +1959,7 @@ class Playings extends Controller
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 
