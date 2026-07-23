@@ -33,25 +33,29 @@
     .container-section--playing .top-section.live {
         flex: 0 0 auto !important;
         padding-top: 3rem !important;
-        padding-bottom: 0 !important;
+        padding-bottom: 0.5rem !important;
         justify-content: flex-start !important;
+        align-items: center !important;
         height: auto !important;
-        max-height: min(42vh, 360px) !important;
-        overflow: hidden !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: transparent !important;
     }
 
-    /* Live compacto: el video no debe comerse los cartones */
+    /* Video solo del tamaño del reproductor (centrado), sin franja negra a todo el ancho */
     .container-section--playing .top-section.live .video-responsive {
         position: relative !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        height: min(38vh, 340px) !important;
-        max-height: min(38vh, 340px) !important;
+        width: min(100%, 560px) !important;
+        max-width: min(92vw, 560px) !important;
+        height: auto !important;
+        max-height: none !important;
+        aspect-ratio: 16 / 9 !important;
         padding-bottom: 0 !important;
         margin: 0 auto !important;
-        border-radius: 0 0 10px 10px;
+        border-radius: 12px !important;
         background: #0b0620;
         overflow: hidden !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     }
 
     .container-section--playing .top-section.live .video-responsive iframe {
@@ -63,13 +67,17 @@
     }
 
     .container-section--playing .top-section.live #plyr-video-player {
-        width: 100% !important;
-        max-width: 100% !important;
-        height: min(38vh, 340px) !important;
-        max-height: min(38vh, 340px) !important;
+        display: block !important;
+        width: min(100%, 560px) !important;
+        max-width: min(92vw, 560px) !important;
+        height: auto !important;
+        max-height: none !important;
+        aspect-ratio: 16 / 9 !important;
+        margin: 0 auto !important;
         object-fit: cover !important;
-        border-radius: 0 0 10px 10px;
+        border-radius: 12px !important;
         background: #0b0620;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     }
 
     /* LIVE: misma columna que móvil (video arriba, cartones abajo) en cualquier ancho */
@@ -645,15 +653,22 @@
         }
 
         .container-section--playing .top-section.live {
-            max-height: min(36vh, 300px) !important;
+            max-height: none !important;
             padding-top: 3rem !important;
-            overflow: hidden !important;
+            padding-bottom: 0.4rem !important;
+            overflow: visible !important;
+            background: transparent !important;
         }
 
         .container-section--playing .top-section.live .video-responsive,
         .container-section--playing .top-section.live #plyr-video-player {
-            height: min(32vh, 280px) !important;
-            max-height: min(32vh, 280px) !important;
+            width: min(100%, 100vw) !important;
+            max-width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            aspect-ratio: 16 / 9 !important;
+            border-radius: 0 0 10px 10px !important;
+            box-shadow: none !important;
         }
 
         .container-section--playing .center-section.center-section--playing {
