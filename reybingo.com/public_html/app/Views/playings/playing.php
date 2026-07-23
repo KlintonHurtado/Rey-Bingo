@@ -141,15 +141,16 @@
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 auto !important;
-        gap: 14px !important;
+        gap: 16px !important;
     }
 
     @media (min-width: 701px) {
         .container-section--playing .content-cartons {
             display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)) !important;
             justify-items: center !important;
-            max-width: 1200px !important;
+            max-width: 920px !important;
+            gap: 18px !important;
         }
 
         /* Optimización estética y de proporciones para el panel de chat en Web/PC */
@@ -393,22 +394,23 @@
 
     .container-section--playing .bingo-border-carton {
         width: fit-content !important;
-        max-width: min(320px, 88vw) !important;
+        max-width: min(420px, 94vw) !important;
         margin: 0 auto !important;
+        padding: 10px 12px 12px !important;
     }
 
     .container-section--playing .bingo-border-carton .carton-serial {
-        font-size: 0.72rem !important;
-        margin-bottom: 4px !important;
+        font-size: 0.8rem !important;
+        margin-bottom: 6px !important;
     }
 
     .container-section--playing .bingo-carton {
-        width: min(290px, 84vw) !important;
+        width: min(390px, 90vw) !important;
         max-width: 100% !important;
         display: grid !important;
         grid-template-columns: repeat(5, 1fr) !important;
-        gap: 4px !important;
-        padding: 5px 6px !important;
+        gap: 5px !important;
+        padding: 6px 7px !important;
         box-sizing: border-box !important;
     }
 
@@ -418,13 +420,13 @@
         height: auto !important;
         aspect-ratio: 1;
         min-width: 0 !important;
-        font-size: clamp(0.75rem, 2.4vw, 1rem) !important;
-        border-radius: 6px !important;
+        font-size: clamp(0.85rem, 2.6vw, 1.15rem) !important;
+        border-radius: 7px !important;
     }
 
     .container-section--playing .bingo-carton-number.data-position-13,
     .container-section--playing .bingo-carton-number.modality {
-        font-size: clamp(0.9rem, 3vw, 1.15rem) !important;
+        font-size: clamp(1rem, 3.2vw, 1.3rem) !important;
     }
 
     /* Modalidades: mismo patrón flotante que el chat */
@@ -672,7 +674,7 @@
         }
 
         .container-section--playing .bingo-border-carton {
-            max-width: min(318px, 86vw) !important;
+            max-width: min(380px, 92vw) !important;
             padding: 8px 10px 10px !important;
             background-color: rgba(255, 255, 255, 0.92) !important;
             border-radius: 14px !important;
