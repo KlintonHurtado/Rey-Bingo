@@ -72,6 +72,12 @@
         background: #0b0620;
     }
 
+    /* LIVE: misma columna que móvil (video arriba, cartones abajo) en cualquier ancho */
+    .container-section--playing.container-section--live-game {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
     .container-section--playing.container-section--live-game .center-section.center-section--playing {
         flex: 1 1 0 !important;
         min-height: 0 !important;
@@ -81,47 +87,6 @@
         flex: 1 1 0 !important;
         min-height: 180px !important;
         padding-top: 8px !important;
-    }
-
-    @media (min-width: 901px) {
-        .container-section--playing.container-section--live-game {
-            display: grid !important;
-            grid-template-columns: minmax(320px, 42%) 1fr !important;
-            grid-template-rows: 1fr !important;
-            align-items: stretch !important;
-        }
-
-        .container-section--playing.container-section--live-game > .top-section.live {
-            grid-column: 1;
-            grid-row: 1;
-            max-height: none !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-start !important;
-            padding-top: 3.5rem !important;
-            border-radius: 0 !important;
-        }
-
-        .container-section--playing.container-section--live-game .top-section.live .video-responsive,
-        .container-section--playing.container-section--live-game .top-section.live #plyr-video-player {
-            height: min(52vh, 420px) !important;
-            max-height: min(52vh, 420px) !important;
-            border-radius: 12px !important;
-            margin: 0.5rem !important;
-            width: calc(100% - 1rem) !important;
-        }
-
-        .container-section--playing.container-section--live-game > .center-section.center-section--playing {
-            grid-column: 2;
-            grid-row: 1;
-            height: 100% !important;
-            min-height: 0 !important;
-        }
-
-        .container-section--playing.container-section--live-game .cartons-section.cartons-section--playing {
-            padding: 1rem 1rem calc(90px + env(safe-area-inset-bottom, 0px)) !important;
-        }
     }
 
     .container-section--playing .center-section.center-section--playing {
