@@ -1073,7 +1073,11 @@ class Playings extends Controller
         $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();
 
         $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
-        array_shift($fourNumbers);
+        // En LIVE no hay bola principal en header: incluir la actual en el historial.
+        $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
+        if (!$isLiveGame) {
+            array_shift($fourNumbers);
+        }
         $fourNumbers = array_reverse(array_column($fourNumbers, 'number'));
 
         $fiveNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();

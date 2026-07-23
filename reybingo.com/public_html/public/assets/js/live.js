@@ -813,61 +813,63 @@ function handleNewNumber(newNumber, totalNumbersGenerated) {
     const el = $id('number-' + newNumber);
     if (el) el.removeAttribute('onclick');
 
-    const centerBlock = $id('block-number');
-    const centerBall = $id('last-number-center');
-    
-    if (!centerBlock || !centerBall) return;
+    // Actualizar header e historial de inmediato (antes el header esperaba 7s
+    // y el jugador/admin veían la bola anterior hasta la siguiente).
+    lastNumbers.push(newNumber);
+    if (lastNumbers.length > 5) lastNumbers.shift();
 
-    centerBlock.style.display = 'flex';
-    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
-    centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
-    centerBall.style.display = 'flex';
-
-    setTimeout(() => {
-        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-        centerBall.style.opacity = '0';
-        
+    const lastNumberEl = $('#last-number');
+    if (lastNumberEl.length) {
+        lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
+            .removeClass()
+            .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130 move-number`);
         setTimeout(() => {
-            centerBall.removeAttribute('style');
-            centerBall.className = '';
-            centerBlock.style.display = 'none';
-            
-            lastNumbers.push(newNumber);
-            if (lastNumbers.length > 5) lastNumbers.shift();
-            
-            const latestUncurrent = lastNumbers.slice(0, -1);
-            const container = $("#last-five-numbers");
-            if (container.length) {
-                container.empty();
-                latestUncurrent.forEach(num => {
-                    container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
-                });
-            }
+            lastNumberEl.removeClass('move-number');
         }, 1000);
-        
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-                .removeClass()
-                .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130`);
-        }
-    }, 7000);
-
-    // Reproducir narración si está activada
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
     }
 
-    setTimeout(() => {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.removeClass("move-number");
-        }
-    }, 1000);
+    const latestUncurrent = lastNumbers.slice(0, -1);
+    const container = $("#last-five-numbers");
+    if (container.length) {
+        container.empty();
+        latestUncurrent.forEach(num => {
+            container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
+        });
+    }
 
     const numberEl = $("#number-" + newNumber);
     if (numberEl.length) {
         numberEl.addClass(`bingo-ball ${getColumnClass(newNumber)} size-50`);
+    }
+
+    const centerBlock = $id('block-number');
+    const centerBall = $id('last-number-center');
+    
+    if (centerBlock && centerBall) {
+        centerBlock.style.display = 'flex';
+        centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
+        centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
+        centerBall.style.display = 'flex';
+        centerBall.style.transform = '';
+        centerBall.style.opacity = '1';
+
+        const displayMs = Math.min(parseInt(window.timeBallGet, 10) || 2500, 3500);
+
+        setTimeout(() => {
+            centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
+            centerBall.style.opacity = '0';
+            
+            setTimeout(() => {
+                centerBall.removeAttribute('style');
+                centerBall.className = '';
+                centerBlock.style.display = 'none';
+            }, 500);
+        }, displayMs);
+    }
+
+    // Reproducir narración si está activada
+    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + newNumber + '.mp3');
     }
 }
 
@@ -880,62 +882,37 @@ function handleNewNumberCRON(newNumber, totalNumbersGenerated) {
     const el = $id('number-' + newNumber);
     if (el) el.removeAttribute('onclick');
 
-    /*const centerBlock = $id('block-number');
-    const centerBall = $id('last-number-center');
-    
-    if (!centerBlock || !centerBall) return;
-
-    centerBlock.style.display = 'flex';
-    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
-    centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
-    centerBall.style.display = 'flex';*/
-
     // Marcar número en cartones si está inicializado el gestor
     if (bingoCardManager.initialized) {
         bingoCardManager.markNumber(newNumber);
     }
 
-    setTimeout(() => {
-        //centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-        //centerBall.style.opacity = '0';
-        
+    lastNumbers.push(newNumber);
+    if (lastNumbers.length > 5) lastNumbers.shift();
+
+    const latestUncurrent = lastNumbers.slice(0, -1);
+    const container = $("#last-five-numbers");
+    if (container.length) {
+        container.empty();
+        latestUncurrent.forEach(num => {
+            container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
+        });
+    }
+
+    const lastNumberEl = $('#last-number');
+    if (lastNumberEl.length) {
+        lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
+            .removeClass()
+            .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130 move-number`);
         setTimeout(() => {
-            //centerBall.removeAttribute('style');
-            //centerBall.className = '';
-            //centerBlock.style.display = 'none';
-            
-            lastNumbers.push(newNumber);
-            if (lastNumbers.length > 5) lastNumbers.shift();
-            
-            const latestUncurrent = lastNumbers.slice(0, -1);
-            const container = $("#last-five-numbers");
-            if (container.length) {
-                container.empty();
-                latestUncurrent.forEach(num => {
-                    container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
-                });
-            }
+            lastNumberEl.removeClass('move-number');
         }, 1000);
-        
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-                .removeClass()
-                .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130`);
-        }
-    }, 1000);
+    }
 
     // Reproducir narración si está activada
     if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
         audioManager.play(audioPath + newNumber + '.mp3');
     }
-
-    setTimeout(() => {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.removeClass("move-number");
-        }
-    }, 1000);
 
     const numberEl = $("#number-" + newNumber);
     if (numberEl.length) {

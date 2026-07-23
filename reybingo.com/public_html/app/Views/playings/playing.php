@@ -31,16 +31,97 @@
     }
 
     .container-section--playing .top-section.live {
-        padding-top: 3.25rem !important;
+        flex: 0 0 auto !important;
+        padding-top: 3rem !important;
+        padding-bottom: 0 !important;
         justify-content: flex-start !important;
         height: auto !important;
-        max-height: none !important;
+        max-height: min(32vh, 260px) !important;
+        overflow: hidden !important;
     }
 
-    .container-section--playing .top-section.live .video-responsive,
+    /* Live compacto: el video no debe comerse los cartones */
+    .container-section--playing .top-section.live .video-responsive {
+        position: relative !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: min(28vh, 220px) !important;
+        max-height: min(28vh, 220px) !important;
+        padding-bottom: 0 !important;
+        margin: 0 auto !important;
+        border-radius: 0 0 10px 10px;
+        background: #0b0620;
+        overflow: hidden !important;
+    }
+
+    .container-section--playing .top-section.live .video-responsive iframe {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border: 0 !important;
+    }
+
     .container-section--playing .top-section.live #plyr-video-player {
-        width: 100%;
-        max-width: 100%;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: min(28vh, 220px) !important;
+        max-height: min(28vh, 220px) !important;
+        object-fit: cover !important;
+        border-radius: 0 0 10px 10px;
+        background: #0b0620;
+    }
+
+    .container-section--playing.container-section--live-game .center-section.center-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+    }
+
+    .container-section--playing.container-section--live-game .cartons-section.cartons-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 180px !important;
+        padding-top: 8px !important;
+    }
+
+    @media (min-width: 901px) {
+        .container-section--playing.container-section--live-game {
+            display: grid !important;
+            grid-template-columns: minmax(320px, 42%) 1fr !important;
+            grid-template-rows: 1fr !important;
+            align-items: stretch !important;
+        }
+
+        .container-section--playing.container-section--live-game > .top-section.live {
+            grid-column: 1;
+            grid-row: 1;
+            max-height: none !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: flex-start !important;
+            padding-top: 3.5rem !important;
+            border-radius: 0 !important;
+        }
+
+        .container-section--playing.container-section--live-game .top-section.live .video-responsive,
+        .container-section--playing.container-section--live-game .top-section.live #plyr-video-player {
+            height: min(52vh, 420px) !important;
+            max-height: min(52vh, 420px) !important;
+            border-radius: 12px !important;
+            margin: 0.5rem !important;
+            width: calc(100% - 1rem) !important;
+        }
+
+        .container-section--playing.container-section--live-game > .center-section.center-section--playing {
+            grid-column: 2;
+            grid-row: 1;
+            height: 100% !important;
+            min-height: 0 !important;
+        }
+
+        .container-section--playing.container-section--live-game .cartons-section.cartons-section--playing {
+            padding: 1rem 1rem calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+        }
     }
 
     .container-section--playing .center-section.center-section--playing {
@@ -599,8 +680,15 @@
         }
 
         .container-section--playing .top-section.live {
-            max-height: none !important;
-            padding-top: 3.25rem !important;
+            max-height: min(30vh, 220px) !important;
+            padding-top: 3rem !important;
+            overflow: hidden !important;
+        }
+
+        .container-section--playing .top-section.live .video-responsive,
+        .container-section--playing .top-section.live #plyr-video-player {
+            height: min(26vh, 200px) !important;
+            max-height: min(26vh, 200px) !important;
         }
 
         .container-section--playing .center-section.center-section--playing {
@@ -884,7 +972,7 @@
         }
     }
 </style>
-<div class="container-section container-section--playing">
+<div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?>">
     <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
         <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i
                 class="fa-duotone fa-solid fa-house"></i></a>
@@ -1318,7 +1406,7 @@
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     //window.timeBallLast = singBall.split('-')[1];
-    window.timeBallLast = 2500;
+    window.timeBallLast = 1000;
     window.totalNumbersGenerated = <?= (int) ($totalNumbersGenerated ?? 0); ?>;
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;

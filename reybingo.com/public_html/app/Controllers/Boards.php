@@ -389,10 +389,12 @@ class Boards extends Controller {
 
         $model->insert($data);
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
+        $totalAfter = $totalNumbersGenerated + 1;
+        bingo_broadcast_number_drawn((int) $game['id'], (int) $number, $drawnNumbers, $totalAfter);
 
         return $this->response->setJSON([
             'status' => 'success',
-            'totalNumbersGenerated' => $totalNumbersGenerated + 1,
+            'totalNumbersGenerated' => $totalAfter,
             'message' => translate('new number generated'),
             'number' => $number,
             'drawnNumbers' => $drawnNumbers,
@@ -505,10 +507,12 @@ class Boards extends Controller {
 
         $model->insert($data);
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
+        $totalAfter = $totalNumbersGenerated + 1;
+        bingo_broadcast_number_drawn((int) $game['id'], (int) $number, $drawnNumbers, $totalAfter);
 
         return $this->response->setJSON([
             'status' => 'success',
-            'totalNumbersGenerated' => $totalNumbersGenerated + 1,
+            'totalNumbersGenerated' => $totalAfter,
             'message' => translate('new number generated'),
             'number' => $number,
             'drawnNumbers' => $drawnNumbers,

@@ -141,15 +141,15 @@ class Cron extends Controller
 
         $modelGames = new GamesModel();
         
-        // Validar máximo 2 juegos automáticos pendientes (status = 1 o 2)
+        // Validar máximo 3 juegos automáticos pendientes (status = 1 o 2)
         $pendingGamesCount = $modelGames->where('type', 1)
             ->whereIn('status', [1, 2])
             ->countAllResults();
 
-        if ($pendingGamesCount >= 2) {
+        if ($pendingGamesCount >= 3) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'Máximo de 2 juegos automáticos pendientes/activos alcanzado.'
+                'message' => 'Máximo de 3 juegos automáticos pendientes/activos alcanzado.'
             ]);
         }
 
@@ -409,6 +409,7 @@ class Cron extends Controller
 
                 $ballsCanted++;
                 log_message('info', "BOLA CANTADA: {$number} en juego {$gameId} a las {$now}");
+                bingo_broadcast_number_drawn((int) $gameId, (int) $number);
 
                 // 2.5) Procesar la bola cantada
                 $this->dialNumber($number, $gameId);
@@ -514,6 +515,7 @@ class Cron extends Controller
 
                 $ballsCanted++;
                 log_message('info', "BOLA CANTADA: {$number} en juego {$gameId} a las {$now}");
+                bingo_broadcast_number_drawn((int) $gameId, (int) $number);
 
                 // 2.5) Procesar la bola cantada
                 $this->dialNumber($number, $gameId);
@@ -660,6 +662,7 @@ class Cron extends Controller
 
             $ballsCanted++;
             log_message('info', "BOLA CANTADA: {$number} en juego {$gameId} a las {$now}");
+            bingo_broadcast_number_drawn((int) $gameId, (int) $number);
 
             // Procesar la bola cantada
             $this->dialNumber($number, $gameId);

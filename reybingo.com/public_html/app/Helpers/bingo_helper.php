@@ -32,6 +32,37 @@ if (!function_exists('bingo_count_drawn_numbers')) {
     }
 }
 
+if (!function_exists('bingo_broadcast_number_drawn')) {
+    /**
+     * Notifica en tiempo real a jugadores/admin la bola cantada.
+     */
+    function bingo_broadcast_number_drawn(int $gameId, int $number, ?array $drawnNumbers = null, ?int $totalNumbersGenerated = null): void
+    {
+        if ($gameId < 1 || $number < 1) {
+            return;
+        }
+
+        try {
+            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
+                return;
+            }
+
+            $drawn = $drawnNumbers ?? bingo_get_ordered_drawn_numbers($gameId);
+            $total = $totalNumbersGenerated ?? count($drawn);
+
+            \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:number_drawn', [
+                'n' => $number,
+                'number' => $number,
+                'drawn' => $drawn,
+                'drawnNumbers' => $drawn,
+                'totalNumbersGenerated' => $total,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Error al notificar bola por Pusher: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('bingo_sync_drawn_marks_for_user')) {
     function bingo_sync_drawn_marks_for_user(int $userId, int $gameId, array $drawnNumbers): void
     {

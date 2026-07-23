@@ -1069,12 +1069,15 @@ function renderBallHistory() {
         return;
     }
 
-    const history = ordered.length > 1
-        ? ordered.slice(Math.max(0, ordered.length - 5), -1)
-        : [];
+    // En LIVE no hay #last-number: el historial debe incluir la bola actual
+    // (si no, el jugador ve la bola recién cantada solo cuando sale la siguiente).
+    const hasMainBall = $('#last-number').length > 0;
+    const history = hasMainBall
+        ? (ordered.length > 1 ? ordered.slice(Math.max(0, ordered.length - 5), -1) : [])
+        : ordered.slice(Math.max(0, ordered.length - 5));
 
     container.empty();
-    history.slice(-4).forEach(function(num) {
+    history.slice(-5).forEach(function(num) {
         container.append(`<div class="bingo-ball ${getColumnClass(num)} ${getHistoryBallSizeClass()}"><span>${num}</span></div>`);
     });
 }
@@ -1688,7 +1691,12 @@ function lastNumberGet() {
         return;
     }
 
-    $.get(site_url + 'playings/numberGet')
+    $.ajax({
+        url: site_url + 'playings/numberGet',
+        method: 'GET',
+        cache: false,
+        data: { _ts: Date.now() }
+    })
         .done((data) => {
             if (!data || data.status === 'error') {
                 return;
@@ -1705,7 +1713,9 @@ function startAutomaticLast() {
     intervalManager.clear('lastNumber');
     if (typeof timeBallLast !== 'undefined') {
         lastNumberGet();
-        intervalManager.set('lastNumber', lastNumberGet, timeBallLast);
+        // LIVE / sync rápido: poll agresivo como respaldo de Pusher
+        const pollMs = Math.min(parseInt(timeBallLast, 10) || 2500, 1000);
+        intervalManager.set('lastNumber', lastNumberGet, pollMs);
     }
 }
 
@@ -2847,6 +2857,21 @@ function initializeApp() {
                 console.log('Pusher game:postponed received', data);
                 if (data && data.new_time) {
                     handleGamePostponed(data.new_time, data.message);
+                }
+            });
+            pusherHelper.on('game:number_drawn', function(data) {
+                if (!data || bingoInProgress || window.gameIsFinished || isGameFinishedShown) {
+                    return;
+                }
+
+                const number = data.n ?? data.number;
+                const drawn = data.drawnNumbers || data.drawn || null;
+                const total = data.totalNumbersGenerated;
+
+                if (Array.isArray(drawn) && drawn.length) {
+                    syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, { animate: false });
+                } else if (number) {
+                    handleNewNumber(number, total, drawn);
                 }
             });
         } catch (pe) {
