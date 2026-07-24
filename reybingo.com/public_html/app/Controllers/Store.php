@@ -379,7 +379,11 @@ class Store extends Controller
         ];
 
         $modelDeposits->insert($depositData);
-        $depositId = $modelDeposits->getInsertID();
+        $depositId = (int) $modelDeposits->getInsertID();
+
+        if ($depositId > 0 && function_exists('bingo_voucher_sync_after_insert')) {
+            bingo_voucher_sync_after_insert($depositId, $voucherFile);
+        }
 
         $admins = $modelUsers->select('id')->where('group', bingo_group_admin())->findAll();
         foreach ($admins as $admin) {

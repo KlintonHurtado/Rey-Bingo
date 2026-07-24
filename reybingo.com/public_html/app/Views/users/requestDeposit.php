@@ -33,9 +33,15 @@
                         <?php endif; ?>
                     </div>
                     <div class="col-md-6">
-                        <?php if (! empty($deposit['voucher']) && bingo_voucher_exists($deposit['voucher'])) : ?>
-                            <img src="<?= esc(bingo_voucher_url($deposit['voucher'])) ?>" alt="voucher" style="width:200px; max-height:200px; object-fit:contain; cursor:pointer;" class="img-thumbnail bg-white" onclick="modalVoucher('<?= (int) $deposit['id'] ?>');">
-                        <?php elseif (! empty($deposit['voucher'])) : ?>
+                        <?php
+                            $voucherName = trim((string) ($deposit['voucher'] ?? ''));
+                            $voucherOk = $voucherName !== '' && bingo_voucher_exists($voucherName);
+                            $voucherUrl = $voucherOk ? bingo_voucher_url($voucherName) : '';
+                        ?>
+                        <?php if ($voucherOk && $voucherUrl !== '') : ?>
+                            <img src="<?= esc($voucherUrl) ?>" alt="voucher" style="width:200px; max-height:200px; object-fit:contain; cursor:pointer;" class="img-thumbnail bg-white" onclick="modalVoucher('<?= (int) $deposit['id'] ?>');" onerror="this.classList.add('d-none'); this.nextElementSibling && this.nextElementSibling.classList.remove('d-none');">
+                            <div class="alert alert-warning py-2 px-2 small mb-0 d-none">Comprobante registrado pero el archivo no está disponible en el servidor.</div>
+                        <?php elseif ($voucherName !== '') : ?>
                             <div class="alert alert-warning py-2 px-2 small mb-0">Comprobante registrado pero el archivo no está disponible en el servidor.</div>
                         <?php else : ?>
                             <div class="alert alert-secondary py-2 px-2 small mb-0">Sin comprobante.</div>

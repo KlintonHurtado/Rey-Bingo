@@ -894,6 +894,12 @@ class Payments extends Controller {
             $data['deposit'] = $modelDeposits->where('id', $id)->first();
 
             if ($data['deposit']) {
+                // Intentar recuperar comprobante si el nombre en BD no coincide exactamente con el archivo
+                if (! empty($data['deposit']['voucher']) && ! bingo_voucher_exists($data['deposit']['voucher'])) {
+                    bingo_voucher_sync_after_insert((int) $data['deposit']['id'], (string) $data['deposit']['voucher']);
+                    $data['deposit'] = $modelDeposits->where('id', $id)->first() ?: $data['deposit'];
+                }
+
                 $data['user'] = $modelUsers->find($data['deposit']['user']);
                 if ($data['user']) {
                     $data['user'] = wallet_service()->normalizeUser($data['user']);
@@ -1207,6 +1213,23 @@ class Payments extends Controller {
             return $this->response->setJSON([
                 'success' => false,
                 'error' => translate('error saving payment'),
+            ]);
+        }
+
+        // Asegurar que el archivo exista con el nombre real guardado en BD (evita truncados)
+        if (! bingo_voucher_sync_after_insert($depositId, $saved['filename'])) {
+            log_message('error', 'depositSubmit voucher missing after insert id=' . $depositId . ' file=' . $saved['filename']);
+            try {
+                $modelDeposits->delete($depositId);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'deposit-voucher' => 'No se pudo guardar el comprobante en el servidor. Verifique permisos de uploads/vouchers.',
+                ],
             ]);
         }
 
