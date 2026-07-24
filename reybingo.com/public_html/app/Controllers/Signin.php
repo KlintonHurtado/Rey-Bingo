@@ -103,11 +103,16 @@ class Signin extends Controller {
             return $this->response->setJSON($response);
         }
 
-        if ($user['status'] == 2) {
+        // status: 1 = activo, 0 = baneado, 2 = inactivo
+        $accountStatus = (int) ($user['status'] ?? 0);
+        if ($accountStatus !== 1) {
+            $message = $accountStatus === 0
+                ? translate('your account has been banned')
+                : translate('your account is inactive');
             $response = [
                 'success' => false,
                 'errors' => [
-                    'username' => translate('your account is inactive')
+                    'username' => $message
                 ]
             ];
             return $this->response->setJSON($response);

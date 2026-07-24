@@ -1434,6 +1434,95 @@ if (!function_exists('bingo_is_admin')) {
     }
 }
 
+if (!function_exists('bingo_user_is_active')) {
+    /** Cuenta usable: no eliminada y status = 1 (activo). */
+    function bingo_user_is_active(?array $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return (int) ($user['deleted'] ?? 0) === 0
+            && (int) ($user['status'] ?? 0) === 1;
+    }
+}
+
+if (!function_exists('bingo_destroy_user_sessions')) {
+    /**
+     * Elimina sesiones en BD del usuario (ci_sessions) para forzar cierre.
+     */
+    function bingo_destroy_user_sessions(int $userId): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        try {
+            $sessionConfig = config('Session');
+            $driver = (string) ($sessionConfig->driver ?? '');
+            $table = (string) ($sessionConfig->savePath ?? 'ci_sessions');
+
+            if (strpos($driver, 'DatabaseHandler') === false) {
+                return;
+            }
+
+            $db = \Config\Database::connect();
+            if (! $db->tableExists($table)) {
+                return;
+            }
+
+            // Payload serializado PHP típico de CI: "id";i:123;
+            $needle = '"id";i:' . $userId . ';';
+            $db->table($table)->like('data', $needle, 'both', null, false)->delete();
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_destroy_user_sessions: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_enforce_active_session')) {
+    /**
+     * Si la sesión actual pertenece a un usuario baneado/inactivo, la cierra.
+     *
+     * @return \CodeIgniter\HTTP\RedirectResponse|null
+     */
+    function bingo_enforce_active_session()
+    {
+        if (! session()->get('logged_in')) {
+            return null;
+        }
+
+        $userId = (int) session()->get('id');
+        if ($userId < 1) {
+            return null;
+        }
+
+        static $checked = [];
+        if (isset($checked[$userId])) {
+            return $checked[$userId] ? null : redirect()->to('/signin');
+        }
+
+        try {
+            $user = (new UsersModel())->find($userId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (bingo_user_is_active($user)) {
+            $checked[$userId] = true;
+
+            return null;
+        }
+
+        $checked[$userId] = false;
+        session()->destroy();
+        helper('cookie');
+        delete_cookie('_signin');
+
+        return redirect()->to('/signin');
+    }
+}
+
 if (!function_exists('bingo_is_player')) {
     function bingo_is_player(?int $group = null): bool
     {
@@ -1486,55 +1575,204 @@ if (!function_exists('bingo_ensure_deposits_schema')) {
                     ],
                 ]);
             }
+
+            // Evitar truncar nombres de archivo del comprobante
+            if ($db->fieldExists('voucher', 'deposits')) {
+                try {
+                    $forge->modifyColumn('deposits', [
+                        'voucher' => [
+                            'type' => 'VARCHAR',
+                            'constraint' => 191,
+                            'null' => true,
+                            'default' => null,
+                        ],
+                    ]);
+                } catch (\Throwable $e) {
+                    // Algunos hosts no permiten MODIFY; el guardado usa nombres cortos de todos modos.
+                    log_message('debug', 'No se pudo ampliar deposits.voucher: ' . $e->getMessage());
+                }
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de deposits: ' . $e->getMessage());
         }
     }
 }
 
+if (!function_exists('bingo_voucher_candidate_dirs')) {
+    /**
+     * Carpetas donde pueden vivir los comprobantes (public y writable).
+     *
+     * @return list<string>
+     */
+    function bingo_voucher_candidate_dirs(): array
+    {
+        $dirs = [];
+        $candidates = [
+            rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR,
+            rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR,
+        ];
+
+        foreach ($candidates as $dir) {
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            if (is_dir($dir)) {
+                $dirs[] = $dir;
+            }
+        }
+
+        return array_values(array_unique($dirs));
+    }
+}
+
 if (!function_exists('bingo_voucher_dir')) {
     function bingo_voucher_dir(): string
     {
-        $dir = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
-        if (! is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        foreach (bingo_voucher_candidate_dirs() as $dir) {
+            if (is_writable($dir)) {
+                return $dir;
+            }
         }
 
-        return $dir;
+        // Fallback: intentar public aunque no sea writable (el error se verá al escribir)
+        $fallback = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        if (! is_dir($fallback)) {
+            @mkdir($fallback, 0755, true);
+        }
+
+        return $fallback;
+    }
+}
+
+if (!function_exists('bingo_voucher_sanitize_name')) {
+    function bingo_voucher_sanitize_name(?string $filename): string
+    {
+        $filename = basename(str_replace(["\0", '\\'], '', trim((string) $filename)));
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return '';
+        }
+
+        // Solo nombres seguros
+        if (! preg_match('/^[A-Za-z0-9._-]+$/', $filename)) {
+            return '';
+        }
+
+        return $filename;
+    }
+}
+
+if (!function_exists('bingo_voucher_resolve')) {
+    /**
+     * Resuelve la ruta real del archivo (incluye nombres truncados en BD).
+     */
+    function bingo_voucher_resolve(?string $filename): string
+    {
+        $filename = bingo_voucher_sanitize_name($filename);
+        if ($filename === '') {
+            return '';
+        }
+
+        foreach (bingo_voucher_candidate_dirs() as $dir) {
+            $path = $dir . $filename;
+            if (is_file($path) && filesize($path) > 0) {
+                return $path;
+            }
+        }
+
+        // Recuperar si la columna truncó el nombre (p. ej. uniqid con more_entropy)
+        $prefix = $filename;
+        if (strlen($prefix) >= 8) {
+            foreach (bingo_voucher_candidate_dirs() as $dir) {
+                $matches = glob($dir . $prefix . '*') ?: [];
+                foreach ($matches as $match) {
+                    if (is_file($match) && filesize($match) > 0) {
+                        return $match;
+                    }
+                }
+            }
+        }
+
+        return '';
     }
 }
 
 if (!function_exists('bingo_voucher_path')) {
     function bingo_voucher_path(?string $filename): string
     {
-        $filename = basename(trim((string) $filename));
-        if ($filename === '' || $filename === '.' || $filename === '..') {
-            return '';
-        }
-
-        return bingo_voucher_dir() . $filename;
+        return bingo_voucher_resolve($filename);
     }
 }
 
 if (!function_exists('bingo_voucher_url')) {
     function bingo_voucher_url(?string $filename): string
     {
-        $filename = basename(trim((string) $filename));
-        if ($filename === '') {
-            return '';
+        $resolved = bingo_voucher_resolve($filename);
+        if ($resolved === '') {
+            $filename = bingo_voucher_sanitize_name($filename);
+            if ($filename === '') {
+                return '';
+            }
+
+            return site_url('payments/voucher/' . rawurlencode($filename));
         }
 
-        // Servir vía controlador para Content-Type correcto (JPEG guardados como .png, etc.)
-        return site_url('payments/voucher/' . rawurlencode($filename));
+        // Servir el nombre real del archivo en disco
+        return site_url('payments/voucher/' . rawurlencode(basename($resolved)));
     }
 }
 
 if (!function_exists('bingo_voucher_exists')) {
     function bingo_voucher_exists(?string $filename): bool
     {
-        $path = bingo_voucher_path($filename);
+        return bingo_voucher_resolve($filename) !== '';
+    }
+}
 
-        return $path !== '' && is_file($path) && filesize($path) > 0;
+if (!function_exists('bingo_voucher_new_filename')) {
+    function bingo_voucher_new_filename(string $ext): string
+    {
+        $ext = strtolower($ext);
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        if (! in_array($ext, ['jpg', 'png', 'gif', 'webp'], true)) {
+            $ext = 'png';
+        }
+
+        // Nombre corto (compatible con VARCHAR(20) antiguos): 13 + 1 + ext
+        return uniqid() . '.' . $ext;
+    }
+}
+
+if (!function_exists('bingo_save_voucher_bytes')) {
+    /**
+     * @return array{success:bool,filename:string,error:string}
+     */
+    function bingo_save_voucher_bytes(string $imageData, string $ext = 'png'): array
+    {
+        if ($imageData === '') {
+            return ['success' => false, 'filename' => '', 'error' => 'empty'];
+        }
+
+        $fileName = bingo_voucher_new_filename($ext);
+        $dirs = bingo_voucher_candidate_dirs();
+        // Preferir writable primero
+        usort($dirs, static function ($a, $b) {
+            return (int) is_writable($b) <=> (int) is_writable($a);
+        });
+
+        foreach ($dirs as $dir) {
+            $path = $dir . $fileName;
+            $written = @file_put_contents($path, $imageData);
+            if ($written !== false && is_file($path) && filesize($path) > 0) {
+                @chmod($path, 0644);
+
+                return ['success' => true, 'filename' => $fileName, 'error' => ''];
+            }
+            log_message('error', 'No se pudo guardar voucher en ' . $path . ' (writable=' . (is_writable($dir) ? '1' : '0') . ')');
+        }
+
+        return ['success' => false, 'filename' => '', 'error' => 'write'];
     }
 }
 
@@ -1554,29 +1792,46 @@ if (!function_exists('bingo_save_voucher_base64')) {
         }
 
         $ext = strtolower($matches[1]);
-        if ($ext === 'jpeg') {
-            $ext = 'jpg';
-        }
-        if (! in_array($ext, ['jpg', 'png', 'gif', 'webp'], true)) {
-            $ext = 'png';
-        }
-
         $raw = (string) preg_replace('#^data:image/[a-z0-9.+-]+;base64,#i', '', $dataUrl);
         $imageData = base64_decode($raw, true);
         if ($imageData === false || $imageData === '') {
             return ['success' => false, 'filename' => '', 'error' => 'decode'];
         }
 
-        $fileName = uniqid('', true) . '.' . $ext;
-        $path = bingo_voucher_dir() . $fileName;
-        $written = @file_put_contents($path, $imageData);
-        if ($written === false || ! is_file($path) || filesize($path) < 1) {
-            log_message('error', 'No se pudo guardar voucher en ' . $path);
+        return bingo_save_voucher_bytes($imageData, $ext);
+    }
+}
 
-            return ['success' => false, 'filename' => '', 'error' => 'write'];
+if (!function_exists('bingo_save_voucher_upload')) {
+    /**
+     * Guarda un archivo subido (multipart) como comprobante.
+     *
+     * @return array{success:bool,filename:string,error:string}
+     */
+    function bingo_save_voucher_upload($file): array
+    {
+        if (! $file || ! is_object($file) || ! method_exists($file, 'isValid') || ! $file->isValid() || $file->hasMoved()) {
+            return ['success' => false, 'filename' => '', 'error' => 'invalid'];
         }
 
-        return ['success' => true, 'filename' => $fileName, 'error' => ''];
+        $mime = (string) ($file->getMimeType() ?: '');
+        $ext = strtolower((string) $file->getExtension());
+        if ($ext === '' && str_starts_with($mime, 'image/')) {
+            $ext = substr($mime, 6);
+        }
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        if (! in_array($ext, ['jpg', 'png', 'gif', 'webp'], true)) {
+            return ['success' => false, 'filename' => '', 'error' => 'type'];
+        }
+
+        $bytes = @file_get_contents($file->getTempName());
+        if ($bytes === false || $bytes === '') {
+            return ['success' => false, 'filename' => '', 'error' => 'empty'];
+        }
+
+        return bingo_save_voucher_bytes($bytes, $ext);
     }
 }
 

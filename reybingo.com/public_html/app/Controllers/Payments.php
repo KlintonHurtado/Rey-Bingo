@@ -947,8 +947,8 @@ class Payments extends Controller {
 
     public function voucher($file = null)
     {
-        $path = bingo_voucher_path($file);
-        if ($path === '' || ! is_file($path)) {
+        $path = bingo_voucher_resolve($file);
+        if ($path === '') {
             return $this->response->setStatusCode(404)->setBody('Voucher no encontrado');
         }
 
@@ -972,7 +972,7 @@ class Payments extends Controller {
         return $this->response
             ->setHeader('Content-Type', $mime)
             ->setHeader('Cache-Control', 'private, max-age=86400')
-            ->setBody(file_get_contents($path));
+            ->setBody((string) file_get_contents($path));
     }
   
     public function depositGet() {
@@ -1059,6 +1059,10 @@ class Payments extends Controller {
     }
 
     public function depositSubmit() {
+        if (function_exists('bingo_ensure_deposits_schema')) {
+            bingo_ensure_deposits_schema();
+        }
+
         $modelDeposits = new DepositsModel();
         $modelUsers = new UsersModel();
         $modelReferrals = new ReferralsModel();
@@ -1115,7 +1119,11 @@ class Payments extends Controller {
         }
 
         $voucherImage = trim((string) $this->request->getPost('deposit-voucher'));
-        if ($voucherImage === '' || strpos($voucherImage, 'data:image') !== 0) {
+        $voucherFile = $this->request->getFile('deposit-voucher-file');
+        $hasUpload = $voucherFile && $voucherFile->isValid() && ! $voucherFile->hasMoved();
+        $hasBase64 = $voucherImage !== '' && strpos($voucherImage, 'data:image') === 0;
+
+        if (! $hasUpload && ! $hasBase64) {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => [
@@ -1152,26 +1160,27 @@ class Payments extends Controller {
             'status'    => $status
         ];
 
-        // Si llega base64 => nueva imagen (obligatoria)
-        if (strpos($voucherImage, 'data:image') === 0) {
-            $saved = bingo_save_voucher_base64($voucherImage);
-            if (! $saved['success']) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'errors' => [
-                        'deposit-voucher' => translate('voucher') . ' ' . strtolower(translate('it is mandatory')),
-                    ],
-                ]);
-            }
-            $data['voucher'] = $saved['filename'];
+        // Preferir archivo multipart (más fiable que base64 grande)
+        if ($hasUpload) {
+            $saved = bingo_save_voucher_upload($voucherFile);
         } else {
+            $saved = bingo_save_voucher_base64($voucherImage);
+        }
+
+        if (! $saved['success']) {
+            $msg = translate('voucher') . ' ' . strtolower(translate('it is mandatory'));
+            if (($saved['error'] ?? '') === 'write') {
+                $msg = 'No se pudo guardar el comprobante en el servidor. Verifique permisos de uploads/vouchers.';
+            }
+
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => [
-                    'deposit-voucher' => translate('voucher') . ' ' . strtolower(translate('it is mandatory')),
+                    'deposit-voucher' => $msg,
                 ],
             ]);
         }
+        $data['voucher'] = $saved['filename'];
 
         if (systemGet('activateDeposit') == 1) {
             if ($data['amount'] < systemGet('minimumDeposit')) {

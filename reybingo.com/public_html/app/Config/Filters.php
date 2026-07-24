@@ -4,6 +4,7 @@ namespace Config;
 
 use CodeIgniter\Config\Filters as BaseFilters;
 use App\Filters\ClientDomain;
+use App\Filters\ActiveUser;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
 use CodeIgniter\Filters\DebugToolbar;
@@ -36,6 +37,7 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
         'clientdomain'  => ClientDomain::class,
+        'activeuser'    => ActiveUser::class,
     ];
 
     /**
@@ -71,6 +73,7 @@ class Filters extends BaseFilters
     public array $globals = [
         'before' => [
             'clientdomain',
+            'activeuser',
             // 'honeypot',
             // 'csrf',
             // 'invalidchars',

@@ -945,15 +945,30 @@ class Users extends Controller {
     }
 
     public function banUser() {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized'),
+            ]);
+        }
+
         $model = new UsersModel();
 
-        $userId = $this->request->getPost('user_id');
-        $status = $this->request->getPost('status'); // 0 = ban, 1 = unban
+        $userId = (int) $this->request->getPost('user_id');
+        // 0 = ban, 1 = unban (castear: POST "0" no debe tratarse como vacío)
+        $status = ((int) $this->request->getPost('status') === 1) ? 1 : 0;
         
-        if (!$userId) {
+        if ($userId < 1) {
             return $this->response->setJSON([
                 'success' => false,
                 'error' => translate('user id required')
+            ]);
+        }
+
+        if ($userId === (int) session()->get('id')) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('you cannot ban yourself'),
             ]);
         }
         
@@ -965,18 +980,48 @@ class Users extends Controller {
                 'error' => translate('user not found')
             ]);
         }
-        
-        if ($model->update($userId, ['status' => $status])) {
-            $message = $status == 0 ? translate('user banned successfully') : translate('user unbanned successfully');
+
+        // No banear administradores
+        if ((int) ($user['group'] ?? -1) === 1 && $status === 0) {
             return $this->response->setJSON([
-                'success' => true,
-                'message' => $message
+                'success' => false,
+                'error' => translate('cannot ban admin users'),
             ]);
         }
+
+        $payload = [
+            'status' => $status,
+        ];
+        // Al banear, invalidar "recordarme" para impedir reingreso automático
+        if ($status === 0) {
+            $payload['remember_token'] = null;
+        }
         
+        if (! $model->update($userId, $payload)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('error updating user status')
+            ]);
+        }
+
+        $fresh = $model->find($userId);
+        if (! $fresh || (int) ($fresh['status'] ?? -1) !== $status) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('error updating user status')
+            ]);
+        }
+
+        // Cerrar sesiones activas del usuario baneado (si el driver es DB)
+        if ($status === 0 && function_exists('bingo_destroy_user_sessions')) {
+            bingo_destroy_user_sessions($userId);
+        }
+            
+        $message = $status === 0 ? translate('user banned successfully') : translate('user unbanned successfully');
         return $this->response->setJSON([
-            'success' => false,
-            'error' => translate('error updating user status')
+            'success' => true,
+            'message' => $message,
+            'status' => $status,
         ]);
     }
 

@@ -107,7 +107,7 @@ class Boards extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             $status = 'stop';
         }
 
@@ -214,7 +214,7 @@ class Boards extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             $status = 'stop';
         }
 
@@ -303,7 +303,7 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
 
-        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, false)) {
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, true)) {
             $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
                 'status' => 'error',
@@ -313,15 +313,21 @@ class Boards extends Controller {
             ]);
         }
 
+        // Si el admin inicia, asegurar que la partida quede activa (1)
+        if ((int) ($game['status'] ?? 0) === 2) {
+            $modelGames->update((int) $game['id'], ['status' => 1]);
+            $game['status'] = 1;
+        }
+
         $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
-            $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
+            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
-                'number' => $lastBall['number']
+                'number' => $lastBall['number'] ?? null
             ]);
         }
 
@@ -329,13 +335,13 @@ class Boards extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
-            $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
+            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => $lastBall['number']
+                'number' => $lastBall['number'] ?? null
             ]);
         }
 
@@ -421,7 +427,7 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
 
-        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, false)) {
+        if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, true)) {
             $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
                 'status' => 'error',
@@ -431,15 +437,21 @@ class Boards extends Controller {
             ]);
         }
 
+        // Si el admin inicia, asegurar que la partida quede activa (1)
+        if ((int) ($game['status'] ?? 0) === 2) {
+            $modelGames->update((int) $game['id'], ['status' => 1]);
+            $game['status'] = 1;
+        }
+
         $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
-            $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
+            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
-                'number' => $lastBall['number']
+                'number' => $lastBall['number'] ?? null
             ]);
         }
 
@@ -447,13 +459,13 @@ class Boards extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
-            $modelGames->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
+            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => $lastBall['number']
+                'number' => $lastBall['number'] ?? null
             ]);
         }
 
@@ -592,7 +604,7 @@ class Boards extends Controller {
             // Verificar si este era el último premio
             $updatedSingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
             
-            if ($updatedSingsCount >= $AwardsCount) {
+            if ($AwardsCount > 0 && $updatedSingsCount >= $AwardsCount) {
                 bingo_ensure_winners_registered((int) $game['id']);
                 $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
                 $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
@@ -628,7 +640,7 @@ class Boards extends Controller {
         }
 
         // Verificar si todos los premios ya fueron ganados (sin bingos pendientes)
-        if ($SingsCount >= $AwardsCount) {
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
             $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
@@ -850,7 +862,7 @@ class Boards extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             return $this->response->setJSON([
                 'status' => 'completed',
                 'userCount' => $userCount,

@@ -1157,10 +1157,36 @@ function generateAutoNumber() {
                 showGameFinalized();
             } else if (data.status === 'success') {
                 handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+            } else if (data.status === 'error') {
+                stopAutomaticGeneration();
+                $('#stop-button, #next-number-button, #play-button').hide();
+                $('#start-button').show();
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: data.message || 'No se pudo iniciar el sorteo',
+                        duration: 5000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' },
+                        stopOnFocus: true
+                    }).showToast();
+                } else {
+                    alert(data.message || 'No se pudo iniciar el sorteo');
+                }
             }
         })
         .fail(() => {
             console.warn('Failed to generate auto number');
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: 'Error al generar la bola. Intenta de nuevo.',
+                    duration: 4000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' },
+                    stopOnFocus: true
+                }).showToast();
+            }
         });
 }
 
@@ -1182,6 +1208,18 @@ function generateNumber(number) {
                 showGameFinalized();
             } else if (data.status === 'success') {
                 handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+            } else if (data.status === 'error') {
+                stopAutomaticGeneration();
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: data.message || 'No se pudo generar la bola',
+                        duration: 5000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' },
+                        stopOnFocus: true
+                    }).showToast();
+                }
             }
         })
         .fail(() => {
@@ -1425,6 +1463,7 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
+        generateAutoNumber();
         startAutomaticGeneration();
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();

@@ -161,7 +161,7 @@
                                 <label for="voucherfileInput"
                                     class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2 img-button"><i
                                         class="fa-duotone fa-solid fa-plus"></i></label>
-                                <input type="file" id="voucherfileInput" accept="image/*" class="d-none"
+                                <input type="file" id="voucherfileInput" name="deposit-voucher-file" accept="image/*" class="d-none"
                                     onchange="previewvoucherImage(event)">
 
                                 <!-- Botón Eliminar (oculto si no hay imagen) -->
@@ -382,6 +382,12 @@
 
             var formEl = this;
             var formData = new FormData(formEl);
+            var fileInput = document.getElementById('voucherfileInput');
+            // Si hay archivo real, no enviar base64 (evita saturar post_max_size)
+            if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                formData.delete('deposit-voucher');
+                formData.set('deposit-voucher-file', fileInput.files[0]);
+            }
 
             $.ajax({
                 url: '<?= site_url('payments/depositSubmit') ?>',
@@ -861,6 +867,10 @@
     }
 
     function hasDepositVoucher() {
+        const fileInput = document.getElementById('voucherfileInput');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            return true;
+        }
         const voucherValue = (document.getElementById('voucher_image_input')?.value || '').trim();
         return voucherValue.indexOf('data:image') === 0;
     }
@@ -903,13 +913,21 @@
     }
 
     function previewvoucherImage(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) {
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = function() {
             const output = document.getElementById('voucherImage');
             output.src = reader.result;
-            document.getElementById('voucher_image_input').value = reader.result;
 
-            // Mostrar botón eliminar
+            // Comprimir a JPEG ~1200px para no saturar post_max_size con base64
+            compressDepositVoucher(reader.result, function (dataUrl) {
+                document.getElementById('voucher_image_input').value = dataUrl || reader.result;
+            });
+
             document.getElementById('removeVoucherBtn').classList.remove('d-none');
             const voucherError = document.getElementById('deposit-voucher-error');
             if (voucherError) {
@@ -917,7 +935,29 @@
                 voucherError.textContent = '';
             }
         };
-        reader.readAsDataURL(event.target.files[0]);
+        reader.readAsDataURL(file);
+    }
+
+    function compressDepositVoucher(dataUrl, done) {
+        try {
+            var img = new Image();
+            img.onload = function () {
+                var maxSide = 1200;
+                var w = img.width || 1;
+                var h = img.height || 1;
+                var scale = Math.min(1, maxSide / Math.max(w, h));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(w * scale));
+                canvas.height = Math.max(1, Math.round(h * scale));
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                done(canvas.toDataURL('image/jpeg', 0.82));
+            };
+            img.onerror = function () { done(dataUrl); };
+            img.src = dataUrl;
+        } catch (e) {
+            done(dataUrl);
+        }
     }
 
     function removeVoucherImage() {
