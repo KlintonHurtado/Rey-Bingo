@@ -86,34 +86,36 @@
     <a class="btn btn-small btn-home" href="<?= site_url('signin'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 <?php endif; ?>
 
-<div class="legal-page">
-    <div class="legal-page__card">
-        <div class="legal-page__nav">
-            <a href="<?= site_url('terminos'); ?>" class="<?= ($active ?? '') === 'terms' ? 'is-active' : '' ?>">
-                <i class="fa-duotone fa-solid fa-file-contract"></i> <?= translate('terms and conditions'); ?>
-            </a>
-            <a href="<?= site_url('promociones'); ?>" class="<?= ($active ?? '') === 'promotions' ? 'is-active' : '' ?>">
-                <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('promotions'); ?>
-            </a>
-            <?php if (! session()->get('logged_in')) : ?>
-                <a href="<?= site_url('signup'); ?>">
-                    <i class="fa-duotone fa-solid fa-user-plus"></i> <?= translate('create account'); ?>
+<div class="legal-page-scroll">
+    <div class="legal-page">
+        <div class="legal-page__card">
+            <div class="legal-page__nav">
+                <a href="<?= site_url('terminos'); ?>" class="<?= ($active ?? '') === 'terms' ? 'is-active' : '' ?>">
+                    <i class="fa-duotone fa-solid fa-file-contract"></i> <?= translate('terms and conditions'); ?>
                 </a>
-                <a href="<?= site_url('signin'); ?>">
-                    <i class="fa-duotone fa-solid fa-right-to-bracket"></i> <?= translate('login'); ?>
+                <a href="<?= site_url('promociones'); ?>" class="<?= ($active ?? '') === 'promotions' ? 'is-active' : '' ?>">
+                    <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('promotions'); ?>
                 </a>
-            <?php endif; ?>
-        </div>
-
-        <h1 class="legal-page__title"><?= esc($title); ?></h1>
-        <?php if (! empty($updatedAt)) : ?>
-            <div class="legal-page__meta">
-                <?= translate('last updated'); ?>: <?= esc(date('d/m/Y H:i', strtotime($updatedAt))); ?>
+                <?php if (! session()->get('logged_in')) : ?>
+                    <a href="<?= site_url('signup'); ?>">
+                        <i class="fa-duotone fa-solid fa-user-plus"></i> <?= translate('create account'); ?>
+                    </a>
+                    <a href="<?= site_url('signin'); ?>">
+                        <i class="fa-duotone fa-solid fa-right-to-bracket"></i> <?= translate('login'); ?>
+                    </a>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
 
-        <div class="legal-page__body">
-            <?= $html; ?>
+            <h1 class="legal-page__title"><?= esc($title); ?></h1>
+            <?php if (! empty($updatedAt)) : ?>
+                <div class="legal-page__meta">
+                    <?= translate('last updated'); ?>: <?= esc(date('d/m/Y H:i', strtotime($updatedAt))); ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="legal-page__body">
+                <?= $html; ?>
+            </div>
         </div>
     </div>
 </div>

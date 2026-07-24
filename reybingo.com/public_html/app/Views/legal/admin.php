@@ -48,55 +48,57 @@
     }
 </style>
 
-<div class="legal-admin">
-    <div class="legal-admin__card">
-        <div class="legal-admin__header">
-            <div>
-                <h1><i class="fa-duotone fa-solid fa-scale-balanced"></i> <?= translate('legal content'); ?></h1>
-                <small class="text-muted">
-                    <?= translate('edit terms and promotions description'); ?>
-                    <?php if (! empty($termsUpdatedAt)) : ?>
-                        · <?= translate('last updated'); ?>: <?= esc(date('d/m/Y H:i', strtotime($termsUpdatedAt))); ?>
-                    <?php endif; ?>
-                </small>
+<div class="legal-page-scroll">
+    <div class="legal-admin">
+        <div class="legal-admin__card">
+            <div class="legal-admin__header">
+                <div>
+                    <h1><i class="fa-duotone fa-solid fa-scale-balanced"></i> <?= translate('legal content'); ?></h1>
+                    <small class="text-muted">
+                        <?= translate('edit terms and promotions description'); ?>
+                        <?php if (! empty($termsUpdatedAt)) : ?>
+                            · <?= translate('last updated'); ?>: <?= esc(date('d/m/Y H:i', strtotime($termsUpdatedAt))); ?>
+                        <?php endif; ?>
+                    </small>
+                </div>
+                <div class="legal-admin__links">
+                    <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('view terms'); ?></a>
+                    <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('view promotions'); ?></a>
+                </div>
             </div>
-            <div class="legal-admin__links">
-                <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('view terms'); ?></a>
-                <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('view promotions'); ?></a>
-            </div>
+
+            <form id="legal-admin-form" method="post" action="<?= site_url('legal/adminSubmit'); ?>">
+                <?= csrf_field(); ?>
+
+                <div class="mb-3">
+                    <label class="form-label" for="termsRequireAccept"><?= translate('require terms acceptance on signup'); ?></label>
+                    <select class="form-control form-control-lg form-bingo" name="termsRequireAccept" id="termsRequireAccept">
+                        <option value="1" <?= ($termsRequireAccept ?? '1') === '1' ? 'selected' : ''; ?>><?= translate('active'); ?></option>
+                        <option value="0" <?= ($termsRequireAccept ?? '1') === '0' ? 'selected' : ''; ?>><?= translate('inactive'); ?></option>
+                    </select>
+                    <small class="text-muted"><?= translate('require terms acceptance help'); ?></small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label" for="termsHtml"><?= translate('terms and conditions'); ?></label>
+                    <textarea name="termsHtml" id="termsHtml" rows="14"><?= esc($termsHtml ?? '', 'html'); ?></textarea>
+                    <small id="termsHtml-error" class="text-danger d-none"></small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label" for="promotionsHtml"><?= translate('promotions'); ?></label>
+                    <textarea name="promotionsHtml" id="promotionsHtml" rows="14"><?= esc($promotionsHtml ?? '', 'html'); ?></textarea>
+                    <small id="promotionsHtml-error" class="text-danger d-none"></small>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary btn-bingo" id="legal-save-btn">
+                        <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save'); ?>
+                    </button>
+                    <a href="<?= site_url('games'); ?>" class="btn btn-secondary"><?= translate('cancel'); ?></a>
+                </div>
+            </form>
         </div>
-
-        <form id="legal-admin-form" method="post" action="<?= site_url('legal/adminSubmit'); ?>">
-            <?= csrf_field(); ?>
-
-            <div class="mb-3">
-                <label class="form-label" for="termsRequireAccept"><?= translate('require terms acceptance on signup'); ?></label>
-                <select class="form-control form-control-lg form-bingo" name="termsRequireAccept" id="termsRequireAccept">
-                    <option value="1" <?= ($termsRequireAccept ?? '1') === '1' ? 'selected' : ''; ?>><?= translate('active'); ?></option>
-                    <option value="0" <?= ($termsRequireAccept ?? '1') === '0' ? 'selected' : ''; ?>><?= translate('inactive'); ?></option>
-                </select>
-                <small class="text-muted"><?= translate('require terms acceptance help'); ?></small>
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label" for="termsHtml"><?= translate('terms and conditions'); ?></label>
-                <textarea name="termsHtml" id="termsHtml" rows="14"><?= esc($termsHtml ?? '', 'html'); ?></textarea>
-                <small id="termsHtml-error" class="text-danger d-none"></small>
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label" for="promotionsHtml"><?= translate('promotions'); ?></label>
-                <textarea name="promotionsHtml" id="promotionsHtml" rows="14"><?= esc($promotionsHtml ?? '', 'html'); ?></textarea>
-                <small id="promotionsHtml-error" class="text-danger d-none"></small>
-            </div>
-
-            <div class="d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-primary btn-bingo" id="legal-save-btn">
-                    <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save'); ?>
-                </button>
-                <a href="<?= site_url('games'); ?>" class="btn btn-secondary"><?= translate('cancel'); ?></a>
-            </div>
-        </form>
     </div>
 </div>
 

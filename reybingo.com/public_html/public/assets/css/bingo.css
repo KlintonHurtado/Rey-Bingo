@@ -23,8 +23,9 @@ body {
     position: relative;
 }
 
-/* Perfil admin: scroll interno sin barra visible en el panel morado */
+/* Perfil admin / páginas legales: scroll interno sin barra visible en el panel morado */
 html:has(#content-page > .admin-profile-scroll),
+html:has(#content-page > .legal-page-scroll),
 html:has(#content-page > .start-section),
 html:has(#content-page > .store-panel-fit),
 html:has(#content-page > .operator-panel-fit) {
@@ -33,6 +34,7 @@ html:has(#content-page > .operator-panel-fit) {
 }
 
 #content-page:has(> .admin-profile-scroll),
+#content-page:has(> .legal-page-scroll),
 #content-page:has(> .start-section),
 #content-page:has(> .store-panel-fit),
 #content-page:has(> .operator-panel-fit) {
@@ -41,7 +43,8 @@ html:has(#content-page > .operator-panel-fit) {
     overflow: hidden;
 }
 
-.admin-profile-scroll {
+.admin-profile-scroll,
+.legal-page-scroll {
     max-height: 100dvh;
     overflow-x: hidden;
     overflow-y: auto;
@@ -51,7 +54,8 @@ html:has(#content-page > .operator-panel-fit) {
     -webkit-overflow-scrolling: touch;
 }
 
-.admin-profile-scroll::-webkit-scrollbar {
+.admin-profile-scroll::-webkit-scrollbar,
+.legal-page-scroll::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
