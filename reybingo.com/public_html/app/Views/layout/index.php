@@ -2000,6 +2000,45 @@
     </script>
 
     <!-- <script src="<?= site_url('assets/js/notifications.js'); ?>"></script>-->
+    <script src="<?= site_url('assets/js/pull-to-refresh.js'); ?>?<?= md5(date('YmdHi')); ?>"></script>
+    <style>
+        #pull-to-refresh-indicator {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            z-index: 12000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #4b2ad6;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+            transform: translate(-50%, -80px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        #pull-to-refresh-indicator .ptr-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(75, 42, 214, 0.25);
+            border-top-color: #4b2ad6;
+            border-radius: 50%;
+        }
+        #pull-to-refresh-indicator.ptr-ready .ptr-spinner,
+        #pull-to-refresh-indicator.ptr-loading .ptr-spinner {
+            animation: ptr-spin 0.7s linear infinite;
+        }
+        @keyframes ptr-spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 
     <script src="<?= asset_url('plugin/components/moment/moment.min.js') ?>"></script>
     <script src="<?= asset_url('plugin/components/moment/moment-timezone-with-data.min.js') ?>"></script>

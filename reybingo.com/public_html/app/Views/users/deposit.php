@@ -131,8 +131,8 @@
                         <label for="deposit-amount" class="form-label"><?= translate('amount'); ?></label>
                         <input type="number" class="form-control form-control-lg form-bingo" name="deposit-amount"
                             id="deposit-amount"
-                            placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>"
-                            autocomplete="off" value="0.00">
+                            placeholder="0.00"
+                            autocomplete="off" min="0.01" step="0.01" inputmode="decimal">
                         <small id="deposit-amount-error" class="text-danger d-none"></small>
                     </div>
 
@@ -185,7 +185,7 @@
 
                     <div class="col-md-12">
                         <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2"
-                            id="deposit-button"><?= translate('send'); ?></button>
+                            id="deposit-button" disabled><?= translate('send'); ?></button>
                     </div>
                 </div>
 
@@ -351,6 +351,10 @@
         $('#deposit-form').on('submit', function (e) {
             e.preventDefault();
 
+            if (!hasDepositVoucher()) {
+                return;
+            }
+
             var button = $('#deposit-button');
             button.prop("disabled", true);
 
@@ -391,6 +395,9 @@
                     } else {
                         if (response.errors) {
                             $.each(response.errors, function (field, message) {
+                                if (field === 'deposit-voucher') {
+                                    return;
+                                }
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
                             });
@@ -408,7 +415,7 @@
                     }).showToast();
                 },
                 complete: function () {
-                    button.prop("disabled", false);
+                    syncDepositSendButton();
                 }
             });
         });
@@ -820,6 +827,19 @@
         }
     }
 
+    function hasDepositVoucher() {
+        const voucherValue = (document.getElementById('voucher_image_input')?.value || '').trim();
+        return voucherValue.indexOf('data:image') === 0;
+    }
+
+    function syncDepositSendButton() {
+        const button = document.getElementById('deposit-button');
+        if (!button) {
+            return;
+        }
+        button.disabled = !hasDepositVoucher();
+    }
+
     function previewvoucherImage(event) {
         const reader = new FileReader();
         reader.onload = function() {
@@ -829,6 +849,7 @@
 
             // Mostrar botón eliminar
             document.getElementById('removeVoucherBtn').classList.remove('d-none');
+            syncDepositSendButton();
         };
         reader.readAsDataURL(event.target.files[0]);
     }
@@ -840,11 +861,13 @@
 
         // Ocultar botón eliminar
         document.getElementById('removeVoucherBtn').classList.add('d-none');
+        syncDepositSendButton();
     }
 
     // Al cargar si ya hay imagen, mostrar botón eliminar
     window.addEventListener("DOMContentLoaded", () => {
-        if (document.getElementById('voucherImage').src) {
+        syncDepositSendButton();
+        if (hasDepositVoucher()) {
             document.getElementById('removeVoucherBtn').classList.remove('d-none');
         }
     });

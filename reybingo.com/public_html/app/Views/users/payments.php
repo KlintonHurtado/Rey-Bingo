@@ -180,7 +180,7 @@
                                     <option value="deposit" <?= ($filters['type'] ?? '') == 'deposit' ? 'selected' : ''; ?>><?= translate('deposit'); ?></option>
                                     <option value="retire" <?= ($filters['type'] ?? '') == 'retire' ? 'selected' : ''; ?>><?= translate('retire'); ?></option>
                                     <option value="transfer" <?= ($filters['type'] ?? '') == 'transfer' ? 'selected' : ''; ?>><?= translate('transfer'); ?></option>
-                                    <option value="payment" <?= ($filters['type'] ?? '') == 'payment' ? 'selected' : ''; ?>><?= translate('payment'); ?></option>
+                                    <option value="payment" <?= ($filters['type'] ?? '') == 'payment' ? 'selected' : ''; ?>><?= translate('award'); ?></option>
                                 </select>
                             </div>
                             

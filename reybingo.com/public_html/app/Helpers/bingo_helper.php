@@ -620,7 +620,7 @@ if (!function_exists('bingo_pay_sing_award')) {
             }
         }
 
-        wallet_credit_withdrawable((int) $sing['user'], $awardPerSing);
+        wallet_credit_recharge((int) $sing['user'], $awardPerSing);
         $modelSings->update($singId, ['status' => 2]);
 
         $modelPayments->insert([
@@ -700,7 +700,7 @@ if (!function_exists('bingo_notify_award_payment')) {
             'type' => 'payment',
             'type_id' => $paymentId,
             'title' => '🎉 ¡GANASTE! Premio acreditado',
-            'message' => 'Felicitaciones, ganaste la partida "' . $gameName . '" en la modalidad ' . $modalityName . '. Se acreditó ' . $currency . ' ' . number_format($awardPerSing, 2) . ' en tu billetera (saldo retirable).',
+            'message' => 'Felicitaciones, ganaste la partida "' . $gameName . '" en la modalidad ' . $modalityName . '. Se acreditó ' . $currency . ' ' . number_format($awardPerSing, 2) . ' en tu billetera (saldo recarga).',
         ]);
     }
 }
@@ -782,7 +782,7 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
                 continue;
             }
 
-            wallet_credit_withdrawable((int) $sing['user'], $awardPerSing);
+            wallet_credit_recharge((int) $sing['user'], $awardPerSing);
             $modelSings->update($sing['id'], ['status' => 2]);
 
             $modelPayments->insert([

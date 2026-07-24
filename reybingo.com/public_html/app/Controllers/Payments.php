@@ -307,19 +307,28 @@ class Payments extends Controller {
                     continue;
                 }
 
+                $typePayment = '';
+                $typeTra = translate('payment');
+
                 if ($payment['type'] == 'award') {
                     $typePayment = translate('per award paid');
+                    $typeTra = translate('award');
                 } else if ($payment['type'] == 'referred') {
                     $typePayment = translate('per referred player');
                 }
+
                 $transaction = [
                     'id' => $payment['id'],
                     'type' => 'payment',
-                    'type_Tra' => translate('payment'),
+                    'type_Tra' => $typeTra,
                     'user_id' => $payment['user'],
                     'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
                     'user_code' => $user ? $user['code'] : 'N/A',
-                    'bank' => $this->formatBankInfo('payment', $user, $typePayment),
+                    'bank' => $this->formatBankInfo(
+                        $payment['type'] == 'award' ? 'award' : 'payment',
+                        $user,
+                        $typePayment
+                    ),
                     'reference' => str_pad($payment['id'], 4, '0', STR_PAD_LEFT),
                     'amount' => $payment['amount'],
                     'date' => $payment['created_at'],
@@ -685,6 +694,8 @@ class Payments extends Controller {
                 case 'payment':
                     return translate('payment to wallet') . '<br><small class="text-muted">' . $bank . '</small>';
                     //return translate('payment to wallet') . '<br><small class="text-muted">' . ($user ? $user['code'] . ' - ' . $user['firstname'] . ' ' . $user['lastname'] : 'N/A') . '</small>';
+                case 'award':
+                    return translate('award to wallet') . '<br><small class="text-muted">' . $bank . '</small>';
                 case 'deposit':
                 case 'retire':
                     return ($bank ?? 'N/A') . '<br><small class="text-muted">' . ($user ? $user['code'] . ' - ' . $user['firstname'] . ' ' . $user['lastname'] : 'N/A') . '</small>';
@@ -695,6 +706,8 @@ class Payments extends Controller {
             switch ($type) {
                 case 'payment':
                     return translate('payment to wallet') . '<br><small class="text-muted">' . $bank . '</small>';
+                case 'award':
+                    return translate('award to wallet') . '<br><small class="text-muted">' . $bank . '</small>';
                 case 'deposit':
                 case 'retire':
                     return $bank ?? 'N/A';
@@ -1017,6 +1030,16 @@ class Payments extends Controller {
             return $this->response->setJSON($response);
         }
 
+        $voucherImage = trim((string) $this->request->getPost('deposit-voucher'));
+        if ($voucherImage === '' || strpos($voucherImage, 'data:image') !== 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'deposit-voucher' => translate('voucher') . ' ' . strtolower(translate('it is mandatory')),
+                ],
+            ]);
+        }
+
         $isAdmin = session()->get('group') == 1;
         $selectedUser = $this->request->getPost('deposit-user');
 
@@ -1045,19 +1068,25 @@ class Payments extends Controller {
             'status'    => $status
         ];
 
-        $voucherImage = $this->request->getPost('deposit-voucher');
-        if ($voucherImage) {
-            // Si llega base64 => nueva imagen
-            if (strpos($voucherImage, 'data:image') === 0) {
-                $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $voucherImage));
-                $fileName  = uniqid() . '.png';  
-                $uploadPath = FCPATH . 'uploads/vouchers/';
-                if (!is_dir($uploadPath)) {
-                    mkdir($uploadPath, 0755, true); 
-                }
-                file_put_contents($uploadPath . $fileName, $imageData);
-                $data['voucher'] = $fileName;
+        // Si llega base64 => nueva imagen (obligatoria)
+        if (strpos($voucherImage, 'data:image') === 0) {
+            $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $voucherImage));
+            if ($imageData === false || $imageData === '') {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'deposit-voucher' => translate('voucher') . ' ' . strtolower(translate('it is mandatory')),
+                    ],
+                ]);
             }
+
+            $fileName  = uniqid() . '.png';
+            $uploadPath = FCPATH . 'uploads/vouchers/';
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            file_put_contents($uploadPath . $fileName, $imageData);
+            $data['voucher'] = $fileName;
         }
 
         if (systemGet('activateDeposit') == 1) {

@@ -1357,7 +1357,7 @@ class Cron extends Controller
             }
 
             if ($sing['status'] == '1') {
-                $modelUsers->update($user['id'], ['wallet' => $user['wallet'] + $awardPerSing]);
+                wallet_credit_recharge((int) $user['id'], (float) $awardPerSing);
             }
             $modelSings->update($sing['id'], ['status' => 2]);
 
