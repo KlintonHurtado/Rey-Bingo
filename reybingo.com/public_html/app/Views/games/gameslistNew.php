@@ -253,9 +253,9 @@
                     stopOnFocus: true
                 }).showToast();
                 if (typeof gameslistGet === 'function') {
-                    setTimeout(gameslistGet, 1500);
+                    setTimeout(gameslistGet, 800);
                 } else if (typeof loadGames === 'function') {
-                    setTimeout(loadGames, 1500);
+                    setTimeout(loadGames, 800);
                 }
             } else {
                 console.error('error when starting the game:', data.message || 'unknown error');
@@ -267,6 +267,11 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 800);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 800);
+                }
             }
         })
         .catch(error => {
@@ -303,9 +308,9 @@
                     stopOnFocus: true
                 }).showToast();
                 if (typeof gameslistGet === 'function') {
-                    setTimeout(gameslistGet, 1500);
+                    setTimeout(gameslistGet, 800);
                 } else if (typeof loadGames === 'function') {
-                    setTimeout(loadGames, 1500);
+                    setTimeout(loadGames, 800);
                 }
             } else {
                 console.error('error when starting the game:', data.message || 'unknown error');
@@ -317,6 +322,11 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 800);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 800);
+                }
             }
         })
         .catch(error => {

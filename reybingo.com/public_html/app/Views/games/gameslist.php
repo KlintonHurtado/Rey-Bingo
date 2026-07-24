@@ -195,9 +195,11 @@
                     stopOnFocus: true
                 }).showToast();
                 if (typeof gameslistGet === 'function') {
-                    setTimeout(gameslistGet, 1500);
+                    setTimeout(gameslistGet, 800);
                 } else if (typeof loadGames === 'function') {
-                    setTimeout(loadGames, 1500);
+                    setTimeout(loadGames, 800);
+                } else if (typeof gameslistGetPage === 'function') {
+                    setTimeout(function () { gameslistGetPage(1); }, 800);
                 }
             } else {
                 Toastify({
@@ -208,6 +210,14 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
+                // Refrescar listado para alinear conteos/botones con el servidor
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 800);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 800);
+                } else if (typeof gameslistGetPage === 'function') {
+                    setTimeout(function () { gameslistGetPage(1); }, 800);
+                }
             }
         })
         .catch(error => {
@@ -244,11 +254,12 @@
                     style: { background: "#f59e0b" },
                     stopOnFocus: true
                 }).showToast();
-                // Refrescar la lista para mostrar la nueva hora
                 if (typeof gameslistGet === 'function') {
-                    setTimeout(gameslistGet, 1500);
+                    setTimeout(gameslistGet, 800);
                 } else if (typeof loadGames === 'function') {
-                    setTimeout(loadGames, 1500);
+                    setTimeout(loadGames, 800);
+                } else if (typeof gameslistGetPage === 'function') {
+                    setTimeout(function () { gameslistGetPage(1); }, 800);
                 }
             } else {
                 Toastify({
@@ -259,6 +270,13 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
+                if (typeof gameslistGet === 'function') {
+                    setTimeout(gameslistGet, 800);
+                } else if (typeof loadGames === 'function') {
+                    setTimeout(loadGames, 800);
+                } else if (typeof gameslistGetPage === 'function') {
+                    setTimeout(function () { gameslistGetPage(1); }, 800);
+                }
             }
         })
         .catch(error => {

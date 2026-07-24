@@ -2605,23 +2605,20 @@ class Games extends Controller {
 
             $buttons = '';
             $canView = ($game['numbers'] == 75 || $SingsCount >= $AwardsCount);
+            // Solo para estilo visual; el click SIEMPRE consulta al servidor (conteos frescos)
             $canStart = ($game['numbers'] > 0) || bingo_can_start_game($game, (int) $game['players'], (int) $cartons, false);
-            $startBlockMessage = esc(bingo_game_start_block_message($game, (int) $game['players'], (int) $cartons), 'attr');
 
             if (session()->get('group') == 1) {
                 $playButtonClass = $canView ? 'primary' : ($canStart ? 'success' : 'secondary');
                 $playButtonIcon = $canView ? 'eye' : 'play';
-                $playButtonAction = ($canView || $canStart)
-                    ? "gameGet('" . $game['id'] . "');"
-                    : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
+                // No bloquear en el cliente con conteos viejos del listado: siempre validar en /game
+                $playButtonAction = "gameGet('" . $game['id'] . "');";
 
                 if ($game['type'] != 3 && $game['type'] != 4) {
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
-                    // LIVE: también exige mínimos de jugadores/cartones
-                    $liveButtonAction = ($canView || $canStart)
-                        ? "liveGet('" . $game['id'] . "');"
-                        : "notifyMinPlayersRequired('" . $startBlockMessage . "');";
+                    // LIVE: misma regla — validación fresca en servidor
+                    $liveButtonAction = "liveGet('" . $game['id'] . "');";
                     $liveButtonClass = $canView ? 'primary' : ($canStart ? 'primary' : 'secondary');
                     $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
