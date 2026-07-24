@@ -122,6 +122,24 @@
                         <?= translate('do you want to update your password?'); ?> <br /> <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" href="<?= site_url('password'); ?>"><?= translate('change here'); ?></a>
                     </div>
 
+                    <?php if ((int) session()->get('group') === 0) : ?>
+                        <hr />
+                        <div class="player-legal-box text-center p-3 mb-3" style="background: rgba(98,54,255,0.12); border-radius: 14px;">
+                            <h6 class="mb-2" style="color:#fff; font-weight:700;">
+                                <i class="fa-duotone fa-solid fa-scale-balanced"></i> <?= translate('terms and promotions'); ?>
+                            </h6>
+                            <p class="small text-white-50 mb-3"><?= translate('player legal section help'); ?></p>
+                            <div class="d-flex flex-wrap justify-content-center gap-2">
+                                <a href="<?= site_url('terminos'); ?>" class="btn btn-primary btn-bingo btn-sm">
+                                    <i class="fa-duotone fa-solid fa-file-contract"></i> <?= translate('terms and conditions'); ?>
+                                </a>
+                                <a href="<?= site_url('promociones'); ?>" class="btn btn-primary btn-bingo btn-sm">
+                                    <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('promotions'); ?>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if (bingo_user_requires_kyc($user)) : ?>
                         <?= view('users/kyc_content', ['user' => $user]); ?>
                     <?php endif; ?>

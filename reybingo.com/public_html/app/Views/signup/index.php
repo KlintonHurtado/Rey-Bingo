@@ -73,6 +73,21 @@
                                 <small id="password_confirm-error" class="text-danger d-none"></small>
                             </div>
 
+                            <?php if (bingo_terms_require_accept()) : ?>
+                            <div class="col-md-12 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="1" name="accept_terms" id="accept_terms">
+                                    <label class="form-check-label text-white" for="accept_terms">
+                                        <?= translate('i accept the'); ?>
+                                        <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('terms and conditions'); ?></a>
+                                        <?= translate('and'); ?>
+                                        <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('promotions'); ?></a>
+                                    </label>
+                                </div>
+                                <small id="accept_terms-error" class="text-danger d-none"></small>
+                            </div>
+                            <?php endif; ?>
+
                             <div class="col-md-12">
                                 <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-3" id="signup-button"><?= translate('create'); ?></button>
                             </div>
@@ -87,6 +102,10 @@
 
                     <div class="text-center">
                         <?= translate('do you already have an account?'); ?> <br /> <a class="link-offset-2 link-offset-3-hover link-underline link-underline-opacity-0 link-underline-opacity-75-hover" href="<?= site_url('signin'); ?>"><?= translate('enter'); ?></a>
+                    </div>
+                    <div class="text-center mt-3 small">
+                        <a href="<?= site_url('terminos'); ?>" class="text-white-50 me-2"><?= translate('terms and conditions'); ?></a>
+                        <a href="<?= site_url('promociones'); ?>" class="text-white-50"><?= translate('promotions'); ?></a>
                     </div>
                 </div>
             </div>
@@ -186,7 +205,7 @@
                         window.location.href = response.redirect;
                     } else {
                         if (response.errors) {
-                            if (response.errors.username || response.errors.email || response.errors.password || response.errors.password_confirm) {
+                            if (response.errors.username || response.errors.email || response.errors.password || response.errors.password_confirm || response.errors.accept_terms) {
                                 $('#signup-step-1').hide();
                                 $('#signup-step-2').show();
                             }

@@ -1153,5 +1153,21 @@
     "selected modalities": "Selected modalities",
     "game postponed": "PARTIDA POSPUESTA",
     "game postponed notification": "La partida automática se pospuso 5 minutos (hasta las :time) porque no se cumplieron los requisitos mínimos de :players jugador(es) y :cartons cartón(es).",
-    "game postponed to": "La partida fue pospuesta hasta las"
+    "game postponed to": "La partida fue pospuesta hasta las",
+    "terms and conditions": "Términos y Condiciones",
+    "promotions": "Promociones",
+    "legal": "Legal",
+    "legal content": "TyC y promociones",
+    "terms and promotions": "Términos y promociones",
+    "edit terms and promotions description": "Edite el texto legal y de promociones cuando lo desee. Los cambios se reflejan de inmediato en las páginas públicas.",
+    "open legal editor": "Abrir editor de TyC",
+    "view terms": "Ver términos",
+    "view promotions": "Ver promociones",
+    "require terms acceptance on signup": "Exigir aceptación de TyC al registrarse",
+    "require terms acceptance help": "Si está activo, el jugador debe marcar el checkbox de aceptación para crear su cuenta.",
+    "legal content updated successfully": "Contenido legal actualizado correctamente",
+    "last updated": "Última actualización",
+    "i accept the": "Acepto los",
+    "you must accept the terms and conditions": "Debe aceptar los términos y condiciones",
+    "player legal section help": "Consulta en cualquier momento los términos y las promociones vigentes."
 }

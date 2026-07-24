@@ -2458,9 +2458,117 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
                     'value' => '0',
                 ]);
             }
+
+            // TyC / promociones: value puede ser HTML largo
+            try {
+                $db->query('ALTER TABLE `system` MODIFY COLUMN `value` MEDIUMTEXT NULL');
+            } catch (\Throwable $e) {
+                // Algunos hosts no permiten MODIFY
+            }
+
+            $legalDefaults = [
+                'termsHtml' => bingo_default_terms_html(),
+                'promotionsHtml' => bingo_default_promotions_html(),
+                'termsRequireAccept' => '1',
+                'termsUpdatedAt' => date('Y-m-d H:i:s'),
+            ];
+            foreach ($legalDefaults as $key => $value) {
+                if ($db->table('system')->where('key', $key)->countAllResults() === 0) {
+                    $db->table('system')->insert([
+                        'key' => $key,
+                        'value' => $value,
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de system: ' . $e->getMessage());
         }
+    }
+}
+
+if (!function_exists('bingo_default_terms_html')) {
+    function bingo_default_terms_html(): string
+    {
+        return '<h2>Términos y Condiciones</h2>'
+            . '<p>Bienvenido a ' . esc(systemGet('name') ?: 'Rey Bingo') . '. Al crear una cuenta y utilizar la plataforma, usted acepta estos términos.</p>'
+            . '<h3>1. Cuenta de usuario</h3>'
+            . '<p>Usted es responsable de la confidencialidad de sus credenciales y de toda actividad realizada desde su cuenta.</p>'
+            . '<h3>2. Depósitos y retiros</h3>'
+            . '<p>Los depósitos y retiros están sujetos a verificación. La plataforma puede solicitar comprobantes o documentación adicional.</p>'
+            . '<h3>3. Juego responsable</h3>'
+            . '<p>El servicio está dirigido a mayores de edad. Juegue de forma responsable y dentro de sus posibilidades.</p>'
+            . '<h3>4. Cartones y partidas</h3>'
+            . '<p>La compra de cartones, el inicio de partidas y la asignación de premios se rigen por las reglas publicadas en cada juego.</p>'
+            . '<h3>5. Modificaciones</h3>'
+            . '<p>Nos reservamos el derecho de actualizar estos términos. El uso continuado de la plataforma implica la aceptación de los cambios.</p>';
+    }
+}
+
+if (!function_exists('bingo_default_promotions_html')) {
+    function bingo_default_promotions_html(): string
+    {
+        return '<h2>Promociones</h2>'
+            . '<p>Conozca las promociones vigentes de ' . esc(systemGet('name') ?: 'Rey Bingo') . '.</p>'
+            . '<h3>Bono de registro</h3>'
+            . '<p>Los nuevos jugadores pueden recibir un bono de bienvenida según la configuración activa del sistema.</p>'
+            . '<h3>Ruleta y premios especiales</h3>'
+            . '<p>Algunas promociones otorgan cartones o premios adicionales. Las condiciones específicas se indicarán en cada campaña.</p>'
+            . '<h3>Condiciones generales</h3>'
+            . '<ul>'
+            . '<li>Las promociones no son acumulables salvo indicación expresa.</li>'
+            . '<li>La plataforma puede modificar o finalizar una promoción en cualquier momento.</li>'
+            . '<li>Uso indebido o fraude puede anular el beneficio.</li>'
+            . '</ul>';
+    }
+}
+
+if (!function_exists('bingo_sanitize_legal_html')) {
+    function bingo_sanitize_legal_html(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+
+        // Quitar scripts/embeds peligrosos; el admin edita el resto del HTML
+        $html = preg_replace('#<\s*(script|iframe|object|embed|link|meta)[^>]*>.*?<\s*/\s*\1\s*>#is', '', $html) ?? $html;
+        $html = preg_replace('#<\s*(script|iframe|object|embed|link|meta)[^>]*/?>#is', '', $html) ?? $html;
+        $html = preg_replace('/\son\w+\s*=\s*("|\').*?\1/iu', '', $html) ?? $html;
+        $html = preg_replace('/\s(href|src)\s*=\s*("|\')\s*javascript:[^"\']*\2/iu', '', $html) ?? $html;
+
+        return $html;
+    }
+}
+
+if (!function_exists('bingo_legal_html')) {
+    function bingo_legal_html(string $key): string
+    {
+        $allowed = ['termsHtml', 'promotionsHtml'];
+        if (! in_array($key, $allowed, true)) {
+            return '';
+        }
+
+        if (function_exists('bingo_ensure_system_settings_schema')) {
+            bingo_ensure_system_settings_schema();
+        }
+
+        $html = trim((string) (systemGet($key) ?? ''));
+        if ($html === '') {
+            $html = $key === 'promotionsHtml' ? bingo_default_promotions_html() : bingo_default_terms_html();
+        }
+
+        return bingo_sanitize_legal_html($html);
+    }
+}
+
+if (!function_exists('bingo_terms_require_accept')) {
+    function bingo_terms_require_accept(): bool
+    {
+        if (function_exists('bingo_ensure_system_settings_schema')) {
+            bingo_ensure_system_settings_schema();
+        }
+
+        return (string) (systemGet('termsRequireAccept') ?? '1') === '1';
     }
 }
 

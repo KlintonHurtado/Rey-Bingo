@@ -87,6 +87,11 @@
                             <div class="col-md-12 pt-3">
                                 <a href="<?= site_url('signup/google') ?>" class="btn btn-primary d-block google"><img src="https://developers.google.com/identity/images/g-logo.png" style="width:20px; margin-right:10px;"> <?= translate('signin with google'); ?></a>
                             </div>
+
+                            <div class="col-md-12 pt-3 text-center small">
+                                <a href="<?= site_url('terminos'); ?>" class="text-white-50 me-2"><?= translate('terms and conditions'); ?></a>
+                                <a href="<?= site_url('promociones'); ?>" class="text-white-50"><?= translate('promotions'); ?></a>
+                            </div>
                         </div>
                     <?= form_close(); ?>
                 </div>

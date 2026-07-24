@@ -2522,7 +2522,8 @@ small.text-danger {
 .player-nav-cluster .btn-home,
 .player-nav-cluster .btn-wallet,
 .player-nav-cluster .btn-gamepad,
-.player-nav-cluster .btn-won-cartons {
+.player-nav-cluster .btn-won-cartons,
+.player-nav-cluster .btn-legal-player {
     position: relative !important;
     left: auto !important;
     top: auto !important;
@@ -2533,10 +2534,28 @@ small.text-danger {
     justify-content: center;
 }
 
+.btn-legal-player {
+    background: linear-gradient(145deg, #22cbe6, #0d6efd);
+    color: #fff;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2), 0px 0px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-legal-player:hover,
+.btn-legal-player.is-active {
+    color: #fff;
+    transform: scale(1.05);
+}
+
+.player-nav-cluster:has(.btn-legal-player) {
+    grid-template-rows: 50px 50px 50px;
+    height: 162px;
+}
+
 .player-nav-cluster--home .player-nav-slot-main,
 .player-nav-cluster--home .player-nav-slot-wallet,
 .player-nav-cluster--home .player-nav-slot-gamepad,
-.player-nav-cluster--home .btn-won-cartons {
+.player-nav-cluster--home .btn-won-cartons,
+.player-nav-cluster--home .btn-legal-player {
     width: 50px;
     height: 50px;
     min-width: 50px;
@@ -2562,6 +2581,12 @@ small.text-danger {
 .player-nav-cluster--home .btn-won-cartons {
     grid-column: 2;
     grid-row: 2;
+}
+
+.player-nav-cluster--home .player-nav-slot-legal {
+    grid-column: 1 / span 2;
+    grid-row: 3;
+    justify-self: center;
 }
 
 .player-nav-cluster--avatar {
@@ -2618,6 +2643,24 @@ small.text-danger {
     margin-top: -10px;
     font-size: 1.55rem;
     z-index: 5;
+}
+
+.player-nav-cluster--avatar:has(.btn-legal-player) {
+    grid-template-rows: 56px 46px 46px;
+    height: 160px;
+}
+
+.player-nav-cluster--avatar .player-nav-slot-legal {
+    grid-column: 1 / span 2;
+    grid-row: 3;
+    justify-self: center;
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    min-height: 46px;
+    margin-top: -4px;
+    font-size: 1.55rem;
+    z-index: 3;
 }
 
 .admin-nav-cluster {

@@ -51,6 +51,9 @@ $showGgr = $showGgr ?? ($showAffiliates ?? true);
             <a class="btn btn-small btn-kyc-admin admin-nav-cluster-item<?= $activeNav === 'kyc' ? ' is-active' : '' ?>" href="<?= site_url('kycAdmin'); ?>" title="Revisión KYC">
                 <i class="fa-duotone fa-solid fa-user-check"></i>
             </a>
+            <a class="btn btn-small admin-nav-cluster-item<?= $activeNav === 'legal' ? ' is-active' : '' ?>" href="<?= site_url('legal/admin'); ?>" title="<?= translate('legal content'); ?>" style="background: linear-gradient(145deg, #8767fa, #6236ff); color:#fff;">
+                <i class="fa-duotone fa-solid fa-scale-balanced"></i>
+            </a>
         <?php endif; ?>
     </div>
 </div>

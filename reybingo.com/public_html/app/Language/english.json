@@ -1155,5 +1155,21 @@
     "selected modalities": "Selected modalities",
     "game postponed": "GAME POSTPONED",
     "game postponed notification": "The automatic game was postponed 5 minutes (until :time) because the minimum requirements of :players player(s) and :cartons carton(s) were not met.",
-    "game postponed to": "Game was postponed until"
+    "game postponed to": "Game was postponed until",
+    "terms and conditions": "Terms and Conditions",
+    "promotions": "Promotions",
+    "legal": "Legal",
+    "legal content": "Terms & promotions",
+    "terms and promotions": "Terms and promotions",
+    "edit terms and promotions description": "Edit legal and promotions text whenever you want. Changes appear immediately on the public pages.",
+    "open legal editor": "Open legal editor",
+    "view terms": "View terms",
+    "view promotions": "View promotions",
+    "require terms acceptance on signup": "Require terms acceptance on signup",
+    "require terms acceptance help": "If active, players must check the acceptance box to create an account.",
+    "legal content updated successfully": "Legal content updated successfully",
+    "last updated": "Last updated",
+    "i accept the": "I accept the",
+    "you must accept the terms and conditions": "You must accept the terms and conditions",
+    "player legal section help": "You can view the current terms and promotions at any time."
 }

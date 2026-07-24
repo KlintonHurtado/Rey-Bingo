@@ -263,6 +263,11 @@ $routes->get('bingo/generate-number', 'Bingo::generateNumber');
 
 $routes->get('home/settingsGet', 'Home::settingsGet');
 $routes->post('home/settingsSubmit', 'Home::settingsSubmit');
+
+$routes->get('terminos', 'Legal::terms');
+$routes->get('promociones', 'Legal::promotions');
+$routes->get('legal/admin', 'Legal::admin');
+$routes->post('legal/adminSubmit', 'Legal::adminSubmit');
 $routes->post('home/bankSubmit', 'Home::bankSubmit');
 $routes->post('home/activateAlgorithm', 'Home::activateAlgorithm');
 $routes->get('home/bankGet', 'Home::bankGet');

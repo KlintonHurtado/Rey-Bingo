@@ -284,7 +284,7 @@ if (! function_exists('bingo_is_public_auth_route')) {
             $path = '/';
         }
 
-        if (in_array($path, ['/', '/signin', '/signup', '/restore'], true)) {
+        if (in_array($path, ['/', '/signin', '/signup', '/restore', '/terminos', '/promociones'], true)) {
             return true;
         }
 
@@ -297,6 +297,10 @@ if (! function_exists('bingo_is_public_auth_route')) {
         }
 
         if (str_starts_with($path, '/verify/')) {
+            return true;
+        }
+
+        if (str_starts_with($path, '/terminos') || str_starts_with($path, '/promociones')) {
             return true;
         }
 

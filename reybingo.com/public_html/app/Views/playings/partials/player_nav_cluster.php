@@ -32,4 +32,10 @@ $clusterClass = 'player-nav-cluster' . ($mode === 'avatar' ? ' player-nav-cluste
             'extraClass' => trim('player-nav-slot-cartons ' . $wonCartonsExtraClass),
         ]); ?>
     <?php endif; ?>
+
+    <?php if ((int) session()->get('group') === 0) : ?>
+        <a class="btn btn-small btn-legal-player player-nav-slot-legal<?= ! empty($legalActive) ? ' is-active' : ''; ?>" href="<?= site_url('terminos'); ?>" title="<?= translate('terms and promotions'); ?>">
+            <i class="fa-duotone fa-solid fa-scale-balanced"></i>
+        </a>
+    <?php endif; ?>
 </div>

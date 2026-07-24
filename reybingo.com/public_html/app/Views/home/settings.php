@@ -44,6 +44,11 @@
                             <i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('banks'); ?>
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="legal-tab" data-bs-toggle="tab" data-bs-target="#legal" type="button" role="tab">
+                            <i class="fa-duotone fa-solid fa-scale-balanced"></i> <?= translate('legal'); ?>
+                        </button>
+                    </li>
                 </ul>
 
                 <!-- Contenido de las pestañas -->
@@ -701,6 +706,34 @@
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA LEGAL / TyC -->
+                    <div class="tab-pane fade" id="legal" role="tabpanel">
+                        <div class="row mt-3">
+                            <div class="col-md-12 mb-3">
+                                <h6><?= translate('terms and promotions'); ?></h6>
+                                <p class="text-muted mb-2"><?= translate('edit terms and promotions description'); ?></p>
+                                <a href="<?= site_url('legal/admin'); ?>" class="btn btn-primary btn-bingo">
+                                    <i class="fa-duotone fa-solid fa-pen-to-square"></i> <?= translate('open legal editor'); ?>
+                                </a>
+                                <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener" class="btn btn-outline-primary ms-1">
+                                    <?= translate('view terms'); ?>
+                                </a>
+                                <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener" class="btn btn-outline-primary ms-1">
+                                    <?= translate('view promotions'); ?>
+                                </a>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="termsRequireAccept" class="form-label"><?= translate('require terms acceptance on signup'); ?></label>
+                                <select class="form-control form-control-lg form-bingo" name="termsRequireAccept" id="termsRequireAccept">
+                                    <option value="1" <?= (string) (systemGet('termsRequireAccept') ?? '1') === '1' ? 'selected' : ''; ?>><?= translate('active'); ?></option>
+                                    <option value="0" <?= (string) (systemGet('termsRequireAccept') ?? '1') === '0' ? 'selected' : ''; ?>><?= translate('inactive'); ?></option>
+                                </select>
+                                <small class="text-muted d-block"><?= translate('require terms acceptance help'); ?></small>
+                                <small id="termsRequireAccept-error" class="text-danger d-none"></small>
                             </div>
                         </div>
                     </div>

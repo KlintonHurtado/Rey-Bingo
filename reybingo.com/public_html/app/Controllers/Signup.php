@@ -554,6 +554,17 @@ class Signup extends Controller {
             ]
         ];
 
+        if (bingo_terms_require_accept()) {
+            $validationRules['accept_terms'] = [
+                'label' => translate('terms and conditions'),
+                'rules' => 'required|in_list[1]',
+                'errors' => [
+                    'required' => translate('you must accept the terms and conditions'),
+                    'in_list' => translate('you must accept the terms and conditions'),
+                ],
+            ];
+        }
+
         if ($this->request->getPost('signup_context') === 'store_affiliate') {
             $validationRules['address_line'] = [
                 'label' => translate('address'),

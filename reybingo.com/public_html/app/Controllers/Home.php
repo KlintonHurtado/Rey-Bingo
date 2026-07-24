@@ -610,8 +610,12 @@ class Home extends Controller {
             'activateTransfer' => $this->request->getPost('activateTransfer')
         ];
 
+        $legalSettings = [
+            'termsRequireAccept' => $this->request->getPost('termsRequireAccept') === '1' ? '1' : '0',
+        ];
+
         // Combinar todos los datos
-        $data = array_merge($generalSettings, $paymentSettings, $gameSettings, $financialSettings);
+        $data = array_merge($generalSettings, $paymentSettings, $gameSettings, $financialSettings, $legalSettings);
 
         // Procesar logo si se envió
         $logoImage = $this->request->getPost('logo');
@@ -632,9 +636,12 @@ class Home extends Controller {
 
         // Actualizar cada valor en la base de datos
         try {
+            // Actualizar cada valor en la base de datos
+            // termsRequireAccept puede ser "0" y debe guardarse
+            $allowEmptyKeys = ['termsRequireAccept' => true];
             foreach ($data as $key => $value) {
-                if ($value !== null && $value !== '') {
-                    $model->updateValue($key, $value);
+                if ($value !== null && ($value !== '' || isset($allowEmptyKeys[$key]))) {
+                    $model->updateValue($key, (string) $value);
                 }
             }
 
