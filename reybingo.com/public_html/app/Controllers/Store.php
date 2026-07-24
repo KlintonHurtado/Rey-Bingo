@@ -97,21 +97,9 @@ class Store extends Controller
 
     private function saveVoucherFromBase64(?string $voucherImage): string
     {
-        if (empty($voucherImage) || strpos($voucherImage, 'data:image') !== 0) {
-            return '';
-        }
+        $saved = bingo_save_voucher_base64($voucherImage);
 
-        $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $voucherImage));
-        $fileName = uniqid() . '.png';
-        $uploadPath = FCPATH . 'uploads/vouchers/';
-
-        if (! is_dir($uploadPath)) {
-            mkdir($uploadPath, 0755, true);
-        }
-
-        file_put_contents($uploadPath . $fileName, $imageData);
-
-        return $fileName;
+        return $saved['success'] ? $saved['filename'] : '';
     }
 
     public function index()

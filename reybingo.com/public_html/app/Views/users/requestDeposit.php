@@ -33,8 +33,12 @@
                         <?php endif; ?>
                     </div>
                     <div class="col-md-6">
-                        <?php if ($deposit['voucher'] != '') : ?>
-                            <img src="<?= site_url('uploads/vouchers/' . $deposit['voucher']) ?>" alt="voucher" style="width:200px; max-height:200px; cursor:pointer;" class="img-thumbnail" onclick="modalVoucher('<?= $deposit['id'] ?>');">
+                        <?php if (! empty($deposit['voucher']) && bingo_voucher_exists($deposit['voucher'])) : ?>
+                            <img src="<?= esc(bingo_voucher_url($deposit['voucher'])) ?>" alt="voucher" style="width:200px; max-height:200px; object-fit:contain; cursor:pointer;" class="img-thumbnail bg-white" onclick="modalVoucher('<?= (int) $deposit['id'] ?>');">
+                        <?php elseif (! empty($deposit['voucher'])) : ?>
+                            <div class="alert alert-warning py-2 px-2 small mb-0">Comprobante registrado pero el archivo no está disponible en el servidor.</div>
+                        <?php else : ?>
+                            <div class="alert alert-secondary py-2 px-2 small mb-0">Sin comprobante.</div>
                         <?php endif; ?>
                     </div>
 

@@ -393,10 +393,15 @@
 
             button.prop("disabled", true);
 
+            var formEl = this;
+            var formData = new FormData(formEl);
+
             $.ajax({
                 url: '<?= site_url('payments/depositSubmit') ?>',
                 method: 'POST',
-                data: $(this).serialize(),
+                data: formData,
+                processData: false,
+                contentType: false,
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {

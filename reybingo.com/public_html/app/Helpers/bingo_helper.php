@@ -1492,6 +1492,94 @@ if (!function_exists('bingo_ensure_deposits_schema')) {
     }
 }
 
+if (!function_exists('bingo_voucher_dir')) {
+    function bingo_voucher_dir(): string
+    {
+        $dir = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+
+        return $dir;
+    }
+}
+
+if (!function_exists('bingo_voucher_path')) {
+    function bingo_voucher_path(?string $filename): string
+    {
+        $filename = basename(trim((string) $filename));
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return '';
+        }
+
+        return bingo_voucher_dir() . $filename;
+    }
+}
+
+if (!function_exists('bingo_voucher_url')) {
+    function bingo_voucher_url(?string $filename): string
+    {
+        $filename = basename(trim((string) $filename));
+        if ($filename === '') {
+            return '';
+        }
+
+        // Servir vía controlador para Content-Type correcto (JPEG guardados como .png, etc.)
+        return site_url('payments/voucher/' . rawurlencode($filename));
+    }
+}
+
+if (!function_exists('bingo_voucher_exists')) {
+    function bingo_voucher_exists(?string $filename): bool
+    {
+        $path = bingo_voucher_path($filename);
+
+        return $path !== '' && is_file($path) && filesize($path) > 0;
+    }
+}
+
+if (!function_exists('bingo_save_voucher_base64')) {
+    /**
+     * @return array{success:bool,filename:string,error:string}
+     */
+    function bingo_save_voucher_base64(?string $dataUrl): array
+    {
+        $dataUrl = trim((string) $dataUrl);
+        if ($dataUrl === '' || stripos($dataUrl, 'data:image') !== 0) {
+            return ['success' => false, 'filename' => '', 'error' => 'invalid'];
+        }
+
+        if (! preg_match('#^data:image/([a-z0-9.+-]+);base64,#i', $dataUrl, $matches)) {
+            return ['success' => false, 'filename' => '', 'error' => 'invalid'];
+        }
+
+        $ext = strtolower($matches[1]);
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+        if (! in_array($ext, ['jpg', 'png', 'gif', 'webp'], true)) {
+            $ext = 'png';
+        }
+
+        $raw = (string) preg_replace('#^data:image/[a-z0-9.+-]+;base64,#i', '', $dataUrl);
+        $imageData = base64_decode($raw, true);
+        if ($imageData === false || $imageData === '') {
+            return ['success' => false, 'filename' => '', 'error' => 'decode'];
+        }
+
+        $fileName = uniqid('', true) . '.' . $ext;
+        $path = bingo_voucher_dir() . $fileName;
+        $written = @file_put_contents($path, $imageData);
+        if ($written === false || ! is_file($path) || filesize($path) < 1) {
+            log_message('error', 'No se pudo guardar voucher en ' . $path);
+
+            return ['success' => false, 'filename' => '', 'error' => 'write'];
+        }
+
+        return ['success' => true, 'filename' => $fileName, 'error' => ''];
+    }
+}
+
 if (!function_exists('bingo_ensure_games_schema')) {
     function bingo_ensure_games_schema(): void
     {

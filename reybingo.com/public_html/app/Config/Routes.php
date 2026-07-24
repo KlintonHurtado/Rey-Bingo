@@ -245,6 +245,7 @@ $routes->post('payments/payawardSubmit', 'Payments::payawardSubmit');
 $routes->get('payments/requestGet/(:segment)/(:num)', 'Payments::requestGet/$1/$2');
 $routes->get('payments/userAccreditationStatsGet/(:num)', 'Payments::userAccreditationStatsGet/$1');
 $routes->get('payments/modalVoucher/(:num)', 'Payments::modalVoucher/$1');
+$routes->get('payments/voucher/(:segment)', 'Payments::voucher/$1');
 
 $routes->get('payments/show', 'Payments::show');
 $routes->post('payments/stripe/create', 'Payments::createStripeCheckoutSession');

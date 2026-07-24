@@ -944,6 +944,36 @@ class Payments extends Controller {
 
         return view('users/modalVoucher', $data);
     }
+
+    public function voucher($file = null)
+    {
+        $path = bingo_voucher_path($file);
+        if ($path === '' || ! is_file($path)) {
+            return $this->response->setStatusCode(404)->setBody('Voucher no encontrado');
+        }
+
+        $mime = 'application/octet-stream';
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $detected = finfo_file($finfo, $path);
+                finfo_close($finfo);
+                if (is_string($detected) && $detected !== '') {
+                    $mime = $detected;
+                }
+            }
+        } elseif (function_exists('mime_content_type')) {
+            $detected = @mime_content_type($path);
+            if (is_string($detected) && $detected !== '') {
+                $mime = $detected;
+            }
+        }
+
+        return $this->response
+            ->setHeader('Content-Type', $mime)
+            ->setHeader('Cache-Control', 'private, max-age=86400')
+            ->setBody(file_get_contents($path));
+    }
   
     public function depositGet() {
         $modelBanks = new BanksModel();
@@ -1124,8 +1154,8 @@ class Payments extends Controller {
 
         // Si llega base64 => nueva imagen (obligatoria)
         if (strpos($voucherImage, 'data:image') === 0) {
-            $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $voucherImage));
-            if ($imageData === false || $imageData === '') {
+            $saved = bingo_save_voucher_base64($voucherImage);
+            if (! $saved['success']) {
                 return $this->response->setJSON([
                     'success' => false,
                     'errors' => [
@@ -1133,14 +1163,14 @@ class Payments extends Controller {
                     ],
                 ]);
             }
-
-            $fileName  = uniqid() . '.png';
-            $uploadPath = FCPATH . 'uploads/vouchers/';
-            if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0755, true);
-            }
-            file_put_contents($uploadPath . $fileName, $imageData);
-            $data['voucher'] = $fileName;
+            $data['voucher'] = $saved['filename'];
+        } else {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'deposit-voucher' => translate('voucher') . ' ' . strtolower(translate('it is mandatory')),
+                ],
+            ]);
         }
 
         if (systemGet('activateDeposit') == 1) {
