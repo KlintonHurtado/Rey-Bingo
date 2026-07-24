@@ -165,7 +165,9 @@
 	                                <td>
 	                                    <small>
 	                                        <?= translate('cartons'); ?>: <strong><?= number_format($user['total_cartons']); ?></strong><br>
-	                                        <?= translate('deposits'); ?>: <strong class="text-success"><?= systemGet('currency'); ?> <?= number_format($user['total_deposits'], 2); ?></strong><br>
+	                                        <?= translate('deposits'); ?>: <strong class="text-success"><?= systemGet('currency'); ?> <?= number_format((float) ($user['total_deposits'] ?? 0), 2); ?></strong><br>
+	                                        <?= translate('total retires'); ?>: <strong class="text-danger"><?= systemGet('currency'); ?> <?= number_format((float) ($user['total_retires'] ?? 0), 2); ?></strong><br>
+	                                        Tablas otorgadas: <strong><?= number_format((int) ($user['granted_cartons'] ?? 0)); ?></strong><br>
 	                                        <?php if ($user['last_activity']): ?>
 	                                            <span class="text-muted"><?= date('d/m/Y H:i', strtotime($user['last_activity'])); ?></span>
 	                                        <?php else: ?>
@@ -508,16 +510,20 @@
 	                                <tr><td><strong><?= translate('phone'); ?>:</strong></td><td>${user.phone || '<?= translate('not provided'); ?>'}</td></tr>
 	                                <tr><td><strong><?= translate('document'); ?>:</strong></td><td>${user.document || '<?= translate('not provided'); ?>'}</td></tr>
 	                                <tr><td><strong><?= translate('group'); ?>:</strong></td><td>${user.group == 1 ? '<?= translate('admin'); ?>' : '<?= translate('player'); ?>'}</td></tr>
-	                                <tr><td><strong><?= translate('wallet'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(user.wallet).toFixed(2)}<span></td></tr>
+	                                <tr><td><strong><?= translate('wallet'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_total ?? user.wallet ?? 0).toFixed(2)}</span></td></tr>
+	                                <tr><td><strong>Recarga:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_recharge ?? user.wallet_recharge ?? 0).toFixed(2)}</td></tr>
+	                                <tr><td><strong>Retiro:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_withdraw ?? user.wallet_withdraw ?? 0).toFixed(2)}</td></tr>
+	                                <tr><td><strong>Saldo bono:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_bonus ?? user.wallet_bonus ?? 0).toFixed(2)}</td></tr>
 	                                <tr><td><strong><?= translate('registered'); ?>:</strong></td><td>${new Date(user.created_at).toLocaleString()}</td></tr>
 	                                <tr><td><strong><?= translate('last update'); ?>:</strong></td><td>${new Date(user.updated_at).toLocaleString()}</td></tr>
 	                            </table>
 	                            <h6 class="mt-3"><?= translate('activity statistics'); ?></h6>
 	                            <table class="table table-sm">
 	                                <tr><td><strong><?= translate('total cartons'); ?>:</strong></td><td><span class="badge bg-primary p-2 fs-6">${stats.total_cartons}</span></td></tr>
-	                                <tr><td><strong><?= translate('total deposits'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_deposits).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong><?= translate('total retires'); ?>:</strong></td><td><span class="badge bg-danger p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_retires).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong><?= translate('total roulettes'); ?>:</strong></td><td><span class="badge bg-info p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_roulettes).toFixed(2)}</span></td></tr>
+	                                <tr><td><strong><?= translate('total deposits'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_deposits || 0).toFixed(2)}</span></td></tr>
+	                                <tr><td><strong><?= translate('total retires'); ?>:</strong></td><td><span class="badge bg-danger p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_retires || 0).toFixed(2)}</span></td></tr>
+	                                <tr><td><strong>Tablas otorgadas:</strong></td><td><span class="badge bg-info p-2 fs-6">${parseInt(stats.granted_cartons || 0, 10)}</span> <small class="text-muted">(pendientes: ${parseInt(stats.pending_cartons || 0, 10)})</small></td></tr>
+	                                <tr><td><strong><?= translate('total roulettes'); ?>:</strong></td><td><span class="badge bg-secondary p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_roulettes || 0).toFixed(2)}</span></td></tr>
 	                                <tr><td><strong><?= translate('last activity'); ?>:</strong></td><td>${stats.last_activity ? new Date(stats.last_activity).toLocaleString() : '<?= translate('no activity'); ?>'}</td></tr>
 	                            </table>
 	                        </div>

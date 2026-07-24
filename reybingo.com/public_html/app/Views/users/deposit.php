@@ -39,7 +39,14 @@
                         <div class="col-md-12 mb-2 d-none" id="deposit-user-stats-wrap">
                             <p class="small text-muted mb-2 text-center">Historial del jugador seleccionado</p>
                             <?= view('users/partials/accreditation_user_stats', [
-                                'userStats' => ['manual_credits' => 0, 'user_spend' => 0, 'total_prizes' => 0],
+                                'userStats' => [
+                                    'manual_credits' => 0,
+                                    'user_spend' => 0,
+                                    'total_prizes' => 0,
+                                    'total_retires' => 0,
+                                    'wallet_bonus' => 0,
+                                    'granted_cartons' => 0,
+                                ],
                                 'wrapperClass' => 'user-accreditation-stats deposit-user-stats',
                             ]) ?>
                         </div>
@@ -171,6 +178,7 @@
 
                                 <input type="hidden" id="voucher_image_input" name="deposit-voucher">
                             </div>
+                            <small id="deposit-voucher-error" class="text-danger d-none d-block mt-1"></small>
                         </div>
                     </div>
 
@@ -185,7 +193,7 @@
 
                     <div class="col-md-12">
                         <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2"
-                            id="deposit-button" disabled><?= translate('send'); ?></button>
+                            id="deposit-button"><?= translate('send'); ?></button>
                     </div>
                 </div>
 
@@ -275,6 +283,12 @@
                         wrap.querySelector('.stat-manual-credits').textContent = formatNumber(data.stats.manual_credits || 0);
                         wrap.querySelector('.stat-user-spend').textContent = formatNumber(data.stats.user_spend || 0);
                         wrap.querySelector('.stat-total-prizes').textContent = formatNumber(data.stats.total_prizes || 0);
+                        const retiresEl = wrap.querySelector('.stat-total-retires');
+                        if (retiresEl) retiresEl.textContent = formatNumber(data.stats.total_retires || 0);
+                        const bonusEl = wrap.querySelector('.stat-wallet-bonus');
+                        if (bonusEl) bonusEl.textContent = formatNumber(data.stats.wallet_bonus || 0);
+                        const cartonsEl = wrap.querySelector('.stat-granted-cartons');
+                        if (cartonsEl) cartonsEl.textContent = parseInt(data.stats.granted_cartons || 0, 10);
                         wrap.classList.remove('d-none');
                     })
                     .catch(() => wrap.classList.add('d-none'));
@@ -351,15 +365,33 @@
         $('#deposit-form').on('submit', function (e) {
             e.preventDefault();
 
-            if (!hasDepositVoucher()) {
+            var button = $('#deposit-button');
+            $('.text-danger').addClass('d-none').text('');
+            $('.form-control').removeClass('is-invalid');
+
+            var missing = getDepositMissingFields();
+            if (missing.length) {
+                missing.forEach(function (item) {
+                    if (item.field === 'deposit-voucher') {
+                        $('#deposit-voucher-error').text(item.message).removeClass('d-none');
+                        return;
+                    }
+                    $('#' + item.field + '-error').text(item.message).removeClass('d-none');
+                    $('#' + item.field).addClass('is-invalid');
+                });
+
+                Toastify({
+                    text: 'Falta: ' + missing.map(function (item) { return item.label; }).join(', '),
+                    duration: 4000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
                 return;
             }
 
-            var button = $('#deposit-button');
             button.prop("disabled", true);
-
-            $('.text-danger').addClass('d-none').text('');
-            $('.form-control').removeClass('is-invalid');
 
             $.ajax({
                 url: '<?= site_url('payments/depositSubmit') ?>',
@@ -394,13 +426,22 @@
                         }).showToast();
                     } else {
                         if (response.errors) {
+                            var labels = [];
                             $.each(response.errors, function (field, message) {
-                                if (field === 'deposit-voucher') {
-                                    return;
-                                }
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
+                                labels.push(message);
                             });
+                            if (labels.length) {
+                                Toastify({
+                                    text: 'Falta: ' + labels.join(', '),
+                                    duration: 4000,
+                                    gravity: "top",
+                                    position: "right",
+                                    style: { background: "#dc3545" },
+                                    stopOnFocus: true
+                                }).showToast();
+                            }
                         }
                     }
                 },
@@ -415,7 +456,7 @@
                     }).showToast();
                 },
                 complete: function () {
-                    syncDepositSendButton();
+                    button.prop("disabled", false);
                 }
             });
         });
@@ -832,12 +873,41 @@
         return voucherValue.indexOf('data:image') === 0;
     }
 
-    function syncDepositSendButton() {
-        const button = document.getElementById('deposit-button');
-        if (!button) {
-            return;
+    function getDepositMissingFields() {
+        var missing = [];
+        var required = [
+            { field: 'deposit-bank', label: '<?= translate('bank of origin'); ?>' },
+            { field: 'deposit-document', label: '<?= translate('document'); ?>' },
+            { field: 'deposit-phone', label: '<?= translate('phone'); ?>' },
+            { field: 'deposit-date', label: '<?= translate('date'); ?>' },
+            { field: 'deposit-amount', label: '<?= translate('amount'); ?>' },
+            { field: 'deposit-reference', label: '<?= translate('reference'); ?>' }
+        ];
+
+        required.forEach(function (item) {
+            var el = document.getElementById(item.field);
+            if (!el) {
+                return;
+            }
+            var value = (el.value || '').trim();
+            if (!value || (item.field === 'deposit-amount' && !(parseFloat(value) > 0))) {
+                missing.push({
+                    field: item.field,
+                    label: item.label,
+                    message: item.label + ' <?= strtolower(translate('it is mandatory')); ?>'
+                });
+            }
+        });
+
+        if (!hasDepositVoucher()) {
+            missing.push({
+                field: 'deposit-voucher',
+                label: '<?= translate('voucher'); ?>',
+                message: '<?= translate('voucher'); ?> <?= strtolower(translate('it is mandatory')); ?>'
+            });
         }
-        button.disabled = !hasDepositVoucher();
+
+        return missing;
     }
 
     function previewvoucherImage(event) {
@@ -849,7 +919,11 @@
 
             // Mostrar botón eliminar
             document.getElementById('removeVoucherBtn').classList.remove('d-none');
-            syncDepositSendButton();
+            const voucherError = document.getElementById('deposit-voucher-error');
+            if (voucherError) {
+                voucherError.classList.add('d-none');
+                voucherError.textContent = '';
+            }
         };
         reader.readAsDataURL(event.target.files[0]);
     }
@@ -861,12 +935,10 @@
 
         // Ocultar botón eliminar
         document.getElementById('removeVoucherBtn').classList.add('d-none');
-        syncDepositSendButton();
     }
 
     // Al cargar si ya hay imagen, mostrar botón eliminar
     window.addEventListener("DOMContentLoaded", () => {
-        syncDepositSendButton();
         if (hasDepositVoucher()) {
             document.getElementById('removeVoucherBtn').classList.remove('d-none');
         }

@@ -73,6 +73,16 @@
                         <small id="retire-account-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-12 mb-1">
+                        <label for="retire-account-type" class="form-label"><?= translate('account type'); ?></label>
+                        <select class="form-control form-control-lg form-bingo" name="retire-account-type" id="retire-account-type">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('account type')); ?></option>
+                            <option value="savings"><?= translate('savings account'); ?></option>
+                            <option value="checking"><?= translate('checking account'); ?></option>
+                        </select>
+                        <small id="retire-account-type-error" class="text-danger d-none"></small>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-1">
                             <label for="retire-document" class="form-label"><?= translate('document'); ?></label>
@@ -91,7 +101,7 @@
                 <div class="row" id="current-bank" style="display: none;">
                     <div class="col-md-12 mb-1">
                         <label for="retire-amount" class="form-label"><?= translate('amount'); ?></label>
-                        <input type="number" class="form-control form-control-lg form-bingo" name="retire-amount" id="retire-amount" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('amount')); ?>" autocomplete="off" value="0.00">
+                        <input type="number" class="form-control form-control-lg form-bingo" name="retire-amount" id="retire-amount" placeholder="0.00" autocomplete="off">
                         <small id="retire-amount-error" class="text-danger d-none"></small>
                     </div>
                 </div>
@@ -357,6 +367,7 @@
                             <div style="flex: 1; padding-left: 5px;">
                                 <h6 class="mb-1"><strong><?= translate('bank'); ?>:</strong> ${data.bank}</h6>
                                 <small class="mb-0"><strong><?= translate('account'); ?>:</strong> ${data.account}</small> <br />
+                                <small class="mb-0"><strong><?= translate('account type'); ?>:</strong> ${data.account_type_label || '—'}</small> <br />
                                 <small class="mb-0"><strong><?= translate('holder'); ?>:</strong> ${data.holder}</small> <br />
                                 <small class="mb-0"><strong><?= translate('document'); ?>:</strong> ${data.document} - <strong><?= translate('phone'); ?>:</strong> ${data.phone}</small>
                             </div>

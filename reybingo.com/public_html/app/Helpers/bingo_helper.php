@@ -1711,9 +1711,85 @@ if (!function_exists('bingo_ensure_users_schema')) {
                     ],
                 ]);
             }
+
+            if (!$db->fieldExists('account_type', 'users')) {
+                $forge->addColumn('users', [
+                    'account_type' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 20,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'account',
+                    ],
+                ]);
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de users: ' . $e->getMessage());
         }
+    }
+}
+
+if (!function_exists('bingo_ensure_retires_schema')) {
+    function bingo_ensure_retires_schema(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $ensured = true;
+
+        try {
+            $db = \Config\Database::connect();
+            if (!$db->tableExists('retires')) {
+                return;
+            }
+
+            $forge = \Config\Database::forge();
+
+            if (!$db->fieldExists('account_type', 'retires')) {
+                $forge->addColumn('retires', [
+                    'account_type' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 20,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'account',
+                    ],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo actualizar el esquema de retires: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_normalize_account_type')) {
+    function bingo_normalize_account_type(?string $type): string
+    {
+        $type = strtolower(trim((string) $type));
+        if (in_array($type, ['savings', 'ahorros', 'ahorro'], true)) {
+            return 'savings';
+        }
+        if (in_array($type, ['checking', 'corriente', 'current'], true)) {
+            return 'checking';
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('bingo_account_type_label')) {
+    function bingo_account_type_label(?string $type): string
+    {
+        $normalized = bingo_normalize_account_type($type);
+        if ($normalized === 'savings') {
+            return translate('savings account');
+        }
+        if ($normalized === 'checking') {
+            return translate('checking account');
+        }
+
+        return '';
     }
 }
 

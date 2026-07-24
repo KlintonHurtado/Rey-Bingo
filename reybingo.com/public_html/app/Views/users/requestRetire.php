@@ -19,6 +19,9 @@
                             <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('account'); ?>', '<?= esc($retire['account']) ?>')"></i>
                         </div>
                         <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                            <small class="mb-0"><strong><?= translate('account type'); ?>:</strong> <?= esc(bingo_account_type_label($retire['account_type'] ?? '') ?: '—') ?></small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-1">
                             <small class="mb-0"><strong><?= translate('amount'); ?>:</strong> <?= systemGet('currency'); ?> <?= esc($retire['amount']) ?></small>
                             <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('amount'); ?>', '<?= esc($retire['amount']) ?>')"></i>
                         </div>

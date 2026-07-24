@@ -48,6 +48,9 @@ Events::on('post_controller_constructor', static function (): void {
     if (function_exists('bingo_ensure_users_schema')) {
         bingo_ensure_users_schema();
     }
+    if (function_exists('bingo_ensure_retires_schema')) {
+        bingo_ensure_retires_schema();
+    }
     if (function_exists('bingo_ensure_system_settings_schema')) {
         bingo_ensure_system_settings_schema();
     }

@@ -1096,12 +1096,18 @@ class Games extends Controller {
                     // Enriquecer datos de usuarios con estadísticas
                     foreach ($users as &$user) {
                         $userId = $user['id'];
+                        $depositsModel = new DepositsModel();
+                        $retiresModel = new RetiresModel();
+                        $roulettesGrantedModel = new RoulettesModel();
+                        $roulettesUsedModel = new RoulettesModel();
+                        $cartonsModel = new CartonsModel();
                         
-                        // Estadísticas del usuario
-                        $user['total_cartons'] = $modelCartons->where('user', $userId)->countAllResults();
-                        $user['total_deposits'] = $modelDeposits->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0;
-                        $user['total_retires'] = $modelRetires->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0;
-                        $user['total_roulettes'] = $modelRoulettes->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0;
+                        // Depósitos/retiros aprobados = status 2; tablas otorgadas = cartones de ruleta
+                        $user['total_cartons'] = $cartonsModel->where('user', $userId)->countAllResults();
+                        $user['total_deposits'] = (float) (($depositsModel->where('user', $userId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        $user['total_retires'] = (float) (($retiresModel->where('user', $userId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        $user['granted_cartons'] = (int) (($roulettesGrantedModel->where('user', $userId)->selectSum('cartons')->get()->getRow()->cartons) ?? 0);
+                        $user['total_roulettes'] = (float) (($roulettesUsedModel->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount) ?? 0);
                         $user['last_activity'] = $this->getLastActivity($userId);
                     }
                     

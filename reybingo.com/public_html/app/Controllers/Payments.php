@@ -6,6 +6,7 @@ use App\Models\UsersModel;
 use App\Models\PaymentsModel;
 use App\Models\DepositsModel;
 use App\Models\RetiresModel;
+use App\Models\RoulettesModel;
 use App\Models\TransfersModel;
 use App\Models\ReferralsModel;
 use App\Models\BanksModel;
@@ -583,7 +584,43 @@ class Payments extends Controller {
 
     private function getUserAccreditationStats(int $userId): array
     {
-        return $this->buildAccreditationStats(['user_id' => $userId]);
+        $stats = $this->buildAccreditationStats(['user_id' => $userId]);
+
+        helper('wallet');
+        $modelUsers = new UsersModel();
+        $user = $modelUsers->find($userId);
+        if ($user) {
+            $user = wallet_service()->normalizeUser($user);
+            $stats['wallet_total'] = round(wallet_total($user), 2);
+            $stats['wallet_recharge'] = round((float) ($user['wallet_recharge'] ?? 0), 2);
+            $stats['wallet_withdraw'] = round((float) ($user['wallet_withdraw'] ?? 0), 2);
+            $stats['wallet_bonus'] = round((float) ($user['wallet_bonus'] ?? 0), 2);
+        } else {
+            $stats['wallet_total'] = 0;
+            $stats['wallet_recharge'] = 0;
+            $stats['wallet_withdraw'] = 0;
+            $stats['wallet_bonus'] = 0;
+        }
+
+        $modelRetires = new RetiresModel();
+        $stats['total_retires'] = round((float) (($modelRetires
+            ->where('user', $userId)
+            ->where('status', 2)
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0), 2);
+
+        $modelRoulettes = new RoulettesModel();
+        $stats['granted_cartons'] = (int) (($modelRoulettes
+            ->where('user', $userId)
+            ->selectSum('cartons')
+            ->get()
+            ->getRow()
+            ->cartons) ?? 0);
+        $stats['pending_cartons'] = bingo_count_pending_roulette_cartons($userId);
+
+        return $stats;
     }
 
     private function getAdminKpis(array $filters = []): array
@@ -1309,6 +1346,10 @@ class Payments extends Controller {
                     'label' => translate('account'),
                     'rules' => 'required|numeric'
                 ],
+                'retire-account-type' => [
+                    'label' => translate('account type'),
+                    'rules' => 'required|in_list[savings,checking]'
+                ],
                 'retire-document' => [
                     'label' => translate('document'),
                     'rules' => 'required|numeric'
@@ -1373,10 +1414,12 @@ class Payments extends Controller {
         $saveAccount = $this->request->getPost('save-account');
 
         if ($receiver === "0") {
+            $accountType = bingo_normalize_account_type($this->request->getPost('retire-account-type'));
             $data = [
                 'user'   => session()->get('id'),
                 'bank'      => $this->request->getPost('retire-bank'),
                 'account'   => $this->request->getPost('retire-account'),
+                'account_type' => $accountType,
                 'document'  => $this->request->getPost('retire-document'),
                 'phone'     => $this->request->getPost('retire-phone'),
                 'amount'    => $this->request->getPost('retire-amount'),
@@ -1387,6 +1430,7 @@ class Payments extends Controller {
                 $dataBank = [
                     'bank'     => $data['bank'],
                     'account'  => $data['account'],
+                    'account_type' => $accountType,
                     'document' => $data['document'],
                     'phone'    => $data['phone']
                 ];
@@ -1394,10 +1438,21 @@ class Payments extends Controller {
                 $modelUsers->update(session()->get('id'), $dataBank);
             }
         } else {
+            $accountType = bingo_normalize_account_type($user['account_type'] ?? '');
+            if ($accountType === '') {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'retire-receiver' => translate('please update your bank account type'),
+                    ],
+                ]);
+            }
+
             $data = [
                 'user'   => session()->get('id'),
                 'bank'      => $user['bank'],
                 'account'   => $user['account'],
+                'account_type' => $accountType,
                 'document'  => $user['document'],
                 'phone'     => $user['phone'],
                 'amount'    => $this->request->getPost('retire-amount'),
@@ -1487,6 +1542,8 @@ class Payments extends Controller {
         return $this->response->setJSON([
             'bank' => $user['bank'],
             'account' => $user['account'],
+            'account_type' => bingo_normalize_account_type($user['account_type'] ?? ''),
+            'account_type_label' => bingo_account_type_label($user['account_type'] ?? ''),
             'holder' => $user['firstname'] . ' ' . $user['lastname'],
             'document' => $user['document'],
             'phone' => $user['phone']
@@ -1667,6 +1724,10 @@ class Payments extends Controller {
                 'label' => translate('account'),  
                 'rules' => 'required|numeric'
             ],
+            'setting-account-type' => [
+                'label' => translate('account type'),
+                'rules' => 'required|in_list[savings,checking]'
+            ],
             'setting-document' => [
                 'label' => translate('document'),
                 'rules' => 'required|numeric'
@@ -1689,6 +1750,7 @@ class Payments extends Controller {
         $data = [
             'bank' => $this->request->getPost('setting-bank'),
             'account' => $this->request->getPost('setting-account'),
+            'account_type' => bingo_normalize_account_type($this->request->getPost('setting-account-type')),
             'document' => $this->request->getPost('setting-document'),
             'phone' => $this->request->getPost('setting-phone')
         ];

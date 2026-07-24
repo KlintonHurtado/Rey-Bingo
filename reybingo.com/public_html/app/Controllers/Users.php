@@ -985,7 +985,6 @@ class Users extends Controller {
         $modelCartons = new CartonsModel();
         $modelDeposits = new DepositsModel();
         $modelRetires = new RetiresModel();
-        $modelRoulettes = new RoulettesModel();
 
         $user = $model->find($userId);
         
@@ -995,13 +994,54 @@ class Users extends Controller {
                 'error' => translate('user not found')
             ]);
         }
+
+        helper('wallet');
+        $user = wallet_service()->normalizeUser($user);
+        unset($user['password']);
+
+        $totalDeposits = (float) (($modelDeposits
+            ->where('user', $userId)
+            ->where('status', 2)
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0);
+
+        $totalRetires = (float) (($modelRetires
+            ->where('user', $userId)
+            ->where('status', 2)
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0);
+
+        $grantedCartons = (int) (((new RoulettesModel())
+            ->where('user', $userId)
+            ->selectSum('cartons')
+            ->get()
+            ->getRow()
+            ->cartons) ?? 0);
+
+        $rouletteAmount = (float) (((new RoulettesModel())
+            ->where('user', $userId)
+            ->where('status', 1)
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0);
         
-        // Estadísticas detalladas del usuario
+        // Estadísticas detalladas del usuario (depósitos/retiros aprobados = status 2)
         $stats = [
             'total_cartons' => $modelCartons->where('user', $userId)->countAllResults(),
-            'total_deposits' => $modelDeposits->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0,
-            'total_retires' => $modelRetires->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0,
-            'total_roulettes' => $modelRoulettes->where('user', $userId)->where('status', 1)->selectSum('amount')->get()->getRow()->amount ?? 0,
+            'total_deposits' => round($totalDeposits, 2),
+            'total_retires' => round($totalRetires, 2),
+            'total_roulettes' => round($rouletteAmount, 2),
+            'granted_cartons' => $grantedCartons,
+            'pending_cartons' => bingo_count_pending_roulette_cartons((int) $userId),
+            'wallet_total' => wallet_total($user),
+            'wallet_recharge' => (float) ($user['wallet_recharge'] ?? 0),
+            'wallet_withdraw' => (float) ($user['wallet_withdraw'] ?? 0),
+            'wallet_bonus' => (float) ($user['wallet_bonus'] ?? 0),
             'last_activity' => $this->getLastActivity($userId)
         ];
         
@@ -1124,6 +1164,7 @@ class Users extends Controller {
             'document' => $this->request->getPost('document') ?? '',
             'bank' => $this->request->getPost('bank') ?? '',
             'account' => $this->request->getPost('account') ?? '',
+            'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
             'wallet' => $this->request->getPost('wallet') ?? 0,
             'group' => $this->request->getPost('group'),
             'status' => $this->request->getPost('status'),

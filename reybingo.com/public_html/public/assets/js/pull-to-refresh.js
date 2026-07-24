@@ -12,7 +12,6 @@
     var armed = false;
     var pullDistance = 0;
     var indicator = null;
-    var label = null;
 
     function isBlocked() {
         if (document.querySelector('.modal.show')) {
@@ -69,9 +68,8 @@
         indicator = document.createElement('div');
         indicator.id = 'pull-to-refresh-indicator';
         indicator.setAttribute('aria-hidden', 'true');
-        indicator.innerHTML = '<div class="ptr-spinner"></div><span class="ptr-label">Suelta para actualizar</span>';
+        indicator.innerHTML = '<i class="fa-duotone fa-arrows-rotate ptr-spinner" aria-hidden="true"></i>';
         document.body.appendChild(indicator);
-        label = indicator.querySelector('.ptr-label');
     }
 
     function setPull(distance) {
@@ -81,9 +79,6 @@
         var offset = Math.min(distance, MAX_PULL);
         indicator.style.transform = 'translate(-50%, ' + (offset - 56) + 'px)';
         indicator.style.opacity = String(Math.min(progress * 1.2, 1));
-        if (label) {
-            label.textContent = distance >= THRESHOLD ? 'Suelta para actualizar' : 'Desliza para actualizar';
-        }
         indicator.classList.toggle('ptr-ready', distance >= THRESHOLD);
     }
 
@@ -100,9 +95,6 @@
     function triggerRefresh() {
         ensureIndicator();
         indicator.classList.add('ptr-loading');
-        if (label) {
-            label.textContent = 'Actualizando...';
-        }
         indicator.style.transform = 'translate(-50%, 12px)';
         indicator.style.opacity = '1';
         setTimeout(function () {

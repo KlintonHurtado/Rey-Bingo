@@ -2008,11 +2008,11 @@
             left: 50%;
             z-index: 12000;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 10px 14px;
-            border-radius: 999px;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             background: rgba(255, 255, 255, 0.95);
             color: #4b2ad6;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
@@ -2020,16 +2020,10 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.15s ease;
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 12px;
-            font-weight: 600;
         }
         #pull-to-refresh-indicator .ptr-spinner {
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(75, 42, 214, 0.25);
-            border-top-color: #4b2ad6;
-            border-radius: 50%;
+            font-size: 20px;
+            line-height: 1;
         }
         #pull-to-refresh-indicator.ptr-ready .ptr-spinner,
         #pull-to-refresh-indicator.ptr-loading .ptr-spinner {

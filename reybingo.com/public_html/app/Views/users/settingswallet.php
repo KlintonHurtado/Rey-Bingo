@@ -36,6 +36,17 @@
                         <input type="number" class="form-control form-control-lg form-bingo" name="setting-account" id="setting-account" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('naccount')); ?>" autocomplete="off" value="<?= $user['account']; ?>">
                         <small id="setting-account-error" class="text-danger d-none"></small>
                     </div>
+
+                    <div class="col-md-12 mb-1">
+                        <label for="setting-account-type" class="form-label"><?= translate('account type'); ?></label>
+                        <?php $accountType = bingo_normalize_account_type($user['account_type'] ?? ''); ?>
+                        <select class="form-control form-control-lg form-bingo" name="setting-account-type" id="setting-account-type">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('account type')); ?></option>
+                            <option value="savings" <?= $accountType === 'savings' ? 'selected' : ''; ?>><?= translate('savings account'); ?></option>
+                            <option value="checking" <?= $accountType === 'checking' ? 'selected' : ''; ?>><?= translate('checking account'); ?></option>
+                        </select>
+                        <small id="setting-account-type-error" class="text-danger d-none"></small>
+                    </div>
                     
                     <div class="col-md-6 mb-1">
                         <label for="setting-document" class="form-label"><?= translate('document'); ?></label>

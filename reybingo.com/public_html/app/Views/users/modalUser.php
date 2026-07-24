@@ -147,6 +147,16 @@
                         <input type="text" class="form-control form-control-lg form-bingo" name="account" id="account" placeholder="<?= translate('enter account'); ?>" value="<?= $isUpdate ? esc($userData['account']) : ''; ?>" autocomplete="off">
                     </div>
 
+                    <div class="col-md-6 mb-2">
+                        <label for="account_type" class="form-label"><?= translate('account type'); ?></label>
+                        <?php $accountType = bingo_normalize_account_type($isUpdate ? ($userData['account_type'] ?? '') : ''); ?>
+                        <select class="form-control form-control-lg form-bingo" name="account_type" id="account_type">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('account type')); ?></option>
+                            <option value="savings" <?= $accountType === 'savings' ? 'selected' : ''; ?>><?= translate('savings account'); ?></option>
+                            <option value="checking" <?= $accountType === 'checking' ? 'selected' : ''; ?>><?= translate('checking account'); ?></option>
+                        </select>
+                    </div>
+
                     <!-- Configuraciones -->
                     <div class="col-md-12 mb-3 mt-3">
                         <h6 class="text-white"><?= translate('settings'); ?></h6>
