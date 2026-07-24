@@ -2326,6 +2326,17 @@ if (!function_exists('bingo_ensure_users_schema')) {
                     ],
                 ]);
             }
+
+            if (!$db->fieldExists('terms_accepted_at', 'users')) {
+                $forge->addColumn('users', [
+                    'terms_accepted_at' => [
+                        'type' => 'DATETIME',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'verified_email',
+                    ],
+                ]);
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de users: ' . $e->getMessage());
         }
@@ -2569,6 +2580,73 @@ if (!function_exists('bingo_terms_require_accept')) {
         }
 
         return (string) (systemGet('termsRequireAccept') ?? '1') === '1';
+    }
+}
+
+if (!function_exists('bingo_user_needs_terms_accept')) {
+    /**
+     * Jugadores (group 0) que aún no aceptaron TyC, o cuya aceptación
+     * es anterior a la última actualización del texto legal.
+     */
+    function bingo_user_needs_terms_accept(?array $user = null): bool
+    {
+        if (! bingo_terms_require_accept()) {
+            return false;
+        }
+
+        if ($user === null && session()->get('logged_in')) {
+            $model = new \App\Models\UsersModel();
+            $user = $model->find(session()->get('id'));
+        }
+
+        if (! is_array($user) || $user === []) {
+            return false;
+        }
+
+        if ((int) ($user['group'] ?? -1) !== 0) {
+            return false;
+        }
+
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+
+        $acceptedAt = trim((string) ($user['terms_accepted_at'] ?? ''));
+        if ($acceptedAt === '' || $acceptedAt === '0000-00-00 00:00:00') {
+            return true;
+        }
+
+        $updatedAt = trim((string) (systemGet('termsUpdatedAt') ?: ''));
+        if ($updatedAt === '') {
+            return false;
+        }
+
+        $acceptedTs = strtotime($acceptedAt);
+        $updatedTs = strtotime($updatedAt);
+        if ($acceptedTs === false || $updatedTs === false) {
+            return false;
+        }
+
+        return $acceptedTs < $updatedTs;
+    }
+}
+
+if (!function_exists('bingo_mark_terms_accepted')) {
+    function bingo_mark_terms_accepted(int $userId): bool
+    {
+        if ($userId <= 0) {
+            return false;
+        }
+
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+
+        $model = new \App\Models\UsersModel();
+
+        return (bool) $model->update($userId, [
+            'terms_accepted_at' => date('Y-m-d H:i:s'),
+        ]);
     }
 }
 

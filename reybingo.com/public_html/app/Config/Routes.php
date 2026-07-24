@@ -268,6 +268,7 @@ $routes->get('terminos', 'Legal::terms');
 $routes->get('promociones', 'Legal::promotions');
 $routes->get('legal/admin', 'Legal::admin');
 $routes->post('legal/adminSubmit', 'Legal::adminSubmit');
+$routes->post('legal/acceptTerms', 'Legal::acceptTerms');
 $routes->post('home/bankSubmit', 'Home::bankSubmit');
 $routes->post('home/activateAlgorithm', 'Home::activateAlgorithm');
 $routes->get('home/bankGet', 'Home::bankGet');

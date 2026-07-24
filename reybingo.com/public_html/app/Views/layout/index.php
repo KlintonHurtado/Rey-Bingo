@@ -216,6 +216,53 @@
         </div>
     <?php endif; ?>
 
+    <?php
+        $needsTermsAccept = session()->get('logged_in')
+            && (int) session()->get('group') === 0
+            && ! empty($user)
+            && function_exists('bingo_user_needs_terms_accept')
+            && bingo_user_needs_terms_accept($user);
+
+        $currentPath = '/' . trim(service('request')->getUri()->getPath(), '/');
+        if ($currentPath === '//') {
+            $currentPath = '/';
+        }
+        $onLegalReadPage = in_array($currentPath, ['/terminos', '/promociones'], true)
+            || str_starts_with($currentPath, '/terminos')
+            || str_starts_with($currentPath, '/promociones');
+    ?>
+
+    <?php if ($needsTermsAccept) : ?>
+        <div class="modal fade" id="modalAcceptTerms" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body p-4">
+                        <div class="text-center mb-3">
+                            <i class="fa-duotone fa-solid fa-scale-balanced" style="font-size:2.2rem; color:#6236ff;"></i>
+                            <h5 class="mt-2 mb-1" style="color:#3b1f9c; font-weight:800;"><?= translate('accept terms title'); ?></h5>
+                            <p class="mb-0 text-muted"><?= translate('accept terms help'); ?></p>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" value="1" id="modal_accept_terms">
+                            <label class="form-check-label" for="modal_accept_terms" style="color:#2d3748;">
+                                <?= translate('i accept the'); ?>
+                                <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('terms and conditions'); ?></a>
+                                <?= translate('and'); ?>
+                                <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('promotions'); ?></a>
+                            </label>
+                        </div>
+                        <small id="modal_accept_terms-error" class="text-danger d-none d-block mb-2"></small>
+
+                        <button type="button" class="btn btn-primary btn-bingo w-100" id="modal-accept-terms-btn">
+                            <i class="fa-duotone fa-solid fa-check"></i> <?= translate('accept terms button'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="modal fade" id="modalSharegame" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -1616,7 +1663,67 @@
             <?php endif; ?>
         <?php endif; ?>
 
-        <?php if (session()->get('logged_in') && $user['roulette'] == 0 && systemGet('activateRoulette') == 1) : ?>
+        <?php if (! empty($needsTermsAccept) && empty($onLegalReadPage)) : ?>
+            document.addEventListener("DOMContentLoaded", function () {
+                var modalEl = document.getElementById('modalAcceptTerms');
+                if (!modalEl || typeof bootstrap === 'undefined') {
+                    return;
+                }
+                var modal = new bootstrap.Modal(modalEl);
+                modal.show();
+
+                $('#modal-accept-terms-btn').on('click', function () {
+                    var btn = $(this);
+                    var original = btn.html();
+                    $('#modal_accept_terms-error').addClass('d-none').text('');
+
+                    if (!$('#modal_accept_terms').is(':checked')) {
+                        $('#modal_accept_terms-error')
+                            .text('<?= translate('you must accept the terms and conditions'); ?>')
+                            .removeClass('d-none');
+                        return;
+                    }
+
+                    btn.prop('disabled', true).html('<i class="fa-duotone fa-spinner-third fa-spin"></i>');
+                    $.ajax({
+                        url: '<?= site_url('legal/acceptTerms'); ?>',
+                        method: 'POST',
+                        dataType: 'json',
+                        data: {
+                            accept_terms: '1',
+                            <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+                        }
+                    }).done(function (response) {
+                        if (response.success) {
+                            modal.hide();
+                            Toastify({
+                                text: response.message,
+                                duration: 3000,
+                                gravity: 'top',
+                                position: 'right',
+                                style: { background: '#198754' },
+                                stopOnFocus: true
+                            }).showToast();
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 600);
+                        } else {
+                            $('#modal_accept_terms-error')
+                                .text(response.message || '<?= translate('error accepting terms'); ?>')
+                                .removeClass('d-none');
+                        }
+                    }).fail(function () {
+                        $('#modal_accept_terms-error')
+                            .text('<?= translate('there was an error in the request to the server'); ?>')
+                            .removeClass('d-none');
+                    }).always(function () {
+                        btn.prop('disabled', false).html(original);
+                    });
+                });
+            });
+        <?php endif; ?>
+
+        <?php if (session()->get('logged_in') && !empty($user) && ($user['roulette'] ?? 1) == 0 && systemGet('activateRoulette') == 1) : ?>
             <?php if (!empty($user['document']) && !empty($user['firstname']) && !empty($user['lastname']) && !empty($user['username']) && !empty($user['email']) && !empty($user['phone'])) : ?>
                 document.addEventListener("DOMContentLoaded", function () {
                     modalRoulette = 'modalactivateRoulette';

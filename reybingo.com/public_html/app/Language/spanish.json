@@ -1169,5 +1169,10 @@
     "last updated": "Última actualización",
     "i accept the": "Acepto los",
     "you must accept the terms and conditions": "Debe aceptar los términos y condiciones",
-    "player legal section help": "Consulta en cualquier momento los términos y las promociones vigentes."
+    "player legal section help": "Consulta en cualquier momento los términos y las promociones vigentes.",
+    "accept terms title": "Aceptar términos y condiciones",
+    "accept terms help": "Para continuar jugando debes aceptar los términos y las promociones vigentes.",
+    "accept terms button": "Aceptar y continuar",
+    "terms accepted successfully": "Términos aceptados correctamente",
+    "error accepting terms": "No se pudo registrar la aceptación de los términos"
 }

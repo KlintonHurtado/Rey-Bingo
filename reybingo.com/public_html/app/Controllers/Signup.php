@@ -607,6 +607,10 @@ class Signup extends Controller {
             'status' => 1,
             'autodial' => 1,
         ];
+
+        if ($this->request->getPost('accept_terms') === '1') {
+            $data['terms_accepted_at'] = date('Y-m-d H:i:s');
+        }
     
         $model->insert($data);
         

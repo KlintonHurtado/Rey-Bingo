@@ -1171,5 +1171,10 @@
     "last updated": "Last updated",
     "i accept the": "I accept the",
     "you must accept the terms and conditions": "You must accept the terms and conditions",
-    "player legal section help": "You can view the current terms and promotions at any time."
+    "player legal section help": "You can view the current terms and promotions at any time.",
+    "accept terms title": "Accept terms and conditions",
+    "accept terms help": "To keep playing you must accept the current terms and promotions.",
+    "accept terms button": "Accept and continue",
+    "terms accepted successfully": "Terms accepted successfully",
+    "error accepting terms": "Could not save terms acceptance"
 }

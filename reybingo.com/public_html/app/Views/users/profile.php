@@ -137,6 +137,23 @@
                                     <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('promotions'); ?>
                                 </a>
                             </div>
+                            <?php if (bingo_user_needs_terms_accept($user)) : ?>
+                                <div class="mt-3 text-start">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" value="1" id="profile_accept_terms">
+                                        <label class="form-check-label text-white" for="profile_accept_terms">
+                                            <?= translate('i accept the'); ?>
+                                            <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('terms and conditions'); ?></a>
+                                            <?= translate('and'); ?>
+                                            <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('promotions'); ?></a>
+                                        </label>
+                                    </div>
+                                    <small id="profile_accept_terms-error" class="text-danger d-none d-block mb-2"></small>
+                                    <button type="button" class="btn btn-success btn-bingo btn-sm w-100" id="profile-accept-terms-btn">
+                                        <i class="fa-duotone fa-solid fa-check"></i> <?= translate('accept terms button'); ?>
+                                    </button>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -261,6 +278,52 @@
                 complete: function() {
                     button.prop("disabled", false);
                 }
+            });
+        });
+
+        $('#profile-accept-terms-btn').on('click', function () {
+            var btn = $(this);
+            var original = btn.html();
+            $('#profile_accept_terms-error').addClass('d-none').text('');
+
+            if (!$('#profile_accept_terms').is(':checked')) {
+                $('#profile_accept_terms-error')
+                    .text('<?= translate('you must accept the terms and conditions'); ?>')
+                    .removeClass('d-none');
+                return;
+            }
+
+            btn.prop('disabled', true).html('<i class="fa-duotone fa-spinner-third fa-spin"></i>');
+            $.ajax({
+                url: '<?= site_url('legal/acceptTerms'); ?>',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    accept_terms: '1',
+                    <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+                }
+            }).done(function (response) {
+                if (response.success) {
+                    Toastify({
+                        text: response.message,
+                        duration: 3000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#198754' },
+                        stopOnFocus: true
+                    }).showToast();
+                    setTimeout(function () { window.location.reload(); }, 600);
+                } else {
+                    $('#profile_accept_terms-error')
+                        .text(response.message || '<?= translate('error accepting terms'); ?>')
+                        .removeClass('d-none');
+                }
+            }).fail(function () {
+                $('#profile_accept_terms-error')
+                    .text('<?= translate('there was an error in the request to the server'); ?>')
+                    .removeClass('d-none');
+            }).always(function () {
+                btn.prop('disabled', false).html(original);
             });
         });
     });

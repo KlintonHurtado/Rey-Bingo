@@ -129,6 +129,36 @@ class Legal extends Controller
         }
     }
 
+    public function acceptTerms()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 0) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access'),
+            ]);
+        }
+
+        if ($this->request->getPost('accept_terms') !== '1') {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('you must accept the terms and conditions'),
+            ]);
+        }
+
+        $userId = (int) session()->get('id');
+        if (! bingo_mark_terms_accepted($userId)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('error accepting terms'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('terms accepted successfully'),
+        ]);
+    }
+
     private function renderPublicPage(string $title, string $html, string $active): string
     {
         if (function_exists('bingo_ensure_system_settings_schema')) {

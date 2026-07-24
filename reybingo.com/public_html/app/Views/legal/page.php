@@ -116,6 +116,73 @@
             <div class="legal-page__body">
                 <?= $html; ?>
             </div>
+
+            <?php if (session()->get('logged_in') && (int) session()->get('group') === 0 && bingo_user_needs_terms_accept($user ?? null)) : ?>
+                <div class="mt-4 p-3" style="background: rgba(98,54,255,0.08); border-radius: 14px;">
+                    <h6 style="color:#3b1f9c; font-weight:800;"><?= translate('accept terms title'); ?></h6>
+                    <p class="small text-muted mb-2"><?= translate('accept terms help'); ?></p>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="legal_page_accept_terms">
+                        <label class="form-check-label" for="legal_page_accept_terms" style="color:#2d3748;">
+                            <?= translate('i accept the'); ?>
+                            <a href="<?= site_url('terminos'); ?>"><?= translate('terms and conditions'); ?></a>
+                            <?= translate('and'); ?>
+                            <a href="<?= site_url('promociones'); ?>"><?= translate('promotions'); ?></a>
+                        </label>
+                    </div>
+                    <small id="legal_page_accept_terms-error" class="text-danger d-none d-block mb-2"></small>
+                    <button type="button" class="btn btn-primary btn-bingo" id="legal-page-accept-terms-btn">
+                        <i class="fa-duotone fa-solid fa-check"></i> <?= translate('accept terms button'); ?>
+                    </button>
+                </div>
+                <script>
+                (function () {
+                    $('#legal-page-accept-terms-btn').on('click', function () {
+                        var btn = $(this);
+                        var original = btn.html();
+                        $('#legal_page_accept_terms-error').addClass('d-none').text('');
+                        if (!$('#legal_page_accept_terms').is(':checked')) {
+                            $('#legal_page_accept_terms-error')
+                                .text('<?= translate('you must accept the terms and conditions'); ?>')
+                                .removeClass('d-none');
+                            return;
+                        }
+                        btn.prop('disabled', true).html('<i class="fa-duotone fa-spinner-third fa-spin"></i>');
+                        $.ajax({
+                            url: '<?= site_url('legal/acceptTerms'); ?>',
+                            method: 'POST',
+                            dataType: 'json',
+                            data: {
+                                accept_terms: '1',
+                                <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+                            }
+                        }).done(function (response) {
+                            if (response.success) {
+                                Toastify({
+                                    text: response.message,
+                                    duration: 3000,
+                                    gravity: 'top',
+                                    position: 'right',
+                                    style: { background: '#198754' },
+                                    stopOnFocus: true
+                                }).showToast();
+                                setTimeout(function () { window.location.href = '<?= site_url('play'); ?>'; }, 700);
+                            } else {
+                                $('#legal_page_accept_terms-error')
+                                    .text(response.message || '<?= translate('error accepting terms'); ?>')
+                                    .removeClass('d-none');
+                            }
+                        }).fail(function () {
+                            $('#legal_page_accept_terms-error')
+                                .text('<?= translate('there was an error in the request to the server'); ?>')
+                                .removeClass('d-none');
+                        }).always(function () {
+                            btn.prop('disabled', false).html(original);
+                        });
+                    });
+                })();
+                </script>
+            <?php endif; ?>
         </div>
     </div>
 </div>
