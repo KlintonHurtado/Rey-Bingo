@@ -177,9 +177,9 @@
                                 <label class="form-label small"><?= translate('transaction type'); ?></label>
                                 <select class="form-control form-control-lg form-bingo" id="type" name="type">
                                     <option value="all" <?= ($filters['type'] ?? 'all') == 'all' ? 'selected' : ''; ?>><?= translate('all types'); ?></option>
-                                    <option value="deposit" <?= ($filters['type'] ?? '') == 'deposit' ? 'selected' : ''; ?>><?= translate('deposit'); ?></option>
+                                    <option value="deposit" <?= ($filters['type'] ?? '') == 'deposit' ? 'selected' : ''; ?>><?= translate('deposit'); ?> / <?= translate('transfer'); ?></option>
                                     <option value="retire" <?= ($filters['type'] ?? '') == 'retire' ? 'selected' : ''; ?>><?= translate('retire'); ?></option>
-                                    <option value="transfer" <?= ($filters['type'] ?? '') == 'transfer' ? 'selected' : ''; ?>><?= translate('transfer'); ?></option>
+                                    <option value="transfer" <?= ($filters['type'] ?? '') == 'transfer' ? 'selected' : ''; ?>><?= translate('transfer between players'); ?></option>
                                     <option value="payment" <?= ($filters['type'] ?? '') == 'payment' ? 'selected' : ''; ?>><?= translate('award'); ?></option>
                                 </select>
                             </div>

@@ -363,6 +363,14 @@ class Payments extends Controller {
                     $typeTra = translate('deposit');
                 }
 
+                // Usar created_at para ordenar: date solo es Y-m-d (00:00) y queda bajo abonos/premios del mismo día.
+                $depositSortDate = $deposit['created_at'] ?? null;
+                if (empty($depositSortDate) || $depositSortDate === '0000-00-00 00:00:00') {
+                    $depositSortDate = ! empty($deposit['date'])
+                        ? $deposit['date'] . ' 12:00:00'
+                        : date('Y-m-d H:i:s');
+                }
+
                 $transaction = [
                     'id' => $deposit['id'],
                     'type' => 'deposit',
@@ -377,12 +385,12 @@ class Payments extends Controller {
                             : $this->formatBankInfo('deposit', $user, $deposit['bank'])),
                     'reference' => $deposit['reference'],
                     'amount' => $deposit['amount'],
-                    'date' => $deposit['date'],
-                    'date_formatted' => date('d/m/Y', strtotime($deposit['date'])),
+                    'date' => $depositSortDate,
+                    'date_formatted' => date('d/m/Y', strtotime($deposit['date'] ?: $depositSortDate)),
                     'status' => $deposit['status'],
                     'status_raw' => $deposit['status'],
                     'status_formatted' => $this->formatStatusDeposit($deposit['status']),
-                    'created_at' => date('d/m/Y', strtotime($deposit['created_at'])) ?? $deposit['date'],
+                    'created_at' => date('d/m/Y', strtotime($depositSortDate)),
                     'store_name' => $storeUser ? bingo_store_display_name($storeUser) : '',
                 ];
                 $allTransactions[] = $transaction;
@@ -448,9 +456,18 @@ class Payments extends Controller {
                 $allTransactions[] = $transaction;
             }
 
-            // Ordenar por fecha descendente
+            // Ordenar: pendientes de depósito/retiro primero (admin), luego por fecha desc
             usort($allTransactions, function ($a, $b) {
-                return strtotime($b['date']) - strtotime($a['date']);
+                $isAdmin = (int) session()->get('group') === 1;
+                if ($isAdmin) {
+                    $pendingA = in_array($a['type'] ?? '', ['deposit', 'retire'], true) && (int) ($a['status_raw'] ?? 0) === 1 ? 1 : 0;
+                    $pendingB = in_array($b['type'] ?? '', ['deposit', 'retire'], true) && (int) ($b['status_raw'] ?? 0) === 1 ? 1 : 0;
+                    if ($pendingA !== $pendingB) {
+                        return $pendingB - $pendingA;
+                    }
+                }
+
+                return strtotime((string) ($b['date'] ?? '')) - strtotime((string) ($a['date'] ?? ''));
             });
 
         } catch (\Exception $e) {
@@ -1143,8 +1160,16 @@ class Payments extends Controller {
             }
         }
 
-        $modelDeposits->insert($data);
-        $depositId = $modelDeposits->insertID();
+        $inserted = $modelDeposits->insert($data);
+        $depositId = $inserted ? (int) $modelDeposits->insertID() : 0;
+
+        if (! $depositId) {
+            log_message('error', 'depositSubmit insert failed: ' . json_encode($modelDeposits->errors()));
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('error saving payment'),
+            ]);
+        }
 
         $user = $modelUsers->find($depositUserId);
         $currentUserId = session()->get('id');
@@ -1154,70 +1179,67 @@ class Payments extends Controller {
         $creator = $modelUsers->find($currentUserId);
         $creatorName = $creator ? trim($creator['firstname'] . ' ' . $creator['lastname']) : translate('user');
 
-        foreach ($admins as $admin) {
-            $notificationData = [
-                'user' => $admin['id'],
-                'from' => $currentUserId,
-                'type' => 'deposit',
-                'type_id' => $depositId,
-                'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
-                'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha registrado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
-            ];
-
-            $modelNotifications->insert($notificationData);
-        }
-
-        if ((int) $depositUserId !== (int) $currentUserId) {
-            $notificationData = [
-                'user' => $depositUserId,
-                'from' => $currentUserId,
-                'type' => 'deposit',
-                'type_id' => $depositId,
-                'title' => '📥 DEPÓSITO EN REVISIÓN',
-                'message' => $creatorName . ' registró un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . '. Está pendiente de verificación; el saldo se acreditará cuando sea aprobado.',
-            ];
-
-            $modelNotifications->insert($notificationData);
-        } elseif (! $isAdmin) {
-            $notificationData = [
-                'user' => $depositUserId,
-                'from' => $currentUserId,
-                'type' => 'deposit',
-                'type_id' => $depositId,
-                'title' => '📥 DEPÓSITO EN REVISIÓN',
-                'message' => 'Su solicitud de depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' fue recibida y está pendiente de verificación.',
-            ];
-
-            $modelNotifications->insert($notificationData);
-        }
-
-        if ($depositId) {
-            $response = [
-                'success' => true,
-                'newRecharge' => [
-                    'id' => $depositId,
+        try {
+            foreach ($admins as $admin) {
+                $notificationData = [
+                    'user' => $admin['id'],
+                    'from' => $currentUserId,
                     'type' => 'deposit',
-                    'type_Tra' => translate('deposit'),
-                    'user_id' => $data['user'],
-                    'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
-                    'user_code' => $user ? $user['code'] : 'N/A',
-                    'bank' => $this->formatBankInfo('deposit', $user, $data['bank']),
-                    'reference' => $data['reference'],
-                    'amount' => $data['amount'],
-                    'date' => $data['date'],
-                    'date_formatted' => date('d/m/Y', strtotime($data['date'])),
-                    'status' => $data['status'],
-                    'status_raw' => $data['status'],
-                    'status_formatted' => $this->formatStatusDeposit($data['status']),
-                    'created_at' => date('d/m/Y')
-                ]
-            ];
-        } else {
-            $response = [
-                'success' => false,
-                'error' => translate('error saving payment')
-            ];
+                    'type_id' => $depositId,
+                    'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
+                    'message' => ($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '') . ' ha registrado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
+                ];
+
+                $modelNotifications->insert($notificationData);
+            }
+
+            if ((int) $depositUserId !== (int) $currentUserId) {
+                $notificationData = [
+                    'user' => $depositUserId,
+                    'from' => $currentUserId,
+                    'type' => 'deposit',
+                    'type_id' => $depositId,
+                    'title' => '📥 DEPÓSITO EN REVISIÓN',
+                    'message' => $creatorName . ' registró un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . '. Está pendiente de verificación; el saldo se acreditará cuando sea aprobado.',
+                ];
+
+                $modelNotifications->insert($notificationData);
+            } elseif (! $isAdmin) {
+                $notificationData = [
+                    'user' => $depositUserId,
+                    'from' => $currentUserId,
+                    'type' => 'deposit',
+                    'type_id' => $depositId,
+                    'title' => '📥 DEPÓSITO EN REVISIÓN',
+                    'message' => 'Su solicitud de depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' fue recibida y está pendiente de verificación.',
+                ];
+
+                $modelNotifications->insert($notificationData);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'depositSubmit notification failed: ' . $e->getMessage());
         }
+
+        $response = [
+            'success' => true,
+            'newRecharge' => [
+                'id' => $depositId,
+                'type' => 'deposit',
+                'type_Tra' => translate('deposit'),
+                'user_id' => $data['user'],
+                'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                'user_code' => $user ? $user['code'] : 'N/A',
+                'bank' => $this->formatBankInfo('deposit', $user, $data['bank']),
+                'reference' => $data['reference'],
+                'amount' => $data['amount'],
+                'date' => date('Y-m-d H:i:s'),
+                'date_formatted' => date('d/m/Y', strtotime($data['date'])),
+                'status' => $data['status'],
+                'status_raw' => $data['status'],
+                'status_formatted' => $this->formatStatusDeposit($data['status']),
+                'created_at' => date('d/m/Y')
+            ]
+        ];
         
         return $this->response->setJSON($response);
     }

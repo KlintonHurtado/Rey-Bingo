@@ -264,12 +264,35 @@ function resolveModalEl(target) {
     if (!target) return null;
     if (typeof target === 'string') return document.querySelector(target);
     if (target.jquery) return target[0];
-    return target;
+    return target.nodeType ? target : null;
+}
+
+function disposeBsModal(target) {
+    const el = resolveModalEl(target);
+    if (!el || typeof bootstrap === 'undefined') return;
+    const instance = bootstrap.Modal.getInstance(el);
+    if (instance) {
+        try {
+            instance.dispose();
+        } catch (e) {
+            // ignore stale instances
+        }
+    }
 }
 
 function showBsModal(target) {
     const el = resolveModalEl(target);
     if (!el || typeof bootstrap === 'undefined') return null;
+
+    // Tras .load(), el .modal-dialog cambia; la instancia vieja deja _dialog en null/detached
+    // y Bootstrap hace querySelector.call(null) → Illegal invocation.
+    disposeBsModal(el);
+
+    if (!el.querySelector('.modal-dialog')) {
+        console.warn('Modal sin .modal-dialog:', el.id || el);
+        return null;
+    }
+
     return bootstrap.Modal.getOrCreateInstance(el).show();
 }
 
@@ -280,8 +303,54 @@ function hideBsModal(target) {
     if (instance) instance.hide();
 }
 
+window.resolveModalEl = resolveModalEl;
+window.disposeBsModal = disposeBsModal;
 window.showBsModal = showBsModal;
 window.hideBsModal = hideBsModal;
+
+// Compatibilidad jQuery: $('#modal').modal('show'|'hide') usa la ruta segura.
+(function patchJqueryBootstrapModal() {
+    if (typeof jQuery === 'undefined' || typeof bootstrap === 'undefined') {
+        return;
+    }
+
+    jQuery.fn.modal = function (action) {
+        return this.each(function () {
+            if (action === 'hide') {
+                hideBsModal(this);
+                return;
+            }
+            if (action === 'dispose') {
+                disposeBsModal(this);
+                return;
+            }
+            if (action === 'toggle') {
+                const instance = bootstrap.Modal.getInstance(this);
+                if (instance && instance._isShown) {
+                    hideBsModal(this);
+                } else {
+                    showBsModal(this);
+                }
+                return;
+            }
+            // 'show' o llamada sin args / con objeto de opciones
+            showBsModal(this);
+        });
+    };
+})();
+
+function loadAndShowModal(selector, url) {
+    disposeBsModal(selector);
+    jQuery(selector).load(url, function (response, status) {
+        if (status === 'error') {
+            console.error('No se pudo cargar el modal:', url);
+            return;
+        }
+        showBsModal(selector);
+    });
+}
+
+window.loadAndShowModal = loadAndShowModal;
 
 function modalitiesGet() {
     showBsModal('#modalModalities');
@@ -293,9 +362,7 @@ function boardGet() {
 
 function generateCartonsGet(game) {
     if(game != '') {
-        $("#modalAvailableCartons").load(site_url + 'playings/generateCartonsGet/' + game, function() {
-            showBsModal('#modalAvailableCartons');
-        });
+        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/generateCartonsGet/' + game);
     } else {
         Toastify({
             text: 'Debe seleccionar una sala.',
@@ -310,9 +377,7 @@ function generateCartonsGet(game) {
 
 function availableCartonsRoomGet(game) {
     if(game != '') {
-        $("#modalAvailableCartons").load(site_url + 'playings/availableCartonsGet/' + game, function() {
-            showBsModal('#modalAvailableCartons');
-        });
+        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/availableCartonsGet/' + game);
     } else {
         Toastify({
             text: 'Debe seleccionar una sala.',
@@ -525,6 +590,7 @@ window.availableWallet = availableWallet;
 window.refreshWalletFromServer = refreshWalletFromServer;
 
 function paymentsGet() {
+    disposeBsModal('#modalPayments');
     $("#modalPayments").load(site_url + 'payments/paymentsGet', function(response, status) {
         if (status === 'error') {
             console.error('No se pudo cargar la billetera (payments/paymentsGet)');
@@ -536,48 +602,35 @@ function paymentsGet() {
 }
 
 function requestGet(type, id) {
-    $("#modalRequest").load(site_url + 'payments/requestGet/' + type + '/' + id, function() {
-        showBsModal('#modalRequest');
-    });
+    loadAndShowModal('#modalRequest', site_url + 'payments/requestGet/' + type + '/' + id);
 }
 
 function modalVoucher(id) {
-    $("#modalVoucher").load(site_url + 'payments/modalVoucher/' + id, function() {
-        showBsModal('#modalVoucher');
-    });
+    loadAndShowModal('#modalVoucher', site_url + 'payments/modalVoucher/' + id);
 }
 
 function depositGet() {
-    $("#modalDeposit").load(site_url + 'payments/depositGet', function() {
-        showBsModal('#modalDeposit');
-    });
+    loadAndShowModal('#modalDeposit', site_url + 'payments/depositGet');
 }
 
 function retireGet() {
-    $("#modalRetire").load(site_url + 'payments/retireGet', function() {
-        showBsModal('#modalRetire');
-    });
+    loadAndShowModal('#modalRetire', site_url + 'payments/retireGet');
 }
 
 function transferGet() {
-    $("#modalTransfer").load(site_url + 'payments/transferGet', function() {
-        showBsModal('#modalTransfer');
-    });
+    loadAndShowModal('#modalTransfer', site_url + 'payments/transferGet');
 }
 
 function settingswalletGet() {
-    $("#modalSettings").load(site_url + 'payments/settingswalletGet', function() {
-        showBsModal('#modalSettings');
-    });
+    loadAndShowModal('#modalSettings', site_url + 'payments/settingswalletGet');
 }
 
 function settingsGet() {
-    $("#modalSettings").load(site_url + 'home/settingsGet', function() {
-        showBsModal('#modalSettings');
-    });
+    loadAndShowModal('#modalSettings', site_url + 'home/settingsGet');
 }
 
 function bankGet() {
+    disposeBsModal('#modalBank');
     $("#modalBank").load(site_url + 'home/bankGet', function() {
         $('#bank-action').val('add');
         $('#bank-id').val('');
