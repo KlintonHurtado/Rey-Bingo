@@ -1268,42 +1268,52 @@ function setupEvents() {
         }
     });
 
-    // Toggle de mensajes mejorado
-    const toggleBtn = $id("toggle-messages-btn");
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", function(event) {
-            const messageContainer = $id("message-display-container");
-            if (messageContainer) {
-                const isVisible = messageContainer.style.display === "flex";
-                messageContainer.style.display = isVisible ? "none" : "flex";
-                
-                // Actualizar icono del botón si existe
-                const icon = toggleBtn.querySelector('i');
-                if (icon) {
-                    icon.className = isVisible ? 'fa fa-comments' : 'fa fa-times';
-                }
-            }
-            event.stopPropagation();
-        });
+    function setChatPanelOpen(open) {
+        const messageContainer = document.getElementById("message-display-container");
+        const toggleBtn = document.getElementById("toggle-messages-btn");
+        if (!messageContainer) {
+            return;
+        }
+        messageContainer.classList.toggle("is-open", open);
+        messageContainer.style.display = open ? "flex" : "none";
+        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("chat-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
     }
 
-    // Click fuera para cerrar mensajes
-    document.addEventListener("click", function(event) {
-        const messageContainer = $id("message-display-container");
-        const toggleButton = $id("toggle-messages-btn");
-        
-        if (messageContainer && toggleButton && 
-            messageContainer.style.display === "flex" && 
-            !messageContainer.contains(event.target) && 
-            !toggleButton.contains(event.target)) {
-            messageContainer.style.display = "none";
-            
-            // Actualizar icono del botón
-            const icon = toggleButton.querySelector('i');
-            if (icon) {
-                icon.className = 'fa fa-comments';
-            }
+    function isChatPanelOpen() {
+        const messageContainer = document.getElementById("message-display-container");
+        if (!messageContainer) {
+            return false;
         }
+        return messageContainer.classList.contains("is-open")
+            || messageContainer.style.display === "flex";
+    }
+
+    $(document).off("click.liveChatToggle", "#toggle-messages-btn")
+        .on("click.liveChatToggle", "#toggle-messages-btn", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(!isChatPanelOpen());
+        });
+
+    $(document).off("click.liveChatClose", "#message-display-close")
+        .on("click.liveChatClose", "#message-display-close", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(false);
+        });
+
+    $(document).off("click.liveChatOutside").on("click.liveChatOutside", function(event) {
+        if (!isChatPanelOpen()) {
+            return;
+        }
+        if ($(event.target).closest("#message-display-container, #toggle-messages-btn, #message-display-close").length) {
+            return;
+        }
+        setChatPanelOpen(false);
     });
 
     // Eventos para auto-scroll del chat
@@ -1712,6 +1722,11 @@ const resourceManager = new ResourceManager();
 
 // Función de inicialización principal
 function initializeApp() {
+    if (window.__liveAppInitialized) {
+        return;
+    }
+    window.__liveAppInitialized = true;
+
     console.log('Initializing Bingo App with Enhanced Chat...');
     
     // Ajustar configuración según el dispositivo
@@ -1756,8 +1771,12 @@ function initializeApp() {
 // EVENT LISTENERS PRINCIPALES
 // ==========================================
 
-// Inicialización cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initializeApp);
+// Inicialización cuando el DOM esté listo (o ya listo si el script carga tarde)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
 
 // Manejo de errores globales
 window.addEventListener('error', (event) => {

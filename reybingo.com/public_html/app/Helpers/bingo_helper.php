@@ -1914,10 +1914,151 @@ if (!function_exists('bingo_ensure_games_schema')) {
 }
 
 if (!function_exists('bingo_roulette_carton_price')) {
-    /** Precio de cartón requerido para usar premios de ruleta. */
+    /** Precio de referencia histórico (salas clásicas de ruleta). */
     function bingo_roulette_carton_price(): float
     {
         return 0.25;
+    }
+}
+
+if (!function_exists('bingo_roulette_max_carton_price')) {
+    /** Precio máximo del cartón para permitir cartones de ruleta. */
+    function bingo_roulette_max_carton_price(): float
+    {
+        return 0.50;
+    }
+}
+
+if (!function_exists('bingo_price_allows_roulette_cartons')) {
+    function bingo_price_allows_roulette_cartons(float $price): bool
+    {
+        return $price > 0 && $price <= (bingo_roulette_max_carton_price() + 0.001);
+    }
+}
+
+if (!function_exists('bingo_roulette_default_prizes')) {
+    /**
+     * Premios por defecto (8 segmentos: 6 con cartones + 2 sin premio).
+     *
+     * @return list<array{label:string,cartons:int}>
+     */
+    function bingo_roulette_default_prizes(): array
+    {
+        return [
+            ['label' => '1 CARTÓN', 'cartons' => 1],
+            ['label' => '2 CARTONES', 'cartons' => 2],
+            ['label' => '3 CARTONES', 'cartons' => 3],
+            ['label' => '4 CARTONES', 'cartons' => 4],
+            ['label' => '5 CARTONES', 'cartons' => 5],
+            ['label' => '10 CARTONES', 'cartons' => 10],
+            ['label' => 'INTENTA DE NUEVO', 'cartons' => 0],
+            ['label' => 'SUERTE LA PRÓXIMA VEZ', 'cartons' => 0],
+        ];
+    }
+}
+
+if (!function_exists('bingo_normalize_roulette_prizes')) {
+    /**
+     * Normaliza y valida premios de ruleta (mín. 4, máx. 8).
+     *
+     * @param mixed $input
+     * @return array{ok:bool,prizes:list<array{label:string,cartons:int}>,error:string}
+     */
+    function bingo_normalize_roulette_prizes($input): array
+    {
+        $rows = [];
+
+        if (is_string($input)) {
+            $decoded = json_decode($input, true);
+            $input = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($input)) {
+            return ['ok' => false, 'prizes' => [], 'error' => 'invalid'];
+        }
+
+        foreach ($input as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $label = trim((string) ($item['label'] ?? ''));
+            $cartons = (int) ($item['cartons'] ?? 0);
+            if ($label === '') {
+                continue;
+            }
+            if ($cartons < 0) {
+                $cartons = 0;
+            }
+            if ($cartons > 100) {
+                $cartons = 100;
+            }
+            $rows[] = [
+                'label' => mb_substr($label, 0, 40),
+                'cartons' => $cartons,
+            ];
+        }
+
+        $count = count($rows);
+        if ($count < 4) {
+            return ['ok' => false, 'prizes' => [], 'error' => 'min'];
+        }
+        if ($count > 8) {
+            $rows = array_slice($rows, 0, 8);
+        }
+
+        // Debe haber al menos un premio con cartones > 0
+        $hasWin = false;
+        foreach ($rows as $row) {
+            if ($row['cartons'] > 0) {
+                $hasWin = true;
+                break;
+            }
+        }
+        if (! $hasWin) {
+            return ['ok' => false, 'prizes' => [], 'error' => 'nowin'];
+        }
+
+        return ['ok' => true, 'prizes' => array_values($rows), 'error' => ''];
+    }
+}
+
+if (!function_exists('bingo_roulette_prizes')) {
+    /**
+     * Premios activos de la ruleta (4–8).
+     *
+     * @return list<array{label:string,cartons:int}>
+     */
+    function bingo_roulette_prizes(): array
+    {
+        $raw = systemGet('roulettePrizes');
+        if ($raw) {
+            $normalized = bingo_normalize_roulette_prizes($raw);
+            if ($normalized['ok']) {
+                return $normalized['prizes'];
+            }
+        }
+
+        return bingo_roulette_default_prizes();
+    }
+}
+
+if (!function_exists('bingo_roulette_allowed_carton_amounts')) {
+    /**
+     * Cantidades de cartones que se pueden reclamar (sin ceros).
+     *
+     * @return list<int>
+     */
+    function bingo_roulette_allowed_carton_amounts(): array
+    {
+        $amounts = [];
+        foreach (bingo_roulette_prizes() as $prize) {
+            $n = (int) ($prize['cartons'] ?? 0);
+            if ($n > 0) {
+                $amounts[$n] = $n;
+            }
+        }
+
+        return array_values($amounts);
     }
 }
 
@@ -1932,8 +2073,8 @@ if (!function_exists('bingo_game_allows_roulette_cartons')) {
             return false;
         }
 
-        // Solo salas con cartones a 0.25
-        return abs((float) ($game['price'] ?? 0) - bingo_roulette_carton_price()) < 0.001;
+        // Solo salas con precio de cartón hasta 0.50
+        return bingo_price_allows_roulette_cartons((float) ($game['price'] ?? 0));
     }
 }
 

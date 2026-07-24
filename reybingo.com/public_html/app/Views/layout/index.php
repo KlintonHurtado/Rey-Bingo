@@ -1648,10 +1648,9 @@
             }
         }
 
-        const prizes = [
-            "1 CARTÓN", "2 CARTONES", "3 CARTONES", "4 CARTONES", "5 CARTONES", "10 CARTONES",
-            "INTENTA DE NUEVO", "SUERTE LA PRÓXIMA VEZ"
-        ];
+        const roulettePrizes = <?= json_encode(bingo_roulette_prizes(), JSON_UNESCAPED_UNICODE); ?>;
+        const prizes = roulettePrizes.map(function (p) { return p.label; });
+        const prizeCartons = roulettePrizes.map(function (p) { return parseInt(p.cartons, 10) || 0; });
 
         const wheel = document.getElementById("wheel");
         const ctx = wheel.getContext("2d");
@@ -1661,7 +1660,8 @@
 
         const rouletteModalEl = document.getElementById('modalactivateRoulette');
 
-        const totalSegments = 30;
+        // Un segmento por premio configurado (4–8)
+        const totalSegments = Math.max(4, Math.min(8, prizes.length || 4));
         const segmentAngle = (2 * Math.PI) / totalSegments;
 
         let angles = [];
@@ -1670,17 +1670,8 @@
 
         function generateSegments() {
             segments = [];
-            let iphoneIncluded = false;
             for (let i = 0; i < totalSegments; i++) {
-                if (!iphoneIncluded && Math.random() < 0.05) {
-                    segments.push("10 CARTONES");
-                    iphoneIncluded = true;
-                } else {
-                    segments.push(prizes[Math.floor(Math.random() * prizes.length)]);
-                }
-            }
-            if (!iphoneIncluded) {
-                segments[Math.floor(Math.random() * totalSegments)] = "10 CARTONES";
+                segments.push(prizes[i] || prizes[i % prizes.length] || 'PREMIO');
             }
         }
 
@@ -1701,6 +1692,7 @@
             const centerX = wheel.width / 2;
             const centerY = wheel.height / 2;
             const radius = wheel.width / 2;
+            const fontSize = totalSegments <= 5 ? 14 : (totalSegments <= 6 ? 13 : 12);
 
             for (let i = 0; i < totalSegments; i++) {
                 const startAngle = angles[i] + rotation;
@@ -1718,7 +1710,7 @@
                 ctx.rotate(startAngle + segmentAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "black";
-                ctx.font = "bold 12px sans-serif";
+                ctx.font = "bold " + fontSize + "px sans-serif";
                 ctx.fillText(segments[i], radius - 10, 5);
                 ctx.restore();
             }
@@ -1752,40 +1744,19 @@
                     let index = Math.floor(angleAtPointer / segmentAngle) % totalSegments;
 
                     const selectedPrize = segments[index];
+                    const cartons = prizeCartons[index] || 0;
 
-                    if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
+                    if (cartons > 0) {
                         result.textContent = `🎉 TU PREMIO: ${selectedPrize} 🎉`;
-                    } else {
-                        result.textContent = `${selectedPrize}`;
-                    }
-
-                    if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
                         AppcreateConfetti();
                         spinBtn.style.display = "none";
                         claimBtn.style.display = "inline-block";
                         claimBtn.style.width = "220px";
                         claimBtn.disabled = false;
                         claimBtn.textContent = 'RECLAMAR PREMIO';
-
-                        // ✅ Extraer número de cartones (singular y plural)
-                        let cartons = 0;
-                        
-                        // Buscar patrón "X CARTONES" (plural)
-                        let match = selectedPrize.match(/^(\d+)\s+CARTONES$/);
-                        if (match) {
-                            cartons = parseInt(match[1]);
-                        } else {
-                            // Buscar patrón "1 CARTÓN" (singular)
-                            match = selectedPrize.match(/^(\d+)\s+CARTÓN$/);
-                            if (match) {
-                                cartons = parseInt(match[1]);
-                            }
-                        }
-                        
                         claimBtn.dataset.cartons = cartons;
-                        console.log('Cartones asignados:', cartons, 'Premio:', selectedPrize); // ✅ Debug
-                        
                     } else {
+                        result.textContent = `${selectedPrize}`;
                         claimBtn.style.display = "none";
                         spinBtn.disabled = false;
                     }

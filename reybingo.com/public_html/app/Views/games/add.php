@@ -107,14 +107,14 @@
                             <small id="reset-error" class="text-danger d-none"></small>
                         </div>
 
-                        <div class="col-md-12 mb-2">
+                        <div class="col-md-12 mb-2" id="allow-roulette-cartons-wrap">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" name="allow_roulette_cartons" id="allow_roulette_cartons" value="1" checked style="cursor: pointer; transform: scale(1.2); margin-top: 0.25rem;">
                                 <label class="form-check-label ms-2" for="allow_roulette_cartons" style="cursor: pointer;">
                                     <?= translate('allow roulette cartons'); ?>
                                 </label>
                             </div>
-                            <small class="text-muted d-block mt-1"><?= translate('allow roulette cartons help'); ?></small>
+                            <small class="text-muted d-block mt-1" id="allow-roulette-cartons-help"><?= translate('allow roulette cartons help'); ?></small>
                         </div>
 
                         <div class="col-md-12 mb-1" id="type-url" style="display: none;">
@@ -485,9 +485,42 @@
             } else {
                 $(this).val('0.00');
             }
+            if (this.id === 'price') {
+                syncRouletteCartonsToggle();
+            }
         });
 
+        $(document).on('input change', '#price', function () {
+            syncRouletteCartonsToggle();
+        });
+
+        function parseGamePrice() {
+            var raw = String($('#price').val() || '0').replace(/,/g, '.').trim();
+            var parsed = parseFloat(raw);
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
+
+        function syncRouletteCartonsToggle() {
+            var price = parseGamePrice();
+            var maxPrice = <?= json_encode(bingo_roulette_max_carton_price()); ?>;
+            var $wrap = $('#allow-roulette-cartons-wrap');
+            var $chk = $('#allow_roulette_cartons');
+
+            // Siempre visible
+            $wrap.show();
+
+            if (price > maxPrice) {
+                $chk.prop('checked', false);
+                $chk.prop('disabled', true);
+                $('#allow-roulette-cartons-help').text('<?= translate('allow roulette cartons disabled over max'); ?>');
+            } else {
+                $chk.prop('disabled', false);
+                $('#allow-roulette-cartons-help').text('<?= translate('allow roulette cartons help'); ?>');
+            }
+        }
+
         typeGame();
+        syncRouletteCartonsToggle();
 
         <?php if (isset($isUpdate) && $isUpdate && $gameData): ?>
             $('#game-id').val('<?= $gameData['id'] ?>');
@@ -509,6 +542,7 @@
             $('#add-button').text('<?= translate('update'); ?>');
 
             typeGame();
+            syncRouletteCartonsToggle();
 
             const awardsExisting = <?= json_encode($awards ?? []) ?>;
             if (awardsExisting && awardsExisting.length) {

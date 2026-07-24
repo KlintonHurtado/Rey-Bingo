@@ -1493,55 +1493,82 @@ function setupEvents() {
         }
     });
 
-    function setChatPanelOpen(open) {
-        const messageContainer = $id("message-display-container");
-        const toggleBtn = $id("toggle-messages-btn");
-        if (!messageContainer) {
+    function setModalitiesPanelOpen(open) {
+        const panel = document.getElementById("playing-modalities-panel");
+        const toggleBtn = document.getElementById("toggle-modalities-btn");
+        if (!panel) {
             return;
         }
-        messageContainer.style.display = open ? "flex" : "none";
-        messageContainer.classList.toggle("is-open", open);
-        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
-        document.body.classList.toggle("chat-panel-open", open);
+        panel.classList.toggle("is-open", open);
+        panel.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("modalities-panel-open", open);
         if (toggleBtn) {
             toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
         }
     }
 
-    function isChatPanelOpen() {
-        const messageContainer = $id("message-display-container");
-        return messageContainer && messageContainer.style.display === "flex";
+    function isModalitiesPanelOpen() {
+        const panel = document.getElementById("playing-modalities-panel");
+        return !!(panel && panel.classList.contains("is-open"));
     }
 
-    const toggleBtn = $id("toggle-messages-btn");
-    if (toggleBtn) {
-        toggleBtn.addEventListener("click", function(event) {
-            setChatPanelOpen(!isChatPanelOpen());
-            event.stopPropagation();
-        });
-    }
-
-    const closeChatBtn = $id("message-display-close");
-    if (closeChatBtn) {
-        closeChatBtn.addEventListener("click", function(event) {
-            setChatPanelOpen(false);
-            event.stopPropagation();
-        });
-    }
-
-    document.addEventListener("click", function(event) {
-        const messageContainer = $id("message-display-container");
-        const toggleButton = $id("toggle-messages-btn");
-        const closeButton = $id("message-display-close");
-
-        if (messageContainer && toggleButton &&
-            isChatPanelOpen() &&
-            !messageContainer.contains(event.target) &&
-            !toggleButton.contains(event.target) &&
-            !(closeButton && closeButton.contains(event.target))) {
-            setChatPanelOpen(false);
+    function setChatPanelOpen(open) {
+        const messageContainer = document.getElementById("message-display-container");
+        const toggleBtn = document.getElementById("toggle-messages-btn");
+        if (!messageContainer) {
+            return;
         }
+        // Clase is-open = fuente de verdad (CSS con !important en board.php)
+        messageContainer.classList.toggle("is-open", open);
+        messageContainer.style.display = open ? "flex" : "none";
+        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("chat-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        if (open && isModalitiesPanelOpen()) {
+            setModalitiesPanelOpen(false);
+        }
+    }
+
+    function isChatPanelOpen() {
+        const messageContainer = document.getElementById("message-display-container");
+        if (!messageContainer) {
+            return false;
+        }
+        return messageContainer.classList.contains("is-open")
+            || messageContainer.style.display === "flex";
+    }
+
+    // Delegación: funciona aunque el botón se re-renderice o el init se atrase
+    $(document).off("click.boardChatToggle", "#toggle-messages-btn")
+        .on("click.boardChatToggle", "#toggle-messages-btn", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(!isChatPanelOpen());
+        });
+
+    $(document).off("click.boardChatClose", "#message-display-close")
+        .on("click.boardChatClose", "#message-display-close", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(false);
+        });
+
+    $(document).off("click.boardChatOutside").on("click.boardChatOutside", function(event) {
+        if (!isChatPanelOpen()) {
+            return;
+        }
+        const target = event.target;
+        if ($(target).closest("#message-display-container, #toggle-messages-btn, #message-display-close").length) {
+            return;
+        }
+        setChatPanelOpen(false);
     });
+
+    // Exponer para el script inline de modalidades en board.php
+    window.__boardSetChatPanelOpen = setChatPanelOpen;
+    window.__boardIsChatPanelOpen = isChatPanelOpen;
 
     // Eventos para auto-scroll del chat
     const messageDisplay = $id("message-display");
@@ -1971,6 +1998,11 @@ const resourceManager = new ResourceManager();
 
 // Función de inicialización principal
 function initializeApp() {
+    if (window.__boardAppInitialized) {
+        return;
+    }
+    window.__boardAppInitialized = true;
+
     console.log('Initializing Bingo App with Enhanced Chat...');
     
     // Ajustar configuración según el dispositivo
@@ -2012,10 +2044,13 @@ function initializeApp() {
         reconcileBallDisplay(numbersgenerated);
     }
     
-    // Iniciar último número si es necesario
+    // Iniciar último número si es necesario (respaldo si no hay Pusher / CRON)
     if (typeof timeBallLast !== 'undefined') {
         startAutomaticLast();
     }
+
+    // Tiempo real: escuchar bolas por Pusher (misma fuente que el jugador)
+    initBoardPusherRealtime();
     
     // Limpiar mensajes antiguos periódicamente
     intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
@@ -2023,12 +2058,95 @@ function initializeApp() {
     console.log('Bingo App with Enhanced Chat initialized successfully');
 }
 
+function initBoardPusherRealtime() {
+    try {
+        const key = window.PUSHER_KEY;
+        const cluster = window.PUSHER_CLUSTER || 'us2';
+        const gameId = window.GAME_ID;
+        if (!key || !gameId || typeof Pusher === 'undefined') {
+            console.warn('Board Pusher no disponible; se usa polling numberGet');
+            return;
+        }
+
+        // Evitar doble init
+        if (window.__boardPusherInitialized) {
+            return;
+        }
+        window.__boardPusherInitialized = true;
+
+        const authUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'pusher/auth';
+        const pusher = new Pusher(key, {
+            cluster: cluster,
+            forceTLS: true,
+            authEndpoint: authUrl,
+            auth: {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }
+        });
+
+        const channelName = 'private-game-' + gameId;
+        const channel = pusher.subscribe(channelName);
+
+        channel.bind('pusher:subscription_succeeded', function () {
+            console.log('✅ Admin board suscrito a', channelName);
+        });
+
+        channel.bind('pusher:subscription_error', function (err) {
+            console.warn('❌ Error suscripción Pusher admin board:', err);
+        });
+
+        channel.bind('game:number_drawn', function (data) {
+            const number = data.number || data.n;
+            const drawn = data.drawnNumbers || data.drawn || null;
+            const total = data.totalNumbersGenerated !== undefined
+                ? data.totalNumbersGenerated
+                : (Array.isArray(drawn) ? drawn.length : undefined);
+
+            if (Array.isArray(drawn) && drawn.length) {
+                syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, {
+                    showCenterAnimation: true
+                });
+            } else if (number) {
+                handleNewNumber(number, total, drawn);
+            }
+
+            if (!gameStarted) {
+                gameStarted = true;
+                startTime = new Date();
+                updateGameTimer();
+                if (!gameTimerInterval) {
+                    gameTimerInterval = setInterval(updateGameTimer, 1000);
+                }
+            }
+
+            // Si llegan bolas por Pusher (p.ej. CRON), alinear botones con juego en curso
+            if ($('#start-button').is(':visible')) {
+                $('#start-button').hide();
+                $('#stop-button, #next-number-button').show();
+            }
+        });
+
+        channel.bind('game:game_finished', function () {
+            showGameFinalized();
+        });
+
+        window.__boardPusher = pusher;
+        window.__boardChannel = channel;
+    } catch (e) {
+        console.warn('No se pudo iniciar Pusher en el tablero admin:', e);
+    }
+}
+
 // ==========================================
 // EVENT LISTENERS PRINCIPALES
 // ==========================================
 
-// Inicialización cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initializeApp);
+// Inicialización cuando el DOM esté listo (o ya listo si el script carga tarde / AJAX)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
 
 // Manejo de errores globales
 window.addEventListener('error', (event) => {

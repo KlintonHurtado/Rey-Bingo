@@ -556,6 +556,34 @@ class Home extends Controller {
             'activateInstallPWA' => $this->request->getPost('activateInstallPWA')
         ];
 
+        // Premios de ruleta (4–8 ítems)
+        $prizeLabels = $this->request->getPost('roulette_prize_label');
+        $prizeCartons = $this->request->getPost('roulette_prize_cartons');
+        if (is_array($prizeLabels) && is_array($prizeCartons)) {
+            $rawPrizes = [];
+            $total = max(count($prizeLabels), count($prizeCartons));
+            for ($i = 0; $i < $total; $i++) {
+                $rawPrizes[] = [
+                    'label' => (string) ($prizeLabels[$i] ?? ''),
+                    'cartons' => (int) ($prizeCartons[$i] ?? 0),
+                ];
+            }
+            $normalizedPrizes = bingo_normalize_roulette_prizes($rawPrizes);
+            if (! $normalizedPrizes['ok']) {
+                $msg = translate('roulette prizes must be between 4 and 8');
+                if (($normalizedPrizes['error'] ?? '') === 'nowin') {
+                    $msg = translate('roulette must include at least one winning prize');
+                }
+
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error' => $msg,
+                    'errors' => ['roulettePrizes' => $msg],
+                ]);
+            }
+            $gameSettings['roulettePrizes'] = json_encode($normalizedPrizes['prizes'], JSON_UNESCAPED_UNICODE);
+        }
+
         $financialSettings = [
             'currency' => $this->request->getPost('currency'),
             'rateExchange' => $this->request->getPost('rateExchange'),

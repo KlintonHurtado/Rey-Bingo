@@ -562,6 +562,48 @@
                                 </select>
                                 <small id="activateRoulette-error" class="text-danger d-none"></small>
                             </div>
+                            <div class="col-md-12 mb-3">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div>
+                                        <h6 class="mb-0"><?= translate('roulette prizes'); ?></h6>
+                                        <small class="text-muted"><?= translate('roulette prizes help'); ?></small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-primary" id="roulette-prize-add">
+                                        <i class="fa-duotone fa-plus"></i> <?= translate('add prize'); ?>
+                                    </button>
+                                </div>
+                                <div class="table-responsive mt-2">
+                                    <table class="table table-sm align-middle mb-1">
+                                        <thead>
+                                            <tr>
+                                                <th><?= translate('prize label'); ?></th>
+                                                <th style="width:140px"><?= translate('cartons'); ?></th>
+                                                <th style="width:60px"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="roulette-prizes-list">
+                                            <?php foreach (bingo_roulette_prizes() as $prize) : ?>
+                                                <tr class="roulette-prize-row">
+                                                    <td>
+                                                        <input type="text" class="form-control form-bingo" name="roulette_prize_label[]" value="<?= esc($prize['label']); ?>" maxlength="40" required>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-bingo" name="roulette_prize_cartons[]" value="<?= (int) $prize['cartons']; ?>" min="0" max="100" step="1" required>
+                                                        <small class="text-muted">0 = <?= translate('no prize'); ?></small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger roulette-prize-remove" title="<?= translate('delete'); ?>">
+                                                            <i class="fa-duotone fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <small id="roulettePrizes-error" class="text-danger d-none"></small>
+                                <small class="text-muted d-block" id="roulette-prizes-count"></small>
+                            </div>
                             <div class="col-md-4 mb-3">
                                 <label for="activateJoinGroup" class="form-label"><?= translate('activate join group'); ?></label>
                                 <select class='form-control form-control-lg form-bingo' name="activateJoinGroup" id="activateJoinGroup">
@@ -677,6 +719,51 @@
 </div>
 
 <script type="text/javascript">
+    (function () {
+        var minPrizes = 4;
+        var maxPrizes = 8;
+
+        function roulettePrizeCount() {
+            return $('#roulette-prizes-list .roulette-prize-row').length;
+        }
+
+        function refreshRoulettePrizeUi() {
+            var count = roulettePrizeCount();
+            $('#roulette-prizes-count').text(count + ' / ' + maxPrizes + ' <?= translate('prizes'); ?> (<?= translate('min'); ?> ' + minPrizes + ')');
+            $('#roulette-prize-add').prop('disabled', count >= maxPrizes);
+            $('#roulette-prizes-list .roulette-prize-remove').prop('disabled', count <= minPrizes);
+        }
+
+        function buildRoulettePrizeRow(label, cartons) {
+            return $(
+                '<tr class="roulette-prize-row">' +
+                    '<td><input type="text" class="form-control form-bingo" name="roulette_prize_label[]" value="' + (label || '') + '" maxlength="40" required></td>' +
+                    '<td><input type="number" class="form-control form-bingo" name="roulette_prize_cartons[]" value="' + (cartons || 0) + '" min="0" max="100" step="1" required>' +
+                    '<small class="text-muted">0 = <?= translate('no prize'); ?></small></td>' +
+                    '<td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger roulette-prize-remove" title="<?= translate('delete'); ?>"><i class="fa-duotone fa-trash"></i></button></td>' +
+                '</tr>'
+            );
+        }
+
+        $(document).on('click', '#roulette-prize-add', function () {
+            if (roulettePrizeCount() >= maxPrizes) {
+                return;
+            }
+            $('#roulette-prizes-list').append(buildRoulettePrizeRow('NUEVO PREMIO', 1));
+            refreshRoulettePrizeUi();
+        });
+
+        $(document).on('click', '.roulette-prize-remove', function () {
+            if (roulettePrizeCount() <= minPrizes) {
+                return;
+            }
+            $(this).closest('tr').remove();
+            refreshRoulettePrizeUi();
+        });
+
+        refreshRoulettePrizeUi();
+    })();
+
     $(document).ready(function () {
         // Manejar envío del formulario
         $('#settings-form').on('submit', function (e) {
@@ -689,6 +776,21 @@
             // Limpiar errores previos
             $('.text-danger').addClass('d-none').text('');
             $('.form-control').removeClass('is-invalid');
+
+            var prizeRows = $('#roulette-prizes-list .roulette-prize-row').length;
+            if (prizeRows < 4 || prizeRows > 8) {
+                $('#roulettePrizes-error').text('<?= translate('roulette prizes must be between 4 and 8'); ?>').removeClass('d-none');
+                button.prop("disabled", false).html(originalHtml);
+                Toastify({
+                    text: '<?= translate('roulette prizes must be between 4 and 8'); ?>',
+                    duration: 4000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+                return;
+            }
 
             $.ajax({
                 url: '<?= site_url('home/settingsSubmit') ?>',

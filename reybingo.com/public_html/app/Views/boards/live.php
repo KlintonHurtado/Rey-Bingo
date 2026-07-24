@@ -118,6 +118,91 @@
         background: radial-gradient(circle at 30% 30%, #e5e5e5 10%, #b4b0b0 40%, #0c0c0c 100%);
         font-size: 1.5rem;
     }
+
+    /* Chat admin LIVE */
+    .board-admin-chat.message-display-container {
+        display: none !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        bottom: 80px !important;
+        left: 12px !important;
+        width: 330px !important;
+        max-width: calc(100vw - 24px) !important;
+        height: 450px !important;
+        max-height: calc(100vh - 100px) !important;
+        z-index: 1100 !important;
+        background: linear-gradient(180deg, rgba(24, 10, 84, 0.35) 0%, rgba(33, 16, 95, 0.82) 35%, rgba(55, 29, 146, 0.96) 100%) !important;
+        border: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
+        justify-content: space-between !important;
+        overflow: hidden !important;
+        pointer-events: auto !important;
+    }
+    .board-admin-chat.message-display-container.is-open {
+        display: flex !important;
+    }
+    .board-admin-chat .message-display {
+        flex-grow: 1 !important;
+        width: 100% !important;
+        height: calc(100% - 150px) !important;
+        margin: 0 !important;
+        padding: 0 10px !important;
+        background: transparent !important;
+    }
+    .board-admin-chat .message-bubble {
+        margin-bottom: 6px !important;
+        background: #ffffff !important;
+        opacity: 0.85 !important;
+    }
+    .board-admin-chat .emoji-slider,
+    .board-admin-chat .message-bubble-slider {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        width: 100% !important;
+        gap: 4px !important;
+    }
+    .board-admin-chat .emoji-btn {
+        width: 30px !important;
+        height: 30px !important;
+        margin: 3px 0 !important;
+        border-radius: 50% !important;
+        font-size: 18px !important;
+        flex: 0 0 auto !important;
+    }
+    .board-admin-chat .message-btn {
+        width: auto !important;
+        padding: 6px 12px !important;
+        margin: 3px 0 !important;
+        border-radius: 50px !important;
+        font-size: 13px !important;
+        white-space: nowrap !important;
+        flex: 0 0 auto !important;
+    }
+    body .btn-chat {
+        position: fixed !important;
+        left: 15px !important;
+        bottom: 15px !important;
+        z-index: 1101 !important;
+        pointer-events: auto !important;
+        width: 50px !important;
+        height: 50px !important;
+    }
+    @media (max-width: 700px) {
+        .board-admin-chat.message-display-container {
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+            height: min(50vh, 420px) !important;
+            border-radius: 16px 16px 0 0 !important;
+        }
+        body .btn-chat {
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+        }
+    }
 </style>
 <div class="container-transmission">
     <div class="transmission">
@@ -263,6 +348,52 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<button type="button" class="btn btn-small btn-chat" id="toggle-messages-btn" aria-label="Chat" aria-expanded="false"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
+
+<div class="message-display-container board-admin-chat" id="message-display-container" aria-hidden="true">
+    <div class="message-display-container__toolbar">
+        <button type="button" class="message-display-close" id="message-display-close" aria-label="Cerrar">
+            <i class="fa-duotone fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="message-display" id="message-display" aria-live="polite"></div>
+    <div class="emoji-message-panel">
+        <div class="emoji-slider">
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😊', 1)">😊</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😢', 2)">😢</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🤯', 3)">🤯</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😂', 4)">😂</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😍', 5)">😍</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🥺', 6)">🥺</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🤔', 7)">🤔</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🙄', 8)">🙄</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🧐', 9)">🧐</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😘', 10)">😘</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😜', 11)">😜</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😅', 12)">😅</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😨', 13)">😨</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😎', 14)">😎</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('🤪', 15)">🤪</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😲', 16)">😲</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😒', 17)">😒</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😛', 18)">😛</button>
+            <button type="button" class="emoji-btn" onclick="sendEmoji('😓', 19)">😓</button>
+        </div>
+
+        <div class="message-bubble-slider">
+            <button type="button" class="message-btn" onclick="sendMessage('<?= translate('hello!'); ?> 🥰', 20)"><?= translate('hello!'); ?> 🥰</button>
+            <button type="button" class="message-btn" onclick="sendMessage('<?= translate('ha ha ha'); ?> 🤣', 22)"><?= translate('ha ha ha'); ?> 🤣</button>
+            <button type="button" class="message-btn" onclick="sendMessage('<?= translate('lets have fun!'); ?> 😉', 23)"><?= translate('lets have fun!'); ?> 😉</button>
+            <button type="button" class="message-btn" onclick="sendMessage('<?= translate('good luck!'); ?> 🤑', 24)"><?= translate('good luck!'); ?> 🤑</button>
+        </div>
+
+        <div class="input-group">
+            <input type="text" class="form-control form-control-chat message-input" name="message-send-new" id="message-send-new" placeholder="<?= translate('write a message'); ?>..." autocomplete="off" maxlength="50">
+            <button type="button" id="message-button" class="btn btn-small btn-primary btn-send"><i class="fa-duotone fa-solid fa-paper-plane-top"></i></button>
         </div>
     </div>
 </div>

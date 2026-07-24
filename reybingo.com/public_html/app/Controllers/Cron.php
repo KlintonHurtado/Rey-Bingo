@@ -973,9 +973,9 @@ class Cron extends Controller
         $gameDateTime = new \DateTime();
         $gameDateTime->add(new \DateInterval('PT' . $randomMinutes . 'M'));
 
-        $roulettePrice = function_exists('bingo_roulette_carton_price')
-            ? bingo_roulette_carton_price()
-            : 0.25;
+        $rouletteMaxPrice = function_exists('bingo_roulette_max_carton_price')
+            ? bingo_roulette_max_carton_price()
+            : 0.50;
 
         return [
             'user' => 1,
@@ -995,7 +995,8 @@ class Cron extends Controller
             'min_cartons' => max(1, (int) (systemGet('autoGameMinCartons') ?: 10)),
             'allow_roulette_cartons' => (
                 (systemGet('autoGameAllowRoulette') ?? 1) == 1
-                && abs((float) $randomPrice - $roulettePrice) < 0.001
+                && (float) $randomPrice > 0
+                && (float) $randomPrice <= ($rouletteMaxPrice + 0.001)
             ) ? 1 : 0,
             'status' => 2
         ];

@@ -201,7 +201,8 @@ class Playings extends Controller
         $games = $modelGames
             ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
-            ->where('price', bingo_roulette_carton_price())
+            ->where('price <=', bingo_roulette_max_carton_price())
+            ->where('price >', 0)
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
             ->findAll();
@@ -232,9 +233,13 @@ class Playings extends Controller
         }
 
         $cartons = (int) $this->request->getPost('cartons');
+        $allowed = bingo_roulette_allowed_carton_amounts();
 
-        if ($cartons < 1) {
-            return $this->response->setJSON(['status' => 'error', 'message' => 'Datos de premio inválidos']);
+        if ($cartons < 1 || ! in_array($cartons, $allowed, true)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Datos de premio inválidos. Premios permitidos: ' . implode(', ', $allowed) . ' cartones.',
+            ]);
         }
 
         $modelUsers = new UsersModel();
@@ -304,7 +309,8 @@ class Playings extends Controller
         $games = $modelGames
             ->whereIn('status', [1, 2])
             ->where('allow_roulette_cartons', 1)
-            ->where('price', bingo_roulette_carton_price())
+            ->where('price <=', bingo_roulette_max_carton_price())
+            ->where('price >', 0)
             ->orderBy('date', 'ASC')
             ->orderBy('time', 'ASC')
             ->findAll();
@@ -391,7 +397,8 @@ class Playings extends Controller
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('roulette cartons only for price games') . ' '
-                    . systemGet('currency') . ' ' . number_format(bingo_roulette_carton_price(), 2),
+                    . systemGet('currency') . ' ' . number_format(bingo_roulette_max_carton_price(), 2)
+                    . ' ' . translate('or less'),
             ]);
         }
 

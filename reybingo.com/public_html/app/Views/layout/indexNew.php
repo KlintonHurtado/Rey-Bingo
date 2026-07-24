@@ -2227,17 +2227,18 @@
             }
         }
 
-        const prizes = [
-            "1 CARTÓN", "2 CARTONES", "3 CARTONES", "4 CARTONES", "5 CARTONES", "10 CARTONES",
-            "INTENTA DE NUEVO", "SUERTE LA PRÓXIMA VEZ"
-        ];
+        const roulettePrizes = <?= json_encode(bingo_roulette_prizes(), JSON_UNESCAPED_UNICODE); ?>;
+        const prizes = roulettePrizes.map(function (p) { return p.label; });
+        const prizeCartons = roulettePrizes.map(function (p) { return parseInt(p.cartons, 10) || 0; });
 
         const wheel = document.getElementById("wheel");
+        if (!wheel) { /* ruleta no presente en esta vista */ } else {
         const ctx = wheel.getContext("2d");
         const spinBtn = document.getElementById("spin");
+        const claimBtn = document.getElementById("claimBtn");
         const result = document.getElementById("result");
 
-        const totalSegments = 30;
+        const totalSegments = Math.max(4, Math.min(8, prizes.length || 4));
         const segmentAngle = (2 * Math.PI) / totalSegments;
 
         let angles = [];
@@ -2246,17 +2247,8 @@
 
         function generateSegments() {
             segments = [];
-            let iphoneIncluded = false;
             for (let i = 0; i < totalSegments; i++) {
-                if (!iphoneIncluded && Math.random() < 0.05) {
-                    segments.push("10 CARTONES");
-                    iphoneIncluded = true;
-                } else {
-                    segments.push(prizes[Math.floor(Math.random() * prizes.length)]);
-                }
-            }
-            if (!iphoneIncluded) {
-                segments[Math.floor(Math.random() * totalSegments)] = "10 CARTONES";
+                segments.push(prizes[i] || prizes[i % prizes.length] || 'PREMIO');
             }
         }
 
@@ -2277,6 +2269,7 @@
             const centerX = wheel.width / 2;
             const centerY = wheel.height / 2;
             const radius = wheel.width / 2;
+            const fontSize = totalSegments <= 5 ? 14 : (totalSegments <= 6 ? 13 : 12);
 
             for (let i = 0; i < totalSegments; i++) {
                 const startAngle = angles[i] + rotation;
@@ -2294,7 +2287,7 @@
                 ctx.rotate(startAngle + segmentAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "black";
-                ctx.font = "bold 12px sans-serif";
+                ctx.font = "bold " + fontSize + "px sans-serif";
                 ctx.fillText(segments[i], radius - 10, 5);
                 ctx.restore();
             }
@@ -2327,33 +2320,19 @@
                     const angleAtPointer = (3 * Math.PI / 2 - finalAngle + 2 * Math.PI) % (2 * Math.PI);
                     let index = Math.floor(angleAtPointer / segmentAngle) % totalSegments;
 
-                    // Si el premio es 10 CARTONES, forzar selección de otro premio
-                    while (segments[index] === "10 CARTONES") {
-                        index = (index + 1) % totalSegments;
-                    }
-
                     const selectedPrize = segments[index];
+                    const cartons = prizeCartons[index] || 0;
 
-                    if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
+                    if (cartons > 0) {
                         result.textContent = `🎉 TU PREMIO: ${selectedPrize} 🎉`;
-                    } else {
-                        result.textContent = `${selectedPrize}`;
-                    }
-
-                    if (selectedPrize !== "INTENTA DE NUEVO" && selectedPrize !== "SUERTE LA PRÓXIMA VEZ") {
                         AppcreateConfetti();
                         spinBtn.style.display = "none";
                         claimBtn.style.display = "inline-block";
                         claimBtn.style.width = "200px";
                         claimBtn.disabled = false;
-
-                        const match = selectedPrize.match(/^(\d+)\s+CARTONES$/);
-                        if (match) {
-                            claimBtn.dataset.cartons = match[1];
-                        } else {
-                            claimBtn.dataset.cartons = 0;
-                        }
+                        claimBtn.dataset.cartons = cartons;
                     } else {
+                        result.textContent = `${selectedPrize}`;
                         claimBtn.style.display = "none";
                         spinBtn.disabled = false;
                     }
@@ -2362,6 +2341,7 @@
         }
 
         spinBtn.addEventListener("click", spinWheel);
+        } // end wheel guard
 
         function claimPrize() {
             const claimBtn = document.getElementById('claimBtn');
@@ -2383,7 +2363,7 @@
                         /*modalShare = 'modalSharegame';
                         const modal = new bootstrap.Modal(document.getElementById(modalShare));
                         modal.show();*/
-                        cartonsInput.value = cartons;
+                        if (cartonsInput) cartonsInput.value = cartons;
                         Toastify({
                             text: data.message,
                             duration: 3000,
@@ -2395,7 +2375,7 @@
                         claimBtn.style.display = 'none';
                     } else {
                         Toastify({
-                            text: "<?= translate('there was an error in the request to the server'); ?>",
+                            text: data.message || "<?= translate('there was an error in the request to the server'); ?>",
                             duration: 3000,
                             gravity: "top",
                             position: "right",

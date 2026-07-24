@@ -49,10 +49,26 @@
 
     /* Admin /board: chat clásico (burbujas + sliders horizontales) */
     .board-admin-chat.message-display-container {
-        background-color: transparent !important;
+        display: none !important;
+        flex-direction: column !important;
+        position: fixed !important;
+        bottom: 80px !important;
+        left: 12px !important;
+        width: 330px !important;
+        max-width: calc(100vw - 24px) !important;
+        height: 450px !important;
+        max-height: calc(100vh - 100px) !important;
+        z-index: 1100 !important;
+        background: linear-gradient(180deg, rgba(24, 10, 84, 0.35) 0%, rgba(33, 16, 95, 0.82) 35%, rgba(55, 29, 146, 0.96) 100%) !important;
         border: none !important;
-        box-shadow: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
         justify-content: space-between !important;
+        overflow: hidden !important;
+        pointer-events: auto !important;
+    }
+    .board-admin-chat.message-display-container.is-open {
+        display: flex !important;
     }
     .board-admin-chat .message-display {
         flex-grow: 1 !important;
@@ -73,9 +89,32 @@
     .message-btn:hover {
         background: #f0f0f0 !important;
     }
+
+    /* Barra inferior no debe bloquear el botón de chat */
+    .bottom-section {
+        pointer-events: none !important;
+        z-index: 1051 !important;
+    }
+    .bottom-section .controls-board,
+    .bottom-section .controls-board * {
+        pointer-events: auto !important;
+    }
+    body .btn-chat {
+        position: fixed !important;
+        left: 15px !important;
+        bottom: 15px !important;
+        z-index: 1101 !important;
+        pointer-events: auto !important;
+        width: 50px !important;
+        height: 50px !important;
+    }
+    body.chat-panel-open .btn-chat {
+        z-index: 1102 !important;
+    }
     
     /* Panel de modalidades: Estilo chat pero con colores móviles */
     .modalities-display-container {
+        position: fixed !important;
         width: 450px !important;
         height: 520px !important;
         max-height: calc(100vh - 120px) !important;
@@ -91,8 +130,9 @@
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35) !important;
         border: none !important;
         flex-direction: column !important;
-        z-index: 1060 !important;
-        display: none;
+        z-index: 1100 !important;
+        display: none !important;
+        pointer-events: auto !important;
     }
 
     .modalities-display-container.is-open {
@@ -255,11 +295,12 @@
             bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
             height: min(50vh, 420px) !important;
             max-height: min(50vh, 420px) !important;
-            z-index: 1054 !important;
+            border-radius: 16px 16px 0 0 !important;
+            z-index: 1100 !important;
         }
         body .btn-chat {
             bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
-            z-index: 1055 !important;
+            z-index: 1101 !important;
         }
     }
 </style>
@@ -403,7 +444,7 @@
     </div>
 </div>
 
-<button class="btn btn-small btn-chat" id="toggle-messages-btn"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
+<button type="button" class="btn btn-small btn-chat" id="toggle-messages-btn" aria-label="Chat" aria-expanded="false"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
 
 <div class="bottom-section">
     <?php if ($status != 'stop') : ?>
@@ -727,12 +768,14 @@
 </script>
 
 <script>
-    window.PUSHER_KEY = '<?= env("PUSHER_KEY") ?>';
-    window.PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
-    window.GAME_ID = '<?= $game['id'] ?>';
+    window.PUSHER_KEY = '<?= esc(env("PUSHER_KEY") ?? '', 'js') ?>';
+    window.PUSHER_CLUSTER = '<?= esc(env("PUSHER_CLUSTER") ?? 'us2', 'js') ?>';
+    window.GAME_ID = '<?= (int) ($game['id'] ?? 0) ?>';
+    window.USER_ID = <?= (int) session()->get('id') ?>;
 </script>
-
-<script src="<?= site_url('assets/js/board-optimized.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="https://js.pusher.com/8.2/pusher.min.js"></script>
+<script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
+<script src="<?= site_url('assets/js/board.js'); ?>?<?= md5(date('YmdHis')) ?>"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -740,33 +783,51 @@ document.addEventListener("DOMContentLoaded", function () {
     const panelModalities = document.getElementById("playing-modalities-panel");
     const btnCloseModalities = document.getElementById("modalities-panel-close");
 
-    if (btnModalities && panelModalities) {
-        btnModalities.addEventListener("click", function (event) {
-            event.stopPropagation();
-            panelModalities.classList.toggle("is-open");
-            document.body.classList.toggle("modalities-panel-open", panelModalities.classList.contains("is-open"));
-            
-            // Si se abre este, cerrar chat si estuviere abierto
+    function setModalitiesOpen(open) {
+        if (!panelModalities) {
+            return;
+        }
+        panelModalities.classList.toggle("is-open", open);
+        panelModalities.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("modalities-panel-open", open);
+        if (btnModalities) {
+            btnModalities.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        if (open && typeof window.__boardSetChatPanelOpen === "function") {
+            window.__boardSetChatPanelOpen(false);
+        } else if (open) {
             const chatPanel = document.getElementById("message-display-container");
-            if (chatPanel && panelModalities.classList.contains("is-open")) {
+            if (chatPanel) {
                 chatPanel.classList.remove("is-open");
+                chatPanel.style.display = "none";
                 document.body.classList.remove("chat-panel-open");
             }
+        }
+    }
+
+    if (btnModalities && panelModalities) {
+        btnModalities.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setModalitiesOpen(!panelModalities.classList.contains("is-open"));
         });
 
         if (btnCloseModalities) {
-            btnCloseModalities.addEventListener("click", function () {
-                panelModalities.classList.remove("is-open");
-                document.body.classList.remove("modalities-panel-open");
+            btnCloseModalities.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                setModalitiesOpen(false);
             });
         }
         
-        // Cerrar panel al hacer click afuera
         document.addEventListener("click", function (event) {
-            if (panelModalities.classList.contains("is-open") && !panelModalities.contains(event.target) && !btnModalities.contains(event.target)) {
-                panelModalities.classList.remove("is-open");
-                document.body.classList.remove("modalities-panel-open");
+            if (!panelModalities.classList.contains("is-open")) {
+                return;
             }
+            if (panelModalities.contains(event.target) || btnModalities.contains(event.target)) {
+                return;
+            }
+            setModalitiesOpen(false);
         });
     }
 });
