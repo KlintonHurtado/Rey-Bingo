@@ -56,6 +56,11 @@
                         <small id="document-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-6 mb-2">
+                        <label for="document_expires_at" class="form-label"><?= translate('document expiry'); ?></label>
+                        <input type="date" class="form-control form-control-lg form-bingo" name="document_expires_at" id="document_expires_at" value="<?= $isUpdate ? esc($userData['document_expires_at'] ?? '') : ''; ?>">
+                    </div>
+
                     <div class="col-md-12 mb-2">
                         <label for="address_line" class="form-label"><?= translate('address'); ?></label>
                         <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="address_line" placeholder="<?= translate('address'); ?>" value="<?= $isUpdate ? esc($userData['address_line'] ?? '') : ''; ?>" autocomplete="off">

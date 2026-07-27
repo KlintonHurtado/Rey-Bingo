@@ -1,5 +1,127 @@
 <div class="row mt-4">
     <div class="col">
+        <h4><?= translate('operational kpis'); ?></h4>
+    </div>
+</div>
+
+<?php
+$ops = $ops ?? [
+    'approved_recharges' => 0,
+    'bonuses_granted' => 0,
+    'bonus_released' => 0,
+    'cartons_granted' => 0,
+    'cartons_released' => 0,
+    'total_prizes' => 0,
+    'total_retires' => 0,
+    'active_instant' => 0,
+    'active_day' => 0,
+    'active_month' => 0,
+    'active_day_date' => date('Y-m-d'),
+    'active_month_key' => date('Y-m'),
+];
+$currency = systemGet('currency');
+?>
+
+<div class="card mt-2 mb-3">
+    <div class="row g-0">
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-success text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total approved recharges'); ?></h6>
+                    <h4 class="mb-0"><?= esc($currency); ?> <?= number_format((float) $ops['approved_recharges'], 2); ?></h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-primary text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total bonuses granted'); ?></h6>
+                    <h4 class="mb-0"><?= esc($currency); ?> <?= number_format((float) $ops['bonuses_granted'], 2); ?></h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-info text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total bonus released to recharge'); ?></h6>
+                    <h4 class="mb-0"><?= esc($currency); ?> <?= number_format((float) $ops['bonus_released'], 2); ?></h4>
+                    <small class="opacity-75"><?= translate('bonus spent on cartons'); ?></small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-warning text-dark m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total cartons granted'); ?></h6>
+                    <h4 class="mb-0"><?= number_format((int) $ops['cartons_granted']); ?></h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-orange text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total cartons released'); ?></h6>
+                    <h4 class="mb-0"><?= number_format((int) $ops['cartons_released']); ?></h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row g-0">
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-danger text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total prizes paid'); ?></h6>
+                    <h4 class="mb-0"><?= esc($currency); ?> <?= number_format((float) $ops['total_prizes'], 2); ?></h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-dark text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('total approved retires'); ?></h6>
+                    <h4 class="mb-0"><?= esc($currency); ?> <?= number_format((float) $ops['total_retires'], 2); ?></h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-secondary text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('users active now'); ?></h6>
+                    <h4 class="mb-0"><?= number_format((int) $ops['active_instant']); ?></h4>
+                    <small class="opacity-75"><?= translate('last 15 minutes'); ?></small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-primary text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('users active today'); ?></h6>
+                    <h4 class="mb-0"><?= number_format((int) $ops['active_day']); ?></h4>
+                    <a class="btn btn-sm btn-light mt-2"
+                       href="<?= site_url('games/exportActiveUsers/day?date=' . urlencode((string) $ops['active_day_date'])); ?>">
+                        <i class="fa-duotone fa-solid fa-file-excel"></i> Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl">
+            <div class="card bingo-bg-success text-white m-2 h-100">
+                <div class="card-body py-3">
+                    <h6 class="card-title mb-1"><?= translate('users active this month'); ?></h6>
+                    <h4 class="mb-0"><?= number_format((int) $ops['active_month']); ?></h4>
+                    <small class="opacity-75 d-block"><?= translate('unique users not daily sum'); ?></small>
+                    <a class="btn btn-sm btn-light mt-2"
+                       href="<?= site_url('games/exportActiveUsers/month?month=' . urlencode((string) $ops['active_month_key'])); ?>">
+                        <i class="fa-duotone fa-solid fa-file-excel"></i> Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2">
+    <div class="col">
         <h4><?= translate('general statistics'); ?></h4>
     </div>
 </div>

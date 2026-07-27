@@ -80,4 +80,30 @@ class KycAdmin extends Controller
 
         return redirect()->to('/kycAdmin')->with('success', 'KYC actualizado correctamente.');
     }
+
+    public function revoke(int $id)
+    {
+        if (! session()->get('logged_in') || session()->get('group') != 1) {
+            return redirect()->to('/signin');
+        }
+
+        $observations = trim((string) $this->request->getPost('kyc_observations'));
+        $modelUsers = new UsersModel();
+        $user = $modelUsers->find($id);
+        if (! $user) {
+            return redirect()->back()->with('error', translate('user not found'));
+        }
+
+        $modelUsers->update($id, [
+            'kyc_status' => 'pending',
+            'kyc_front' => null,
+            'kyc_back' => null,
+            'kyc_selfie' => null,
+            'kyc_observations' => $observations !== ''
+                ? $observations
+                : translate('kyc revoked by admin'),
+        ]);
+
+        return redirect()->to('/kycAdmin')->with('success', translate('kyc verification removed'));
+    }
 }

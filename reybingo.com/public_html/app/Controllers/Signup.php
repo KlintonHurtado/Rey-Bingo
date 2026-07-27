@@ -15,7 +15,7 @@ use Google_Service_Oauth2;
 
 class Signup extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo']);
         session();
     }
 
@@ -606,6 +606,7 @@ class Signup extends Controller {
             'referred_code' => $generateReferred_code,
             'status' => 1,
             'autodial' => 1,
+            'verified_email' => 0,
         ];
 
         if ($this->request->getPost('accept_terms') === '1') {
@@ -646,6 +647,7 @@ class Signup extends Controller {
 
             $model->update($id, ['verification_token' => $verificationToken]);
 
+            $user = $model->find($id);
             $this->sendVerificationEmail($user, $verificationToken);
 
             if (bingo_is_store() || (bingo_is_operator() && bingo_get_acting_store_id() > 0)) {
@@ -657,23 +659,13 @@ class Signup extends Controller {
                 return $this->response->setJSON($response);
             }
 
-            $sessionData = [
-                'id' => $id,
-                'group' => 0,
-                'firstname' => $data['firstname'],
-                'lastname' => $data['lastname'],
-                'document' => $data['document'],
-                'username' => $data['username'],
-                'phone' => $data['phone'],
-                'email' => $data['email'],
-                'logged_in' => true
-            ];
-            
-            session()->set($sessionData);
+            // No iniciar sesión hasta confirmar el correo
+            session()->remove(['id', 'group', 'firstname', 'lastname', 'document', 'username', 'phone', 'email', 'logged_in']);
         
             $response = [
                 'success' => true,
-                'redirect' => site_url('/play')
+                'redirect' => site_url('signup/verifyPending?email=' . rawurlencode((string) $data['email'])),
+                'message' => translate('please verify your email before login'),
             ];
         } else {
             $response = [
@@ -686,16 +678,16 @@ class Signup extends Controller {
 
         $ip = $_SERVER['REMOTE_ADDR'];
 
-        $geo = json_decode(file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
+        $geo = @json_decode(@file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
 
-        $country = ($geo['status'] === 'success') ? $geo['country'] : 'Unknown';
+        $country = (is_array($geo) && ($geo['status'] ?? '') === 'success') ? $geo['country'] : 'Unknown';
 
         $log = [
-            'id_user'    => session()->get('id'),
-            'action'     => 'login',
-            'details'    => 'user account created successfully.',
+            'id_user'    => $id,
+            'action'     => 'account',
+            'details'    => 'user account created successfully. pending email verification.',
             'ip_address' => $ip,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
             'country'    => $country
         ];
 
@@ -725,6 +717,7 @@ class Signup extends Controller {
     public function signupGoogleSubmit()
     {
         $model = new UsersModel();
+        helper('bingo');
 
         $client = new Google_Client();
         $client->setClientId(env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com'));
@@ -742,92 +735,228 @@ class Signup extends Controller {
         $googleService = new Google_Service_Oauth2($client);
         $googleInfo = $googleService->userinfo->get();
 
-        $email     = $googleInfo->email;
-        $firstname = $googleInfo->givenName;
-        $lastname  = $googleInfo->familyName;
-        $username  = explode('@', $email)[0];
+        $email     = (string) $googleInfo->email;
+        $firstname = (string) ($googleInfo->givenName ?: 'Jugador');
+        $lastname  = (string) ($googleInfo->familyName ?: '');
+        $picture   = (string) ($googleInfo->picture ?? '');
 
         $existingUser = $model->where('email', $email)->first();
 
         if ($existingUser) {
+            if (! bingo_player_email_is_verified($existingUser)) {
+                return redirect()->to(site_url('signup/verifyPending?email=' . rawurlencode($email)))
+                    ->with('error', translate('please verify your email before login'));
+            }
             $this->setSession($existingUser);
             return redirect()->to(site_url('play'))->with('success', translate('login successful.'));
         }
 
+        $suggestedUsername = bingo_generate_player_username($firstname, $lastname, $model);
+
+        session()->set('google_signup_pending', [
+            'email' => $email,
+            'firstname' => $firstname,
+            'lastname' => $lastname,
+            'picture' => $picture,
+            'suggested_username' => $suggestedUsername,
+            'created_at' => time(),
+        ]);
+
+        return redirect()->to(site_url('signup/googleAlias'));
+    }
+
+    public function googleAlias()
+    {
+        $pending = session()->get('google_signup_pending');
+        if (! is_array($pending) || empty($pending['email'])) {
+            return redirect()->to(site_url('signup'))->with('error', translate('error authenticating with google.'));
+        }
+
+        // Expirar pendiente > 30 min
+        if ((time() - (int) ($pending['created_at'] ?? 0)) > 1800) {
+            session()->remove('google_signup_pending');
+            return redirect()->to(site_url('signup'))->with('error', translate('google signup expired'));
+        }
+
+        $model = new UsersModel();
+        helper('bingo');
+        $suggested = (string) ($pending['suggested_username'] ?? '');
+        if ($suggested === '' || $model->usernameExists($suggested)) {
+            $suggested = bingo_generate_player_username(
+                (string) ($pending['firstname'] ?? ''),
+                (string) ($pending['lastname'] ?? ''),
+                $model
+            );
+            $pending['suggested_username'] = $suggested;
+            session()->set('google_signup_pending', $pending);
+        }
+
+        $modelContacts = new ContactsModel();
+        $data = [
+            'page' => ['title' => translate('choose username')],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('signup/google_alias', [
+                'pending' => $pending,
+                'suggestedUsername' => $suggested,
+                'contacts' => $modelContacts->findAll(),
+            ]),
+        ];
+
+        return view('layout/index', $data);
+    }
+
+    public function googleAliasSubmit()
+    {
+        $pending = session()->get('google_signup_pending');
+        if (! is_array($pending) || empty($pending['email'])) {
+            return redirect()->to(site_url('signup'))->with('error', translate('error authenticating with google.'));
+        }
+
+        $model = new UsersModel();
+        helper(['bingo', 'text']);
+
+        $username = strtolower(trim((string) $this->request->getPost('username')));
+        $username = preg_replace('/[^a-z0-9_]/', '', $username) ?? '';
+
+        if (strlen($username) < 3) {
+            return redirect()->back()->with('error', translate('username') . ': ' . translate('it is mandatory'));
+        }
+
+        if ($model->usernameExists($username)) {
+            return redirect()->back()->with('error', translate('username already in use'));
+        }
+
+        if ($model->where('email', $pending['email'])->first()) {
+            session()->remove('google_signup_pending');
+            return redirect()->to(site_url('signin'))->with('error', translate('email already in use'));
+        }
+
         $generateReferred_code = strtoupper(random_string('alnum', 8));
+        $verificationToken = random_string('md5');
 
         $data = [
             'group' => 0,
-            'firstname' => $firstname,
-            'lastname'  => $lastname,
+            'firstname' => $pending['firstname'] ?? 'Jugador',
+            'lastname'  => $pending['lastname'] ?? '',
             'username'  => $username,
-            'email'     => $email,
-            'password'  => password_hash('123456', PASSWORD_DEFAULT),
-            'verified_email' => 1,
+            'email'     => $pending['email'],
+            'password'  => password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
+            'verified_email' => 0,
+            'verification_token' => $verificationToken,
             'referred_code' => $generateReferred_code,
             'status'    => 1,
             'autodial'  => 1,
         ];
 
-        $profileImageUrl = $googleInfo->picture;
-        $uploadDir = FCPATH . 'uploads/users/';
-
-        $timestamp = time();
-        $randomHash = bin2hex(random_bytes(10));
-        $extension = 'jpg';
-        $newImageName = "{$timestamp}_{$randomHash}.{$extension}";
-
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+        if (bingo_terms_require_accept()) {
+            $data['terms_accepted_at'] = date('Y-m-d H:i:s');
         }
 
-        $imageContents = file_get_contents($profileImageUrl);
-        if ($imageContents !== false) {
-            file_put_contents($uploadDir . $newImageName, $imageContents);
-            $data['image'] = $newImageName;
+        $picture = (string) ($pending['picture'] ?? '');
+        if ($picture !== '') {
+            $uploadDir = FCPATH . 'uploads/users/';
+            if (! is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            $newImageName = time() . '_' . bin2hex(random_bytes(10)) . '.jpg';
+            $imageContents = @file_get_contents($picture);
+            if ($imageContents !== false) {
+                file_put_contents($uploadDir . $newImageName, $imageContents);
+                $data['image'] = $newImageName;
+            }
         }
 
         $model->insert($data);
         $id = $model->insertID();
+        if (! $id) {
+            return redirect()->to(site_url('signup'))->with('error', translate('the user could not be created.'));
+        }
 
         $code = 'BGC-A' . str_pad($id, 5, '0', STR_PAD_LEFT);
         $model->update($id, ['code' => $code]);
 
         wallet_apply_registration_bonus((int) $id);
-
-        helper('bingo');
         bingo_apply_signup_referral((int) $id);
 
         $user = $model->find($id);
-        if (!$user) {
-            return redirect()->to(site_url('signin'))->with('error', translate('the user could not be created.'));
-        }
+        $this->sendVerificationEmail($user, $verificationToken);
 
-        $this->sendWelcomeEmailGoogle($user);
-
-        $this->setSession($user);
+        session()->remove('google_signup_pending');
 
         $modelLogs = new LogsModel();
-
-        $ip = $_SERVER['REMOTE_ADDR'];
-
-        $geo = json_decode(file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
-
-        $country = ($geo['status'] === 'success') ? $geo['country'] : 'Unknown';
-
-        $log = [
-            'id_user'    => $id,
-            'action'     => 'account',
-            'details'    => 'user google account created successfully.',
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        $geo = @json_decode(@file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
+        $country = (is_array($geo) && ($geo['status'] ?? '') === 'success') ? $geo['country'] : 'Unknown';
+        $modelLogs->insert([
+            'id_user' => $id,
+            'action' => 'account',
+            'details' => 'user google account created successfully. pending email verification.',
             'ip_address' => $ip,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'],
-            'country'    => $country
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+            'country' => $country,
+        ]);
+
+        return redirect()->to(site_url('signup/verifyPending?email=' . rawurlencode((string) $pending['email'])))
+            ->with('success', translate('please verify your email before login'));
+    }
+
+    public function verifyPending()
+    {
+        $email = trim((string) ($this->request->getGet('email') ?: session()->getFlashdata('email') ?: ''));
+        $modelContacts = new ContactsModel();
+
+        $data = [
+            'page' => ['title' => translate('verify your email')],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('signup/verify_pending', [
+                'email' => $email,
+                'contacts' => $modelContacts->findAll(),
+            ]),
         ];
 
-        $modelLogs->insert($log);
+        return view('layout/index', $data);
+    }
 
-        return redirect()->to(site_url('play'))->with('success', translate('account created successfully.'));
-    } 
+    public function resendVerification()
+    {
+        $email = trim((string) $this->request->getPost('email'));
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('email') . ' ' . strtolower(translate('it is mandatory')),
+            ]);
+        }
+
+        $model = new UsersModel();
+        $user = $model->where('email', $email)->where('group', 0)->first();
+        if (! $user) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => translate('if the email exists we sent a new link'),
+            ]);
+        }
+
+        if ((int) ($user['verified_email'] ?? 0) === 1) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => translate('email already verified'),
+                'redirect' => site_url('signin'),
+            ]);
+        }
+
+        $token = random_string('md5');
+        $model->update((int) $user['id'], [
+            'verification_token' => $token,
+            'verified_email' => 0,
+        ]);
+        $user['verification_token'] = $token;
+        $this->sendVerificationEmail($user, $token);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('verification email resent'),
+        ]);
+    }
 
     private function setSession($user)
     {
@@ -908,9 +1037,9 @@ class Signup extends Controller {
             
             session()->set($sessionData);
 
-            return redirect()->to('/play');
+            return redirect()->to('/play')->with('success', translate('email verified successfully'));
         } else {
-            return redirect()->to('/signin');
+            return redirect()->to('/signin')->with('error', translate('invalid or expired verification link'));
         }
     }
 

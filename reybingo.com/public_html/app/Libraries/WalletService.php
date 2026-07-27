@@ -80,13 +80,25 @@ class WalletService
      */
     public function deductForPurchase(int $userId, float $amount): bool
     {
+        return $this->deductForPurchaseDetailed($userId, $amount) !== null;
+    }
+
+    /**
+     * @return array{from_bonus:float,from_recharge:float,from_withdraw:float}|null
+     */
+    public function deductForPurchaseDetailed(int $userId, float $amount): ?array
+    {
         $user = $this->normalizeUser($this->users->find($userId));
         if (! $user) {
-            return false;
+            return null;
         }
 
         if ($amount <= 0) {
-            return true;
+            return [
+                'from_bonus' => 0.0,
+                'from_recharge' => 0.0,
+                'from_withdraw' => 0.0,
+            ];
         }
 
         $remaining = $amount;
@@ -107,7 +119,7 @@ class WalletService
         $withdraw -= $fromWithdraw;
 
         if ($remaining > 0.0001) {
-            return false;
+            return null;
         }
 
         $this->syncLegacyWallet($userId, [
@@ -116,7 +128,11 @@ class WalletService
             'wallet_withdraw' => round($withdraw, 2),
         ]);
 
-        return true;
+        return [
+            'from_bonus' => round($fromBonus, 2),
+            'from_recharge' => round($fromRecharge, 2),
+            'from_withdraw' => round($fromWithdraw, 2),
+        ];
     }
 
     public function creditRecharge(int $userId, float $amount): void

@@ -357,6 +357,23 @@
                                         <?php endif; ?>
                                     </div>
 
+                                    <?php
+                                        $docExpiry = function_exists('bingo_document_expiry_status')
+                                            ? bingo_document_expiry_status($u)
+                                            : ['status' => 'unknown', 'label' => '', 'expires_at' => null];
+                                    ?>
+                                    <?php if (in_array($docExpiry['status'], ['expired', 'expiring'], true)) : ?>
+                                        <div class="px-2 pb-2">
+                                            <div class="alert alert-<?= $docExpiry['status'] === 'expired' ? 'danger' : 'warning'; ?> py-1 px-2 mb-0" style="font-size:.75rem;">
+                                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                                <?= esc($docExpiry['label']); ?>
+                                                <?php if (! empty($docExpiry['expires_at'])) : ?>
+                                                    (<?= esc(date('d/m/Y', strtotime($docExpiry['expires_at']))); ?>)
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <!-- Formulario (solo visible en Pendientes) -->
                                     <?php if ($tabKey === 'pending'): ?>
                                     <form action="<?= site_url('kycAdmin/review/' . $u['id']); ?>" method="post">
@@ -370,6 +387,18 @@
                                             </button>
                                             <button type="submit" name="action" value="rejected" class="btn btn-danger">
                                                 <i class="fa-solid fa-times me-1"></i>Rechazar
+                                            </button>
+                                        </div>
+                                    </form>
+                                    <?php elseif ($tabKey === 'verified'): ?>
+                                    <form action="<?= site_url('kycAdmin/revoke/' . $u['id']); ?>" method="post" onsubmit="return confirm('<?= translate('confirm remove kyc verification'); ?>');">
+                                        <?= csrf_field(); ?>
+                                        <div class="kyc-obs-area">
+                                            <textarea name="kyc_observations" rows="2" placeholder="<?= translate('kyc revoke reason placeholder'); ?>"></textarea>
+                                        </div>
+                                        <div class="kyc-card-actions">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fa-solid fa-user-slash me-1"></i><?= translate('remove kyc verification'); ?>
                                             </button>
                                         </div>
                                     </form>

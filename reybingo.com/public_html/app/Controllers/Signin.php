@@ -9,7 +9,7 @@ use CodeIgniter\Controller;
 
 class Signin extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo']);
         session();
     }
 
@@ -127,6 +127,18 @@ class Signin extends Controller {
             ];
             return $this->response->setJSON($response);
         }
+
+        // Jugadores: exigir correo confirmado de Rey Bingo
+        if ((int) ($user['group'] ?? 0) === 0 && ! bingo_player_email_is_verified($user)) {
+            $response = [
+                'success' => false,
+                'errors' => [
+                    'username' => translate('please verify your email before login')
+                ],
+                'redirect' => site_url('signup/verifyPending?email=' . rawurlencode((string) ($user['email'] ?? ''))),
+            ];
+            return $this->response->setJSON($response);
+        }
     
         $sessionData = [
             'id' => $user['id'],
@@ -197,6 +209,16 @@ class Signin extends Controller {
         ];
 
         $modelLogs->insert($log);
+
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+        $mac = function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac($this->request) : '';
+        $modelUsers = new UsersModel();
+        $modelUsers->update((int) session()->get('id'), array_filter([
+            'last_ip' => $ip,
+            'last_mac' => $mac !== '' ? $mac : null,
+        ], static fn ($v) => $v !== null));
 
         return $this->response->setJSON($response);
     }

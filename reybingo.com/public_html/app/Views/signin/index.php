@@ -141,6 +141,10 @@
                     if (response.success) {
                         window.location.href = response.redirect;
                     } else {
+                        if (response.redirect) {
+                            window.location.href = response.redirect;
+                            return;
+                        }
                         if (response.errors) {
                             $.each(response.errors, function(field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');

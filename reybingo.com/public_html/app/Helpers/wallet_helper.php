@@ -30,6 +30,16 @@ if (! function_exists('wallet_deduct_purchase')) {
     }
 }
 
+if (! function_exists('wallet_deduct_purchase_detailed')) {
+    /**
+     * @return array{from_bonus:float,from_recharge:float,from_withdraw:float}|null
+     */
+    function wallet_deduct_purchase_detailed(int $userId, float $amount): ?array
+    {
+        return wallet_service()->deductForPurchaseDetailed($userId, $amount);
+    }
+}
+
 if (! function_exists('wallet_credit_recharge')) {
     function wallet_credit_recharge(int $userId, float $amount): void
     {
@@ -185,6 +195,87 @@ if (! function_exists('wallet_apply_registration_bonus')) {
             wallet_service()->creditBonus($userId, $amount);
             wallet_record_registration_bonus($userId, $amount);
         }
+    }
+}
+
+if (! function_exists('wallet_grant_admin_bonus')) {
+    /**
+     * Otorga saldo bono a un jugador específico (admin).
+     *
+     * @return array{success:bool,message:string,amount?:float,wallet_bonus?:float}
+     */
+    function wallet_grant_admin_bonus(int $userId, float $amount, ?int $adminId = null, string $note = ''): array
+    {
+        helper('bingo');
+
+        $amount = round($amount, 2);
+        if ($userId <= 0 || $amount <= 0) {
+            return [
+                'success' => false,
+                'message' => translate('invalid bonus amount'),
+            ];
+        }
+
+        $modelUsers = new \App\Models\UsersModel();
+        $player = $modelUsers
+            ->where('id', $userId)
+            ->where('group', bingo_group_player())
+            ->where('deleted', 0)
+            ->first();
+
+        if (! $player) {
+            return [
+                'success' => false,
+                'message' => translate('user not found'),
+            ];
+        }
+
+        wallet_service()->creditBonus($userId, $amount);
+
+        $modelPayments = new \App\Models\PaymentsModel();
+        $paymentId = $modelPayments->insert([
+            'user'    => $userId,
+            'type'    => 'admin_bonus',
+            'type_id' => $adminId ?: 0,
+            'amount'  => $amount,
+            'status'  => 2,
+        ]);
+
+        $player = wallet_service()->normalizeUser($modelUsers->find($userId) ?: $player);
+
+        $currency = (string) systemGet('currency');
+        $message = translate('bonus granted notification');
+        $message = str_replace(
+            [':currency', ':amount'],
+            [$currency, number_format($amount, 2)],
+            $message
+        );
+        if ($note !== '') {
+            $message .= ' ' . $note;
+        }
+
+        try {
+            $modelNotifications = new \App\Models\NotificationsModel();
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId ?: 0,
+                'type'    => 'bonus',
+                'type_id' => $paymentId ?: $userId,
+                'title'   => translate('bonus granted'),
+                'message' => $message,
+                'status'  => 0,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'wallet_grant_admin_bonus notification: ' . $e->getMessage());
+        }
+
+        return [
+            'success' => true,
+            'message' => translate('bonus granted successfully'),
+            'amount' => $amount,
+            'wallet_bonus' => round((float) ($player['wallet_bonus'] ?? 0), 2),
+            'payment_id' => $paymentId,
+        ];
     }
 }
 

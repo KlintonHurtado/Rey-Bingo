@@ -161,6 +161,7 @@
                     <div class="card-body p-3">
                         <?php if (session()->get('group') == 1) : ?>
                             <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('deposit'); ?>" onclick="depositGet();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                            <button type="button" class="btn btn-small btn-warning text-dark float-end mt-4 me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('grant bonus'); ?>" onclick="grantBonusGet();"><i class="fa-duotone fa-solid fa-gift"></i></button>
                             <button type="button" class="btn btn-success btn-sm float-end mt-4 me-2" id="export-data">
                                 <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('export'); ?>
                             </button>
@@ -177,10 +178,14 @@
                                 <label class="form-label small"><?= translate('transaction type'); ?></label>
                                 <select class="form-control form-control-lg form-bingo" id="type" name="type">
                                     <option value="all" <?= ($filters['type'] ?? 'all') == 'all' ? 'selected' : ''; ?>><?= translate('all types'); ?></option>
-                                    <option value="deposit" <?= ($filters['type'] ?? '') == 'deposit' ? 'selected' : ''; ?>><?= translate('deposit'); ?> / <?= translate('transfer'); ?></option>
+                                    <option value="deposit" <?= ($filters['type'] ?? '') == 'deposit' ? 'selected' : ''; ?>><?= translate('deposit'); ?></option>
+                                    <option value="bonus" <?= ($filters['type'] ?? '') == 'bonus' ? 'selected' : ''; ?>><?= translate('bonus'); ?></option>
+                                    <option value="purchase" <?= ($filters['type'] ?? '') == 'purchase' ? 'selected' : ''; ?>><?= translate('carton purchase'); ?></option>
+                                    <option value="award" <?= ($filters['type'] ?? '') == 'award' || ($filters['type'] ?? '') == 'payment' ? 'selected' : ''; ?>><?= translate('award'); ?></option>
+                                    <option value="roulette" <?= ($filters['type'] ?? '') == 'roulette' ? 'selected' : ''; ?>><?= translate('roulette'); ?></option>
                                     <option value="retire" <?= ($filters['type'] ?? '') == 'retire' ? 'selected' : ''; ?>><?= translate('retire'); ?></option>
                                     <option value="transfer" <?= ($filters['type'] ?? '') == 'transfer' ? 'selected' : ''; ?>><?= translate('transfer between players'); ?></option>
-                                    <option value="payment" <?= ($filters['type'] ?? '') == 'payment' ? 'selected' : ''; ?>><?= translate('award'); ?></option>
+                                    <option value="referred" <?= ($filters['type'] ?? '') == 'referred' ? 'selected' : ''; ?>><?= translate('referred'); ?></option>
                                 </select>
                             </div>
                             
@@ -301,7 +306,11 @@
                                                     'retire' => '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
                                                     'transfer' => '<i class="fa-duotone fa-solid fa-arrow-right-arrow-left text-info"></i>',
                                                     'payment' => '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>',
+                                                    'award' => '<i class="fa-duotone fa-solid fa-trophy text-warning"></i>',
                                                     'bonus' => '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>',
+                                                    'purchase' => '<i class="fa-duotone fa-solid fa-ticket text-primary"></i>',
+                                                    'roulette' => '<i class="fa-duotone fa-solid fa-dharmachakra text-info"></i>',
+                                                    'referred' => '<i class="fa-duotone fa-solid fa-user-plus text-success"></i>',
                                                 ];
 
                                                 echo $typeIcons[$payment['type']] ?? '<i class="fa-duotone fa-solid fa-circle-question"></i>';
@@ -323,8 +332,7 @@
                                         <?php endif; ?>
                                         <td><?= $payment['bank']; ?></td>
                                         <td class="text-center">
-                                            <?php if ($payment['type'] == 'retire'): ?>
-                                                <!-- Retiro normal -->
+                                            <?php if ($payment['type'] == 'retire' || $payment['type'] == 'purchase'): ?>
                                                 <strong class="icon-danger">
                                                     -<?= systemGet('currency'); ?> <?= number_format($payment['amount'], 2); ?>
                                                 </strong>
@@ -354,6 +362,10 @@
                                                 <strong class="text-bonus">
                                                     +<?= systemGet('currency'); ?> <?= number_format($payment['amount'], 2); ?>
                                                 </strong>
+                                            <?php elseif ($payment['type'] == 'roulette'): ?>
+                                                <strong class="text-info">
+                                                    +<?= systemGet('currency'); ?> <?= number_format($payment['amount'], 2); ?>
+                                                </strong>
                                             <?php else: ?>
                                                 <!-- Otro tipo de ingreso -->
                                                 <strong class="text-success">
@@ -371,7 +383,11 @@
                                         </td>
                                         <?php if (session()->get('group') == 1) : ?>
                                         <td class="text-center">
+                                            <?php if (in_array($payment['type'], ['deposit', 'retire', 'transfer', 'payment', 'award', 'bonus', 'referred'], true)) : ?>
                                             <a class="btn btn-primary btn-modal text-white" onclick="requestGet('<?= $payment['type'] ?>', '<?= $payment['id'] ?>');"><i class="fa-duotone fa-solid fa-eye"></i></a>
+                                            <?php else : ?>
+                                            <span class="text-muted">—</span>
+                                            <?php endif; ?>
                                             <!--  
                                             <?php if ($payment['type'] !== 'transfer') : ?>
                                             <div class="btn-group btn-group-sm" role="group">
@@ -729,7 +745,11 @@
                     'retire': '<i class="fa-duotone fa-solid fa-arrow-up-from-bracket icon-danger"></i>',
                     'transfer': '<i class="fa-duotone fa-solid fa-arrow-right-arrow-left text-info"></i>',
                     'payment': '<i class="fa-duotone fa-solid fa-credit-card text-primary"></i>',
-                    'bonus': '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>'
+                    'award': '<i class="fa-duotone fa-solid fa-trophy text-warning"></i>',
+                    'bonus': '<i class="fa-duotone fa-solid fa-gift icon-bonus"></i>',
+                    'purchase': '<i class="fa-duotone fa-solid fa-ticket text-primary"></i>',
+                    'roulette': '<i class="fa-duotone fa-solid fa-dharmachakra text-info"></i>',
+                    'referred': '<i class="fa-duotone fa-solid fa-user-plus text-success"></i>'
                 };
 
                 const typeIcon = typeIcons[payment.type] || '<i class="fa-duotone fa-solid fa-circle-question text-warning"></i>';
@@ -764,7 +784,7 @@
 
                 let amountHtml = '';
 
-                if (payment.type === 'retire') {
+                if (payment.type === 'retire' || payment.type === 'purchase') {
                     amountHtml = `
                         <strong class="icon-danger">
                             -<?= systemGet('currency'); ?> ${formatNumber(payment.amount)}
@@ -807,6 +827,12 @@
                             +<?= systemGet('currency'); ?> ${formatNumber(payment.amount)}
                         </strong>
                     `;
+                } else if (payment.type === 'roulette') {
+                    amountHtml = `
+                        <strong class="text-info">
+                            +<?= systemGet('currency'); ?> ${formatNumber(payment.amount)}
+                        </strong>
+                    `;
                 } else {
                     amountHtml = `
                         <strong class="text-success">
@@ -831,7 +857,7 @@
                 `;
 
                 <?php if (session()->get('group') == 1) : ?>
-                if (payment.type !== 'transfer') {
+                if (payment.type !== 'transfer' && ['deposit', 'retire', 'payment', 'award', 'bonus', 'referred'].includes(payment.type)) {
                     row += `<td class="text-center">`;
                     row += `<div class="btn-group btn-group-sm" role="group">`;
                     
@@ -870,8 +896,10 @@
                     }*/
                     
                     row += `</div></td>`;
-                } else {
+                } else if (payment.type === 'transfer') {
                     row += `<td class="text-center"><span class="text-muted small"><?= translate('approved'); ?></span></td>`;
+                } else {
+                    row += `<td class="text-center"><span class="text-muted">—</span></td>`;
                 }
                 <?php endif; ?>
 

@@ -613,6 +613,14 @@ function depositGet() {
     loadAndShowModal('#modalDeposit', site_url + 'payments/depositGet');
 }
 
+function grantBonusGet(userId) {
+    var url = site_url + 'users/grantBonusGet';
+    if (userId) {
+        url += '/' + userId;
+    }
+    loadAndShowModal('#modalGrantBonus', url);
+}
+
 function retireGet() {
     loadAndShowModal('#modalRetire', site_url + 'payments/retireGet');
 }

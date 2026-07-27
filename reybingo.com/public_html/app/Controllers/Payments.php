@@ -269,12 +269,33 @@ class Payments extends Controller {
         $modelDeposits = new DepositsModel();
         $modelRetires = new RetiresModel();
         $modelTransfers = new TransfersModel();
+        $modelPurchaseLogs = new \App\Models\CartonPurchaseLogsModel();
+        $modelRoulettes = new RoulettesModel();
+        $modelGames = new GamesModel();
 
         $allTransactions = [];
+        $gameCache = [];
 
         if (session()->get('group') == 0 && session()->get('id')) {
             wallet_backfill_registration_bonus_transaction((int) session()->get('id'));
         }
+
+        $resolveGameLabel = static function (?int $gameId) use ($modelGames, &$gameCache): string {
+            if (!$gameId) {
+                return 'N/A';
+            }
+            if (!array_key_exists($gameId, $gameCache)) {
+                $gameCache[$gameId] = $modelGames->find($gameId);
+            }
+            $game = $gameCache[$gameId];
+            if (!$game) {
+                return '#' . $gameId;
+            }
+
+            return trim((string) ($game['description'] ?? '')) !== ''
+                ? (string) $game['description']
+                : ('#' . $gameId);
+        };
         
         try {
             // Obtener pagos
@@ -287,16 +308,19 @@ class Payments extends Controller {
             foreach ($payments as $payment) {
                 $user = $modelUsers->find($payment['user']);
 
-                if ($payment['type'] === 'registration_bonus') {
+                if ($payment['type'] === 'registration_bonus' || $payment['type'] === 'admin_bonus') {
+                    $isAdminBonus = $payment['type'] === 'admin_bonus';
                     $allTransactions[] = [
                         'id' => $payment['id'],
                         'type' => 'bonus',
-                        'type_Tra' => translate('registration bonus'),
+                        'type_Tra' => $isAdminBonus ? translate('admin bonus') : translate('registration bonus'),
                         'user_id' => $payment['user'],
                         'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
                         'user_code' => $user ? $user['code'] : 'N/A',
-                        'bank' => translate('registration bonus info'),
-                        'reference' => 'ABN-' . str_pad($payment['id'], 4, '0', STR_PAD_LEFT),
+                        'bank' => $isAdminBonus
+                            ? translate('admin bonus info')
+                            : translate('registration bonus info'),
+                        'reference' => ($isAdminBonus ? 'ABO-' : 'ABN-') . str_pad($payment['id'], 4, '0', STR_PAD_LEFT),
                         'amount' => $payment['amount'],
                         'date' => $payment['created_at'],
                         'date_formatted' => date('d/m/Y', strtotime($payment['created_at'])),
@@ -310,17 +334,21 @@ class Payments extends Controller {
 
                 $typePayment = '';
                 $typeTra = translate('payment');
+                $ledgerType = 'payment';
 
                 if ($payment['type'] == 'award') {
                     $typePayment = translate('per award paid');
                     $typeTra = translate('award');
+                    $ledgerType = 'award';
                 } else if ($payment['type'] == 'referred') {
                     $typePayment = translate('per referred player');
+                    $typeTra = translate('referred');
+                    $ledgerType = 'referred';
                 }
 
                 $transaction = [
                     'id' => $payment['id'],
-                    'type' => 'payment',
+                    'type' => $ledgerType,
                     'type_Tra' => $typeTra,
                     'user_id' => $payment['user'],
                     'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
@@ -456,6 +484,157 @@ class Payments extends Controller {
                 $allTransactions[] = $transaction;
             }
 
+            // Compras de cartones (wallet / bono / ruleta)
+            try {
+                bingo_ensure_users_schema();
+                $db = \Config\Database::connect();
+                if ($db->tableExists('carton_purchase_logs')) {
+                    if (session()->get('group') == 1) {
+                        $purchaseLogs = $modelPurchaseLogs->orderBy('created_at', 'DESC')->findAll();
+                    } else {
+                        $purchaseLogs = $modelPurchaseLogs
+                            ->where('user_id', session()->get('id'))
+                            ->orderBy('created_at', 'DESC')
+                            ->findAll();
+                    }
+
+                    foreach ($purchaseLogs as $log) {
+                        $user = $modelUsers->find($log['user_id']);
+                        $gameLabel = $resolveGameLabel(! empty($log['game_id']) ? (int) $log['game_id'] : null);
+                        $cartonsCount = (int) ($log['cartons_count'] ?? 0);
+                        $source = (string) ($log['source'] ?? 'wallet');
+
+                        $sourceLabel = translate('wallet');
+                        if ($source === 'roulette') {
+                            $sourceLabel = translate('roulette');
+                        } elseif ($source === 'bonus') {
+                            $sourceLabel = translate('bonus');
+                        }
+
+                        $splitParts = [];
+                        if ((float) ($log['from_bonus'] ?? 0) > 0) {
+                            $splitParts[] = translate('bonus') . ': ' . number_format((float) $log['from_bonus'], 2);
+                        }
+                        if ((float) ($log['from_recharge'] ?? 0) > 0) {
+                            $splitParts[] = translate('recharge') . ': ' . number_format((float) $log['from_recharge'], 2);
+                        }
+                        if ((float) ($log['from_withdraw'] ?? 0) > 0) {
+                            $splitParts[] = translate('withdraw') . ': ' . number_format((float) $log['from_withdraw'], 2);
+                        }
+
+                        $info = translate('carton purchase') . ': ' . $cartonsCount
+                            . ' · ' . $gameLabel
+                            . ' · ' . $sourceLabel;
+                        if (! empty($splitParts)) {
+                            $info .= '<br><small class="text-muted">' . esc(implode(' | ', $splitParts)) . '</small>';
+                        }
+
+                        $allTransactions[] = [
+                            'id' => $log['id'],
+                            'type' => 'purchase',
+                            'type_Tra' => translate('carton purchase'),
+                            'user_id' => $log['user_id'],
+                            'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                            'user_code' => $user ? $user['code'] : 'N/A',
+                            'bank' => $info,
+                            'reference' => 'CP-' . str_pad((string) $log['id'], 4, '0', STR_PAD_LEFT),
+                            'amount' => $log['amount'],
+                            'date' => $log['created_at'],
+                            'date_formatted' => date('d/m/Y', strtotime((string) $log['created_at'])),
+                            'status' => 2,
+                            'status_raw' => 2,
+                            'status_formatted' => $this->formatStatusPayment(2),
+                            'created_at' => date('d/m/Y', strtotime((string) $log['created_at'])),
+                        ];
+                    }
+
+                    // Histórico sin logs: solo en wallet del jugador
+                    if ((int) session()->get('group') === 0 && empty($purchaseLogs) && session()->get('id')) {
+                        $playerId = (int) session()->get('id');
+                        $user = $modelUsers->find($playerId);
+                        $legacy = $db->query(
+                            'SELECT c.game AS game_id, COUNT(*) AS cartons_count, MIN(c.created_at) AS first_at, MAX(c.created_at) AS last_at
+                             FROM cartons c
+                             WHERE c.user = ?
+                             GROUP BY c.game
+                             ORDER BY last_at DESC
+                             LIMIT 100',
+                            [$playerId]
+                        )->getResultArray();
+
+                        foreach ($legacy as $row) {
+                            $gameId = (int) ($row['game_id'] ?? 0);
+                            $game = $gameId ? ($gameCache[$gameId] ?? $modelGames->find($gameId)) : null;
+                            if ($gameId && !array_key_exists($gameId, $gameCache)) {
+                                $gameCache[$gameId] = $game;
+                            }
+                            $price = (float) ($game['price'] ?? 0);
+                            $count = (int) ($row['cartons_count'] ?? 0);
+                            $gameLabel = $resolveGameLabel($gameId > 0 ? $gameId : null);
+                            $sortDate = $row['last_at'] ?? $row['first_at'] ?? date('Y-m-d H:i:s');
+
+                            $allTransactions[] = [
+                                'id' => 'L' . $gameId,
+                                'type' => 'purchase',
+                                'type_Tra' => translate('carton purchase'),
+                                'user_id' => $playerId,
+                                'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                                'user_code' => $user ? $user['code'] : 'N/A',
+                                'bank' => translate('carton purchase') . ': ' . $count . ' · ' . $gameLabel,
+                                'reference' => 'CG-' . str_pad((string) $gameId, 4, '0', STR_PAD_LEFT),
+                                'amount' => round($price * $count, 2),
+                                'date' => $sortDate,
+                                'date_formatted' => date('d/m/Y', strtotime((string) $sortDate)),
+                                'status' => 2,
+                                'status_raw' => 2,
+                                'status_formatted' => $this->formatStatusPayment(2),
+                                'created_at' => date('d/m/Y', strtotime((string) $sortDate)),
+                            ];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'Error cargando compras de cartones: ' . $e->getMessage());
+            }
+
+            // Premios / cartones de ruleta otorgados
+            if (session()->get('group') == 1) {
+                $roulettes = $modelRoulettes->findAll();
+            } else {
+                $roulettes = $modelRoulettes->where('user', session()->get('id'))->findAll();
+            }
+
+            foreach ($roulettes as $roulette) {
+                $user = $modelUsers->find($roulette['user']);
+                $gameLabel = $resolveGameLabel(! empty($roulette['game']) ? (int) $roulette['game'] : null);
+                $isUsed = (int) ($roulette['status'] ?? 0) === 1;
+                $cartonsCount = (int) ($roulette['cartons'] ?? 0);
+                $amount = (float) ($roulette['amount'] ?? $roulette['price'] ?? 0);
+
+                $info = translate('roulette') . ': ' . $cartonsCount . ' ' . translate('cartons')
+                    . ' · ' . $gameLabel;
+
+                $allTransactions[] = [
+                    'id' => $roulette['id'],
+                    'type' => 'roulette',
+                    'type_Tra' => $isUsed ? translate('roulette used') : translate('roulette granted'),
+                    'user_id' => $roulette['user'],
+                    'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                    'user_code' => $user ? $user['code'] : 'N/A',
+                    'bank' => $info,
+                    'reference' => 'RL-' . str_pad((string) $roulette['id'], 4, '0', STR_PAD_LEFT),
+                    'amount' => $amount,
+                    'date' => $roulette['created_at'] ?? $roulette['updated_at'] ?? date('Y-m-d H:i:s'),
+                    'date_formatted' => date('d/m/Y', strtotime((string) ($roulette['created_at'] ?? 'now'))),
+                    'status' => $isUsed ? 2 : 1,
+                    'status_raw' => $isUsed ? 2 : 1,
+                    'status_formatted' => $isUsed
+                        ? $this->formatStatusPayment(2)
+                        : $this->formatStatusPayment(1),
+                    'created_at' => date('d/m/Y', strtotime((string) ($roulette['created_at'] ?? 'now'))),
+                ];
+            }
+
             // Ordenar: pendientes de depósito/retiro primero (admin), luego por fecha desc
             usort($allTransactions, function ($a, $b) {
                 $isAdmin = (int) session()->get('group') === 1;
@@ -492,6 +671,11 @@ class Payments extends Controller {
             // Filtro por tipo
             if ($filters['type'] !== 'all') {
                 $filtered = array_filter($filtered, function ($transaction) use ($filters) {
+                    // Compatibilidad: el filtro antiguo "payment" incluía premios
+                    if ($filters['type'] === 'payment') {
+                        return in_array($transaction['type'], ['payment', 'award', 'referred'], true);
+                    }
+
                     return $transaction['type'] === $filters['type'];
                 });
             }
@@ -541,6 +725,10 @@ class Payments extends Controller {
             'retires' => ['count' => 0, 'amount' => 0],
             'transfers' => ['count' => 0, 'amount' => 0],
             'payments' => ['count' => 0, 'amount' => 0],
+            'bonuses' => ['count' => 0, 'amount' => 0],
+            'awards' => ['count' => 0, 'amount' => 0],
+            'purchases' => ['count' => 0, 'amount' => 0],
+            'roulettes' => ['count' => 0, 'amount' => 0],
             'pending' => ['count' => 0, 'amount' => 0],
             'approved' => ['count' => 0, 'amount' => 0],
             'rejected' => ['count' => 0, 'amount' => 0]
@@ -558,6 +746,9 @@ class Payments extends Controller {
                 } elseif ($transaction['type'] === 'payment') {
                     $stats['payments']['count']++;
                     $stats['payments']['amount'] += $amount;
+                } elseif ($transaction['type'] === 'bonus') {
+                    $stats['bonuses']['count']++;
+                    $stats['bonuses']['amount'] += $amount;
                 }
 
                 // Por estado
@@ -667,7 +858,7 @@ class Payments extends Controller {
         $spendBuilder = $modelPayments->builder();
         $spendBuilder->selectSum('amount', 'total')
             ->where('status', 2)
-            ->whereNotIn('type', ['award', 'referred', 'registration_bonus']);
+            ->whereNotIn('type', ['award', 'referred', 'registration_bonus', 'admin_bonus']);
         $this->applyKpiFilters($spendBuilder, $filters, 'created_at', 'user');
         $userSpend = (float) ($spendBuilder->get()->getRow()->total ?? 0);
 
@@ -878,16 +1069,16 @@ class Payments extends Controller {
         $modelTransfers = new TransfersModel();
         $data         = [];
 
-        if ($type === 'payment') {
+        if ($type === 'payment' || $type === 'award' || $type === 'bonus' || $type === 'referred') {
             $data['payment'] = $modelPayments->where('id', $id)->first();
 
             if ($data['payment']) {
                 $data['user'] = $modelUsers->find($data['payment']['user']);
             }
 
-            $data['status'] = $this->formatStatusPayment($data['payment']['status']);
+            $data['status'] = $this->formatStatusPayment($data['payment']['status'] ?? 0);
 
-            $data['type'] = $type;
+            $data['type'] = $type === 'award' || $type === 'bonus' || $type === 'referred' ? $type : 'payment';
 
             return view('users/requestPayment', $data);
         } else if ($type === 'deposit') {

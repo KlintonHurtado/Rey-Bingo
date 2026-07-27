@@ -21,7 +21,10 @@ class ActiveUser implements FilterInterface
             'signin',
             'signup',
             'restore',
+            'verify',
             'cron',
+            'terminos',
+            'promociones',
         ];
         foreach ($public as $prefix) {
             if ($path === $prefix || str_starts_with($path, $prefix . '/')) {

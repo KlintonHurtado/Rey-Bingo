@@ -21,11 +21,12 @@ use App\Models\ContactsModel;
 use App\Models\NotificationsModel;
 //use App\Libraries\PushNotificationService;
 use App\Libraries\SimplePushService;
+use App\Libraries\ExcelExport;
 use CodeIgniter\Controller;
 
 class Games extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo']);
         session();
     }
     
@@ -830,6 +831,9 @@ class Games extends Controller {
                     $data['referrals_trend'] = 'up';
                 }
             }
+
+            // KPIs operativos solicitados (recargas, bonos, cartones, activos…)
+            $data['ops'] = $this->buildOperationalKpis($dateFilter, $startDate, $endDate);
         }
         
         // Estadísticas específicas según el módulo seleccionado
@@ -1421,6 +1425,223 @@ class Games extends Controller {
             default:
                 return view('games/statistics/summary', $data);
         }
+    }
+
+    public function exportActiveUsers(string $period = 'day')
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return redirect()->to('/signin');
+        }
+
+        bingo_ensure_users_schema();
+        $period = in_array($period, ['day', 'month'], true) ? $period : 'day';
+
+        if ($period === 'day') {
+            $day = trim((string) $this->request->getGet('date'));
+            if ($day === '' || ! strtotime($day)) {
+                $day = date('Y-m-d');
+            } else {
+                $day = date('Y-m-d', strtotime($day));
+            }
+            $from = $day . ' 00:00:00';
+            $to = $day . ' 23:59:59';
+            $label = $day;
+            $filename = 'usuarios-activos-dia-' . $day . '.xls';
+        } else {
+            $month = trim((string) $this->request->getGet('month'));
+            if ($month === '' || ! preg_match('/^\d{4}-\d{2}$/', $month)) {
+                $month = date('Y-m');
+            }
+            $from = $month . '-01 00:00:00';
+            $to = date('Y-m-t 23:59:59', strtotime($from));
+            $label = $month;
+            $filename = 'usuarios-activos-mes-' . $month . '.xls';
+        }
+
+        $users = $this->fetchActiveUsersInRange($from, $to);
+
+        $headers = ['ID', 'Codigo', 'Nombre', 'Usuario', 'Email', 'Telefono', 'Documento', 'Ultimo acceso', 'IP'];
+        $rows = [];
+        foreach ($users as $u) {
+            $rows[] = [
+                $u['id'] ?? '',
+                $u['code'] ?? '',
+                trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')),
+                $u['username'] ?? '',
+                $u['email'] ?? '',
+                $u['phone'] ?? '',
+                $u['document'] ?? '',
+                $u['last_access'] ?? ($u['last_seen_at'] ?? ''),
+                $u['last_ip'] ?? '',
+            ];
+        }
+
+        return (new ExcelExport())->downloadResponse($headers, $rows, $filename, [
+            'sheet_name' => 'Activos ' . $label,
+        ]);
+    }
+
+    /**
+     * @return array<string, float|int>
+     */
+    private function buildOperationalKpis(string $dateFilter, ?string $startDate, ?string $endDate): array
+    {
+        bingo_ensure_users_schema();
+        helper('wallet');
+
+        [$from, $to] = $this->resolveStatsDateRange($dateFilter, $startDate, $endDate);
+        $db = \Config\Database::connect();
+
+        $depositsSql = 'SELECT COALESCE(SUM(amount),0) AS total FROM deposits WHERE status = 2';
+        $params = [];
+        if ($from && $to) {
+            $depositsSql .= ' AND date >= ? AND date <= ?';
+            $params[] = $from;
+            $params[] = $to;
+        }
+        $approvedRecharges = (float) ($db->query($depositsSql, $params)->getRow()->total ?? 0);
+
+        $bonusSql = "SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE type IN ('registration_bonus', 'admin_bonus') AND status = 2";
+        $bonusParams = [];
+        if ($from && $to) {
+            $bonusSql .= ' AND created_at >= ? AND created_at <= ?';
+            $bonusParams[] = $from;
+            $bonusParams[] = $to;
+        }
+        $bonusesGranted = (float) ($db->query($bonusSql, $bonusParams)->getRow()->total ?? 0);
+
+        $bonusReleased = 0.0;
+        if ($db->tableExists('carton_purchase_logs')) {
+            $brSql = 'SELECT COALESCE(SUM(from_bonus),0) AS total FROM carton_purchase_logs WHERE 1=1';
+            $brParams = [];
+            if ($from && $to) {
+                $brSql .= ' AND created_at >= ? AND created_at <= ?';
+                $brParams[] = $from;
+                $brParams[] = $to;
+            }
+            $bonusReleased = (float) ($db->query($brSql, $brParams)->getRow()->total ?? 0);
+        }
+
+        $cartonsGrantedSql = 'SELECT COALESCE(SUM(cartons),0) AS total FROM roulettes WHERE 1=1';
+        $cgParams = [];
+        if ($from && $to) {
+            $cartonsGrantedSql .= ' AND created_at >= ? AND created_at <= ?';
+            $cgParams[] = $from;
+            $cgParams[] = $to;
+        }
+        $cartonsGranted = (int) ($db->query($cartonsGrantedSql, $cgParams)->getRow()->total ?? 0);
+
+        $cartonsReleasedSql = 'SELECT COALESCE(SUM(cartons),0) AS total FROM roulettes WHERE status = 1';
+        $crParams = [];
+        if ($from && $to) {
+            $cartonsReleasedSql .= ' AND created_at >= ? AND created_at <= ?';
+            $crParams[] = $from;
+            $crParams[] = $to;
+        }
+        $cartonsReleased = (int) ($db->query($cartonsReleasedSql, $crParams)->getRow()->total ?? 0);
+
+        $prizesSql = "SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE type = 'award' AND status = 2";
+        $prParams = [];
+        if ($from && $to) {
+            $prizesSql .= ' AND created_at >= ? AND created_at <= ?';
+            $prParams[] = $from;
+            $prParams[] = $to;
+        }
+        $totalPrizes = (float) ($db->query($prizesSql, $prParams)->getRow()->total ?? 0);
+
+        $retiresSql = 'SELECT COALESCE(SUM(amount),0) AS total FROM retires WHERE status = 2';
+        $rtParams = [];
+        if ($from && $to) {
+            $retiresSql .= ' AND created_at >= ? AND created_at <= ?';
+            $rtParams[] = $from;
+            $rtParams[] = $to;
+        }
+        $totalRetires = (float) ($db->query($retiresSql, $rtParams)->getRow()->total ?? 0);
+
+        $activeInstant = (int) ($db->query(
+            "SELECT COUNT(*) AS total FROM users
+             WHERE deleted = 0 AND status = 1 AND `group` = 0
+               AND last_seen_at IS NOT NULL
+               AND last_seen_at >= ?",
+            [date('Y-m-d H:i:s', time() - 15 * 60)]
+        )->getRow()->total ?? 0);
+
+        $dayStart = date('Y-m-d 00:00:00');
+        $dayEnd = date('Y-m-d 23:59:59');
+        $monthStart = date('Y-m-01 00:00:00');
+        $monthEnd = date('Y-m-t 23:59:59');
+
+        $activeDay = count($this->fetchActiveUsersInRange($dayStart, $dayEnd));
+        $activeMonth = count($this->fetchActiveUsersInRange($monthStart, $monthEnd));
+
+        return [
+            'approved_recharges' => round($approvedRecharges, 2),
+            'bonuses_granted' => round($bonusesGranted, 2),
+            'bonus_released' => round($bonusReleased, 2),
+            'cartons_granted' => $cartonsGranted,
+            'cartons_released' => $cartonsReleased,
+            'total_prizes' => round($totalPrizes, 2),
+            'total_retires' => round($totalRetires, 2),
+            'active_instant' => $activeInstant,
+            'active_day' => $activeDay,
+            'active_month' => $activeMonth,
+            'active_day_date' => date('Y-m-d'),
+            'active_month_key' => date('Y-m'),
+        ];
+    }
+
+    /**
+     * @return array{0:?string,1:?string}
+     */
+    private function resolveStatsDateRange(string $dateFilter, ?string $startDate, ?string $endDate): array
+    {
+        if ($dateFilter !== 'all') {
+            switch ($dateFilter) {
+                case 'today':
+                    return [date('Y-m-d 00:00:00'), date('Y-m-d 23:59:59')];
+                case 'week':
+                    return [date('Y-m-d 00:00:00', strtotime('-7 days')), date('Y-m-d 23:59:59')];
+                case 'month':
+                    return [date('Y-m-d 00:00:00', strtotime('-1 month')), date('Y-m-d 23:59:59')];
+                case 'year':
+                    return [date('Y-m-d 00:00:00', strtotime('-1 year')), date('Y-m-d 23:59:59')];
+            }
+        }
+
+        if ($startDate && $endDate) {
+            return [$startDate . ' 00:00:00', $endDate . ' 23:59:59'];
+        }
+
+        return [null, null];
+    }
+
+    /**
+     * Usuarios únicos activos en el rango (login/signup o last_seen). No acumula días.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function fetchActiveUsersInRange(string $from, string $to): array
+    {
+        $db = \Config\Database::connect();
+
+        $sql = "SELECT u.id, u.code, u.firstname, u.lastname, u.username, u.email, u.phone, u.document,
+                       u.last_ip, u.last_seen_at,
+                       COALESCE(MAX(l.created_at), u.last_seen_at) AS last_access
+                FROM users u
+                LEFT JOIN logs l
+                  ON l.id_user = u.id
+                 AND l.action IN ('login', 'signup', 'google_signup', 'account')
+                 AND l.created_at >= ? AND l.created_at <= ?
+                WHERE u.deleted = 0
+                  AND u.`group` = 0
+                  AND (
+                        (l.id IS NOT NULL)
+                     OR (u.last_seen_at IS NOT NULL AND u.last_seen_at >= ? AND u.last_seen_at <= ?)
+                  )
+                GROUP BY u.id, u.code, u.firstname, u.lastname, u.username, u.email, u.phone, u.document, u.last_ip, u.last_seen_at
+                ORDER BY last_access DESC";
+
+        return $db->query($sql, [$from, $to, $from, $to])->getResultArray();
     }
 
     private function getLastActivity($userId) {

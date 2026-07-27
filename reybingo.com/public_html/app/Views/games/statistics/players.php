@@ -479,62 +479,12 @@
 	        method: 'GET',
 	        dataType: 'json',
 	        success: function(response) {
-	            if (response.success) {
-	                const user = response.user;
-	                const stats = response.stats;
-	                
-	                let content = `
-	                    <div class="row">
-	                        <div class="col-md-4 text-center">
-	                            ${user.image ? 
-	                                `<img src="<?= site_url('uploads/users/'); ?>${user.image}" class="rounded-circle mb-3" width="120" height="120">` :
-	                                `<div class="bingo-bg-primary rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
-	                                    <span class="text-white" style="font-size: 2rem;">${user.firstname.charAt(0).toUpperCase()}</span>
-	                                </div>`
-	                            }
-	                            <h5>${user.firstname} ${user.lastname}</h5>
-	                            <p class="text-muted">@${user.username}</p>
-	                            <span class="badge ${user.status == 1 ? 'bg-success' : 'bg-danger'}">${user.status == 1 ? '<?= translate('active'); ?>' : '<?= translate('banned'); ?>'}</span>
-	                            <h6 class="mt-3"><?= translate('banking information'); ?></h6>
-	                            <strong><?= translate('bank'); ?>:</strong><br>
-	                            <p class="text-muted mb-0">${user.bank || '<?= translate('not provided'); ?>'}</p>
-	                            <strong><?= translate('account'); ?>:</strong><br>
-	                            <p class="text-muted mb-0">${user.account || '<?= translate('not provided'); ?>'}</p>
-
-	                        </div>
-	                        <div class="col-md-8">
-	                            <h6><?= translate('personal information'); ?></h6>
-	                            <table class="table table-sm">
-	                                <tr><td><strong><?= translate('code'); ?>:</strong></td><td>${user.code}</td></tr>
-	                                <tr><td><strong><?= translate('email'); ?>:</strong></td><td>${user.email}</td></tr>
-	                                <tr><td><strong><?= translate('phone'); ?>:</strong></td><td>${user.phone || '<?= translate('not provided'); ?>'}</td></tr>
-	                                <tr><td><strong><?= translate('document'); ?>:</strong></td><td>${user.document || '<?= translate('not provided'); ?>'}</td></tr>
-	                                <tr><td><strong><?= translate('group'); ?>:</strong></td><td>${user.group == 1 ? '<?= translate('admin'); ?>' : '<?= translate('player'); ?>'}</td></tr>
-	                                <tr><td><strong><?= translate('wallet'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_total ?? user.wallet ?? 0).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong>Recarga:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_recharge ?? user.wallet_recharge ?? 0).toFixed(2)}</td></tr>
-	                                <tr><td><strong>Retiro:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_withdraw ?? user.wallet_withdraw ?? 0).toFixed(2)}</td></tr>
-	                                <tr><td><strong>Saldo bono:</strong></td><td><?= systemGet('currency'); ?> ${parseFloat(stats.wallet_bonus ?? user.wallet_bonus ?? 0).toFixed(2)}</td></tr>
-	                                <tr><td><strong><?= translate('registered'); ?>:</strong></td><td>${new Date(user.created_at).toLocaleString()}</td></tr>
-	                                <tr><td><strong><?= translate('last update'); ?>:</strong></td><td>${new Date(user.updated_at).toLocaleString()}</td></tr>
-	                            </table>
-	                            <h6 class="mt-3"><?= translate('activity statistics'); ?></h6>
-	                            <table class="table table-sm">
-	                                <tr><td><strong><?= translate('total cartons'); ?>:</strong></td><td><span class="badge bg-primary p-2 fs-6">${stats.total_cartons}</span></td></tr>
-	                                <tr><td><strong><?= translate('total deposits'); ?>:</strong></td><td><span class="badge bg-success p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_deposits || 0).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong><?= translate('total retires'); ?>:</strong></td><td><span class="badge bg-danger p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_retires || 0).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong>Tablas otorgadas:</strong></td><td><span class="badge bg-info p-2 fs-6">${parseInt(stats.granted_cartons || 0, 10)}</span> <small class="text-muted">(pendientes: ${parseInt(stats.pending_cartons || 0, 10)})</small></td></tr>
-	                                <tr><td><strong><?= translate('total roulettes'); ?>:</strong></td><td><span class="badge bg-secondary p-2 fs-6"><?= systemGet('currency'); ?> ${parseFloat(stats.total_roulettes || 0).toFixed(2)}</span></td></tr>
-	                                <tr><td><strong><?= translate('last activity'); ?>:</strong></td><td>${stats.last_activity ? new Date(stats.last_activity).toLocaleString() : '<?= translate('no activity'); ?>'}</td></tr>
-	                            </table>
-	                        </div>
-	                    </div>
-	                `;
-	                
-	                $('#userDetailsContent').html(content);
+	            if (response.success && response.html) {
+	                $('#userDetailsContent').html(response.html);
 	                $('#modalUserDetails').modal('show');
 	            } else {
 	                Toastify({
-	                    text: response.error,
+	                    text: response.error || "<?= translate('user not found'); ?>",
 	                    duration: 3000,
 	                    gravity: "top",
 	                    position: "right",
@@ -554,5 +504,80 @@
 	            }).showToast();
 	        }
 	    });
+	}
+
+	function revokeUserKyc(userId) {
+	    if (!confirm("<?= translate('confirm remove kyc verification'); ?>")) {
+	        return;
+	    }
+	    $.ajax({
+	        url: '<?= site_url('users/revokeKyc'); ?>',
+	        method: 'POST',
+	        dataType: 'json',
+	        data: {
+	            user_id: userId,
+	            <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+	        },
+	        success: function(response) {
+	            Toastify({
+	                text: response.message || (response.success ? 'OK' : 'Error'),
+	                duration: 3000,
+	                gravity: "top",
+	                position: "right",
+	                style: { background: response.success ? "#198754" : "#dc3545" },
+	                stopOnFocus: true
+	            }).showToast();
+	            if (response.success) {
+	                viewUser(userId);
+	            }
+	        }
+	    });
+	}
+
+	function saveDocumentExpiry(userId) {
+	    var value = $('#admin-document-expires-at').val() || '';
+	    $.ajax({
+	        url: '<?= site_url('users/saveDocumentExpiry'); ?>',
+	        method: 'POST',
+	        dataType: 'json',
+	        data: {
+	            user_id: userId,
+	            document_expires_at: value,
+	            <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+	        },
+	        success: function(response) {
+	            Toastify({
+	                text: response.message || (response.success ? 'OK' : 'Error'),
+	                duration: 3000,
+	                gravity: "top",
+	                position: "right",
+	                style: { background: response.success ? "#198754" : "#dc3545" },
+	                stopOnFocus: true
+	            }).showToast();
+	            if (response.success) {
+	                viewUser(userId);
+	            }
+	        }
+	    });
+	}
+
+	if (typeof grantBonusGet !== 'function') {
+	    window.grantBonusGet = function(userId) {
+	        var url = '<?= site_url('users/grantBonusGet'); ?>';
+	        if (userId) {
+	            url += '/' + userId;
+	        }
+	        if (typeof loadAndShowModal === 'function') {
+	            loadAndShowModal('#modalGrantBonus', url);
+	        } else {
+	            $('#modalGrantBonus').load(url, function() {
+	                if (typeof showBsModal === 'function') {
+	                    showBsModal('#modalGrantBonus');
+	                } else {
+	                    new bootstrap.Modal(document.getElementById('modalGrantBonus')).show();
+	                }
+	            });
+	        }
+	    };
 	}
 </script>

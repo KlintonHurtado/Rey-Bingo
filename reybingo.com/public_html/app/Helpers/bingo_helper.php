@@ -1382,6 +1382,64 @@ if (!function_exists('bingo_generate_operator_username')) {
     }
 }
 
+if (!function_exists('bingo_generate_player_username')) {
+    /**
+     * Alias aleatorio basado en nombre + apellido (único).
+     */
+    function bingo_generate_player_username(string $firstname, string $lastname, \App\Models\UsersModel $model, ?int $excludeId = null): string
+    {
+        $normalize = static function (string $value): string {
+            $ascii = $value;
+            if (function_exists('iconv')) {
+                $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+                if (is_string($converted) && $converted !== '') {
+                    $ascii = $converted;
+                }
+            }
+            $ascii = strtolower(preg_replace('/[^a-z0-9]/i', '', $ascii) ?? '');
+
+            return $ascii;
+        };
+
+        $first = $normalize($firstname);
+        $last = $normalize($lastname);
+        $base = substr($first . $last, 0, 12);
+        if ($base === '') {
+            $base = 'jugador';
+        }
+
+        for ($i = 0; $i < 40; $i++) {
+            $suffix = (string) random_int(100, 9999);
+            $candidate = substr($base, 0, 16) . $suffix;
+            $builder = $model->where('username', $candidate);
+            if ($excludeId) {
+                $builder = $builder->where('id !=', $excludeId);
+            }
+            if (! $builder->first()) {
+                return $candidate;
+            }
+        }
+
+        return $base . substr(bin2hex(random_bytes(3)), 0, 6);
+    }
+}
+
+if (!function_exists('bingo_player_email_is_verified')) {
+    function bingo_player_email_is_verified(?array $user): bool
+    {
+        if (! is_array($user) || $user === []) {
+            return false;
+        }
+
+        // Admin / PV / operador no requieren verificación de correo de jugador
+        if ((int) ($user['group'] ?? 0) !== 0) {
+            return true;
+        }
+
+        return (int) ($user['verified_email'] ?? 0) === 1;
+    }
+}
+
 if (!function_exists('bingo_enrich_stores_with_operator')) {
     function bingo_enrich_stores_with_operator(array $stores): array
     {
@@ -1509,6 +1567,16 @@ if (!function_exists('bingo_enforce_active_session')) {
         }
 
         if (bingo_user_is_active($user)) {
+            // Jugadores sin correo confirmado no pueden mantener sesión
+            if (! bingo_player_email_is_verified($user)) {
+                $checked[$userId] = false;
+                session()->destroy();
+                helper('cookie');
+                delete_cookie('_signin');
+
+                return redirect()->to('/signup/verifyPending?email=' . rawurlencode((string) ($user['email'] ?? '')));
+            }
+
             $checked[$userId] = true;
 
             return null;
@@ -2337,6 +2405,131 @@ if (!function_exists('bingo_ensure_users_schema')) {
                     ],
                 ]);
             }
+
+            if (!$db->fieldExists('document_expires_at', 'users')) {
+                $forge->addColumn('users', [
+                    'document_expires_at' => [
+                        'type' => 'DATE',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'document',
+                    ],
+                ]);
+            }
+
+            if (!$db->fieldExists('last_ip', 'users')) {
+                $forge->addColumn('users', [
+                    'last_ip' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 64,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'status',
+                    ],
+                ]);
+            }
+
+            if (!$db->fieldExists('last_mac', 'users')) {
+                $forge->addColumn('users', [
+                    'last_mac' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 64,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'last_ip',
+                    ],
+                ]);
+            }
+
+            if (!$db->fieldExists('last_seen_at', 'users')) {
+                $forge->addColumn('users', [
+                    'last_seen_at' => [
+                        'type' => 'DATETIME',
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'last_mac',
+                    ],
+                ]);
+            }
+
+            // Jugadores legacy sin flag: marcar verificados para no bloquear cuentas antiguas
+            try {
+                $db->query("UPDATE `users` SET `verified_email` = 1 WHERE `group` = 0 AND (`verified_email` IS NULL)");
+            } catch (\Throwable $e) {
+            }
+
+            if (!$db->tableExists('carton_purchase_logs')) {
+                $forge->addField([
+                    'id' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'unsigned' => true,
+                        'auto_increment' => true,
+                    ],
+                    'user_id' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'unsigned' => true,
+                    ],
+                    'game_id' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                    ],
+                    'cartons_count' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'unsigned' => true,
+                        'default' => 0,
+                    ],
+                    'amount' => [
+                        'type' => 'DECIMAL',
+                        'constraint' => '12,2',
+                        'default' => 0,
+                    ],
+                    'from_bonus' => [
+                        'type' => 'DECIMAL',
+                        'constraint' => '12,2',
+                        'default' => 0,
+                    ],
+                    'from_recharge' => [
+                        'type' => 'DECIMAL',
+                        'constraint' => '12,2',
+                        'default' => 0,
+                    ],
+                    'from_withdraw' => [
+                        'type' => 'DECIMAL',
+                        'constraint' => '12,2',
+                        'default' => 0,
+                    ],
+                    'source' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 20,
+                        'default' => 'wallet',
+                    ],
+                    'roulette_id' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'unsigned' => true,
+                        'null' => true,
+                        'default' => null,
+                    ],
+                    'created_at' => [
+                        'type' => 'DATETIME',
+                        'null' => true,
+                    ],
+                    'updated_at' => [
+                        'type' => 'DATETIME',
+                        'null' => true,
+                    ],
+                ]);
+                $forge->addKey('id', true);
+                $forge->addKey('user_id');
+                $forge->addKey('game_id');
+                $forge->createTable('carton_purchase_logs', true);
+            }
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de users: ' . $e->getMessage());
         }
@@ -2647,6 +2840,122 @@ if (!function_exists('bingo_mark_terms_accepted')) {
         return (bool) $model->update($userId, [
             'terms_accepted_at' => date('Y-m-d H:i:s'),
         ]);
+    }
+}
+
+if (!function_exists('bingo_log_carton_purchase')) {
+    /**
+     * @param array{from_bonus?:float,from_recharge?:float,from_withdraw?:float} $split
+     */
+    function bingo_log_carton_purchase(
+        int $userId,
+        int $gameId,
+        int $cartonsCount,
+        float $amount,
+        array $split = [],
+        string $source = 'wallet',
+        ?int $rouletteId = null
+    ): void {
+        if ($userId <= 0 || $cartonsCount <= 0) {
+            return;
+        }
+
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+
+        try {
+            $model = new \App\Models\CartonPurchaseLogsModel();
+            $model->insert([
+                'user_id' => $userId,
+                'game_id' => $gameId > 0 ? $gameId : null,
+                'cartons_count' => $cartonsCount,
+                'amount' => round($amount, 2),
+                'from_bonus' => round((float) ($split['from_bonus'] ?? 0), 2),
+                'from_recharge' => round((float) ($split['from_recharge'] ?? 0), 2),
+                'from_withdraw' => round((float) ($split['from_withdraw'] ?? 0), 2),
+                'source' => in_array($source, ['wallet', 'roulette', 'bonus'], true) ? $source : 'wallet',
+                'roulette_id' => $rouletteId,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_log_carton_purchase: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_document_expiry_status')) {
+    /**
+     * @return array{status:string,label:string,days:?int,expires_at:?string}
+     */
+    function bingo_document_expiry_status(?array $user): array
+    {
+        $expires = trim((string) ($user['document_expires_at'] ?? ''));
+        if ($expires === '' || $expires === '0000-00-00') {
+            return [
+                'status' => 'unknown',
+                'label' => translate('document expiry not set'),
+                'days' => null,
+                'expires_at' => null,
+            ];
+        }
+
+        $expiresTs = strtotime($expires . ' 23:59:59');
+        if ($expiresTs === false) {
+            return [
+                'status' => 'unknown',
+                'label' => translate('document expiry not set'),
+                'days' => null,
+                'expires_at' => null,
+            ];
+        }
+
+        $days = (int) floor(($expiresTs - time()) / 86400);
+        if ($days < 0) {
+            return [
+                'status' => 'expired',
+                'label' => translate('document expired'),
+                'days' => $days,
+                'expires_at' => $expires,
+            ];
+        }
+
+        if ($days <= 30) {
+            return [
+                'status' => 'expiring',
+                'label' => translate('document expiring soon'),
+                'days' => $days,
+                'expires_at' => $expires,
+            ];
+        }
+
+        return [
+            'status' => 'ok',
+            'label' => translate('document valid'),
+            'days' => $days,
+            'expires_at' => $expires,
+        ];
+    }
+}
+
+if (!function_exists('bingo_capture_client_mac')) {
+    function bingo_capture_client_mac(?\CodeIgniter\HTTP\RequestInterface $request = null): string
+    {
+        $request = $request ?? service('request');
+        $candidates = [
+            (string) $request->getHeaderLine('X-Client-MAC'),
+            (string) $request->getHeaderLine('X-Device-MAC'),
+            (string) $request->getPost('mac_address'),
+            (string) $request->getGet('mac_address'),
+        ];
+
+        foreach ($candidates as $mac) {
+            $mac = strtoupper(trim($mac));
+            if ($mac !== '' && preg_match('/^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/', $mac)) {
+                return $mac;
+            }
+        }
+
+        return '';
     }
 }
 

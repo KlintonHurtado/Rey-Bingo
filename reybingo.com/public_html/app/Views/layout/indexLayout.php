@@ -558,6 +558,8 @@
 
     <div class="modal fade" id="modalDeposit" tabindex="-1" role="dialog"></div>
 
+    <div class="modal fade" id="modalGrantBonus" tabindex="-1" role="dialog"></div>
+
     <div class="modal fade" id="modalRetire" tabindex="-1" role="dialog"></div>
     
     <div class="modal fade" id="modalTransfer" tabindex="-1" role="dialog"></div>

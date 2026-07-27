@@ -99,7 +99,7 @@
     <div class="modal fade" id="modalOperator" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalUserDetails" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><?= translate('user details'); ?></h5>
@@ -127,6 +127,8 @@
     <div class="modal fade" id="modalAvailableCartons" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalDeposit" tabindex="-1" role="dialog"></div>
+
+    <div class="modal fade" id="modalGrantBonus" tabindex="-1" role="dialog"></div>
 
     <div class="modal fade" id="modalRetire" tabindex="-1" role="dialog"></div>
     
@@ -1785,8 +1787,22 @@
         generateSegments();
 
         function getRandomColor() {
-            const hue = Math.floor(Math.random() * 360);
-            return `hsl(${hue}, 85%, 65%)`;
+            // Paleta fija de alto contraste (evita colores aleatorios ilegibles)
+            const palette = [
+                '#6236ff', '#ff3fa4', '#00c2ff', '#ffb020',
+                '#20c997', '#ff6b6b', '#845ef7', '#339af0'
+            ];
+            return palette[colors.length % palette.length];
+        }
+
+        function contrastTextColor(bg) {
+            // bg = #rrggbb
+            const hex = (bg || '#000000').replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.55 ? '#111111' : '#FFFFFF';
         }
 
         for (let i = 0; i < totalSegments; i++) {
@@ -1799,7 +1815,7 @@
             const centerX = wheel.width / 2;
             const centerY = wheel.height / 2;
             const radius = wheel.width / 2;
-            const fontSize = totalSegments <= 5 ? 14 : (totalSegments <= 6 ? 13 : 12);
+            const fontSize = totalSegments <= 5 ? 16 : (totalSegments <= 6 ? 15 : 14);
 
             for (let i = 0; i < totalSegments; i++) {
                 const startAngle = angles[i] + rotation;
@@ -1810,15 +1826,24 @@
                 ctx.arc(centerX, centerY, radius, startAngle, endAngle);
                 ctx.fillStyle = colors[i];
                 ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
                 ctx.stroke();
 
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(startAngle + segmentAngle / 2);
                 ctx.textAlign = "right";
-                ctx.fillStyle = "black";
-                ctx.font = "bold " + fontSize + "px sans-serif";
-                ctx.fillText(segments[i], radius - 10, 5);
+                ctx.textBaseline = "middle";
+                const label = String(segments[i] || '');
+                const textColor = contrastTextColor(colors[i]);
+                ctx.font = "bold " + fontSize + "px Arial, Helvetica, sans-serif";
+                // Contorno para legibilidad
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = textColor === '#FFFFFF' ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.65)';
+                ctx.strokeText(label, radius - 14, 0);
+                ctx.fillStyle = textColor;
+                ctx.fillText(label, radius - 14, 0);
                 ctx.restore();
             }
 

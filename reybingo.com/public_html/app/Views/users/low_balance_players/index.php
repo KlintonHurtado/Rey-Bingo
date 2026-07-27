@@ -78,9 +78,18 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                                 <?php endif; ?>
                             </small>
                         </h5>
-                        <button type="button" class="btn btn-primary btn-modal-add text-white stores-add-btn flex-shrink-0" onclick="lowBalancePlayersRefresh();" title="<?= translate('refresh'); ?>">
-                            <i class="fa-duotone fa-solid fa-arrows-rotate"></i>
-                        </button>
+                        <div class="d-flex gap-2 flex-shrink-0">
+                            <a
+                                href="<?= site_url('users/exportLowBalancePlayers'); ?>"
+                                class="btn btn-success btn-modal-add text-white stores-add-btn"
+                                title="<?= translate('export'); ?>"
+                            >
+                                <i class="fa-duotone fa-solid fa-file-arrow-down"></i>
+                            </a>
+                            <button type="button" class="btn btn-primary btn-modal-add text-white stores-add-btn" onclick="lowBalancePlayersRefresh();" title="<?= translate('refresh'); ?>">
+                                <i class="fa-duotone fa-solid fa-arrows-rotate"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <?php if ((int) systemGet('activateRoulette') !== 1) : ?>

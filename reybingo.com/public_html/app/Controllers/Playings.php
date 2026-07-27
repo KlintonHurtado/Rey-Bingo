@@ -420,6 +420,16 @@ class Playings extends Controller
             'status' => 1,
         ]);
 
+        bingo_log_carton_purchase(
+            $userId,
+            $gameId,
+            $cartonsToUse,
+            $amount,
+            ['from_bonus' => 0, 'from_recharge' => 0, 'from_withdraw' => 0],
+            'roulette',
+            $rouletteId
+        );
+
         // Si sobran cartones, insertar un nuevo registro de premio pendiente
         $remainingCartons = $cartons - $cartonsToUse;
         if ($remainingCartons > 0) {
@@ -641,11 +651,19 @@ class Playings extends Controller
                 }
             }
 
-            if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
-                throw new \Exception(translate('insufficient wallet balance'));
-            }
-
             if ($totalCost > 0) {
+                $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                if ($split === null) {
+                    throw new \Exception(translate('insufficient wallet balance'));
+                }
+                bingo_log_carton_purchase(
+                    $userId,
+                    (int) $gameId,
+                    (int) $totalSelectedCartons,
+                    (float) $totalCost,
+                    $split,
+                    'wallet'
+                );
                 bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $savedCartonIds);
             }
 
@@ -1373,9 +1391,19 @@ class Playings extends Controller
                 $modelNumbersCartons->insertBatch($numbersData);
 
                 $genCost = $toGenerate * $game['price'];
-                wallet_deduct_purchase($user['id'], $genCost);
                 if ($genCost > 0) {
-                    bingo_after_carton_purchase((int) $user['id'], (int) $game['id'], (float) $genCost);
+                    $split = wallet_deduct_purchase_detailed((int) $user['id'], (float) $genCost);
+                    if ($split !== null) {
+                        bingo_log_carton_purchase(
+                            (int) $user['id'],
+                            (int) $game['id'],
+                            (int) $toGenerate,
+                            (float) $genCost,
+                            $split,
+                            'wallet'
+                        );
+                        bingo_after_carton_purchase((int) $user['id'], (int) $game['id'], (float) $genCost);
+                    }
                 }
             }
 
@@ -1563,11 +1591,19 @@ class Playings extends Controller
                     ]);
                 }
 
-                if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
-                    throw new \Exception(translate('insufficient wallet balance'));
-                }
-
                 if ($totalCost > 0) {
+                    $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                    if ($split === null) {
+                        throw new \Exception(translate('insufficient wallet balance'));
+                    }
+                    bingo_log_carton_purchase(
+                        $userId,
+                        (int) $gameId,
+                        count($cartonIds),
+                        (float) $totalCost,
+                        $split,
+                        'wallet'
+                    );
                     bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
                 }
 
@@ -1771,11 +1807,19 @@ class Playings extends Controller
                     ]);
                 }
 
-                if ($totalCost > 0 && !wallet_deduct_purchase($userId, $totalCost)) {
-                    throw new \Exception(translate('insufficient wallet balance'));
-                }
-
                 if ($totalCost > 0) {
+                    $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                    if ($split === null) {
+                        throw new \Exception(translate('insufficient wallet balance'));
+                    }
+                    bingo_log_carton_purchase(
+                        $userId,
+                        (int) $gameId,
+                        count($cartonIds),
+                        (float) $totalCost,
+                        $split,
+                        'wallet'
+                    );
                     bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
                 }
 

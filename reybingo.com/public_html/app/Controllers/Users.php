@@ -776,6 +776,75 @@ class Users extends Controller {
         ]);
     }
 
+    public function exportLowBalancePlayers()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet']);
+
+        $payload = bingo_fetch_low_balance_players();
+        $players = $payload['players'] ?? [];
+        $threshold = (float) ($payload['threshold'] ?? 0);
+        $currency = (string) systemGet('currency');
+
+        $headers = [
+            'ID',
+            'Codigo',
+            'Nombre',
+            'Usuario',
+            'Email',
+            'Telefono',
+            'Documento',
+            'Saldo total',
+            'Saldo recarga',
+            'Saldo retiro',
+            'Saldo bono',
+            'Ruleta disponible',
+            'Ultimo otorgamiento ruleta',
+            'Origen otorgamiento',
+            'Umbral',
+        ];
+
+        $rows = [];
+        foreach ($players as $player) {
+            $latestGrant = $player['latest_grant'] ?? null;
+            $grantAt = '';
+            $grantSource = '';
+            if (is_array($latestGrant)) {
+                $grantAt = (string) ($latestGrant['created_at'] ?? '');
+                $grantSource = (($latestGrant['source'] ?? '') === 'auto')
+                    ? translate('automatic')
+                    : translate('manual');
+            }
+
+            $rows[] = [
+                $player['id'] ?? '',
+                $player['code'] ?? '',
+                trim(($player['firstname'] ?? '') . ' ' . ($player['lastname'] ?? '')),
+                $player['username'] ?? '',
+                $player['email'] ?? '',
+                $player['phone'] ?? '',
+                $player['document'] ?? '',
+                number_format((float) ($player['wallet_total'] ?? 0), 2, '.', ''),
+                number_format((float) ($player['wallet_recharge_display'] ?? $player['wallet_recharge'] ?? 0), 2, '.', ''),
+                number_format((float) ($player['wallet_withdraw_display'] ?? $player['wallet_withdraw'] ?? 0), 2, '.', ''),
+                number_format((float) ($player['wallet_bonus'] ?? 0), 2, '.', ''),
+                ((int) ($player['roulette'] ?? 1) === 0) ? translate('active') : translate('inactive'),
+                $grantAt,
+                $grantSource,
+                number_format($threshold, 2, '.', '') . ' ' . $currency,
+            ];
+        }
+
+        $filename = 'jugadores-poco-saldo-' . date('Ymd-His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse($headers, $rows, $filename, [
+            'sheet_name' => 'Poco saldo',
+        ]);
+    }
+
     public function lowBalanceHistoryListGet()
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {
@@ -834,6 +903,93 @@ class Users extends Controller {
             'success' => true,
             'message' => translate('roulette granted successfully'),
             'pending_count' => bingo_low_balance_roulette_pending_count(),
+        ]);
+    }
+
+    public function grantBonusGet($userId = null)
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper('wallet');
+
+        $modelUsers = new UsersModel();
+        $selectedUserId = (int) ($userId ?? $this->request->getGet('user_id') ?? 0);
+
+        $players = $modelUsers
+            ->select('id, code, firstname, lastname, username, email, wallet_bonus')
+            ->where('group', bingo_group_player())
+            ->where('deleted', 0)
+            ->where('status', 1)
+            ->orderBy('firstname', 'ASC')
+            ->findAll();
+
+        $selectedUser = null;
+        if ($selectedUserId > 0) {
+            foreach ($players as $player) {
+                if ((int) $player['id'] === $selectedUserId) {
+                    $selectedUser = wallet_service()->normalizeUser($player);
+                    break;
+                }
+            }
+            if (! $selectedUser) {
+                $found = $modelUsers
+                    ->where('id', $selectedUserId)
+                    ->where('group', bingo_group_player())
+                    ->where('deleted', 0)
+                    ->first();
+                if ($found) {
+                    $selectedUser = wallet_service()->normalizeUser($found);
+                }
+            }
+        }
+
+        return view('users/grant_bonus', [
+            'players' => $players,
+            'selectedUserId' => $selectedUserId,
+            'selectedUser' => $selectedUser,
+        ]);
+    }
+
+    public function grantPlayerBonus()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized'),
+            ]);
+        }
+
+        helper('wallet');
+
+        $userId = (int) $this->request->getPost('user_id');
+        $amount = (float) $this->request->getPost('amount');
+        $note = trim((string) $this->request->getPost('note'));
+        if (mb_strlen($note) > 200) {
+            $note = mb_substr($note, 0, 200);
+        }
+
+        $result = wallet_grant_admin_bonus(
+            $userId,
+            $amount,
+            (int) session()->get('id'),
+            $note
+        );
+
+        if (! ($result['success'] ?? false)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => $result['message'] ?? translate('invalid bonus amount'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => $result['message'],
+            'amount' => $result['amount'] ?? $amount,
+            'wallet_bonus' => $result['wallet_bonus'] ?? null,
+            'user_id' => $userId,
         ]);
     }
 
@@ -1026,10 +1182,25 @@ class Users extends Controller {
     }
 
     public function getUserDetails($userId) {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized access'),
+            ]);
+        }
+
+        bingo_ensure_users_schema();
+
         $model = new UsersModel();
         $modelCartons = new CartonsModel();
         $modelDeposits = new DepositsModel();
         $modelRetires = new RetiresModel();
+        $modelRoulettes = new RoulettesModel();
+        $modelPayments = new PaymentsModel();
+        $modelLogs = new \App\Models\LogsModel();
+        $modelGames = new GamesModel();
+        $modelSings = new SingsModel();
+        $modelPurchaseLogs = new \App\Models\CartonPurchaseLogsModel();
 
         $user = $model->find($userId);
         
@@ -1060,22 +1231,49 @@ class Users extends Controller {
             ->getRow()
             ->amount) ?? 0);
 
-        $grantedCartons = (int) (((new RoulettesModel())
+        $grantedCartons = (int) (($modelRoulettes
             ->where('user', $userId)
             ->selectSum('cartons')
             ->get()
             ->getRow()
             ->cartons) ?? 0);
 
-        $rouletteAmount = (float) (((new RoulettesModel())
+        $rouletteAmount = (float) (($modelRoulettes
             ->where('user', $userId)
             ->where('status', 1)
             ->selectSum('amount')
             ->get()
             ->getRow()
             ->amount) ?? 0);
-        
-        // Estadísticas detalladas del usuario (depósitos/retiros aprobados = status 2)
+
+        $bonusReleased = (float) (($modelPurchaseLogs
+            ->where('user_id', $userId)
+            ->selectSum('from_bonus')
+            ->get()
+            ->getRow()
+            ->from_bonus) ?? 0);
+
+        $rouletteReleased = (float) (($modelPurchaseLogs
+            ->where('user_id', $userId)
+            ->where('source', 'roulette')
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0);
+
+        if ($rouletteReleased <= 0) {
+            $rouletteReleased = $rouletteAmount;
+        }
+
+        $totalPrizes = (float) (($modelPayments
+            ->where('user', $userId)
+            ->where('type', 'award')
+            ->where('status', 2)
+            ->selectSum('amount')
+            ->get()
+            ->getRow()
+            ->amount) ?? 0);
+
         $stats = [
             'total_cartons' => $modelCartons->where('user', $userId)->countAllResults(),
             'total_deposits' => round($totalDeposits, 2),
@@ -1087,13 +1285,348 @@ class Users extends Controller {
             'wallet_recharge' => (float) ($user['wallet_recharge'] ?? 0),
             'wallet_withdraw' => (float) ($user['wallet_withdraw'] ?? 0),
             'wallet_bonus' => (float) ($user['wallet_bonus'] ?? 0),
-            'last_activity' => $this->getLastActivity($userId)
+            'bonus_released' => round($bonusReleased, 2),
+            'roulette_released' => round($rouletteReleased, 2),
+            'total_prizes' => round($totalPrizes, 2),
+            'last_activity' => $this->getLastActivity($userId),
         ];
-        
+
+        $deposits = $modelDeposits->where('user', $userId)->orderBy('date', 'DESC')->findAll(100);
+        $retires = $modelRetires->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(100);
+
+        $prizes = $modelPayments
+            ->where('user', $userId)
+            ->where('type', 'award')
+            ->orderBy('created_at', 'DESC')
+            ->findAll(100);
+
+        $prizeRows = [];
+        foreach ($prizes as $prize) {
+            $sing = $modelSings->find((int) ($prize['type_id'] ?? 0));
+            $game = $sing ? $modelGames->find((int) ($sing['game'] ?? 0)) : null;
+            $prizeRows[] = [
+                'id' => $prize['id'],
+                'amount' => (float) $prize['amount'],
+                'status' => (int) $prize['status'],
+                'created_at' => $prize['created_at'],
+                'game' => $game['description'] ?? ('#' . ($sing['game'] ?? '-')),
+                'modality' => $sing['modality'] ?? '-',
+                'carton' => $sing['carton'] ?? '-',
+            ];
+        }
+
+        $purchaseLogs = $modelPurchaseLogs
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'DESC')
+            ->findAll(150);
+
+        $purchaseRows = [];
+        foreach ($purchaseLogs as $log) {
+            $game = ! empty($log['game_id']) ? $modelGames->find((int) $log['game_id']) : null;
+            $purchaseRows[] = [
+                'id' => $log['id'],
+                'created_at' => $log['created_at'],
+                'game' => $game['description'] ?? ('#' . ($log['game_id'] ?? '-')),
+                'cartons_count' => (int) $log['cartons_count'],
+                'amount' => (float) $log['amount'],
+                'from_bonus' => (float) $log['from_bonus'],
+                'from_recharge' => (float) $log['from_recharge'],
+                'from_withdraw' => (float) $log['from_withdraw'],
+                'source' => $log['source'],
+            ];
+        }
+
+        // Histórico sin log: agrupar cartones por partida (aprox. dinero real/bono desconocido)
+        if ($purchaseRows === []) {
+            $db = \Config\Database::connect();
+            $legacy = $db->query(
+                'SELECT c.game AS game_id, COUNT(*) AS cartons_count, MIN(c.created_at) AS first_at, MAX(c.created_at) AS last_at
+                 FROM cartons c
+                 WHERE c.user = ?
+                 GROUP BY c.game
+                 ORDER BY last_at DESC
+                 LIMIT 80',
+                [(int) $userId]
+            )->getResultArray();
+
+            foreach ($legacy as $row) {
+                $game = $modelGames->find((int) $row['game_id']);
+                $price = (float) ($game['price'] ?? 0);
+                $count = (int) $row['cartons_count'];
+                $purchaseRows[] = [
+                    'id' => null,
+                    'created_at' => $row['last_at'] ?? $row['first_at'],
+                    'game' => $game['description'] ?? ('#' . $row['game_id']),
+                    'cartons_count' => $count,
+                    'amount' => round($price * $count, 2),
+                    'from_bonus' => 0,
+                    'from_recharge' => round($price * $count, 2),
+                    'from_withdraw' => 0,
+                    'source' => 'wallet_legacy',
+                ];
+            }
+
+            $rouletteUsed = $modelRoulettes
+                ->where('user', $userId)
+                ->where('status', 1)
+                ->orderBy('created_at', 'DESC')
+                ->findAll(50);
+            foreach ($rouletteUsed as $roulette) {
+                $game = ! empty($roulette['game']) ? $modelGames->find((int) $roulette['game']) : null;
+                $purchaseRows[] = [
+                    'id' => 'R' . $roulette['id'],
+                    'created_at' => $roulette['created_at'],
+                    'game' => $game['description'] ?? ('#' . ($roulette['game'] ?? '-')),
+                    'cartons_count' => (int) $roulette['cartons'],
+                    'amount' => (float) $roulette['amount'],
+                    'from_bonus' => 0,
+                    'from_recharge' => 0,
+                    'from_withdraw' => 0,
+                    'source' => 'roulette',
+                ];
+            }
+        }
+
+        $roulettes = $modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(80);
+        $loginLogs = $modelLogs
+            ->where('id_user', $userId)
+            ->whereIn('action', ['login', 'signup', 'google_signup'])
+            ->orderBy('created_at', 'DESC')
+            ->findAll(30);
+
+        $lastLog = $loginLogs[0] ?? null;
+        $ip = (string) ($user['last_ip'] ?? ($lastLog['ip_address'] ?? ''));
+        $mac = (string) ($user['last_mac'] ?? '');
+        $docExpiry = bingo_document_expiry_status($user);
+        $kycStatus = (string) ($user['kyc_status'] ?? 'pending');
+
+        $html = view('users/user_details_admin', [
+            'user' => $user,
+            'stats' => $stats,
+            'deposits' => $deposits,
+            'retires' => $retires,
+            'prizes' => $prizeRows,
+            'purchases' => $purchaseRows,
+            'roulettes' => $roulettes,
+            'loginLogs' => $loginLogs,
+            'ip' => $ip,
+            'mac' => $mac,
+            'docExpiry' => $docExpiry,
+            'kycStatus' => $kycStatus,
+            'currency' => systemGet('currency'),
+        ]);
+
         return $this->response->setJSON([
             'success' => true,
+            'html' => $html,
             'user' => $user,
-            'stats' => $stats
+            'stats' => $stats,
+        ]);
+    }
+
+    public function exportRiskAnalysis($userId)
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return redirect()->to('/signin');
+        }
+
+        bingo_ensure_users_schema();
+        helper('wallet');
+
+        $model = new UsersModel();
+        $user = $model->find((int) $userId);
+        if (! $user) {
+            return redirect()->back()->with('error', translate('user not found'));
+        }
+
+        $user = wallet_service()->normalizeUser($user);
+        $details = $this->buildRiskExportRows((int) $userId, $user);
+
+        $filename = 'riesgo-usuario-' . ($user['code'] ?? $userId) . '-' . date('Ymd-His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            ['Seccion', 'Campo', 'Valor', 'Detalle'],
+            $details,
+            $filename,
+            ['sheet_name' => 'Riesgo']
+        );
+    }
+
+    /**
+     * @return list<list<mixed>>
+     */
+    private function buildRiskExportRows(int $userId, array $user): array
+    {
+        $modelDeposits = new DepositsModel();
+        $modelRetires = new RetiresModel();
+        $modelPayments = new PaymentsModel();
+        $modelLogs = new \App\Models\LogsModel();
+        $modelRoulettes = new RoulettesModel();
+        $modelPurchaseLogs = new \App\Models\CartonPurchaseLogsModel();
+        $modelCartons = new CartonsModel();
+
+        $rows = [];
+        $add = static function (string $section, string $field, $value, string $detail = '') use (&$rows) {
+            $rows[] = [$section, $field, $value, $detail];
+        };
+
+        $docExpiry = bingo_document_expiry_status($user);
+        $add('Perfil', 'ID', $userId);
+        $add('Perfil', 'Codigo', $user['code'] ?? '');
+        $add('Perfil', 'Nombre', trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')));
+        $add('Perfil', 'Usuario', $user['username'] ?? '');
+        $add('Perfil', 'Email', $user['email'] ?? '');
+        $add('Perfil', 'Telefono', $user['phone'] ?? '');
+        $add('Perfil', 'Documento', $user['document'] ?? '');
+        $add('Perfil', 'Vence documento', $docExpiry['expires_at'] ?? '', $docExpiry['label'] ?? '');
+        $add('Perfil', 'KYC', $user['kyc_status'] ?? 'pending');
+        $add('Perfil', 'IP', $user['last_ip'] ?? '');
+        $add('Perfil', 'MAC', $user['last_mac'] ?: translate('mac not available web'));
+        $add('Saldos', 'Total', wallet_total($user));
+        $add('Saldos', 'Recarga', (float) ($user['wallet_recharge'] ?? 0));
+        $add('Saldos', 'Retiro', (float) ($user['wallet_withdraw'] ?? 0));
+        $add('Saldos', 'Bono', (float) ($user['wallet_bonus'] ?? 0));
+
+        $deposits = $modelDeposits->where('user', $userId)->orderBy('date', 'DESC')->findAll(200);
+        foreach ($deposits as $d) {
+            $add('Depositos', '#' . $d['id'], (float) $d['amount'], 'status=' . $d['status'] . ' ref=' . ($d['reference'] ?? '') . ' date=' . ($d['date'] ?? ''));
+        }
+
+        $retires = $modelRetires->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(200);
+        foreach ($retires as $r) {
+            $add('Retiros', '#' . $r['id'], (float) $r['amount'], 'status=' . $r['status'] . ' bank=' . ($r['bank'] ?? '') . ' date=' . ($r['created_at'] ?? ''));
+        }
+
+        $awards = $modelPayments->where('user', $userId)->where('type', 'award')->orderBy('created_at', 'DESC')->findAll(200);
+        foreach ($awards as $a) {
+            $add('Premios', '#' . $a['id'], (float) $a['amount'], 'date=' . ($a['created_at'] ?? ''));
+        }
+
+        $purchases = $modelPurchaseLogs->where('user_id', $userId)->orderBy('created_at', 'DESC')->findAll(300);
+        foreach ($purchases as $p) {
+            $add(
+                'Compras cartones',
+                '#' . $p['id'],
+                (float) $p['amount'],
+                'source=' . $p['source'] . ' cartones=' . $p['cartons_count']
+                . ' bono=' . $p['from_bonus'] . ' recarga=' . $p['from_recharge'] . ' retiro=' . $p['from_withdraw']
+            );
+        }
+
+        $roulettes = $modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(200);
+        foreach ($roulettes as $roulette) {
+            $add('Ruleta', '#' . $roulette['id'], (float) $roulette['amount'], 'cartones=' . $roulette['cartons'] . ' status=' . $roulette['status']);
+        }
+
+        $logs = $modelLogs->where('id_user', $userId)->orderBy('created_at', 'DESC')->findAll(100);
+        foreach ($logs as $log) {
+            $add('Accesos', $log['action'] ?? '', $log['ip_address'] ?? '', ($log['country'] ?? '') . ' | ' . ($log['created_at'] ?? ''));
+        }
+
+        $ips = [];
+        foreach ($logs as $log) {
+            $ip = trim((string) ($log['ip_address'] ?? ''));
+            if ($ip !== '') {
+                $ips[$ip] = ($ips[$ip] ?? 0) + 1;
+            }
+        }
+        foreach ($ips as $ip => $count) {
+            $add('Riesgo', 'IP distinta', $ip, 'veces=' . $count);
+        }
+
+        $sameDoc = [];
+        if (! empty($user['document'])) {
+            $sameDoc = (new UsersModel())
+                ->where('document', $user['document'])
+                ->where('id !=', $userId)
+                ->where('deleted', 0)
+                ->findAll(20);
+        }
+        foreach ($sameDoc as $dup) {
+            $add('Riesgo', 'Documento duplicado', $dup['code'] ?? $dup['id'], ($dup['firstname'] ?? '') . ' ' . ($dup['lastname'] ?? ''));
+        }
+
+        $add('Resumen', 'Total cartones', $modelCartons->where('user', $userId)->countAllResults());
+        $add('Resumen', 'Depositos aprobados', (float) (($modelDeposits->where('user', $userId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0));
+        $add('Resumen', 'Retiros aprobados', (float) (($modelRetires->where('user', $userId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0));
+
+        return $rows;
+    }
+
+    public function revokeKyc()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access'),
+            ]);
+        }
+
+        $userId = (int) $this->request->getPost('user_id');
+        $observations = trim((string) $this->request->getPost('kyc_observations'));
+        if ($userId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        bingo_ensure_users_schema();
+        $model = new UsersModel();
+        $user = $model->find($userId);
+        if (! $user) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        $note = $observations !== ''
+            ? $observations
+            : translate('kyc revoked by admin');
+
+        $model->update($userId, [
+            'kyc_status' => 'pending',
+            'kyc_front' => null,
+            'kyc_back' => null,
+            'kyc_selfie' => null,
+            'kyc_observations' => $note,
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('kyc verification removed'),
+        ]);
+    }
+
+    public function saveDocumentExpiry()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access'),
+            ]);
+        }
+
+        $userId = (int) $this->request->getPost('user_id');
+        $expires = trim((string) $this->request->getPost('document_expires_at'));
+        if ($userId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        bingo_ensure_users_schema();
+        $value = $expires !== '' ? date('Y-m-d', strtotime($expires)) : null;
+        (new UsersModel())->update($userId, [
+            'document_expires_at' => $value,
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('document expiry updated'),
+            'document_expires_at' => $value,
         ]);
     }
 
@@ -1207,6 +1740,9 @@ class Users extends Controller {
             'email' => $this->request->getPost('email'),
             'phone' => $this->request->getPost('phone') ?? '',
             'document' => $this->request->getPost('document') ?? '',
+            'document_expires_at' => ($exp = trim((string) $this->request->getPost('document_expires_at'))) !== ''
+                ? date('Y-m-d', strtotime($exp))
+                : null,
             'bank' => $this->request->getPost('bank') ?? '',
             'account' => $this->request->getPost('account') ?? '',
             'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
