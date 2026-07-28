@@ -539,6 +539,139 @@ if (!function_exists('bingo_summarize_player_prizes')) {
     }
 }
 
+if (!function_exists('bingo_resolve_award_credit_split')) {
+    /**
+     * Destino del premio según fuente de compra de cartones (user+game).
+     * Bono / ruleta → saldo recarga.
+     * Recarga / retiro → saldo retiro.
+     * Compra mixta → proporción por montos gastados.
+     *
+     * @return array{to_recharge:float,to_withdraw:float,has_logs:bool}
+     */
+    function bingo_resolve_award_credit_split(int $userId, int $gameId, float $prizeAmount): array
+    {
+        $prizeAmount = round(max(0, $prizeAmount), 2);
+        $empty = [
+            'to_recharge' => $prizeAmount,
+            'to_withdraw' => 0.0,
+            'has_logs' => false,
+        ];
+
+        if ($userId <= 0 || $gameId <= 0 || $prizeAmount <= 0) {
+            return $empty;
+        }
+
+        helper(['wallet', 'bingo']);
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('carton_purchase_logs')) {
+                return $empty;
+            }
+
+            $logs = (new \App\Models\CartonPurchaseLogsModel())
+                ->where('user_id', $userId)
+                ->where('game_id', $gameId)
+                ->findAll();
+
+            if ($logs === []) {
+                return $empty;
+            }
+
+            $weightRecharge = 0.0;
+            $weightWithdraw = 0.0;
+
+            foreach ($logs as $log) {
+                $source = (string) ($log['source'] ?? 'wallet');
+                $amount = round((float) ($log['amount'] ?? 0), 2);
+                $fromBonus = round((float) ($log['from_bonus'] ?? 0), 2);
+                $fromRecharge = round((float) ($log['from_recharge'] ?? 0), 2);
+                $fromWithdraw = round((float) ($log['from_withdraw'] ?? 0), 2);
+
+                // Ruleta o compra marcada como bono: premio → saldo recarga
+                if ($source === 'roulette' || $source === 'bonus') {
+                    $weightRecharge += $amount > 0 ? $amount : max($fromBonus + $fromRecharge + $fromWithdraw, 0);
+                    continue;
+                }
+
+                // Wallet / mixto
+                $weightRecharge += $fromBonus;
+                $weightWithdraw += $fromRecharge + $fromWithdraw;
+
+                // Si el log no trae split pero sí monto, asumir recarga real → retiro
+                if ($fromBonus <= 0 && $fromRecharge <= 0 && $fromWithdraw <= 0 && $amount > 0) {
+                    $weightWithdraw += $amount;
+                }
+            }
+
+            $totalWeight = round($weightRecharge + $weightWithdraw, 2);
+            if ($totalWeight <= 0) {
+                return $empty;
+            }
+
+            $toRecharge = round($prizeAmount * ($weightRecharge / $totalWeight), 2);
+            if ($toRecharge > $prizeAmount) {
+                $toRecharge = $prizeAmount;
+            }
+            $toWithdraw = round($prizeAmount - $toRecharge, 2);
+
+            return [
+                'to_recharge' => $toRecharge,
+                'to_withdraw' => $toWithdraw,
+                'has_logs' => true,
+            ];
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_resolve_award_credit_split: ' . $e->getMessage());
+            return $empty;
+        }
+    }
+}
+
+if (!function_exists('bingo_credit_award_by_purchase_source')) {
+    /**
+     * @return array{to_recharge:float,to_withdraw:float,has_logs:bool}
+     */
+    function bingo_credit_award_by_purchase_source(int $userId, int $gameId, float $prizeAmount): array
+    {
+        helper('wallet');
+        $split = bingo_resolve_award_credit_split($userId, $gameId, $prizeAmount);
+
+        if ($split['to_recharge'] > 0) {
+            wallet_credit_recharge($userId, $split['to_recharge']);
+        }
+        if ($split['to_withdraw'] > 0) {
+            wallet_credit_withdrawable($userId, $split['to_withdraw']);
+        }
+
+        return $split;
+    }
+}
+
+if (!function_exists('bingo_deduct_award_by_purchase_source')) {
+    /**
+     * Revierte un premio con el mismo criterio de destino (earring).
+     *
+     * @return array{to_recharge:float,to_withdraw:float,has_logs:bool}
+     */
+    function bingo_deduct_award_by_purchase_source(int $userId, int $gameId, float $prizeAmount): array
+    {
+        helper('wallet');
+        $split = bingo_resolve_award_credit_split($userId, $gameId, $prizeAmount);
+
+        if ($split['to_recharge'] > 0) {
+            wallet_deduct_recharge($userId, $split['to_recharge']);
+        }
+        if ($split['to_withdraw'] > 0) {
+            wallet_deduct_withdrawable($userId, $split['to_withdraw']);
+        }
+
+        return $split;
+    }
+}
+
 if (!function_exists('bingo_pay_sing_award')) {
     /**
      * @return array{success:bool,error?:string,amount?:string,store_balance?:float}
@@ -585,6 +718,18 @@ if (!function_exists('bingo_pay_sing_award')) {
             return ['success' => false, 'error' => translate('this award has already been paid')];
         }
 
+        $existingPayment = $modelPayments
+            ->where('type', 'award')
+            ->where('type_id', $singId)
+            ->first();
+        if ($existingPayment) {
+            if ($singStatus === 1) {
+                $modelSings->update($singId, ['status' => 2]);
+            }
+
+            return ['success' => false, 'error' => translate('this award has already been paid')];
+        }
+
         if ($singStatus !== 1) {
             return ['success' => false, 'error' => translate('the winner is not pending payment')];
         }
@@ -620,7 +765,11 @@ if (!function_exists('bingo_pay_sing_award')) {
             }
         }
 
-        wallet_credit_recharge((int) $sing['user'], $awardPerSing);
+        $awardCreditSplit = bingo_credit_award_by_purchase_source(
+            (int) $sing['user'],
+            (int) $sing['game'],
+            $awardPerSing
+        );
         $modelSings->update($singId, ['status' => 2]);
 
         $modelPayments->insert([
@@ -654,7 +803,7 @@ if (!function_exists('bingo_pay_sing_award')) {
         }
 
         $modalitySing = $modelModalities->find($sing['modality']) ?? ['name' => ''];
-        bingo_notify_award_payment($user, $game, $sing, $modalitySing, $awardPerSing, $paymentId, $paidByUserId);
+        bingo_notify_award_payment($user, $game, $sing, $modalitySing, $awardPerSing, $paymentId, $paidByUserId, $awardCreditSplit);
 
         helper('affiliate_ggr');
         bingo_record_ggr_payout((int) $sing['user'], (int) $game['id'], $awardPerSing, 'award', $singId);
@@ -685,12 +834,39 @@ if (!function_exists('bingo_notify_award_payment')) {
         array $modality,
         float $awardPerSing,
         int $paymentId,
-        int $fromUserId
+        int $fromUserId,
+        array $creditSplit = []
     ): void {
         $modelNotifications = new NotificationsModel();
         $currency = systemGet('currency');
         $modalityName = translate($modality['name'] ?? '');
         $gameName = $game['description'] ?? translate('game');
+
+        $toRecharge = round((float) ($creditSplit['to_recharge'] ?? $awardPerSing), 2);
+        $toWithdraw = round((float) ($creditSplit['to_withdraw'] ?? 0), 2);
+
+        if ($toRecharge > 0 && $toWithdraw > 0) {
+            $destMsg = translate('award split credit message');
+            $destMsg = str_replace(
+                [':currency', ':recharge', ':withdraw'],
+                [$currency, number_format($toRecharge, 2), number_format($toWithdraw, 2)],
+                $destMsg
+            );
+        } elseif ($toWithdraw > 0) {
+            $destMsg = translate('award to withdraw balance message');
+            $destMsg = str_replace(
+                [':currency', ':amount'],
+                [$currency, number_format($toWithdraw, 2)],
+                $destMsg
+            );
+        } else {
+            $destMsg = translate('award to recharge balance message');
+            $destMsg = str_replace(
+                [':currency', ':amount'],
+                [$currency, number_format($toRecharge > 0 ? $toRecharge : $awardPerSing, 2)],
+                $destMsg
+            );
+        }
 
         $modelNotifications->insert([
             'user' => (int) $user['id'],
@@ -700,7 +876,7 @@ if (!function_exists('bingo_notify_award_payment')) {
             'type' => 'payment',
             'type_id' => $paymentId,
             'title' => '🎉 ¡GANASTE! Premio acreditado',
-            'message' => 'Felicitaciones, ganaste la partida "' . $gameName . '" en la modalidad ' . $modalityName . '. Se acreditó ' . $currency . ' ' . number_format($awardPerSing, 2) . ' en tu billetera (saldo recarga).',
+            'message' => 'Felicitaciones, ganaste la partida "' . $gameName . '" en la modalidad ' . $modalityName . '. ' . $destMsg,
         ]);
     }
 }
@@ -712,13 +888,7 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
             return 0;
         }
 
-        $modelSings = new SingsModel();
-        $modelAwards = new AwardsModel();
-        $modelUsers = new UsersModel();
-        $modelGames = new GamesModel();
-        $modelPayments = new PaymentsModel();
-        $modelModalities = new ModalitiesModel();
-
+        $modelGames = new \App\Models\GamesModel();
         $game = $modelGames->find($gameId);
         if (!$game) {
             return 0;
@@ -733,7 +903,7 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
         }
 
         $pendingSings = bingo_filter_first_sing_per_modality(
-            (new SingsModel())
+            (new \App\Models\SingsModel())
                 ->where('game', $gameId)
                 ->where('status', 1)
                 ->orderBy('created_at', 'ASC')
@@ -744,63 +914,10 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
         $paid = 0;
 
         foreach ($pendingSings as $sing) {
-            $existingPayment = (new PaymentsModel())
-                ->where('type', 'award')
-                ->where('type_id', (int) $sing['id'])
-                ->first();
-
-            if ($existingPayment) {
-                if ((int) ($sing['status'] ?? 0) === 1) {
-                    $modelSings->update($sing['id'], ['status' => 2]);
-                }
-                continue;
+            $result = bingo_pay_sing_award((int) $sing['id'], max(1, $fromUserId));
+            if ($result['success'] ?? false) {
+                $paid++;
             }
-
-            $award = $modelAwards
-                ->where('game', $gameId)
-                ->where('modality', $sing['modality'])
-                ->where('status', 1)
-                ->first();
-
-            if (!$award) {
-                continue;
-            }
-
-            $awardPerSing = bingo_calculate_award_per_sing(
-                $game,
-                $award,
-                $gameId,
-                (int) $sing['modality']
-            );
-
-            if ($awardPerSing <= 0) {
-                continue;
-            }
-
-            $user = $modelUsers->find($sing['user']);
-            if (!$user) {
-                continue;
-            }
-
-            wallet_credit_recharge((int) $sing['user'], $awardPerSing);
-            $modelSings->update($sing['id'], ['status' => 2]);
-
-            $modelPayments->insert([
-                'user' => (int) $sing['user'],
-                'type' => 'award',
-                'type_id' => (int) $sing['id'],
-                'amount' => $awardPerSing,
-                'status' => 2,
-            ]);
-
-            $paymentId = (int) $modelPayments->insertID();
-            bingo_record_ggr_payout((int) $sing['user'], $gameId, $awardPerSing, 'award', (int) $sing['id']);
-
-            $modality = $modelModalities->find($sing['modality']) ?? ['name' => ''];
-
-            bingo_notify_award_payment($user, $game, $sing, $modality, $awardPerSing, $paymentId, $fromUserId);
-            bingo_settle_player_game_ggr_commissions((int) $sing['user'], $gameId, $fromUserId);
-            $paid++;
         }
 
         return $paid;

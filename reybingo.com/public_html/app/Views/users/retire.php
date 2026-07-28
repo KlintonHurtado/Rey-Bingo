@@ -125,7 +125,7 @@
             <?php if (wallet_withdrawable($user) <= 0): ?>
             <div class="alert alert-info border-0 py-2 px-3 mt-1" style="border-radius:10px; font-size:0.85rem;">
                 <i class="fa-duotone fa-solid fa-circle-info me-1"></i>
-                Tu saldo de <strong>bono</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_bonus'], 2); ?>) y de <strong>recarga</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_recharge'], 2); ?>) sirven para comprar cartones. Los premios de partidas se acreditan al <strong>saldo recarga</strong> (no se retiran directo).
+                Tu saldo de <strong>bono</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_bonus'], 2); ?>) y de <strong>recarga</strong> (<?= systemGet('currency'); ?> <?= number_format($user['wallet_recharge'], 2); ?>) sirven para comprar cartones. Los premios de cartones con bono/ruleta van a <strong>saldo recarga</strong>; los de cartones con recarga/retiro van a <strong>saldo retiro</strong> (retirable).
                 El saldo retirable es el que puedes solicitar para cobro a tu banco.
             </div>
             <?php endif; ?>

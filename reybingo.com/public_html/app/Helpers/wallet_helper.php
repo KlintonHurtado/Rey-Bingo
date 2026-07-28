@@ -279,6 +279,13 @@ if (! function_exists('wallet_grant_admin_bonus')) {
     }
 }
 
+if (! function_exists('wallet_set_balances')) {
+    function wallet_set_balances(int $userId, float $bonus, float $recharge, float $withdraw): void
+    {
+        wallet_service()->setBalances($userId, $bonus, $recharge, $withdraw);
+    }
+}
+
 if (! function_exists('wallet_summary_payload')) {
     function wallet_summary_payload(?array $user): array
     {

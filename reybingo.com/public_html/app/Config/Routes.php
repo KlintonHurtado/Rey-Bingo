@@ -209,6 +209,7 @@ $routes->post('users/grantPlayerRoulette', 'Users::grantPlayerRoulette');
 $routes->get('users/grantBonusGet', 'Users::grantBonusGet');
 $routes->get('users/grantBonusGet/(:num)', 'Users::grantBonusGet/$1');
 $routes->post('users/grantPlayerBonus', 'Users::grantPlayerBonus');
+$routes->post('users/updatePlayerWallets', 'Users::updatePlayerWallets');
 $routes->post('users/lowBalanceSettingsSubmit', 'Users::lowBalanceSettingsSubmit');
 $routes->get('users', 'Users::index');
 $routes->get('users/add', 'Users::add');

@@ -76,27 +76,45 @@ $sourceLabel = static function ($source) {
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
                         <small><?= translate('wallet'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_total'] ?? 0), 2); ?></strong>
+                        <strong id="admin-wallet-total"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_total'] ?? 0), 2); ?></strong>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="stat-chip" style="background:rgba(25,135,84,.12);">
                         <small><?= translate('bonus balance'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2); ?></strong>
+                        <div class="input-group input-group-sm mt-1">
+                            <span class="input-group-text"><?= esc($currency); ?></span>
+                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
+                                   value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
+                        </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
                         <small><?= translate('recharge balance'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2); ?></strong>
+                        <div class="input-group input-group-sm mt-1">
+                            <span class="input-group-text"><?= esc($currency); ?></span>
+                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
+                                   value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
+                        </div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
                         <small><?= translate('withdraw balance'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2); ?></strong>
+                        <div class="input-group input-group-sm mt-1">
+                            <span class="input-group-text"><?= esc($currency); ?></span>
+                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
+                                   value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="mb-2">
+                <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
+                    <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
+                </button>
+                <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
             </div>
             <div class="row g-2 mb-2">
                 <div class="col-6 col-md-3">

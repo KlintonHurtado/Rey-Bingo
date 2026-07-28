@@ -561,6 +561,34 @@
 	    });
 	}
 
+	function savePlayerWallets(userId) {
+	    $.ajax({
+	        url: '<?= site_url('users/updatePlayerWallets'); ?>',
+	        method: 'POST',
+	        dataType: 'json',
+	        data: {
+	            user_id: userId,
+	            wallet_bonus: $('#admin-wallet-bonus').val() || 0,
+	            wallet_recharge: $('#admin-wallet-recharge').val() || 0,
+	            wallet_withdraw: $('#admin-wallet-withdraw').val() || 0,
+	            <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+	        },
+	        success: function(response) {
+	            Toastify({
+	                text: response.message || response.error || (response.success ? 'OK' : 'Error'),
+	                duration: 3000,
+	                gravity: "top",
+	                position: "right",
+	                style: { background: response.success ? "#198754" : "#dc3545" },
+	                stopOnFocus: true
+	            }).showToast();
+	            if (response.success) {
+	                viewUser(userId);
+	            }
+	        }
+	    });
+	}
+
 	if (typeof grantBonusGet !== 'function') {
 	    window.grantBonusGet = function(userId) {
 	        var url = '<?= site_url('users/grantBonusGet'); ?>';

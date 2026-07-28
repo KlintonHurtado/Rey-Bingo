@@ -2341,7 +2341,11 @@ class Payments extends Controller {
             $singStatus = (int) ($sing['status'] ?? 0);
 
             if ($singStatus === 2) {
-                wallet_deduct_withdrawable((int) $sing['user'], $awardPerSing);
+                bingo_deduct_award_by_purchase_source(
+                    (int) $sing['user'],
+                    (int) $sing['game'],
+                    $awardPerSing
+                );
             }
 
             $modelSings->update($id, ['status' => 1]);

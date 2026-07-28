@@ -72,6 +72,8 @@ class Users extends Controller {
             if (!$data['userData']) {
                 throw new \CodeIgniter\Exceptions\PageNotFoundException('Usuario no encontrado');
             }
+            helper('wallet');
+            $data['userData'] = wallet_service()->normalizeUser($data['userData']);
         } else {
             $data['userData'] = null;
             $data['isUpdate'] = false;
@@ -993,6 +995,65 @@ class Users extends Controller {
         ]);
     }
 
+    public function updatePlayerWallets()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized'),
+            ]);
+        }
+
+        helper('wallet');
+
+        $userId = (int) $this->request->getPost('user_id');
+        $bonus = (float) $this->request->getPost('wallet_bonus');
+        $recharge = (float) $this->request->getPost('wallet_recharge');
+        $withdraw = (float) $this->request->getPost('wallet_withdraw');
+
+        if ($userId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user not found'),
+            ]);
+        }
+
+        if ($bonus < 0 || $recharge < 0 || $withdraw < 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('invalid wallet amounts'),
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $player = $modelUsers
+            ->where('id', $userId)
+            ->where('deleted', 0)
+            ->first();
+
+        if (! $player) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user not found'),
+            ]);
+        }
+
+        wallet_set_balances($userId, $bonus, $recharge, $withdraw);
+        $updated = wallet_service()->normalizeUser($modelUsers->find($userId) ?: $player);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('wallets updated successfully'),
+            'wallets' => [
+                'bonus' => round((float) ($updated['wallet_bonus'] ?? 0), 2),
+                'recharge' => round((float) ($updated['wallet_recharge'] ?? 0), 2),
+                'withdraw' => round((float) ($updated['wallet_withdraw'] ?? 0), 2),
+                'total' => round(wallet_total($updated), 2),
+            ],
+            'user_id' => $userId,
+        ]);
+    }
+
     public function lowBalancePendingCountGet()
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {
@@ -1746,7 +1807,6 @@ class Users extends Controller {
             'bank' => $this->request->getPost('bank') ?? '',
             'account' => $this->request->getPost('account') ?? '',
             'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
-            'wallet' => $this->request->getPost('wallet') ?? 0,
             'group' => $this->request->getPost('group'),
             'status' => $this->request->getPost('status'),
             'sounds' => $this->request->getPost('sounds') ?? 1,
@@ -1758,6 +1818,23 @@ class Users extends Controller {
             'state' => $this->request->getPost('state') ?? '',
             'is_reseller' => (int) ($this->request->getPost('is_reseller') ?? 0),
         ];
+
+        helper('wallet');
+        $walletBonus = max(0, round((float) ($this->request->getPost('wallet_bonus') ?? 0), 2));
+        $walletRecharge = max(0, round((float) ($this->request->getPost('wallet_recharge') ?? 0), 2));
+        $walletWithdraw = max(0, round((float) ($this->request->getPost('wallet_withdraw') ?? 0), 2));
+        // Compatibilidad: si solo llega "wallet" legacy y no los 3 campos
+        if (
+            $this->request->getPost('wallet_bonus') === null
+            && $this->request->getPost('wallet_recharge') === null
+            && $this->request->getPost('wallet_withdraw') === null
+        ) {
+            $walletRecharge = max(0, round((float) ($this->request->getPost('wallet') ?? 0), 2));
+        }
+        $data['wallet_bonus'] = $walletBonus;
+        $data['wallet_recharge'] = $walletRecharge;
+        $data['wallet_withdraw'] = $walletWithdraw;
+        $data['wallet'] = round($walletBonus + $walletRecharge + $walletWithdraw, 2);
         
         if ($action === 'add') {
             // Generar código único

@@ -177,6 +177,15 @@ class WalletService
         ]);
     }
 
+    public function setBalances(int $userId, float $bonus, float $recharge, float $withdraw): void
+    {
+        $this->syncLegacyWallet($userId, [
+            'wallet_bonus'    => round(max(0, $bonus), 2),
+            'wallet_recharge' => round(max(0, $recharge), 2),
+            'wallet_withdraw' => round(max(0, $withdraw), 2),
+        ]);
+    }
+
     public function deductWithdrawable(int $userId, float $amount): bool
     {
         $user = $this->normalizeUser($this->users->find($userId));
