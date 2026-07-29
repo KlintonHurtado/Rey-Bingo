@@ -542,9 +542,9 @@ if (!function_exists('bingo_summarize_player_prizes')) {
 if (!function_exists('bingo_resolve_award_credit_split')) {
     /**
      * Destino del premio según fuente de compra de cartones (user+game).
-     * Bono / ruleta → saldo recarga.
-     * Recarga / retiro → saldo retiro.
-     * Compra mixta → proporción por montos gastados.
+     * Bono / ruleta → saldo recarga (100%).
+     * Recarga / retiro → saldo retiro (100%).
+     * Compra mixta (bono + recarga): 100% a saldo recarga (sin reparto proporcional).
      *
      * @return array{to_recharge:float,to_withdraw:float,has_logs:bool}
      */
@@ -597,7 +597,7 @@ if (!function_exists('bingo_resolve_award_credit_split')) {
                     continue;
                 }
 
-                // Wallet / mixto
+                // Wallet: bono cuenta para recarga; recarga/retiro para retiro
                 $weightRecharge += $fromBonus;
                 $weightWithdraw += $fromRecharge + $fromWithdraw;
 
@@ -612,15 +612,13 @@ if (!function_exists('bingo_resolve_award_credit_split')) {
                 return $empty;
             }
 
-            $toRecharge = round($prizeAmount * ($weightRecharge / $totalWeight), 2);
-            if ($toRecharge > $prizeAmount) {
-                $toRecharge = $prizeAmount;
-            }
-            $toWithdraw = round($prizeAmount - $toRecharge, 2);
+            // Sin reparto proporcional: un solo destino.
+            // Si hubo bono/ruleta → 100% recarga. Solo recarga/retiro → 100% retiro.
+            $creditToWithdraw = $weightRecharge <= 0 && $weightWithdraw > 0;
 
             return [
-                'to_recharge' => $toRecharge,
-                'to_withdraw' => $toWithdraw,
+                'to_recharge' => $creditToWithdraw ? 0.0 : $prizeAmount,
+                'to_withdraw' => $creditToWithdraw ? $prizeAmount : 0.0,
                 'has_logs' => true,
             ];
         } catch (\Throwable $e) {
