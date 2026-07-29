@@ -13,7 +13,7 @@ $selectedBonus = $selectedUser
                 <i class="fa-duotone fa-solid fa-gift"></i>
                 <?= translate('grant bonus balance'); ?>
             </h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal">
+            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal" onclick="hideGrantBonusModal();">
                 <i class="fa-duotone fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -22,7 +22,7 @@ $selectedBonus = $selectedUser
                 <?= translate('grant bonus balance help'); ?>
             </p>
 
-            <form id="grant-bonus-form">
+            <form id="grant-bonus-form" novalidate>
                 <?= csrf_field() ?>
 
                 <div class="mb-2">
@@ -93,6 +93,31 @@ $selectedBonus = $selectedUser
 
 <script type="text/javascript">
 (function () {
+    window.hideGrantBonusModal = function () {
+        var el = document.getElementById('modalGrantBonus');
+        if (!el) {
+            return;
+        }
+        if (typeof hideBsModal === 'function') {
+            hideBsModal(el);
+        } else if (typeof bootstrap !== 'undefined') {
+            var instance = bootstrap.Modal.getInstance(el);
+            if (instance) {
+                instance.hide();
+            } else {
+                el.classList.remove('show');
+                el.style.display = 'none';
+                el.setAttribute('aria-hidden', 'true');
+                document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+                    backdrop.remove();
+                });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }
+    };
+
     function updateCurrentBonus() {
         var $opt = $('#grant-bonus-user option:selected');
         var bonus = $opt.data('bonus');
@@ -108,6 +133,7 @@ $selectedBonus = $selectedUser
 
     $('#grant-bonus-form').off('submit.grantBonus').on('submit.grantBonus', function (e) {
         e.preventDefault();
+        e.stopPropagation();
 
         $('#grant-bonus-user-error, #grant-bonus-amount-error').addClass('d-none').text('');
 
@@ -119,7 +145,7 @@ $selectedBonus = $selectedUser
             $('#grant-bonus-user-error').removeClass('d-none').text('<?= translate('select player'); ?>');
             ok = false;
         }
-        if (!amount || amount <= 0) {
+        if (!amount || amount <= 0 || isNaN(amount)) {
             $('#grant-bonus-amount-error').removeClass('d-none').text('<?= translate('invalid bonus amount'); ?>');
             ok = false;
         }
@@ -150,21 +176,25 @@ $selectedBonus = $selectedUser
                 }).showToast();
 
                 if (response.success) {
-                    if (typeof disposeBsModal === 'function') {
-                        disposeBsModal('#modalGrantBonus');
-                    } else {
-                        var el = document.getElementById('modalGrantBonus');
-                        if (el && bootstrap.Modal.getInstance(el)) {
-                            bootstrap.Modal.getInstance(el).hide();
-                        }
+                    $('#grant-bonus-amount').val('');
+                    $('#grant-bonus-note').val('');
+                    if (response.wallet_bonus !== undefined && response.wallet_bonus !== null) {
+                        var formatted = Number(response.wallet_bonus).toFixed(2);
+                        $('#grant-bonus-user option:selected').attr('data-bonus', formatted);
+                        $('#grant-bonus-current').text('<?= $currency ?> ' + formatted);
                     }
+
+                    hideGrantBonusModal();
+
                     if (typeof loadPayments === 'function') {
                         loadPayments();
                     } else if (typeof applyFilters === 'function') {
                         applyFilters();
                     }
                     if (typeof viewUser === 'function' && userId) {
-                        viewUser(userId);
+                        setTimeout(function () {
+                            viewUser(userId);
+                        }, 250);
                     }
                 }
             },
