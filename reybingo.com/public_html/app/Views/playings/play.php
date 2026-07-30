@@ -167,23 +167,34 @@
     }
 
     @media (max-width: 768px) {
-        /* Teléfono: rejilla 2 columnas (como mockup), sin carrusel horizontal */
+        /* Teléfono: 2 cards visibles; si hay más, deslizar izquierda ↔ derecha */
         .player-play-view .play-rooms-carousel {
-            overflow: visible;
-        }
-
-        .player-play-view .play-rooms-scroll-hint,
-        .player-play-view .play-rooms-scroll-hint.is-visible {
-            display: none !important;
-        }
-
-        .player-play-view .play-rooms-carousel.has-scroll-right::after,
-        .player-play-view .play-rooms-carousel.has-scroll-left::before {
-            display: none !important;
+            overflow: hidden;
+            position: relative;
         }
 
         .player-play-view .play-section--rooms,
-        .player-play-view .play-section--multi,
+        .player-play-view .play-section--multi {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: visible !important;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory !important;
+            scrollbar-width: none;
+            display: flex !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            padding: 0.15rem 0 5rem !important;
+        }
+
+        .player-play-view .play-section--rooms::-webkit-scrollbar,
+        .player-play-view .play-section--multi::-webkit-scrollbar {
+            display: none;
+        }
+
         .player-play-view .play-section--single {
             height: auto !important;
             min-height: 0 !important;
@@ -191,42 +202,56 @@
             width: 100% !important;
             overflow-x: hidden !important;
             overflow-y: auto !important;
-            -webkit-overflow-scrolling: touch;
             scroll-snap-type: none !important;
             display: block !important;
-            align-items: stretch !important;
-            justify-content: flex-start !important;
             padding: 0.15rem 6px 5rem !important;
         }
 
-        .player-play-view .play-cards,
-        .player-play-view .play-cards--multi,
+        .player-play-view .play-cards--multi {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 0 !important;
+            width: max-content !important;
+            min-width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 0 8px !important;
+            grid-template-columns: unset !important;
+            align-items: stretch !important;
+        }
+
         .player-play-view .play-cards--single {
             display: grid !important;
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            grid-template-columns: 1fr !important;
             gap: 10px !important;
             width: 100% !important;
             max-width: 100% !important;
-            min-width: 0 !important;
             margin: 0 !important;
-            padding: 0 !important;
-            justify-items: stretch !important;
-            align-items: stretch !important;
-            flex-direction: unset !important;
-            flex-wrap: unset !important;
+            padding: 0 6px !important;
         }
 
-        .player-play-view .play-room-slide {
+        .player-play-view .play-section--multi .play-room-slide {
+            flex: 0 0 var(--play-room-slide-step, 50%) !important;
+            width: var(--play-room-slide-step, 50%) !important;
+            min-width: var(--play-room-slide-step, 50%) !important;
+            max-width: var(--play-room-slide-step, 50%) !important;
+            display: flex !important;
+            justify-content: center;
+            align-items: stretch;
+            scroll-snap-align: start !important;
+            scroll-snap-stop: always !important;
+            box-sizing: border-box;
+            padding: 0 5px;
+        }
+
+        .player-play-view .play-section--single .play-room-slide {
             flex: none !important;
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
             display: flex !important;
-            justify-content: stretch;
-            align-items: stretch;
             scroll-snap-align: none !important;
-            scroll-snap-stop: normal !important;
-            box-sizing: border-box;
         }
 
         .player-play-view .play-cards .card,
@@ -819,8 +844,20 @@
     <?php endif; ?>
 
     window.setPlayRoomSlideWidths = function setPlayRoomSlideWidths() {
-        // En teléfono usamos grid 2 columnas; el carrusel horizontal solo aplica en desktop.
-        return;
+        const playSection = document.querySelector('.play-section--rooms.play-section--multi');
+        const carousel = document.getElementById('play-rooms-carousel');
+        if (!playSection || !carousel) {
+            return;
+        }
+
+        // En móvil: 2 cards visibles; el resto se ve deslizando.
+        if (window.innerWidth < 769) {
+            const step = Math.max(140, Math.floor(playSection.clientWidth / 2));
+            carousel.style.setProperty('--play-room-slide-step', step + 'px');
+            return;
+        }
+
+        carousel.style.removeProperty('--play-room-slide-step');
     };
 
     window.updatePlayRoomsScrollHints = function updatePlayRoomsScrollHints() {
@@ -833,8 +870,11 @@
             return;
         }
 
-        // Teléfono: grid vertical, sin flechas de scroll horizontal.
-        if (window.innerWidth < 769) {
+        window.setPlayRoomSlideWidths();
+
+        // Solo flechas cuando hay más contenido horizontal (más de 2 salas en móvil)
+        const canScroll = playSection.scrollWidth > playSection.clientWidth + 8;
+        if (!canScroll || !playSection.classList.contains('play-section--multi')) {
             prevBtn.classList.remove('is-visible');
             nextBtn.classList.remove('is-visible');
             carousel.classList.remove('has-scroll-right', 'has-scroll-left');
@@ -843,11 +883,17 @@
             return;
         }
 
-        prevBtn.classList.remove('is-visible');
-        nextBtn.classList.remove('is-visible');
-        carousel.classList.remove('has-scroll-right', 'has-scroll-left');
-        prevBtn.setAttribute('aria-hidden', 'true');
-        nextBtn.setAttribute('aria-hidden', 'true');
+        const maxScroll = playSection.scrollWidth - playSection.clientWidth;
+        const left = playSection.scrollLeft;
+        const showPrev = left > 8;
+        const showNext = left < maxScroll - 8;
+
+        prevBtn.classList.toggle('is-visible', showPrev);
+        nextBtn.classList.toggle('is-visible', showNext);
+        carousel.classList.toggle('has-scroll-left', showPrev);
+        carousel.classList.toggle('has-scroll-right', showNext);
+        prevBtn.setAttribute('aria-hidden', showPrev ? 'false' : 'true');
+        nextBtn.setAttribute('aria-hidden', showNext ? 'false' : 'true');
     };
 
     window.initPlayRoomsScrollHints = function initPlayRoomsScrollHints() {
@@ -863,17 +909,23 @@
             window._playRoomsScrollHintsReady = true;
 
             playSection.addEventListener('scroll', window.updatePlayRoomsScrollHints, { passive: true });
-            window.addEventListener('resize', window.updatePlayRoomsScrollHints);
+            window.addEventListener('resize', function() {
+                window.setPlayRoomSlideWidths();
+                window.updatePlayRoomsScrollHints();
+            });
 
             prevBtn.addEventListener('click', function() {
-                playSection.scrollBy({ left: -playSection.clientWidth, behavior: 'smooth' });
+                const step = playSection.clientWidth / 2;
+                playSection.scrollBy({ left: -step, behavior: 'smooth' });
             });
 
             nextBtn.addEventListener('click', function() {
-                playSection.scrollBy({ left: playSection.clientWidth, behavior: 'smooth' });
+                const step = playSection.clientWidth / 2;
+                playSection.scrollBy({ left: step, behavior: 'smooth' });
             });
         }
 
+        window.setPlayRoomSlideWidths();
         window.updatePlayRoomsScrollHints();
     };
 

@@ -2226,6 +2226,41 @@ class Playings extends Controller
 
         foreach ($cartons as $carton) {
             foreach ($modalities as $modality) {
+                $currentUserIdLoop = (int) session()->get('id');
+
+                // Si este cartón ya tiene canto (p. ej. registrado por resolve de otro jugador),
+                // reconocerlo aunque el cupo de la modalidad ya esté lleno — solo si aún no lo celebró.
+                $existingSingForCarton = $modelSings
+                    ->where('game', $game['id'])
+                    ->where('modality', $modality['id'])
+                    ->where('carton', $carton['id'])
+                    ->where('user', $currentUserIdLoop)
+                    ->orderBy('id', 'DESC')
+                    ->first();
+
+                if ($existingSingForCarton) {
+                    $existingStatus = (int) ($existingSingForCarton['status'] ?? 0);
+                    $existingNotified = json_decode($existingSingForCarton['notified'] ?? '[]', true);
+                    if (!is_array($existingNotified)) {
+                        $existingNotified = [];
+                    }
+                    $alreadyCelebrated = in_array($currentUserIdLoop, $existingNotified, true);
+
+                    // Ya pagado y ya visto por el jugador: no re-disparar bingo en bolas siguientes
+                    if ($existingStatus === 2 && $alreadyCelebrated) {
+                        continue;
+                    }
+
+                    $modalitySing = $modelModalities->find($modality['id']);
+                    $bingoAchieved = true;
+                    $registeredSings[] = [
+                        'sing' => $existingSingForCarton,
+                        'modality' => $modalitySing,
+                        'isNew' => false,
+                    ];
+                    continue;
+                }
+
                 $numberSingsLimit = bingo_get_number_sings_limit();
                 $modalityWinners = $modelSings
                     ->where('game', $game['id'])
@@ -2246,17 +2281,6 @@ class Playings extends Controller
                             continue;
                         }
                     }
-                }
-
-                // Evitar duplicar el mismo cartón en la misma modalidad (no bloquear otros cartones del jugador)
-                $cartonAlreadySang = $modelSings
-                    ->where('game', $game['id'])
-                    ->where('modality', $modality['id'])
-                    ->where('carton', $carton['id'])
-                    ->countAllResults();
-
-                if ($cartonAlreadySang > 0) {
-                    continue;
                 }
 
                 $cartonNumbers = $modelNumbersCartons
@@ -2285,6 +2309,25 @@ class Playings extends Controller
                     );
 
                     if (!$registered) {
+                        // Otro proceso pudo registrarlo al mismo tiempo
+                        $singRowRace = $modelSings
+                            ->where('game', $game['id'])
+                            ->where('modality', $modality['id'])
+                            ->where('carton', $carton['id'])
+                            ->where('user', session()->get('id'))
+                            ->orderBy('id', 'DESC')
+                            ->first();
+
+                        if ($singRowRace) {
+                            $modalitySing = $modelModalities->find($modality['id']);
+                            $bingoAchieved = true;
+                            $registeredSings[] = [
+                                'sing' => $singRowRace,
+                                'modality' => $modalitySing,
+                                'isNew' => false,
+                            ];
+                        }
+
                         continue;
                     }
 
@@ -2334,6 +2377,7 @@ class Playings extends Controller
                     $registeredSings[] = [
                         'sing' => $singRow,
                         'modality' => $modalitySing,
+                        'isNew' => true,
                     ];
                 }
             }
@@ -2343,17 +2387,50 @@ class Playings extends Controller
             $currentUserId = (int) session()->get('id');
             helper('bingo');
 
+            // Registrar otros ganadores simultáneos de la misma bola ANTES de calcular/pagar el premio
+            bingo_resolve_missed_bingos_for_game((int) $game['id'], false);
+
+            $modalityIds = [];
+            foreach ($registeredSings as $item) {
+                $modalityIds[] = (int) ($item['sing']['modality'] ?? 0);
+            }
+            $modalityIds = array_values(array_unique(array_filter($modalityIds)));
+
+            // Confirmar todos los cantes pendientes de esas modalidades (ambos empatados)
+            if ($modalityIds !== []) {
+                $modelSings
+                    ->where('game', $game['id'])
+                    ->whereIn('modality', $modalityIds)
+                    ->where('status', 0)
+                    ->set(['status' => 1])
+                    ->update();
+            }
+
             $singsPayload = [];
+            $seenSingIds = [];
+
             foreach ($registeredSings as $item) {
                 $singRow = $item['sing'];
                 $modalitySing = $item['modality'];
+                $singId = (int) ($singRow['id'] ?? 0);
 
-                $modelSings->update($singRow['id'], [
+                if ($singId < 1 || isset($seenSingIds[$singId])) {
+                    continue;
+                }
+                $seenSingIds[$singId] = true;
+
+                $notified = json_decode($singRow['notified'] ?? '[]', true);
+                if (!is_array($notified)) {
+                    $notified = [];
+                }
+                if (!in_array($currentUserId, $notified, true)) {
+                    $notified[] = $currentUserId;
+                }
+
+                $modelSings->update($singId, [
                     'status' => 1,
-                    'notified' => json_encode([$currentUserId]),
+                    'notified' => json_encode(array_values($notified)),
                 ]);
-
-                bingo_pay_sing_award((int) $singRow['id'], $currentUserId);
 
                 $singsPayload[] = [
                     'carton' => $singRow['carton'],
@@ -2365,7 +2442,32 @@ class Playings extends Controller
                 ];
             }
 
+            // Pagar a TODOS los ganadores oficiales de esas modalidades (reparto correcto)
+            if ($modalityIds !== []) {
+                $pendingToPay = bingo_filter_first_sing_per_modality(
+                    $modelSings
+                        ->where('game', $game['id'])
+                        ->whereIn('modality', $modalityIds)
+                        ->where('status', 1)
+                        ->orderBy('created_at', 'ASC')
+                        ->orderBy('id', 'ASC')
+                        ->findAll()
+                );
+
+                foreach ($pendingToPay as $singToPay) {
+                    bingo_pay_sing_award((int) $singToPay['id'], $currentUserId);
+                }
+            }
+
             $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+
+            if ($singsPayload === []) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => translate('you cant sing bingo, the pattern is not complete'),
+                ]);
+            }
+
             $primary = $singsPayload[0];
 
             return $this->response->setJSON([
@@ -2378,18 +2480,86 @@ class Playings extends Controller
                 'image' => $primary['image'],
                 'sings' => $singsPayload,
                 'gameCompleted' => $gameCompleted,
-                'winners' => $gameCompleted ? $this->getWinnersForGame((int) $game['id'], true) : [],
+                'winners' => $this->getWinnersForGame((int) $game['id'], true),
                 'isOwnBingo' => true,
                 'winnerUserId' => $currentUserId,
                 'gameHasWinner' => true,
             ]);
         }
 
-        $existingWinner = $modelSings
+        // Si este usuario ya tiene un canto pendiente de celebrar/pagar, no tratarlo como error de rival
+        $ownSing = $modelSings
             ->where('game', $game['id'])
-            ->countAllResults();
+            ->where('user', session()->get('id'))
+            ->orderBy('id', 'DESC')
+            ->first();
 
-        if ($existingWinner > 0) {
+        if ($ownSing) {
+            $currentUserId = (int) session()->get('id');
+            $ownStatus = (int) ($ownSing['status'] ?? 0);
+            $ownNotified = json_decode($ownSing['notified'] ?? '[]', true);
+            if (!is_array($ownNotified)) {
+                $ownNotified = [];
+            }
+            $ownAlreadySeen = in_array($currentUserId, $ownNotified, true);
+
+            if (!($ownStatus === 2 && $ownAlreadySeen)) {
+                $modalitySing = $modelModalities->find($ownSing['modality']);
+
+                if ($ownStatus === 0) {
+                    $modelSings->update($ownSing['id'], ['status' => 1]);
+                    $ownStatus = 1;
+                }
+
+                if (!in_array($currentUserId, $ownNotified, true)) {
+                    $ownNotified[] = $currentUserId;
+                    $modelSings->update($ownSing['id'], [
+                        'notified' => json_encode(array_values($ownNotified)),
+                    ]);
+                }
+
+                if ($ownStatus !== 2) {
+                    bingo_pay_sing_award((int) $ownSing['id'], $currentUserId);
+                }
+
+                return $this->response->setJSON([
+                    'status' => 'success',
+                    'carton' => $ownSing['carton'],
+                    'numbers' => explode(',', (string) $ownSing['numbers']),
+                    'player' => $userSing['firstname'] . ' ' . $userSing['lastname'],
+                    'modality' => translate($modalitySing['name'] ?? ''),
+                    'modalityId' => $modalitySing['id'] ?? null,
+                    'image' => $imagePath,
+                    'sings' => [[
+                        'carton' => $ownSing['carton'],
+                        'numbers' => explode(',', (string) $ownSing['numbers']),
+                        'player' => $userSing['firstname'] . ' ' . $userSing['lastname'],
+                        'modality' => translate($modalitySing['name'] ?? ''),
+                        'modalityId' => $modalitySing['id'] ?? null,
+                        'image' => $imagePath,
+                    ]],
+                    'gameCompleted' => (int) ($game['status'] ?? 0) === 0,
+                    'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                    'isOwnBingo' => true,
+                    'winnerUserId' => $currentUserId,
+                    'gameHasWinner' => true,
+                ]);
+            }
+        }
+
+        $modalityFull = false;
+        foreach ($modalities as $modality) {
+            $winnersForMod = $modelSings
+                ->where('game', $game['id'])
+                ->where('modality', $modality['id'])
+                ->countAllResults();
+            if ($winnersForMod >= bingo_get_number_sings_limit()) {
+                $modalityFull = true;
+                break;
+            }
+        }
+
+        if ($modalityFull) {
             return $this->response->setJSON([
                 'status' => 'error',
                 'message' => 'Otro jugador ya ganó este premio.',

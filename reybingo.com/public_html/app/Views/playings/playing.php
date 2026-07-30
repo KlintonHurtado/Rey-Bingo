@@ -557,16 +557,16 @@
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
         padding: 2px 10px 10px;
-        scrollbar-width: none;
-        /* Ocultar scrollbar en firefox para mejor vista móvil */
+        scrollbar-width: thin;
         scroll-snap-type: x mandatory;
         scroll-padding: 10px;
     }
 
     .modalities-display::-webkit-scrollbar {
-        display: none;
-        /* Ocultar scrollbar en webkit */
+        display: block;
+        height: 4px;
     }
 
     .modalities-display::-webkit-scrollbar {

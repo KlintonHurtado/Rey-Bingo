@@ -159,18 +159,28 @@ if (!function_exists('bingo_get_number_sings_limit')) {
 }
 
 if (!function_exists('bingo_filter_first_sing_per_modality')) {
+    /**
+     * Conserva hasta numberSings cantes oficiales por modalidad (orden de llegada).
+     * Antes solo dejaba el primero y el resto no se pagaba ni se anunciaba.
+     */
     function bingo_filter_first_sing_per_modality(array $sings): array
     {
-        $seen = [];
+        $limit = bingo_get_number_sings_limit();
+        $counts = [];
         $official = [];
 
         foreach ($sings as $sing) {
             $modalityId = (int) ($sing['modality'] ?? 0);
-            if ($modalityId < 1 || isset($seen[$modalityId])) {
+            if ($modalityId < 1) {
                 continue;
             }
 
-            $seen[$modalityId] = true;
+            $used = $counts[$modalityId] ?? 0;
+            if ($used >= $limit) {
+                continue;
+            }
+
+            $counts[$modalityId] = $used + 1;
             $official[] = $sing;
         }
 
@@ -411,18 +421,18 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
 
         foreach ($modalities as $modality) {
             $numberSingsLimit = bingo_get_number_sings_limit();
-            $existingForModality = (new SingsModel())
-                ->where('game', $gameId)
-                ->where('modality', $modality['id'])
-                ->countAllResults();
-
-            if ($existingForModality >= $numberSingsLimit) {
-                continue;
-            }
-
             $requiredPositions = explode(',', (string) $modality['positions']);
 
             foreach ($cartons as $carton) {
+                $existingForModality = (new SingsModel())
+                    ->where('game', $gameId)
+                    ->where('modality', $modality['id'])
+                    ->countAllResults();
+
+                if ($existingForModality >= $numberSingsLimit) {
+                    break;
+                }
+
                 $userId = (int) $carton['user'];
                 $cartonId = (int) $carton['id'];
 
@@ -469,7 +479,6 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
                     )
                 ) {
                     $registered++;
-                    break;
                 }
             }
         }
@@ -1171,6 +1180,7 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
 
         $paid = 0;
 
+        // Pagar todos los cantes oficiales (hasta numberSings por modalidad), no solo el primero.
         foreach ($pendingSings as $sing) {
             $result = bingo_pay_sing_award((int) $sing['id'], max(1, $fromUserId));
             if ($result['success'] ?? false) {
@@ -1194,9 +1204,13 @@ if (!function_exists('bingo_ensure_winners_registered')) {
             return;
         }
 
+        // Completar ganadores faltantes hasta numberSings (empates en la misma bola)
+        bingo_resolve_missed_bingos_for_game($gameId, false);
+
         $modelSings = new SingsModel();
         $existingSings = $modelSings->where('game', $gameId)->countAllResults();
 
+        // Si no hubo ningún canto, recuperación a fin de partida (sin exigir última bola)
         if ($existingSings === 0) {
             bingo_resolve_missed_bingos_for_game($gameId, true);
         }
