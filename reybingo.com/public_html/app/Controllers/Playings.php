@@ -429,6 +429,7 @@ class Playings extends Controller
             'roulette',
             $rouletteId
         );
+        bingo_tag_cartons_pay_source($assignment['carton_ids'] ?? [], 'roulette');
 
         // Si sobran cartones, insertar un nuevo registro de premio pendiente
         $remainingCartons = $cartons - $cartonsToUse;
@@ -494,9 +495,13 @@ class Playings extends Controller
         $modelUsers = new UsersModel();
         $modelGameRooms = new GameRoomsModel();
 
+        helper('wallet');
         $game = $modelGames->find($gameId);
-        $data['user'] = $modelUsers->find(session()->get('id'));
+        $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')) ?: []);
+        $data['user'] = $user;
         $data['game'] = $game;
+        $data['pay_with'] = wallet_normalize_pay_mode($this->request->getGet('pay_with') ?: 'real');
+        $data['pay_wallet_available'] = wallet_available_for_pay_mode($user, $data['pay_with']);
 
         $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
 
@@ -592,13 +597,19 @@ class Playings extends Controller
 
         // Calcular costo total
         $totalCost = $totalSelectedCartons * $game['price'];
+        helper('wallet');
+        $payWith = wallet_normalize_pay_mode($data['pay_with'] ?? 'real');
 
-        // Verificar saldo suficiente
+        // Verificar saldo suficiente según modo (bono o real)
         $user = wallet_service()->normalizeUser($user);
-        if (!wallet_service()->canAfford($user, $totalCost)) {
+        if (! wallet_service()->canAfford($user, $totalCost, $payWith)) {
+            $msg = $payWith === 'bonus'
+                ? 'Saldo bono insuficiente para esta compra.'
+                : translate('insufficient wallet balance');
+
             return $this->response->setJSON([
                 'success' => false,
-                'message' => translate('insufficient wallet balance')
+                'message' => $msg,
             ]);
         }
 
@@ -652,9 +663,13 @@ class Playings extends Controller
             }
 
             if ($totalCost > 0) {
-                $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                $split = wallet_deduct_purchase_detailed($userId, $totalCost, $payWith);
                 if ($split === null) {
-                    throw new \Exception(translate('insufficient wallet balance'));
+                    throw new \Exception(
+                        $payWith === 'bonus'
+                            ? 'Saldo bono insuficiente para esta compra.'
+                            : translate('insufficient wallet balance')
+                    );
                 }
                 bingo_log_carton_purchase(
                     $userId,
@@ -665,6 +680,12 @@ class Playings extends Controller
                     'wallet'
                 );
                 bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $savedCartonIds);
+                bingo_tag_cartons_pay_source(
+                    $savedCartonIds,
+                    bingo_pay_source_from_split($split, $payWith === 'bonus' ? 'bonus' : 'wallet')
+                );
+            } elseif (! empty($savedCartonIds)) {
+                bingo_tag_cartons_pay_source($savedCartonIds, $payWith === 'bonus' ? 'bonus' : 'real');
             }
 
             // Completar transacción
@@ -1554,11 +1575,18 @@ class Playings extends Controller
 
         $totalCost = $totalSelectedCartons * $game['price'];
 
+        helper('wallet');
+        $payWith = wallet_normalize_pay_mode($this->request->getPost('pay_with') ?: 'real');
+
         $user = wallet_service()->normalizeUser($user);
-        if (!wallet_service()->canAfford($user, $totalCost)) {
+        if (! wallet_service()->canAfford($user, $totalCost, $payWith)) {
             return $this->response->setJSON([
                 'success' => false,
-                'errors' => ['wallet' => translate('insufficient wallet balance')]
+                'errors' => [
+                    'wallet' => $payWith === 'bonus'
+                        ? 'Saldo bono insuficiente para esta compra.'
+                        : translate('insufficient wallet balance'),
+                ],
             ]);
         }
 
@@ -1592,9 +1620,13 @@ class Playings extends Controller
                 }
 
                 if ($totalCost > 0) {
-                    $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                    $split = wallet_deduct_purchase_detailed($userId, $totalCost, $payWith);
                     if ($split === null) {
-                        throw new \Exception(translate('insufficient wallet balance'));
+                        throw new \Exception(
+                            $payWith === 'bonus'
+                                ? 'Saldo bono insuficiente para esta compra.'
+                                : translate('insufficient wallet balance')
+                        );
                     }
                     bingo_log_carton_purchase(
                         $userId,
@@ -1605,6 +1637,12 @@ class Playings extends Controller
                         'wallet'
                     );
                     bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
+                    bingo_tag_cartons_pay_source(
+                        $cartonIds,
+                        bingo_pay_source_from_split($split, $payWith === 'bonus' ? 'bonus' : 'wallet')
+                    );
+                } elseif (! empty($cartonIds)) {
+                    bingo_tag_cartons_pay_source($cartonIds, $payWith === 'bonus' ? 'bonus' : 'real');
                 }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();
@@ -1770,11 +1808,18 @@ class Playings extends Controller
 
         $totalCost = $totalSelectedCartons * $game['price'];
 
+        helper('wallet');
+        $payWith = wallet_normalize_pay_mode($this->request->getPost('pay_with') ?: 'real');
+
         $user = wallet_service()->normalizeUser($user);
-        if (!wallet_service()->canAfford($user, $totalCost)) {
+        if (! wallet_service()->canAfford($user, $totalCost, $payWith)) {
             return $this->response->setJSON([
                 'success' => false,
-                'errors' => ['wallet' => translate('insufficient wallet balance')]
+                'errors' => [
+                    'wallet' => $payWith === 'bonus'
+                        ? 'Saldo bono insuficiente para esta compra.'
+                        : translate('insufficient wallet balance'),
+                ],
             ]);
         }
 
@@ -1808,9 +1853,13 @@ class Playings extends Controller
                 }
 
                 if ($totalCost > 0) {
-                    $split = wallet_deduct_purchase_detailed($userId, $totalCost);
+                    $split = wallet_deduct_purchase_detailed($userId, $totalCost, $payWith);
                     if ($split === null) {
-                        throw new \Exception(translate('insufficient wallet balance'));
+                        throw new \Exception(
+                            $payWith === 'bonus'
+                                ? 'Saldo bono insuficiente para esta compra.'
+                                : translate('insufficient wallet balance')
+                        );
                     }
                     bingo_log_carton_purchase(
                         $userId,
@@ -1821,6 +1870,12 @@ class Playings extends Controller
                         'wallet'
                     );
                     bingo_after_carton_purchase($userId, (int) $gameId, $totalCost, $cartonIds);
+                    bingo_tag_cartons_pay_source(
+                        $cartonIds,
+                        bingo_pay_source_from_split($split, $payWith === 'bonus' ? 'bonus' : 'wallet')
+                    );
+                } elseif (! empty($cartonIds)) {
+                    bingo_tag_cartons_pay_source($cartonIds, $payWith === 'bonus' ? 'bonus' : 'real');
                 }
 
                 $modelTempCartons->where('user', $userId)->where('game', $gameId)->delete();
@@ -2167,8 +2222,7 @@ class Playings extends Controller
         $singBingoOnlyLastBall = systemGet('singBingoOnlyLastBall');
 
         $bingoAchieved = false;
-        $singUser = null;
-        $modalitySing = null;
+        $registeredSings = [];
 
         foreach ($cartons as $carton) {
             foreach ($modalities as $modality) {
@@ -2194,9 +2248,14 @@ class Playings extends Controller
                     }
                 }
 
-                $userAlreadySang = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->where('user', session()->get('id'))->countAllResults();
+                // Evitar duplicar el mismo cartón en la misma modalidad (no bloquear otros cartones del jugador)
+                $cartonAlreadySang = $modelSings
+                    ->where('game', $game['id'])
+                    ->where('modality', $modality['id'])
+                    ->where('carton', $carton['id'])
+                    ->countAllResults();
 
-                if ($userAlreadySang > 0) {
+                if ($cartonAlreadySang > 0) {
                     continue;
                 }
 
@@ -2229,14 +2288,15 @@ class Playings extends Controller
                         continue;
                     }
 
-                    $id = $modelSings
+                    $singRow = $modelSings
                         ->where('game', $game['id'])
                         ->where('modality', $modality['id'])
+                        ->where('carton', $carton['id'])
                         ->where('user', session()->get('id'))
                         ->orderBy('id', 'DESC')
-                        ->first()['id'] ?? null;
+                        ->first();
 
-                    if (!$id) {
+                    if (!$singRow) {
                         continue;
                     }
 
@@ -2254,14 +2314,7 @@ class Playings extends Controller
 
                     $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
 
-                    $sings = $modelSings->where('game', $game['id'])->findAll();
-
                     $modalitySing = $modelModalities->find($modality['id']);
-
-                    $singsByModality = [];
-                    foreach ($sings as $sing) {
-                        $singsByModality[$sing['modality']][] = $sing;
-                    }
 
                     foreach ($allUserIds as $userId) {
                         $notificationData = [
@@ -2278,32 +2331,52 @@ class Playings extends Controller
                     }
 
                     $bingoAchieved = true;
-
-                    $singUser = $modelSings->find($id);
+                    $registeredSings[] = [
+                        'sing' => $singRow,
+                        'modality' => $modalitySing,
+                    ];
                 }
             }
         }
 
-        if ($bingoAchieved) {
+        if ($bingoAchieved && ! empty($registeredSings)) {
             $currentUserId = (int) session()->get('id');
-            $modelSings->update($singUser['id'], [
-                'status' => 1,
-                'notified' => json_encode([$currentUserId]),
-            ]);
-
-            // Intentar pago automático del cartón ganador
             helper('bingo');
-            bingo_pay_sing_award((int) $singUser['id'], $currentUserId);
+
+            $singsPayload = [];
+            foreach ($registeredSings as $item) {
+                $singRow = $item['sing'];
+                $modalitySing = $item['modality'];
+
+                $modelSings->update($singRow['id'], [
+                    'status' => 1,
+                    'notified' => json_encode([$currentUserId]),
+                ]);
+
+                bingo_pay_sing_award((int) $singRow['id'], $currentUserId);
+
+                $singsPayload[] = [
+                    'carton' => $singRow['carton'],
+                    'numbers' => explode(',', (string) $singRow['numbers']),
+                    'player' => $userSing['firstname'] . ' ' . $userSing['lastname'],
+                    'modality' => translate($modalitySing['name'] ?? ''),
+                    'modalityId' => $modalitySing['id'] ?? null,
+                    'image' => $imagePath,
+                ];
+            }
+
             $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+            $primary = $singsPayload[0];
 
             return $this->response->setJSON([
                 'status' => 'success',
-                'carton' => $singUser['carton'],
-                'numbers' => explode(',', $singUser['numbers']),
-                'player' => $userSing['firstname'] . ' ' . $userSing['lastname'],
-                'modality' => translate($modalitySing['name']),
-                'modalityId' => $modalitySing['id'],
-                'image' => $imagePath,
+                'carton' => $primary['carton'],
+                'numbers' => $primary['numbers'],
+                'player' => $primary['player'],
+                'modality' => $primary['modality'],
+                'modalityId' => $primary['modalityId'],
+                'image' => $primary['image'],
+                'sings' => $singsPayload,
                 'gameCompleted' => $gameCompleted,
                 'winners' => $gameCompleted ? $this->getWinnersForGame((int) $game['id'], true) : [],
                 'isOwnBingo' => true,

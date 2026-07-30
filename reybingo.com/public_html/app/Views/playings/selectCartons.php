@@ -40,9 +40,19 @@
             <div class="col-md-12">
                 <button type="submit" class="btn btn-small btn-primary d-block w-50 btn-bingo" id="modal-play-button"><?= translate('play'); ?></button>
             </div>
+            <?php
+                $payWith = $pay_with ?? 'real';
+                $payWalletAvailable = $pay_wallet_available ?? (float) ($user['wallet'] ?? 0);
+                $payLabel = $payWith === 'bonus' ? 'Saldo bono disponible' : 'Saldo real disponible (recarga + retiro)';
+            ?>
             <div class="card text-center w-50 mx-auto mt-1">
-                <?= translate('available my wallet'); ?> 
-                <h6><?= systemGet('currency'); ?> <span class="modal-available-wallet"><?= $user['wallet']; ?></span></h6>
+                <small class="d-block text-muted"><?= esc($payLabel); ?></small>
+                <h6><?= systemGet('currency'); ?> <span class="modal-available-wallet"><?= number_format((float) $payWalletAvailable, 2); ?></span></h6>
+                <?php if ($payWith === 'bonus') : ?>
+                    <small class="text-info">Esta compra se cobrará solo del saldo bono</small>
+                <?php else : ?>
+                    <small class="text-muted">Esta compra se cobrará del saldo real (sin usar bono)</small>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -921,9 +931,10 @@
             this.loading = false;
             this.otherUsersCartons = [];
             this.destroyed = false;
+            this.payWith = '<?= esc($pay_with ?? 'real'); ?>';
             
-            // Variables para el wallet
-            this.originalWallet = <?= $user['wallet']; ?>;
+            // Variables para el wallet (según modo de pago)
+            this.originalWallet = <?= (float) ($pay_wallet_available ?? $user['wallet'] ?? 0); ?>;
             this.gamePrice = <?= $game['price']; ?>;
             
             // Control de estado más robusto
@@ -1172,7 +1183,8 @@
             
             const selectedCount = this.selectedCartons.size;
             const totalCost = selectedCount * this.gamePrice;
-            const remainingWallet = (window.currentWalletManager ? window.currentWalletManager.getCurrentWallet() : this.originalWallet) - totalCost;
+            // Usar el saldo del modo elegido (bono o real), no el total global
+            const remainingWallet = this.originalWallet - totalCost;
             
             this.renderWalletAmount(remainingWallet);
         }
@@ -1406,10 +1418,13 @@
             }
             
             const newTotalCost = (this.selectedCartons.size + 1) * this.gamePrice;
-            const currentWallet = window.currentWalletManager ? window.currentWalletManager.getCurrentWallet() : this.originalWallet;
+            const currentWallet = this.originalWallet;
             
             if (currentWallet < newTotalCost) {
-                this.showNotification('Saldo insuficiente para seleccionar más cartones', 'error');
+                const msg = this.payWith === 'bonus'
+                    ? 'Saldo bono insuficiente para seleccionar más cartones'
+                    : 'Saldo real insuficiente para seleccionar más cartones';
+                this.showNotification(msg, 'error');
                 return false;
             }
             
@@ -1537,7 +1552,8 @@
                 
                 const requestData = {
                     game_id: this.selectedGame,
-                    carton_data: selectedCartonsData
+                    carton_data: selectedCartonsData,
+                    pay_with: this.payWith || 'real'
                 };
                 
                 const response = await fetch('<?= base_url('playings/saveCartons') ?>', {

@@ -502,14 +502,8 @@ class Payments extends Controller {
                         $user = $modelUsers->find($log['user_id']);
                         $gameLabel = $resolveGameLabel(! empty($log['game_id']) ? (int) $log['game_id'] : null);
                         $cartonsCount = (int) ($log['cartons_count'] ?? 0);
-                        $source = (string) ($log['source'] ?? 'wallet');
-
-                        $sourceLabel = translate('wallet');
-                        if ($source === 'roulette') {
-                            $sourceLabel = translate('roulette');
-                        } elseif ($source === 'bonus') {
-                            $sourceLabel = translate('bonus');
-                        }
+                        $source = bingo_classify_purchase_source($log);
+                        $sourceLabel = bingo_purchase_source_label($source);
 
                         $splitParts = [];
                         if ((float) ($log['from_bonus'] ?? 0) > 0) {
@@ -2344,7 +2338,8 @@ class Payments extends Controller {
                 bingo_deduct_award_by_purchase_source(
                     (int) $sing['user'],
                     (int) $sing['game'],
-                    $awardPerSing
+                    $awardPerSing,
+                    (int) ($sing['carton'] ?? 0)
                 );
             }
 

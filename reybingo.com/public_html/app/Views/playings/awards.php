@@ -67,7 +67,8 @@
                         <?php if (isset($lastGame) && count($lastGame) > 0): ?>
                             <h5 class="text-center continue-text">Quieres continuar jugando?</h5>
                             <h6 class="text-center next-game-play mt-2 text-uppercase" data-game-date="<?= $lastGame["date"] ?> <?= $lastGame["time"] ?>"></h6>
-                            <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo bingo-bg-success card-button-buy continue-button-buy" id="card-button-buy-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>);"><?= translate('buy cartons'); ?></button>
+                            <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo bingo-bg-success card-button-buy continue-button-buy mb-1" id="card-button-buy-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
+                            <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo card-button-buy-bonus continue-button-buy" id="card-button-buy-bonus-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'bonus');">Comprar con bono</button>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>

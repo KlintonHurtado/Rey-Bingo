@@ -1376,77 +1376,7 @@ class Users extends Controller {
             ];
         }
 
-        $purchaseLogs = $modelPurchaseLogs
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'DESC')
-            ->findAll(150);
-
-        $purchaseRows = [];
-        foreach ($purchaseLogs as $log) {
-            $game = ! empty($log['game_id']) ? $modelGames->find((int) $log['game_id']) : null;
-            $purchaseRows[] = [
-                'id' => $log['id'],
-                'created_at' => $log['created_at'],
-                'game' => $game['description'] ?? ('#' . ($log['game_id'] ?? '-')),
-                'cartons_count' => (int) $log['cartons_count'],
-                'amount' => (float) $log['amount'],
-                'from_bonus' => (float) $log['from_bonus'],
-                'from_recharge' => (float) $log['from_recharge'],
-                'from_withdraw' => (float) $log['from_withdraw'],
-                'source' => $log['source'],
-            ];
-        }
-
-        // Histórico sin log: agrupar cartones por partida (aprox. dinero real/bono desconocido)
-        if ($purchaseRows === []) {
-            $db = \Config\Database::connect();
-            $legacy = $db->query(
-                'SELECT c.game AS game_id, COUNT(*) AS cartons_count, MIN(c.created_at) AS first_at, MAX(c.created_at) AS last_at
-                 FROM cartons c
-                 WHERE c.user = ?
-                 GROUP BY c.game
-                 ORDER BY last_at DESC
-                 LIMIT 80',
-                [(int) $userId]
-            )->getResultArray();
-
-            foreach ($legacy as $row) {
-                $game = $modelGames->find((int) $row['game_id']);
-                $price = (float) ($game['price'] ?? 0);
-                $count = (int) $row['cartons_count'];
-                $purchaseRows[] = [
-                    'id' => null,
-                    'created_at' => $row['last_at'] ?? $row['first_at'],
-                    'game' => $game['description'] ?? ('#' . $row['game_id']),
-                    'cartons_count' => $count,
-                    'amount' => round($price * $count, 2),
-                    'from_bonus' => 0,
-                    'from_recharge' => round($price * $count, 2),
-                    'from_withdraw' => 0,
-                    'source' => 'wallet_legacy',
-                ];
-            }
-
-            $rouletteUsed = $modelRoulettes
-                ->where('user', $userId)
-                ->where('status', 1)
-                ->orderBy('created_at', 'DESC')
-                ->findAll(50);
-            foreach ($rouletteUsed as $roulette) {
-                $game = ! empty($roulette['game']) ? $modelGames->find((int) $roulette['game']) : null;
-                $purchaseRows[] = [
-                    'id' => 'R' . $roulette['id'],
-                    'created_at' => $roulette['created_at'],
-                    'game' => $game['description'] ?? ('#' . ($roulette['game'] ?? '-')),
-                    'cartons_count' => (int) $roulette['cartons'],
-                    'amount' => (float) $roulette['amount'],
-                    'from_bonus' => 0,
-                    'from_recharge' => 0,
-                    'from_withdraw' => 0,
-                    'source' => 'roulette',
-                ];
-            }
-        }
+        $purchaseRows = bingo_build_user_carton_purchase_report((int) $userId, 500);
 
         $roulettes = $modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(80);
         $loginLogs = $modelLogs
@@ -1563,14 +1493,20 @@ class Users extends Controller {
             $add('Premios', '#' . $a['id'], (float) $a['amount'], 'date=' . ($a['created_at'] ?? ''));
         }
 
-        $purchases = $modelPurchaseLogs->where('user_id', $userId)->orderBy('created_at', 'DESC')->findAll(300);
+        $purchases = bingo_build_user_carton_purchase_report((int) $userId, 500);
         foreach ($purchases as $p) {
             $add(
                 'Compras cartones',
-                '#' . $p['id'],
-                (float) $p['amount'],
-                'source=' . $p['source'] . ' cartones=' . $p['cartons_count']
-                . ' bono=' . $p['from_bonus'] . ' recarga=' . $p['from_recharge'] . ' retiro=' . $p['from_withdraw']
+                (string) ($p['serial'] ?? $p['id'] ?? ''),
+                (float) ($p['amount'] ?? 0),
+                'partida=' . ($p['game'] ?? '')
+                . ' origen=' . ($p['source'] ?? '')
+                . ' bono=' . ($p['from_bonus'] ?? 0)
+                . ' recarga=' . ($p['from_recharge'] ?? 0)
+                . ' retiro=' . ($p['from_withdraw'] ?? 0)
+                . ' resultado=' . ($p['result_label'] ?? '')
+                . ' premio=' . ($p['prize_amount'] ?? 0)
+                . ' acredito=' . ($p['credit_label'] ?? '')
             );
         }
 

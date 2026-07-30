@@ -19,9 +19,14 @@ $statusDeposit = static function ($s) {
     };
 };
 $sourceLabel = static function ($source) {
+    if (function_exists('bingo_purchase_source_label')) {
+        return bingo_purchase_source_label((string) $source);
+    }
+
     return match ((string) $source) {
         'roulette' => translate('roulette cartons'),
         'bonus' => translate('bonus balance'),
+        'mixed' => translate('mixed') . ' (' . translate('bonus') . ')',
         'wallet_legacy' => translate('wallet historical'),
         default => translate('real money wallet'),
     };
@@ -35,8 +40,16 @@ $sourceLabel = static function ($source) {
     border-radius: 12px; padding: .65rem .75rem; background: rgba(98,54,255,.08); height: 100%;
 }
 .user-details-admin .stat-chip strong { display:block; font-size: 1rem; }
-.user-details-admin .scroll-pane { max-height: 280px; overflow:auto; }
+.user-details-admin .scroll-pane { max-height: 380px; overflow:auto; }
 .user-details-admin .alert-doc { font-size: .9rem; }
+.user-details-admin .ud-purchases-table th.col-result,
+.user-details-admin .ud-purchases-table td.col-result {
+    min-width: 7.5rem;
+    white-space: nowrap;
+}
+.user-details-admin .ud-result-won { background: #198754 !important; }
+.user-details-admin .ud-result-lost { background: #6c757d !important; }
+.user-details-admin .ud-result-pending { background: #ffc107 !important; color: #212529 !important; }
 </style>
 
 <div class="user-details-admin">
@@ -276,22 +289,81 @@ $sourceLabel = static function ($source) {
 
         <div class="tab-pane fade" id="ud-purchases">
             <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
+                <table class="table table-sm table-striped mb-0 ud-purchases-table">
                     <thead><tr>
-                        <th><?= translate('date'); ?></th><th><?= translate('game'); ?></th><th><?= translate('cartons'); ?></th>
-                        <th><?= translate('amount'); ?></th><th><?= translate('source'); ?></th>
-                        <th><?= translate('bonus'); ?></th><th><?= translate('recharge'); ?></th><th><?= translate('withdraw'); ?></th>
+                        <th><?= translate('date'); ?></th>
+                        <th><?= translate('game'); ?></th>
+                        <th><?= translate('carton'); ?></th>
+                        <th class="col-result">Resultado</th>
+                        <th><?= translate('prize'); ?> / premio</th>
+                        <th>Acreditado a</th>
+                        <th><?= translate('amount'); ?></th>
+                        <th><?= translate('source'); ?></th>
+                        <th><?= translate('bonus'); ?></th>
+                        <th><?= translate('recharge'); ?></th>
+                        <th><?= translate('withdraw'); ?></th>
                     </tr></thead>
                     <tbody>
                     <?php if (empty($purchases)) : ?>
-                        <tr><td colspan="8" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($purchases as $row) : ?>
+                        <tr><td colspan="11" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
+                    <?php else : foreach ($purchases as $row) :
+                        $resultKey = (string) ($row['result'] ?? '');
+                        $resultLabel = (string) ($row['result_label'] ?? '');
+                        if ($resultLabel === '' || $resultLabel === '—') {
+                            $resultLabel = match ($resultKey) {
+                                'won' => 'Ganó',
+                                'lost' => 'Perdió',
+                                'pending' => 'En juego',
+                                default => '—',
+                            };
+                        }
+                        $resultBadgeClass = match ($resultKey) {
+                            'won' => 'ud-result-won',
+                            'lost' => 'ud-result-lost',
+                            'pending' => 'ud-result-pending',
+                            default => 'bg-secondary',
+                        };
+                        $src = (string) ($row['source'] ?? 'wallet');
+                        $srcLabel = $row['source_label'] ?? $sourceLabel($src);
+                        ?>
                         <tr>
                             <td><?= esc($row['created_at'] ?? ''); ?></td>
                             <td><?= esc($row['game'] ?? ''); ?></td>
-                            <td><?= (int) ($row['cartons_count'] ?? 0); ?></td>
+                            <td>
+                                <?php if (! empty($row['serial']) && $row['serial'] !== '—') : ?>
+                                    <code><?= esc($row['serial']); ?></code>
+                                <?php else : ?>
+                                    <?= (int) ($row['cartons_count'] ?? 0); ?> <?= translate('cartons'); ?>
+                                <?php endif; ?>
+                            </td>
+                            <td class="col-result">
+                                <span class="badge <?= esc($resultBadgeClass); ?>">
+                                    <?= esc($resultLabel); ?>
+                                </span>
+                                <?php if (! empty($row['modality'])) : ?>
+                                    <div class="small text-muted"><?= esc($row['modality']); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($resultKey === 'won') : ?>
+                                    <?= esc($currency); ?> <?= number_format((float) ($row['prize_amount'] ?? 0), 2); ?>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            <td><?= esc($row['credit_label'] ?? '—'); ?></td>
                             <td><?= esc($currency); ?> <?= number_format((float) ($row['amount'] ?? 0), 2); ?></td>
-                            <td><?= esc($sourceLabel($row['source'] ?? 'wallet')); ?></td>
+                            <td>
+                                <?php if ($src === 'bonus') : ?>
+                                    <span class="badge bg-info text-dark"><?= esc($srcLabel); ?></span>
+                                <?php elseif ($src === 'roulette') : ?>
+                                    <span class="badge bg-primary"><?= esc($srcLabel); ?></span>
+                                <?php elseif ($src === 'mixed') : ?>
+                                    <span class="badge bg-warning text-dark"><?= esc($srcLabel); ?></span>
+                                <?php else : ?>
+                                    <?= esc($srcLabel); ?>
+                                <?php endif; ?>
+                            </td>
                             <td><?= number_format((float) ($row['from_bonus'] ?? 0), 2); ?></td>
                             <td><?= number_format((float) ($row['from_recharge'] ?? 0), 2); ?></td>
                             <td><?= number_format((float) ($row['from_withdraw'] ?? 0), 2); ?></td>
@@ -300,6 +372,10 @@ $sourceLabel = static function ($source) {
                     </tbody>
                 </table>
             </div>
+            <p class="small text-muted mt-2 mb-0">
+                <strong>Resultado</strong>: Ganó / Perdió / En juego por cada cartón.
+                Los cartones con bono aparecen con origen <strong>bono</strong>.
+            </p>
         </div>
 
         <div class="tab-pane fade" id="ud-roulette">

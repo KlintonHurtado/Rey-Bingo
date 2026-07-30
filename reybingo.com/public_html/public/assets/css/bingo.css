@@ -17,15 +17,26 @@ body {
     color:#ffffff;
 }
 
+/* Páginas admin con scroll interno: no centrar en vertical (evita recorte) */
+body:has(#content-page > .admin-profile-scroll),
+body:has(#content-page > .legal-page-scroll),
+body:has(#content-page > .admin-stores-scroll),
+body:has(#content-page > .store-panel-fit),
+body:has(#content-page > .operator-panel-fit) {
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
 #content-page {
     width: 100%;
     max-width: 100%;
     position: relative;
 }
 
-/* Perfil admin / páginas legales: scroll interno sin barra visible en el panel morado */
+/* Perfil admin / páginas legales / PV / poco saldo: scroll interno sin barra visible en el panel morado */
 html:has(#content-page > .admin-profile-scroll),
 html:has(#content-page > .legal-page-scroll),
+html:has(#content-page > .admin-stores-scroll),
 html:has(#content-page > .start-section),
 html:has(#content-page > .store-panel-fit),
 html:has(#content-page > .operator-panel-fit) {
@@ -35,6 +46,7 @@ html:has(#content-page > .operator-panel-fit) {
 
 #content-page:has(> .admin-profile-scroll),
 #content-page:has(> .legal-page-scroll),
+#content-page:has(> .admin-stores-scroll),
 #content-page:has(> .start-section),
 #content-page:has(> .store-panel-fit),
 #content-page:has(> .operator-panel-fit) {
@@ -44,8 +56,10 @@ html:has(#content-page > .operator-panel-fit) {
 }
 
 .admin-profile-scroll,
-.legal-page-scroll {
+.legal-page-scroll,
+.admin-stores-scroll {
     max-height: 100dvh;
+    height: 100dvh;
     overflow-x: hidden;
     overflow-y: auto;
     padding-bottom: 120px;
@@ -55,7 +69,8 @@ html:has(#content-page > .operator-panel-fit) {
 }
 
 .admin-profile-scroll::-webkit-scrollbar,
-.legal-page-scroll::-webkit-scrollbar {
+.legal-page-scroll::-webkit-scrollbar,
+.admin-stores-scroll::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
@@ -1772,6 +1787,26 @@ html.reybingo-skip-preloader .preloader {
 .play-cards .list-group {
     border-top: 0px;
     border-bottom: 0px;
+}
+
+.card-button-buy-bonus {
+    background: linear-gradient(145deg, #0ea5e9, #0284c7) !important;
+    border-color: #0284c7 !important;
+    font-size: 0.78rem !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+}
+
+.card-button-buy-bonus:disabled,
+.card-button-buy-bonus.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.card-buy-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .card {

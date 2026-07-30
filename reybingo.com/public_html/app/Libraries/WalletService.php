@@ -66,27 +66,57 @@ class WalletService
         }
     }
 
-    public function canAfford(array $user, float $amount): bool
+    public function canAfford(array $user, float $amount, string $mode = 'auto'): bool
     {
         if ($amount <= 0) {
             return true;
+        }
+
+        $user = $this->normalizeUser($user);
+        $mode = $this->normalizePayMode($mode);
+
+        if ($mode === 'bonus') {
+            return $user['wallet_bonus'] >= $amount;
+        }
+
+        if ($mode === 'real') {
+            return ($user['wallet_recharge'] + $user['wallet_withdraw']) >= $amount;
         }
 
         return $this->getTotalBalance($user) >= $amount;
     }
 
     /**
-     * Descuenta: bono → recarga → retiro
+     * Normaliza modo de cobro: bonus | real | auto
      */
-    public function deductForPurchase(int $userId, float $amount): bool
+    public function normalizePayMode(?string $mode): string
     {
-        return $this->deductForPurchaseDetailed($userId, $amount) !== null;
+        $mode = strtolower(trim((string) $mode));
+        if (in_array($mode, ['bonus', 'bono', 'abono'], true)) {
+            return 'bonus';
+        }
+        if (in_array($mode, ['real', 'recharge', 'recarga', 'wallet'], true)) {
+            return 'real';
+        }
+
+        return 'auto';
+    }
+
+    /**
+     * Descuenta según modo:
+     * - bonus: solo saldo bono
+     * - real: recarga → retiro (sin tocar bono)
+     * - auto: bono → recarga → retiro
+     */
+    public function deductForPurchase(int $userId, float $amount, string $mode = 'auto'): bool
+    {
+        return $this->deductForPurchaseDetailed($userId, $amount, $mode) !== null;
     }
 
     /**
      * @return array{from_bonus:float,from_recharge:float,from_withdraw:float}|null
      */
-    public function deductForPurchaseDetailed(int $userId, float $amount): ?array
+    public function deductForPurchaseDetailed(int $userId, float $amount, string $mode = 'auto'): ?array
     {
         $user = $this->normalizeUser($this->users->find($userId));
         if (! $user) {
@@ -101,22 +131,42 @@ class WalletService
             ];
         }
 
+        $mode = $this->normalizePayMode($mode);
         $remaining = $amount;
         $bonus    = $user['wallet_bonus'];
         $recharge = $user['wallet_recharge'];
         $withdraw = $user['wallet_withdraw'];
 
-        $fromBonus = min($bonus, $remaining);
-        $remaining -= $fromBonus;
-        $bonus -= $fromBonus;
+        $fromBonus = 0.0;
+        $fromRecharge = 0.0;
+        $fromWithdraw = 0.0;
 
-        $fromRecharge = min($recharge, $remaining);
-        $remaining -= $fromRecharge;
-        $recharge -= $fromRecharge;
+        if ($mode === 'bonus') {
+            $fromBonus = min($bonus, $remaining);
+            $remaining -= $fromBonus;
+            $bonus -= $fromBonus;
+        } elseif ($mode === 'real') {
+            $fromRecharge = min($recharge, $remaining);
+            $remaining -= $fromRecharge;
+            $recharge -= $fromRecharge;
 
-        $fromWithdraw = min($withdraw, $remaining);
-        $remaining -= $fromWithdraw;
-        $withdraw -= $fromWithdraw;
+            $fromWithdraw = min($withdraw, $remaining);
+            $remaining -= $fromWithdraw;
+            $withdraw -= $fromWithdraw;
+        } else {
+            // auto: bono → recarga → retiro
+            $fromBonus = min($bonus, $remaining);
+            $remaining -= $fromBonus;
+            $bonus -= $fromBonus;
+
+            $fromRecharge = min($recharge, $remaining);
+            $remaining -= $fromRecharge;
+            $recharge -= $fromRecharge;
+
+            $fromWithdraw = min($withdraw, $remaining);
+            $remaining -= $fromWithdraw;
+            $withdraw -= $fromWithdraw;
+        }
 
         if ($remaining > 0.0001) {
             return null;

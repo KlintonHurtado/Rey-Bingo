@@ -659,6 +659,7 @@ function sendMessageText() {
 // AUTO-BINGO: si el jugador completa cartón lleno
 // ==========================================
 let lastAutoSingBall = null;
+let lastAutoSingNoNew = false;
 let autoSingInFlight = false;
 let ballRevealTimer = null;
 let ballRevealAfterTimer = null;
@@ -784,6 +785,13 @@ function handleBingoSuccess(data, resumeCallback) {
 
     window.gameHasWinner = true;
 
+    // Encolar bingos extras del mismo request (varios cartones / modalidades)
+    if (Array.isArray(data.sings) && data.sings.length > 1) {
+        data.sings.slice(1).forEach(function(extra) {
+            simultaneousBingos.push(extra);
+        });
+    }
+
     registerWinner(data.player, data.modality);
 
     if (Array.isArray(data.winners) && data.winners.length) {
@@ -797,14 +805,21 @@ function handleBingoSuccess(data, resumeCallback) {
         sendEmoji('🥳', 21);
     }
 
-    const cartonElement = document.getElementById(`carton-${data.carton}`);
-    if (cartonElement && Array.isArray(data.numbers)) {
-        data.numbers.forEach((num) => {
-            const numberElement = cartonElement.querySelector(`.bingo-carton-number.number-${num}`);
-            if (numberElement) {
-                numberElement.classList.add('carton-sing');
-            }
-        });
+    const highlightSing = function(singData) {
+        const cartonElement = document.getElementById(`carton-${singData.carton}`);
+        if (cartonElement && Array.isArray(singData.numbers)) {
+            singData.numbers.forEach((num) => {
+                const numberElement = cartonElement.querySelector(`.bingo-carton-number.number-${num}`);
+                if (numberElement) {
+                    numberElement.classList.add('carton-sing');
+                }
+            });
+        }
+    };
+
+    highlightSing(data);
+    if (Array.isArray(data.sings)) {
+        data.sings.forEach(highlightSing);
     }
 
     const afterCountdown = function() {
@@ -812,6 +827,9 @@ function handleBingoSuccess(data, resumeCallback) {
             showGameFinalized();
             return;
         }
+
+        // Tras el anuncio, reintentar auto-canto por si otro cartón también ganó
+        scheduleAutoSingCheck(600);
 
         if (typeof resumeCallback === 'function') {
             resumeCallback();
@@ -875,6 +893,9 @@ function scheduleAutoSingCheck(delay) {
         return;
     }
 
+    // Tras marcar números / anunciar bingo, permitir reintentar en la misma bola
+    lastAutoSingNoNew = false;
+
     if (autoSingCheckTimer) {
         clearTimeout(autoSingCheckTimer);
     }
@@ -886,7 +907,8 @@ function scheduleAutoSingCheck(delay) {
 }
 
 function autoSingIfComplete() {
-    if (autoSingInFlight || bingoInProgress || window.gameIsFinished || window.gameHasWinner) {
+    // No bloquear por gameHasWinner: un segundo cartón / otra modalidad debe poder cantar
+    if (autoSingInFlight || bingoInProgress || window.gameIsFinished) {
         return;
     }
 
@@ -903,10 +925,6 @@ function autoSingIfComplete() {
         return;
     }
 
-    if (lastAutoSingBall === lastBall) {
-        return;
-    }
-
     const cartons = Array.from(document.querySelectorAll('.bingo-carton'));
     if (!cartons.length) {
         return;
@@ -917,16 +935,27 @@ function autoSingIfComplete() {
         return;
     }
 
+    // Evitar spam en la misma bola si el intento anterior no registró bingo nuevo
+    if (lastAutoSingBall === lastBall && lastAutoSingNoNew) {
+        return;
+    }
+
     autoSingInFlight = true;
+    lastAutoSingNoNew = false;
     $.post(site_url + 'playings/singBingo', {})
         .done((data) => {
             if (data && data.status === 'success') {
                 lastAutoSingBall = lastBall;
+                lastAutoSingNoNew = false;
                 handleBingoSuccess(data, startAutomaticLast);
-            } else if (data && data.gameHasWinner) {
-                window.gameHasWinner = true;
-            } else if (data && data.message) {
-                console.warn('autoSingIfComplete:', data.message);
+            } else {
+                lastAutoSingBall = lastBall;
+                lastAutoSingNoNew = true;
+                if (data && data.gameHasWinner) {
+                    window.gameHasWinner = true;
+                } else if (data && data.message) {
+                    console.warn('autoSingIfComplete:', data.message);
+                }
             }
         })
         .always(() => {
@@ -1597,6 +1626,7 @@ function showOtherPlayerBingoNotice(data, callback) {
     }
 
     setTimeout(function() {
+        scheduleAutoSingCheck(400);
         if (typeof callback === 'function') {
             callback();
         } else {
@@ -2002,6 +2032,7 @@ function singBingo() {
                 const lastBall = getLastBoardNumber();
                 if (lastBall) {
                     lastAutoSingBall = lastBall;
+                    lastAutoSingNoNew = false;
                 }
                 handleBingoSuccess(data, startAutomaticLast);
             } else if (data && data.gameHasWinner) {

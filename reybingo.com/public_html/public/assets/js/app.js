@@ -360,9 +360,10 @@ function boardGet() {
     showBsModal('#modalBoard');
 }
 
-function generateCartonsGet(game) {
+function generateCartonsGet(game, payWith) {
     if(game != '') {
-        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/generateCartonsGet/' + game);
+        var mode = (payWith === 'bonus' || payWith === 'bono' || payWith === 'abono') ? 'bonus' : 'real';
+        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/generateCartonsGet/' + game + '?pay_with=' + encodeURIComponent(mode));
     } else {
         Toastify({
             text: 'Debe seleccionar una sala.',

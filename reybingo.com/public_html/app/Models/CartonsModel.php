@@ -9,7 +9,7 @@ class CartonsModel extends Model {
     protected $primaryKey = 'id'; // Llave primaria
 
     // Campos permitidos para insert/update
-    protected $allowedFields = ['serial', 'user', 'game', 'created_at', 'updated_at', 'status'];
+    protected $allowedFields = ['serial', 'user', 'game', 'created_at', 'updated_at', 'status', 'pay_source'];
 
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;

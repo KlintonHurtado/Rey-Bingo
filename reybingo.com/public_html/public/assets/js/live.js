@@ -775,6 +775,7 @@ function showCountdown(data, callback) {
                 if (countdown === 0) {
                     clearInterval(interval);
                     container.style.display = 'none';
+                    // Reanudar: el siguiente poll puede anunciar otro bingo pendiente
                     if (callback) callback();
                 }
             }, 1000);

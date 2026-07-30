@@ -606,14 +606,14 @@
                                                 <li class="p-0" id="card-accumulated-<?= $game['id'] ?>"></li>
                                                 <li class="p-0" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
                                             </ul>
-                                            <div class="card-body p-1">
+                                            <div class="card-body p-1 card-buy-actions">
                                                 <?php if ($game['cartons'] >= 1) : ?>
-                                                    <button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-<?= $game['id'] ?>" onclick="gameGet(<?= $game['id'] ?>);"><?= translate('come in to play'); ?></button>
-                                                    <button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy" id="card-button-buy-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>);"><?= translate('buy cartons'); ?></button>
+                                                    <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-<?= $game['id'] ?>" onclick="gameGet(<?= $game['id'] ?>);"><?= translate('come in to play'); ?></button>
                                                 <?php else : ?>
-                                                    <button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-<?= $game['id'] ?>" disabled><?= translate('come in to play'); ?></button>
-                                                    <button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy" id="card-button-buy-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>);"><?= translate('buy cartons'); ?></button>
+                                                    <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-<?= $game['id'] ?>" disabled><?= translate('come in to play'); ?></button>
                                                 <?php endif; ?>
+                                                <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
+                                                <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus<?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? ' disabled' : ''; ?>" id="card-button-buy-bonus-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>, 'bonus');" <?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? 'disabled' : ''; ?>>Comprar con bono</button>
                                             </div>
                                         </div>
                                         </div>
@@ -995,6 +995,7 @@
             const timeEl = document.querySelector(`#card-time-${gameId} .card-time-display`);
             const btnPlay = document.getElementById(`card-button-play-${gameId}`);
             const btnBuy = document.getElementById(`card-button-buy-${gameId}`);
+            const btnBuyBonus = document.getElementById(`card-button-buy-bonus-${gameId}`);
 
             if (!gameId || !startValue || !timeEl) {
                 return;
@@ -1014,6 +1015,13 @@
                     btnBuy.disabled = started;
                     btnBuy.classList.toggle('disabled', started);
                     btnBuy.textContent = started ? 'Jugando...' : '<?= translate('buy cartons'); ?>';
+                }
+
+                if (btnBuyBonus) {
+                    const noBonus = <?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? 'true' : 'false'; ?>;
+                    btnBuyBonus.disabled = started || noBonus;
+                    btnBuyBonus.classList.toggle('disabled', started || noBonus);
+                    btnBuyBonus.textContent = started ? 'Jugando...' : 'Comprar con bono';
                 }
 
                 if (btnPlay && started) {

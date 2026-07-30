@@ -7,6 +7,7 @@ $thresholdValue = ($configuredThreshold !== null && $configuredThreshold !== '')
 $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
 ?>
 
+<div class="admin-stores-scroll">
 <?= view('games/partials/admin_nav_cluster', [
     'activeNav' => 'low_balance',
     'showHome' => true,
@@ -109,6 +110,7 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script type="text/javascript">

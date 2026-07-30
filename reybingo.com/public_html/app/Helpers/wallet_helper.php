@@ -24,9 +24,9 @@ if (! function_exists('wallet_withdrawable')) {
 }
 
 if (! function_exists('wallet_deduct_purchase')) {
-    function wallet_deduct_purchase(int $userId, float $amount): bool
+    function wallet_deduct_purchase(int $userId, float $amount, string $mode = 'auto'): bool
     {
-        return wallet_service()->deductForPurchase($userId, $amount);
+        return wallet_service()->deductForPurchase($userId, $amount, $mode);
     }
 }
 
@@ -34,9 +34,40 @@ if (! function_exists('wallet_deduct_purchase_detailed')) {
     /**
      * @return array{from_bonus:float,from_recharge:float,from_withdraw:float}|null
      */
-    function wallet_deduct_purchase_detailed(int $userId, float $amount): ?array
+    function wallet_deduct_purchase_detailed(int $userId, float $amount, string $mode = 'auto'): ?array
     {
-        return wallet_service()->deductForPurchaseDetailed($userId, $amount);
+        return wallet_service()->deductForPurchaseDetailed($userId, $amount, $mode);
+    }
+}
+
+if (! function_exists('wallet_normalize_pay_mode')) {
+    function wallet_normalize_pay_mode(?string $mode): string
+    {
+        return wallet_service()->normalizePayMode($mode);
+    }
+}
+
+if (! function_exists('wallet_can_afford')) {
+    function wallet_can_afford(array $user, float $amount, string $mode = 'auto'): bool
+    {
+        return wallet_service()->canAfford($user, $amount, $mode);
+    }
+}
+
+if (! function_exists('wallet_available_for_pay_mode')) {
+    function wallet_available_for_pay_mode(array $user, string $mode = 'auto'): float
+    {
+        $user = wallet_service()->normalizeUser($user);
+        $mode = wallet_service()->normalizePayMode($mode);
+
+        if ($mode === 'bonus') {
+            return round((float) $user['wallet_bonus'], 2);
+        }
+        if ($mode === 'real') {
+            return round((float) $user['wallet_recharge'] + (float) $user['wallet_withdraw'], 2);
+        }
+
+        return wallet_total($user);
     }
 }
 

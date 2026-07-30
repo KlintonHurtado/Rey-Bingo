@@ -345,8 +345,6 @@ class Boards extends Controller {
             ]);
         }
 
-        $lastSings = $modelSings->where('game', $game['id'])->where('status', 0)->findAll();
-
         $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
@@ -356,32 +354,18 @@ class Boards extends Controller {
             $winner['modality'] = translate($wmodality['name']);
         }
 
-        if ($lastBall && !empty($lastSings)) {
-            foreach ($lastSings as $sing) {
-                $user = $modelUsers->find($sing['user']);
-                $modality = $modelModalities->find($sing['modality']);
-
-                $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-
-                $lastBallTime = strtotime($lastBall['created_at']);
-                $lastSingTime = strtotime($sing['created_at']);
-                $timeDifference = $lastSingTime - $lastBallTime;
-
-                if ($timeDifference <= 10) {
-                    $modelSings->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
-
-                    return $this->response->setJSON([
-                        'status' => 'pause',
-                        'totalNumbersGenerated' => $totalNumbersGenerated,
-                        'winners' => $winners,
-                        'message' => 'Se ha cantado un bingo. Pausando el juego por 10 segundos.',
-                        'player' => $user['firstname'] . ' ' . $user['lastname'],
-                        'modality' => translate($modality['name']),
-                        'modalityId' => $modality['id'],
-                        'image' => $imagePath
-                    ]);
-                }
-            }
+        $pendingBoardSing = bingo_claim_pending_board_sing((int) $game['id']);
+        if ($pendingBoardSing) {
+            return $this->response->setJSON([
+                'status' => 'pause',
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'winners' => $winners,
+                'message' => 'Se ha cantado un bingo. Pausando el juego por 10 segundos.',
+                'player' => $pendingBoardSing['player'],
+                'modality' => $pendingBoardSing['modality'],
+                'modalityId' => $pendingBoardSing['modalityId'],
+                'image' => $pendingBoardSing['image'],
+            ]);
         }
 
         $number = $this->generateUniqueNumber();
@@ -469,8 +453,6 @@ class Boards extends Controller {
             ]);
         }
 
-        $lastSings = $modelSings->where('game', $game['id'])->where('status', 0)->findAll();
-
         $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
@@ -480,32 +462,18 @@ class Boards extends Controller {
             $winner['modality'] = translate($wmodality['name']);
         }
 
-        if ($lastBall && !empty($lastSings)) {
-            foreach ($lastSings as $sing) {
-                $user = $modelUsers->find($sing['user']);
-                $modality = $modelModalities->find($sing['modality']);
-
-                $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-
-                $lastBallTime = strtotime($lastBall['created_at']);
-                $lastSingTime = strtotime($sing['created_at']);
-                $timeDifference = $lastSingTime - $lastBallTime;
-
-                if ($timeDifference <= 10) {
-                    $modelSings->where('game', $game['id'])->where('status', 0)->set(['status' => 1])->update();
-
-                    return $this->response->setJSON([
-                        'status' => 'pause',
-                        'totalNumbersGenerated' => $totalNumbersGenerated,
-                        'winners' => $winners,
-                        'message' => 'Se ha cantado un bingo. Pausando el juego por 10 segundos.',
-                        'player' => $user['firstname'] . ' ' . $user['lastname'],
-                        'modality' => translate($modality['name']),
-                        'modalityId' => $modality['id'],
-                        'image' => $imagePath
-                    ]);
-                }
-            }
+        $pendingBoardSing = bingo_claim_pending_board_sing((int) $game['id']);
+        if ($pendingBoardSing) {
+            return $this->response->setJSON([
+                'status' => 'pause',
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'winners' => $winners,
+                'message' => 'Se ha cantado un bingo. Pausando el juego por 10 segundos.',
+                'player' => $pendingBoardSing['player'],
+                'modality' => $pendingBoardSing['modality'],
+                'modalityId' => $pendingBoardSing['modalityId'],
+                'image' => $pendingBoardSing['image'],
+            ]);
         }
 
         $number = $number;
@@ -590,26 +558,18 @@ class Boards extends Controller {
 
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-        $lastSing = $modelSings->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
-        // Verificar si hay un bingo pendiente de procesar
-        if ($lastSing && $lastSing['status'] == 0) {
-            $user = $modelUsers->find($lastSing['user']);
-            $modality = $modelModalities->find($lastSing['modality']);
-            $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-
-            // Marcar el sing como procesado
-            $modelSings->update($lastSing['id'], ['status' => 1]);
-
-            // Verificar si este era el último premio
+        // Bingo pendiente de anunciar en tablero (aunque el jugador ya lo confirmó con status=1)
+        $pendingBoardSing = bingo_claim_pending_board_sing((int) $game['id']);
+        if ($pendingBoardSing) {
             $updatedSingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
-            
+
             if ($AwardsCount > 0 && $updatedSingsCount >= $AwardsCount) {
                 bingo_ensure_winners_registered((int) $game['id']);
                 $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
                 $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
                 bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
-                
+
                 return $this->response->setJSON([
                     'status' => 'completed',
                     'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -617,14 +577,13 @@ class Boards extends Controller {
                     'winners' => $winners,
                     'message' => translate('the game is over, all the prizes have been awarded'),
                     'number' => $lastNumber['number'],
-                    'player' => $user['firstname'] . ' ' . $user['lastname'],
-                    'modality' => translate($modality['name']),
-                    'modalityId' => $modality['id'],
-                    'image' => $imagePath
+                    'player' => $pendingBoardSing['player'],
+                    'modality' => $pendingBoardSing['modality'],
+                    'modalityId' => $pendingBoardSing['modalityId'],
+                    'image' => $pendingBoardSing['image'],
                 ]);
             }
-            
-            // Aún hay más premios por ganar
+
             return $this->response->setJSON([
                 'status' => 'pause',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -632,10 +591,10 @@ class Boards extends Controller {
                 'winners' => $winners,
                 'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
                 'number' => $lastNumber['number'],
-                'player' => $user['firstname'] . ' ' . $user['lastname'],
-                'modality' => translate($modality['name']),
-                'modalityId' => $modality['id'],
-                'image' => $imagePath
+                'player' => $pendingBoardSing['player'],
+                'modality' => $pendingBoardSing['modality'],
+                'modalityId' => $pendingBoardSing['modalityId'],
+                'image' => $pendingBoardSing['image'],
             ]);
         }
 
