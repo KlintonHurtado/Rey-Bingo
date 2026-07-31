@@ -607,6 +607,8 @@ class Signup extends Controller {
             'status' => 1,
             'autodial' => 1,
             'verified_email' => 0,
+            'roulette' => 1,
+            'kyc_status' => 'pending',
         ];
 
         if ($this->request->getPost('accept_terms') === '1') {
@@ -846,6 +848,8 @@ class Signup extends Controller {
             'referred_code' => $generateReferred_code,
             'status'    => 1,
             'autodial'  => 1,
+            'roulette'  => 1,
+            'kyc_status' => 'pending',
         ];
 
         if (bingo_terms_require_accept()) {

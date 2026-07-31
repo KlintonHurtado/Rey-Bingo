@@ -25,10 +25,12 @@ $sourceLabel = static function ($source) {
 
     return match ((string) $source) {
         'roulette' => translate('roulette cartons'),
-        'bonus' => translate('bonus balance'),
-        'mixed' => translate('mixed') . ' (' . translate('bonus') . ')',
+        'bonus' => 'Saldo Bono',
+        'recharge', 'real' => 'Saldo Recarga',
+        'withdraw' => 'Saldo Retiro',
+        'mixed' => 'Mixed (Recarga + Retiro)',
         'wallet_legacy' => translate('wallet historical'),
-        default => translate('real money wallet'),
+        default => 'Saldo Recarga',
     };
 };
 ?>
@@ -186,6 +188,9 @@ $sourceLabel = static function ($source) {
                 <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
                     <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
                 </button>
+                <a class="btn btn-sm btn-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
+                    <i class="fa-duotone fa-solid fa-file-excel"></i> Descargar movimientos
+                </a>
                 <a class="btn btn-sm btn-warning" href="<?= site_url('users/exportRiskAnalysis/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('download risk analysis'); ?>
                 </a>
@@ -202,7 +207,8 @@ $sourceLabel = static function ($source) {
     </div>
 
     <ul class="nav nav-tabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ud-deposits" type="button"><?= translate('deposits'); ?></button></li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ud-movements" type="button">Movimientos</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-deposits" type="button"><?= translate('deposits'); ?></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-retires" type="button"><?= translate('retires'); ?></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-prizes" type="button"><?= translate('prizes'); ?></button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-purchases" type="button"><?= translate('carton purchases'); ?></button></li>
@@ -212,7 +218,106 @@ $sourceLabel = static function ($source) {
     </ul>
 
     <div class="tab-content border border-top-0 p-2 bg-white text-dark">
-        <div class="tab-pane fade show active" id="ud-deposits">
+        <div class="tab-pane fade show active" id="ud-movements">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <p class="small text-muted mb-0">
+                    Historial unificado: recargas, retiros, compras, resultados, premios, bonos y ruleta.
+                </p>
+                <a class="btn btn-sm btn-outline-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
+                    <i class="fa-duotone fa-solid fa-download"></i> Descargar Excel
+                </a>
+            </div>
+            <div class="scroll-pane" style="max-height: 420px;">
+                <table class="table table-sm table-striped mb-0 ud-movements-table">
+                    <thead><tr>
+                        <th><?= translate('date'); ?></th>
+                        <th>Tipo</th>
+                        <th>Monto</th>
+                        <th><?= translate('status'); ?></th>
+                        <th><?= translate('game'); ?></th>
+                        <th>Serie</th>
+                        <th>Resultado</th>
+                        <th>Origen</th>
+                        <th>Detalle</th>
+                    </tr></thead>
+                    <tbody>
+                    <?php if (empty($movements)) : ?>
+                        <tr><td colspan="9" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
+                    <?php else : foreach ($movements as $m) :
+                        $dir = (string) ($m['direction'] ?? '');
+                        $amt = (float) ($m['amount'] ?? 0);
+                        $amtClass = $dir === '+' ? 'text-success' : ($dir === '-' ? 'text-danger' : 'text-muted');
+                        $type = (string) ($m['type'] ?? '');
+                        $typeBadge = match ($type) {
+                            'deposit' => 'bg-success',
+                            'retire' => 'bg-danger',
+                            'purchase' => 'bg-primary',
+                            'prize' => 'bg-warning text-dark',
+                            'bonus' => 'bg-info text-dark',
+                            'roulette' => 'bg-secondary',
+                            default => 'bg-dark',
+                        };
+                        $resultKey = (string) ($m['result'] ?? '');
+                        $resultBadge = match ($resultKey) {
+                            'won' => 'ud-result-won',
+                            'lost' => 'ud-result-lost',
+                            'pending' => 'ud-result-pending',
+                            default => '',
+                        };
+                        ?>
+                        <tr>
+                            <td class="text-nowrap"><?= esc($m['datetime'] ?? ''); ?></td>
+                            <td><span class="badge <?= esc($typeBadge); ?>"><?= esc($m['type_label'] ?? $type); ?></span></td>
+                            <td class="<?= esc($amtClass); ?> text-nowrap">
+                                <?= esc($dir); ?> <?= esc($currency); ?> <?= number_format($amt, 2); ?>
+                            </td>
+                            <td><?= esc($m['status_label'] ?? ''); ?></td>
+                            <td><?= esc($m['game'] ?? '—'); ?></td>
+                            <td>
+                                <?php if (! empty($m['carton_serial'])) : ?>
+                                    <code><?= esc($m['carton_serial']); ?></code>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($resultKey !== '') : ?>
+                                    <span class="badge <?= esc($resultBadge !== '' ? $resultBadge : 'bg-secondary'); ?>">
+                                        <?= esc($m['result_label'] ?? $resultKey); ?>
+                                    </span>
+                                    <?php if ((float) ($m['prize_amount'] ?? 0) > 0) : ?>
+                                        <div class="small text-muted"><?= esc($currency); ?> <?= number_format((float) $m['prize_amount'], 2); ?></div>
+                                    <?php endif; ?>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (! empty($m['source_label'])) : ?>
+                                    <span class="small"><?= esc($m['source_label']); ?></span>
+                                    <?php if ((float) ($m['from_bonus'] ?? 0) > 0 || (float) ($m['from_recharge'] ?? 0) > 0 || (float) ($m['from_withdraw'] ?? 0) > 0) : ?>
+                                        <div class="small text-muted">
+                                            A <?= number_format((float) ($m['from_bonus'] ?? 0), 2); ?>
+                                            / R <?= number_format((float) ($m['from_recharge'] ?? 0), 2); ?>
+                                            / Ret <?= number_format((float) ($m['from_withdraw'] ?? 0), 2); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            <td class="small"><?= esc($m['detail'] ?? ''); ?></td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <p class="small text-muted mt-2 mb-0">
+                <?= count($movements ?? []); ?> registros. Usa <strong>Descargar Excel</strong> para el historial completo.
+            </p>
+        </div>
+
+        <div class="tab-pane fade" id="ud-deposits">
             <div class="scroll-pane">
                 <table class="table table-sm table-striped mb-0">
                     <thead><tr>
@@ -360,6 +465,10 @@ $sourceLabel = static function ($source) {
                                     <span class="badge bg-primary"><?= esc($srcLabel); ?></span>
                                 <?php elseif ($src === 'mixed') : ?>
                                     <span class="badge bg-warning text-dark"><?= esc($srcLabel); ?></span>
+                                <?php elseif ($src === 'withdraw') : ?>
+                                    <span class="badge bg-success"><?= esc($srcLabel); ?></span>
+                                <?php elseif (in_array($src, ['recharge', 'real'], true)) : ?>
+                                    <span class="badge bg-secondary"><?= esc($srcLabel); ?></span>
                                 <?php else : ?>
                                     <?= esc($srcLabel); ?>
                                 <?php endif; ?>
@@ -374,7 +483,8 @@ $sourceLabel = static function ($source) {
             </div>
             <p class="small text-muted mt-2 mb-0">
                 <strong>Resultado</strong>: Ganó / Perdió / En juego por cada cartón.
-                Los cartones con bono aparecen con origen <strong>bono</strong>.
+                Origen: Saldo Bono, Saldo Recarga o Saldo Retiro.
+                <strong>Mixed</strong> solo aplica a Recarga + Retiro (nunca incluye bono).
             </p>
         </div>
 

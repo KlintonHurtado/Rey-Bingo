@@ -83,7 +83,9 @@ class WalletService
             return ($user['wallet_recharge'] + $user['wallet_withdraw']) >= $amount;
         }
 
-        return $this->getTotalBalance($user) >= $amount;
+        // auto: o cubre TODO el bono, o TODO con dinero real (nunca mezcla bono + real)
+        return $user['wallet_bonus'] >= $amount
+            || ($user['wallet_recharge'] + $user['wallet_withdraw']) >= $amount;
     }
 
     /**
@@ -105,8 +107,8 @@ class WalletService
     /**
      * Descuenta según modo:
      * - bonus: solo saldo bono
-     * - real: recarga → retiro (sin tocar bono)
-     * - auto: bono → recarga → retiro
+     * - real: recarga → retiro (sin tocar bono); Mixed solo Recarga+Retiro
+     * - auto: si el bono cubre el total → solo bono; si no → solo real (nunca mezcla bono)
      */
     public function deductForPurchase(int $userId, float $amount, string $mode = 'auto'): bool
     {
@@ -141,24 +143,17 @@ class WalletService
         $fromRecharge = 0.0;
         $fromWithdraw = 0.0;
 
+        if ($mode === 'auto') {
+            // Nunca combinar bono con recarga/retiro
+            $mode = ($bonus + 0.0001) >= $amount ? 'bonus' : 'real';
+        }
+
         if ($mode === 'bonus') {
             $fromBonus = min($bonus, $remaining);
             $remaining -= $fromBonus;
             $bonus -= $fromBonus;
-        } elseif ($mode === 'real') {
-            $fromRecharge = min($recharge, $remaining);
-            $remaining -= $fromRecharge;
-            $recharge -= $fromRecharge;
-
-            $fromWithdraw = min($withdraw, $remaining);
-            $remaining -= $fromWithdraw;
-            $withdraw -= $fromWithdraw;
         } else {
-            // auto: bono → recarga → retiro
-            $fromBonus = min($bonus, $remaining);
-            $remaining -= $fromBonus;
-            $bonus -= $fromBonus;
-
+            // real: recarga → retiro
             $fromRecharge = min($recharge, $remaining);
             $remaining -= $fromRecharge;
             $recharge -= $fromRecharge;

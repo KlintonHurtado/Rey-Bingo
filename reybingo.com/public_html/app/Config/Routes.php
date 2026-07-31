@@ -219,6 +219,7 @@ $routes->post('users/deleteUser', 'Users::deleteUser');
 $routes->post('users/banUser', 'Users::banUser');
 $routes->get('users/getUserDetails/(:num)', 'Users::getUserDetails/$1');
 $routes->get('users/exportRiskAnalysis/(:num)', 'Users::exportRiskAnalysis/$1');
+$routes->get('users/exportUserMovements/(:num)', 'Users::exportUserMovements/$1');
 $routes->post('users/revokeKyc', 'Users::revokeKyc');
 $routes->post('users/saveDocumentExpiry', 'Users::saveDocumentExpiry');
 $routes->get('profile', 'Users::profile');

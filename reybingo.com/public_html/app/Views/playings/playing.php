@@ -16,6 +16,98 @@
         }
     }
 
+    /* Controles partida: engranaje + silencio + micrófono + marcado manual (2x2) */
+    .container-section--playing .btn-sliders,
+    .container-section--playing .btn-volume,
+    .container-section--playing .btn-microphone,
+    .container-section--playing .btn-binary {
+        position: fixed !important;
+        z-index: 1080 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    .container-section--playing .btn-volume {
+        right: 70px !important;
+        top: 12px !important;
+    }
+
+    .container-section--playing .btn-microphone {
+        right: 70px !important;
+        top: 68px !important;
+    }
+
+    .container-section--playing .btn-binary {
+        right: 12px !important;
+        top: 68px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .container-section--playing .btn-binary.hidden {
+        display: none !important;
+    }
+
+    .container-section--playing .btn-sliders {
+        right: 12px !important;
+        top: 12px !important;
+    }
+
+    /* Acumulado a la izquierda para no tapar el botón manual (derecha) */
+    .container-section--playing .total-accumulated {
+        right: auto !important;
+        left: 10px !important;
+        top: 120px !important;
+        z-index: 1 !important;
+    }
+
+    .container-section--playing .top-section.live .last-numbers,
+    .container-section--playing.container-section--live-game .last-numbers {
+        top: 130px !important;
+        right: 10px !important;
+        z-index: 2 !important;
+    }
+
+    @media (max-width: 700px) {
+        .container-section--playing .btn-volume {
+            right: 52px !important;
+            top: 8px !important;
+            width: 42px !important;
+            height: 42px !important;
+        }
+
+        .container-section--playing .btn-microphone {
+            right: 52px !important;
+            top: 56px !important;
+            width: 42px !important;
+            height: 42px !important;
+        }
+
+        .container-section--playing .btn-binary {
+            right: 8px !important;
+            top: 56px !important;
+            width: 42px !important;
+            height: 42px !important;
+        }
+
+        .container-section--playing .btn-sliders {
+            right: 8px !important;
+            top: 8px !important;
+        }
+
+        .container-section--playing .total-accumulated {
+            left: 5px !important;
+            top: 95px !important;
+        }
+
+        .container-section--playing .top-section.live .last-numbers,
+        .container-section--playing.container-section--live-game .last-numbers {
+            top: 115px !important;
+        }
+    }
+
     /* Layout playing: header + cartones a pantalla completa; chat y modalidades flotantes */
     .container-section.container-section--playing {
         display: flex !important;
@@ -961,7 +1053,7 @@
             <i class="fa-duotone fa-solid fa-wallet"></i>
         </button>
 
-        <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
+        <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();" title="Sonido" aria-label="Sonido">
             <?php if ($user['sounds'] == 1): ?>
                 <i class="fa-duotone fa-solid fa-volume"></i>
             <?php else: ?>
@@ -969,7 +1061,7 @@
             <?php endif; ?>
         </button>
 
-        <button class="btn btn-small btn-microphone hidden" onclick="RemoveMicrophone();">
+        <button class="btn btn-small btn-microphone hidden" onclick="RemoveMicrophone();" title="Narración de balotas" aria-label="Narración">
             <?php if ($user['narration'] == 1): ?>
                 <i class="fa-duotone fa-solid fa-microphone"></i>
             <?php else: ?>
@@ -977,11 +1069,11 @@
             <?php endif; ?>
         </button>
 
-        <button class="btn btn-small btn-binary hidden" id="btn-auto-mark" onclick="RemoveCheck();">
+        <button class="btn btn-small btn-binary hidden" id="btn-auto-mark" onclick="RemoveCheck();" title="Marcado automático / manual" aria-label="Marcado manual">
             <?php if ($user['autodial'] == 1): ?>
-                <i class="fa-duotone fa-solid fa-binary-circle-check"></i>
+                <i class="fa-duotone fa-solid fa-wand-magic-sparkles"></i>
             <?php else: ?>
-                <i class="fa-duotone fa-solid fa-binary-slash"></i>
+                <i class="fa-duotone fa-solid fa-hand"></i>
             <?php endif; ?>
         </button>
 

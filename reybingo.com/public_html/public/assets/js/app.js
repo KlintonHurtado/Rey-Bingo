@@ -139,6 +139,7 @@ var App = function() {
     
         let soundtrack;  // Variable para el audio de fondo
         let audioStarted = false;  // Para evitar que el soundtrack se reproduzca más de una vez
+        window.__bingoSoundtrack = null;
     
         // Función para iniciar el soundtrack
         function startSoundtrack() {
@@ -151,23 +152,13 @@ var App = function() {
                     console.log("Autoplay prevented. User interaction needed.");
                 });
                 audioStarted = true;
+                window.__bingoSoundtrack = soundtrack;
             }
         }
+        window.startBingoSoundtrack = startSoundtrack;
     
-        // Función para activar/desactivar el soundtrack
-        $('.btn-volume').click(function() {
-            if (soundtrack && !soundtrack.paused) {
-                soundtrack.pause();
-                $(this).html('<i class="fa-duotone fa-solid fa-volume-slash"></i>');
-            } else {
-                if (!soundtrack) {
-                    startSoundtrack();
-                } else {
-                    soundtrack.play();
-                }
-                $(this).html('<i class="fa-duotone fa-solid fa-volume"></i>');
-            }
-        });
+        // Función para activar/desactivar el soundtrack (icono + AJAX en RemoveVolume)
+        // No enlazar click aquí: el botón usa onclick="RemoveVolume()" para evitar doble toggle.
     
         // Reproduce el soundtrack automáticamente cuando se hace clic en la página
         function playSound() {
@@ -179,10 +170,75 @@ var App = function() {
         // Añadir el event listener para reproducir el soundtrack al hacer clic en la página
         const userSoundsAuto = document.querySelector(`#sounds`);
 
-        if (userSoundsAuto.value == 1) {
+        if (userSoundsAuto && userSoundsAuto.value == 1) {
             document.addEventListener('click', playSound);
         }
     });
+
+    // Preferencias globales: silencio (volumen) y narración de balotas (micrófono)
+    window.RemoveVolume = function RemoveVolume() {
+        const soundsInput = document.getElementById('sounds');
+        const currentlyOn = soundsInput
+            ? String(soundsInput.value) === '1'
+            : !document.querySelector('.btn-volume .fa-volume-slash');
+        const nextOn = !currentlyOn;
+
+        if (soundsInput) {
+            soundsInput.value = nextOn ? '1' : '0';
+        }
+
+        const volBtn = document.querySelector('.btn-volume');
+        if (volBtn) {
+            volBtn.innerHTML = nextOn
+                ? '<i class="fa-duotone fa-solid fa-volume"></i>'
+                : '<i class="fa-duotone fa-solid fa-volume-slash"></i>';
+        }
+
+        try {
+            if (nextOn) {
+                if (window.__bingoSoundtrack) {
+                    window.__bingoSoundtrack.play().catch(() => {});
+                } else if (typeof window.startBingoSoundtrack === 'function') {
+                    window.startBingoSoundtrack();
+                }
+            } else if (window.__bingoSoundtrack) {
+                window.__bingoSoundtrack.pause();
+            }
+        } catch (e) { /* ignore */ }
+
+        if (typeof site_url !== 'undefined' && typeof $ !== 'undefined') {
+            $.ajax({
+                url: site_url + 'playings/volumeSubmit',
+                method: 'POST'
+            });
+        }
+    };
+
+    window.RemoveMicrophone = function RemoveMicrophone() {
+        if (typeof window.narrationPlaying === 'undefined' && typeof narrationPlaying === 'undefined') {
+            window.narrationPlaying = true;
+        }
+        const current = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : window.narrationPlaying;
+        const next = !current;
+        if (typeof narrationPlaying !== 'undefined') {
+            narrationPlaying = next;
+        }
+        window.narrationPlaying = next;
+
+        const micBtn = document.querySelector('.btn-microphone');
+        if (micBtn) {
+            micBtn.innerHTML = next
+                ? '<i class="fa-duotone fa-solid fa-microphone"></i>'
+                : '<i class="fa-duotone fa-solid fa-microphone-slash"></i>';
+        }
+
+        if (typeof site_url !== 'undefined' && typeof $ !== 'undefined') {
+            $.ajax({
+                url: site_url + 'playings/microphoneSubmit',
+                method: 'POST'
+            });
+        }
+    };
     
     var linkPage = function () {
         $('.linkPage').click(function (e) {

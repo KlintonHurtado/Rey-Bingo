@@ -1015,11 +1015,15 @@
             }*/
 
             const gameTimers = new Map();
+            const gameCountdownRefs = new Map();
 
             function parseLocalDateTime(date, time) {
                 try {
-                    const [y, m, d] = date.split('-').map(Number);
-                    const [hh = 0, mm = 0, ss = 0] = (time || '00:00:00').split(':').map(Number);
+                    const [y, m, d] = String(date || '').split('-').map(Number);
+                    const [hh = 0, mm = 0, ss = 0] = String(time || '00:00:00').split(':').map(Number);
+                    if (!y || !m || !d) {
+                        return null;
+                    }
                     return new Date(y, (m - 1), d, hh || 0, mm || 0, ss || 0, 0);
                 } catch (e) {
                     return null;
@@ -1028,7 +1032,7 @@
 
             function calculateTimeRemaining(date, time) {
                 let targetDate = parseLocalDateTime(date, time);
-                if (!targetDate || isNaN(targetDate)) return '';
+                if (!targetDate || isNaN(targetDate.getTime())) return '';
 
                 const now = new Date();
                 const timeDiff = targetDate.getTime() - now.getTime();
@@ -1054,24 +1058,58 @@
                 }
             }
 
+            function setCardCountdownText(timeEl, text) {
+                if (!timeEl) {
+                    return;
+                }
+                const display = timeEl.querySelector('.card-time-display');
+                if (display) {
+                    display.textContent = text;
+                } else {
+                    timeEl.textContent = text;
+                }
+            }
+
             function ensureCountdown(game) {
                 const timeElId = `card-time-${game.id}`;
-                const btnElPlayId  = `card-button-play-${game.id}`;
                 const btnElBuyId  = `card-button-buy-${game.id}`;
+                const btnElBuyBonusId = `card-button-buy-bonus-${game.id}`;
+                const btnElPlayId  = `card-button-play-${game.id}`;
 
                 const timeEl = document.getElementById(timeElId);
                 const btnElBuy  = document.getElementById(btnElBuyId);
+                const btnElBuyBonus = document.getElementById(btnElBuyBonusId);
                 const btnElPlay  = document.getElementById(btnElPlayId);
+                const card = document.querySelector(`.card-game-${game.id}`);
 
                 if (!timeEl) return;
 
-                if (gameTimers.has(game.id)) return;
+                // Evitar dos temporizadores sobre la misma card (causa el parpadeo Jugando/Comprar)
+                if (gameTimers.has(game.id)) {
+                    const existingRef = gameCountdownRefs.get(game.id);
+                    if (existingRef) {
+                        existingRef.cartons = game.cartons;
+                        existingRef.date = game.date;
+                        existingRef.time = game.time;
+                    }
+                    return;
+                }
+
+                const gameRef = {
+                    id: game.id,
+                    date: game.date,
+                    time: game.time,
+                    cartons: game.cartons,
+                };
+                gameCountdownRefs.set(game.id, gameRef);
 
                 const tick = () => {
-                    const text = calculateTimeRemaining(game.date, game.time);
-                    timeEl.textContent = text;
+                    const text = calculateTimeRemaining(gameRef.date, gameRef.time);
+                    setCardCountdownText(timeEl, text);
 
                     const started = text === '¡EL JUEGO YA INICIÓ!';
+                    const hasCartons = Number(gameRef.cartons) >= 1
+                        || (card && card.getAttribute('data-has-cartons') === '1');
 
                     if (btnElBuy) {
                         if (started) {
@@ -1085,45 +1123,74 @@
                         }
                     }
 
-                    if (btnElPlay) {
+                    if (btnElBuyBonus) {
+                        const noBonus = btnElBuyBonus.dataset.noBonus === '1'
+                            || btnElBuyBonus.getAttribute('data-no-bonus') === '1';
                         if (started) {
-                            if (game.cartons >= 1) {
-                                btnElPlay.disabled = false;
-                                btnElPlay.classList.remove('disabled');
-                                btnElPlay.textContent = '<?= translate('come in to play'); ?>';
-                            } else {
-                                btnElPlay.disabled = true;
-                                btnElPlay.classList.add('disabled');
-                                btnElPlay.textContent = 'No disponible';
-                            }
+                            btnElBuyBonus.disabled = true;
+                            btnElBuyBonus.classList.add('disabled');
+                            btnElBuyBonus.textContent = 'Jugando...';
                         } else {
-                            if (game.cartons >= 1) {
-                                btnElPlay.disabled = false;
-                                btnElPlay.classList.remove('disabled');
-                                btnElPlay.textContent = '<?= translate('come in to play'); ?>';
-                            } else {
-                                btnElPlay.disabled = true;
-                                btnElPlay.classList.add('disabled');
-                                btnElPlay.textContent = '<?= translate('come in to play'); ?>';
-                            }
+                            btnElBuyBonus.disabled = noBonus;
+                            btnElBuyBonus.classList.toggle('disabled', noBonus);
+                            btnElBuyBonus.textContent = 'Comprar con bono';
                         }
+                    }
+
+                    if (btnElPlay) {
+                        if (hasCartons) {
+                            btnElPlay.disabled = false;
+                            btnElPlay.classList.remove('disabled');
+                            btnElPlay.textContent = '<?= translate('come in to play'); ?>';
+                            btnElPlay.setAttribute('onclick', `gameGet(${gameRef.id});`);
+                        } else {
+                            btnElPlay.disabled = true;
+                            btnElPlay.classList.add('disabled');
+                            btnElPlay.textContent = started ? 'No disponible' : '<?= translate('come in to play'); ?>';
+                            btnElPlay.removeAttribute('onclick');
+                        }
+                    }
+
+                    if (card) {
+                        card.setAttribute('data-has-cartons', hasCartons ? '1' : '0');
                     }
 
                     if (started) {
-                        const t = gameTimers.get(game.id);
+                        const t = gameTimers.get(gameRef.id);
                         if (t) {
                             clearInterval(t);
-                            gameTimers.delete(game.id);
+                            gameTimers.delete(gameRef.id);
                         }
+                        gameCountdownRefs.delete(gameRef.id);
                     }
                 };
 
-                // Primera ejecución
                 tick();
 
-                // Intervalo por card
                 const timerId = setInterval(tick, 1000);
                 gameTimers.set(game.id, timerId);
+            }
+
+            window.ensurePlayCardCountdown = ensureCountdown;
+            window.initPlayCardsCountdownsFromDom = function initPlayCardsCountdownsFromDom() {
+                document.querySelectorAll('.play-cards .card[data-game-start][data-game-id]').forEach(function(card) {
+                    const startValue = (card.getAttribute('data-game-start') || '').trim();
+                    const parts = startValue.split(/\s+/);
+                    if (parts.length < 2) {
+                        return;
+                    }
+                    ensureCountdown({
+                        id: card.getAttribute('data-game-id'),
+                        date: parts[0],
+                        time: parts[1],
+                        cartons: card.getAttribute('data-has-cartons') === '1' ? 1 : 0,
+                    });
+                });
+            };
+
+            // Arranque inmediato si ya estamos en /play con cards renderizadas
+            if (document.querySelector('.play-cards .card[data-game-start]')) {
+                window.initPlayCardsCountdownsFromDom();
             }
 
             function removeGameCard(gameId) {
@@ -1142,6 +1209,7 @@
                     clearInterval(t);
                     gameTimers.delete(gameId);
                 }
+                gameCountdownRefs.delete(gameId);
             }
 
             function renderOrUpdateCard(game, cardsContainer) {
@@ -1150,11 +1218,16 @@
                 if (!card) {
                     card = document.createElement('div');
                     card.className = `card ${game.color} text-center card-game-${game.id}`;
+                    card.setAttribute('data-game-id', String(game.id));
+                    card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
+                    card.setAttribute('data-game-start', `${game.date} ${game.time}`);
+                    card.setAttribute('data-search-text', `${(game.room || '').toLowerCase()} ${(game.description || '').toLowerCase()}`);
+                    card.setAttribute('data-price', String(game.price || '0'));
                     
                     if (game.cartons >= 1) {
-                        buttonsHtml = `<button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-${game.id}" onclick="gameGet(${game.id});"><?= translate('come in to play'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id}, 'real');"><?= translate('buy cartons'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus" id="card-button-buy-bonus-${game.id}" onclick="generateCartonsGet(${game.id}, 'bonus');">Comprar con bono</button>`;
+                        buttonsHtml = `<button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-${game.id}" onclick="gameGet(${game.id});"><?= translate('come in to play'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id}, 'real');"><?= translate('buy cartons'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus" id="card-button-buy-bonus-${game.id}" data-no-bonus="0" onclick="generateCartonsGet(${game.id}, 'bonus');">Comprar con bono</button>`;
                     } else {
-                        buttonsHtml = `<button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1"  id="card-button-play-${game.id}" onclick="gameGet(${game.id});" disabled><?= translate('come in to play'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id}, 'real');"><?= translate('buy cartons'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus" id="card-button-buy-bonus-${game.id}" onclick="generateCartonsGet(${game.id}, 'bonus');">Comprar con bono</button>`;
+                        buttonsHtml = `<button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1"  id="card-button-play-${game.id}" onclick="gameGet(${game.id});" disabled><?= translate('come in to play'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id}, 'real');"><?= translate('buy cartons'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus" id="card-button-buy-bonus-${game.id}" data-no-bonus="0" onclick="generateCartonsGet(${game.id}, 'bonus');">Comprar con bono</button>`;
                     }
 
                     card.innerHTML = `
@@ -1173,9 +1246,9 @@
                         <ul class="list-group list-group-flush">
                             <li class="p-0" style="font-size: 0.8rem;">${game.date_translate}</li>
                             <li class="p-0" id="card-accumulated-${game.id}">Premio: <?= systemGet('currency'); ?> ${game.accumulated}</li>
-                            <li class="p-0" style="font-size: 0.7rem;" id="card-time-${game.id}"></li>
+                            <li class="p-0" id="card-time-${game.id}"><span class="card-time-display"></span></li>
                         </ul>
-                        <div class="card-body p-1">
+                        <div class="card-body p-1 card-buy-actions">
                             ${buttonsHtml}
                         </div>`;
                     const slide = document.createElement('div');
@@ -1183,6 +1256,9 @@
                     slide.appendChild(card);
                     cardsContainer.appendChild(slide);
                 } else {
+                    card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
+                    card.setAttribute('data-game-start', `${game.date} ${game.time}`);
+
                     const accEl = document.getElementById(`card-accumulated-${game.id}`);
                     if (accEl) accEl.textContent = `Premio: <?= systemGet('currency'); ?> ${game.accumulated}`;
 
@@ -1378,23 +1454,6 @@
                 <?php endif; ?>
             }
 
-            function removeGameCard(gameId) {
-                const card = document.querySelector(`.card-game-${gameId}`);
-                if (card) {
-                    const slide = card.closest('.play-room-slide');
-                    if (slide && slide.parentNode) {
-                        slide.parentNode.removeChild(slide);
-                    } else if (card.parentNode) {
-                        card.parentNode.removeChild(card);
-                    }
-                }
-                const t = gameTimers.get(gameId);
-                if (t) {
-                    clearInterval(t);
-                    gameTimers.delete(gameId);
-                }
-            }
-
             function hideNotification(notificationEl) {
                 if (!notificationEl || !notificationEl.parentNode) {
                     return;
@@ -1549,7 +1608,7 @@
                     success: function(response) {
                         if (response.success) {
                             $('#modalactivateCompleteProfile').modal('hide');
-                            <?php if (session()->get('logged_in') && $user['roulette'] == 0 && systemGet('activateRoulette') == 1) : ?>
+                            <?php if (session()->get('logged_in') && bingo_user_roulette_available($user)) : ?>
                                 modalRoulette = 'modalactivateRoulette';
                                 const modal = new bootstrap.Modal(document.getElementById(modalRoulette));
                                 modal.show();
@@ -1725,7 +1784,7 @@
             });
         <?php endif; ?>
 
-        <?php if (session()->get('logged_in') && !empty($user) && ($user['roulette'] ?? 1) == 0 && systemGet('activateRoulette') == 1) : ?>
+        <?php if (session()->get('logged_in') && !empty($user) && bingo_user_roulette_available($user)) : ?>
             <?php if (!empty($user['document']) && !empty($user['firstname']) && !empty($user['lastname']) && !empty($user['username']) && !empty($user['email']) && !empty($user['phone'])) : ?>
                 document.addEventListener("DOMContentLoaded", function () {
                     modalRoulette = 'modalactivateRoulette';

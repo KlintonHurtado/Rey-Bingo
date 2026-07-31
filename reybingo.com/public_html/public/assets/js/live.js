@@ -1245,16 +1245,7 @@ function setupEvents() {
         $('#stop-button, #next-number-button').show();
     });
 
-    // Control de micrófono
-    $('.btn-microphone').on('click', function() {
-        if (typeof narrationPlaying !== 'undefined') {
-            narrationPlaying = !narrationPlaying;
-            $(this).html(narrationPlaying ? 
-                '<i class="fa-duotone fa-solid fa-microphone"></i>' : 
-                '<i class="fa-duotone fa-solid fa-microphone-slash"></i>'
-            );
-        }
-    });
+    // Silencio/micrófono: solo onclick RemoveVolume/RemoveMicrophone (sin doble toggle)
 
     // Gestión de modales
     $('.modal').on("hidden.bs.modal", function(e) {

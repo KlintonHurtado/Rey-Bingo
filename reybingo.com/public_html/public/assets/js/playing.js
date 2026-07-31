@@ -1023,9 +1023,9 @@ function applyAutoMarkPreferenceFromServer(autodial) {
     const btn = $('#btn-auto-mark');
     if (btn.length) {
         if (window.autoMarkEnabled) {
-            btn.html('<i class="fa-duotone fa-solid fa-binary-circle-check"></i>');
+            btn.html('<i class="fa-duotone fa-solid fa-wand-magic-sparkles"></i>');
         } else {
-            btn.html('<i class="fa-duotone fa-solid fa-binary-slash"></i>');
+            btn.html('<i class="fa-duotone fa-solid fa-hand"></i>');
         }
     }
 }
@@ -2049,33 +2049,74 @@ function singBingo() {
 // NOTE: La implementación válida de singBingo ya está definida arriba (con control de bingoInProgress).
 // Eliminamos la segunda definición duplicada para evitar comportamiento inesperado.
 
-// Funciones de audio
+// Funciones de audio / preferencias
+function updateVolumeButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-volume');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-volume"></i>'
+        : '<i class="fa-duotone fa-solid fa-volume-slash"></i>';
+}
+
+function updateMicrophoneButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-microphone');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-microphone"></i>'
+        : '<i class="fa-duotone fa-solid fa-microphone-slash"></i>';
+}
+
 function RemoveVolume() {
+    const soundsInput = document.getElementById('sounds');
+    const currentlyOn = soundsInput
+        ? String(soundsInput.value) === '1'
+        : !document.querySelector('.btn-volume .fa-volume-slash');
+    const nextOn = !currentlyOn;
+
+    if (soundsInput) {
+        soundsInput.value = nextOn ? '1' : '0';
+    }
+    updateVolumeButtonIcon(nextOn);
+
+    // Pausar/reanudar música de fondo si existe
+    try {
+        const track = window.__bingoSoundtrack;
+        if (track) {
+            if (nextOn) {
+                track.play().catch(() => {});
+            } else {
+                track.pause();
+            }
+        } else if (nextOn && typeof window.startBingoSoundtrack === 'function') {
+            window.startBingoSoundtrack();
+        }
+    } catch (e) { /* ignore */ }
+
     $.ajax({
         url: site_url + 'playings/volumeSubmit',
         method: 'POST',
-        success: function(data) {
-            if (data.status === 'success') {
-                console.log("Sound disabled successfully");
-            }
-        },
         error: function() {
-            console.warn("Error disabling sound");
+            console.warn('Error disabling sound');
         }
     });
 }
 
 function RemoveMicrophone() {
+    if (typeof narrationPlaying === 'undefined') {
+        window.narrationPlaying = true;
+    }
+    narrationPlaying = !narrationPlaying;
+    updateMicrophoneButtonIcon(narrationPlaying);
+
     $.ajax({
         url: site_url + 'playings/microphoneSubmit',
         method: 'POST',
-        success: function(data) {
-            if (data.status === 'success') {
-                console.log("Narrator disabled successfully");
-            }
-        },
         error: function() {
-            console.warn("Error disabling narrator");
+            console.warn('Error disabling narrator');
         }
     });
 }
@@ -2091,9 +2132,9 @@ function RemoveCheck() {
                 const btn = $('#btn-auto-mark');
                 if (btn.length) {
                     if (window.autoMarkEnabled) {
-                        btn.html('<i class="fa-duotone fa-solid fa-binary-circle-check"></i>');
+                        btn.html('<i class="fa-duotone fa-solid fa-wand-magic-sparkles"></i>');
                     } else {
-                        btn.html('<i class="fa-duotone fa-solid fa-binary-slash"></i>');
+                        btn.html('<i class="fa-duotone fa-solid fa-hand"></i>');
                     }
                 }
 
@@ -2143,18 +2184,9 @@ function setupEvents() {
         sendEmoji(emoji);
     });
 
-    // Control de micrófono
-    $('.btn-microphone').on('click', function() {
-        if (typeof narrationPlaying !== 'undefined') {
-            narrationPlaying = !narrationPlaying;
-            $(this).html(narrationPlaying ? 
-                '<i class="fa-duotone fa-solid fa-microphone"></i>' : 
-                '<i class="fa-duotone fa-solid fa-microphone-slash"></i>'
-            );
-        }
-    });
-
     // Click en números del cartón (solo en modo manual)
+    // Nota: silencio/micrófono se manejan solo vía onclick (RemoveVolume/RemoveMicrophone)
+    // para evitar doble toggle.
     $(".bingo-carton-number").on('click', function() {
         if (!isAutoMarkEnabled()) {
             const number = $(this).data('number') || parseInt($(this).attr('id')?.replace('number-', ''), 10);
@@ -2917,8 +2949,12 @@ function initializeApp() {
 // EVENT LISTENERS PRINCIPALES
 // ==========================================
 
-// Inicialización cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initializeApp);
+// Inicialización cuando el DOM esté listo (también si el script carga tras DOMContentLoaded)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
 
 // Manejo de errores globales
 window.addEventListener('error', (event) => {

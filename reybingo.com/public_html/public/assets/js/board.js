@@ -1382,32 +1382,72 @@ function stopUpdateGameAccumulated() {
     intervalManager.clear('gameAccumulated');
 }
 
+function updateVolumeButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-volume');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-volume"></i>'
+        : '<i class="fa-duotone fa-solid fa-volume-slash"></i>';
+}
+
+function updateMicrophoneButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-microphone');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-microphone"></i>'
+        : '<i class="fa-duotone fa-solid fa-microphone-slash"></i>';
+}
+
 function RemoveVolume() {
+    const soundsInput = document.getElementById('sounds');
+    const currentlyOn = soundsInput
+        ? String(soundsInput.value) === '1'
+        : !document.querySelector('.btn-volume .fa-volume-slash');
+    const nextOn = !currentlyOn;
+
+    if (soundsInput) {
+        soundsInput.value = nextOn ? '1' : '0';
+    }
+    updateVolumeButtonIcon(nextOn);
+
+    try {
+        const track = window.__bingoSoundtrack;
+        if (track) {
+            if (nextOn) {
+                track.play().catch(() => {});
+            } else {
+                track.pause();
+            }
+        } else if (nextOn && typeof window.startBingoSoundtrack === 'function') {
+            window.startBingoSoundtrack();
+        }
+    } catch (e) { /* ignore */ }
+
     $.ajax({
         url: site_url + 'playings/volumeSubmit',
         method: 'POST',
-        success: function(data) {
-            if (data.status === 'success') {
-                console.log("Sound disabled successfully");
-            }
-        },
         error: function() {
-            console.warn("Error disabling sound");
+            console.warn('Error disabling sound');
         }
     });
 }
 
 function RemoveMicrophone() {
+    if (typeof narrationPlaying === 'undefined') {
+        window.narrationPlaying = true;
+    }
+    narrationPlaying = !narrationPlaying;
+    updateMicrophoneButtonIcon(narrationPlaying);
+
     $.ajax({
         url: site_url + 'playings/microphoneSubmit',
         method: 'POST',
-        success: function(data) {
-            if (data.status === 'success') {
-                console.log("Narrator disabled successfully");
-            }
-        },
         error: function() {
-            console.warn("Error disabling narrator");
+            console.warn('Error disabling narrator');
         }
     });
 }
@@ -1469,18 +1509,8 @@ function setupEvents() {
         $('#stop-button, #next-number-button').show();
     });
 
-    // Control de micrófono
-    $('.btn-microphone').on('click', function() {
-        if (typeof narrationPlaying !== 'undefined') {
-            narrationPlaying = !narrationPlaying;
-            $(this).html(narrationPlaying ? 
-                '<i class="fa-duotone fa-solid fa-microphone"></i>' : 
-                '<i class="fa-duotone fa-solid fa-microphone-slash"></i>'
-            );
-        }
-    });
-
-    // Gestión de modales
+    // Eventos de control del juego
+    // Silencio/micrófono: solo onclick RemoveVolume/RemoveMicrophone (sin doble toggle)
     $('.modal').on("hidden.bs.modal", function(e) {
         if ($('.modal:visible').length) {
             $('.modal-backdrop').first().css('z-index', parseInt($('.modal:visible').last().css('z-index')) - 10);

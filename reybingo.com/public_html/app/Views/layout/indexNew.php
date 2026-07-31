@@ -2083,7 +2083,7 @@
                     success: function(response) {
                         if (response.success) {
                             $('#modalactivateCompleteProfile').modal('hide');
-                            <?php if (session()->get('logged_in') && $user['roulette'] == 0 && systemGet('activateRoulette') == 1) : ?>
+                            <?php if (session()->get('logged_in') && bingo_user_roulette_available($user)) : ?>
                                 modalRoulette = 'modalactivateRoulette';
                                 const modal = new bootstrap.Modal(document.getElementById(modalRoulette));
                                 modal.show();
@@ -2199,7 +2199,7 @@
             <?php endif; ?>
         <?php endif; ?>
 
-        <?php if (session()->get('logged_in') && $user['roulette'] == 0 && systemGet('activateRoulette') == 1) : ?>
+        <?php if (session()->get('logged_in') && bingo_user_roulette_available($user)) : ?>
             document.addEventListener("DOMContentLoaded", function () {
                 modalRoulette = 'modalactivateRoulette';
 

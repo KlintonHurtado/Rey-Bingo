@@ -255,6 +255,15 @@ class Playings extends Controller
             return $this->response->setJSON(['status' => 'error', 'message' => 'Ya reclamaste tu premio de ruleta.']);
         }
 
+        if (! bingo_user_kyc_verified($user)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Debes verificar tu cuenta (KYC) para girar el Ruletazo.',
+                'kyc_required' => true,
+                'kyc_url' => site_url('kyc'),
+            ]);
+        }
+
         $modelUsers->update($user['id'], ['roulette' => 1]);
 
         $modelRoulettes->insert([

@@ -15,7 +15,7 @@
         <?php if (! empty($players)) : ?>
             <?php foreach ($players as $player) : ?>
                 <?php
-                $canSpin = (int) ($player['roulette'] ?? 1) === 0;
+                $canSpin = bingo_user_roulette_available($player);
                 $playerLabel = trim(($player['firstname'] ?? '') . ' ' . ($player['lastname'] ?? ''));
                 $latestGrant = $player['latest_grant'] ?? null;
                 ?>

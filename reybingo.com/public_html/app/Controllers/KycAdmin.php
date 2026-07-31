@@ -73,10 +73,32 @@ class KycAdmin extends Controller
         }
 
         $modelUsers = new UsersModel();
+        $user = $modelUsers->find($id);
+        if (! $user) {
+            return redirect()->back()->with('error', translate('user not found'));
+        }
+
+        $previousStatus = (string) ($user['kyc_status'] ?? 'pending');
+
         $modelUsers->update($id, [
             'kyc_status'       => $action,
             'kyc_observations' => $observations,
         ]);
+
+        if ($action === 'verified' && $previousStatus !== 'verified') {
+            helper('bingo');
+            bingo_activate_roulette_on_kyc_verified($id);
+        }
+
+        // Si se rechaza y aún no giró, quitar el giro pendiente.
+        if ($action === 'rejected' && (int) ($user['roulette'] ?? 1) === 0) {
+            $alreadyClaimed = (new \App\Models\RoulettesModel())
+                ->where('user', $id)
+                ->countAllResults() > 0;
+            if (! $alreadyClaimed) {
+                $modelUsers->update($id, ['roulette' => 1]);
+            }
+        }
 
         return redirect()->to('/kycAdmin')->with('success', 'KYC actualizado correctamente.');
     }
@@ -103,6 +125,16 @@ class KycAdmin extends Controller
                 ? $observations
                 : translate('kyc revoked by admin'),
         ]);
+
+        // Sin KYC no puede usar el Ruletazo pendiente.
+        if ((int) ($user['roulette'] ?? 1) === 0) {
+            $alreadyClaimed = (new \App\Models\RoulettesModel())
+                ->where('user', $id)
+                ->countAllResults() > 0;
+            if (! $alreadyClaimed) {
+                $modelUsers->update($id, ['roulette' => 1]);
+            }
+        }
 
         return redirect()->to('/kycAdmin')->with('success', translate('kyc verification removed'));
     }

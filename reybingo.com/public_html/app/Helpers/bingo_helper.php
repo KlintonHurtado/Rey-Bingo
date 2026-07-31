@@ -634,6 +634,9 @@ if (!function_exists('bingo_summarize_player_prizes')) {
 
 if (!function_exists('bingo_pay_source_from_split')) {
     /**
+     * Origen de pago del cartón.
+     * Mixed SOLO = Recarga + Retiro. El bono nunca se combina con otros saldos.
+     *
      * @param array{from_bonus?:float,from_recharge?:float,from_withdraw?:float} $split
      */
     function bingo_pay_source_from_split(array $split, string $source = 'wallet'): string
@@ -650,11 +653,19 @@ if (!function_exists('bingo_pay_source_from_split')) {
         $fromRecharge = round((float) ($split['from_recharge'] ?? 0), 2);
         $fromWithdraw = round((float) ($split['from_withdraw'] ?? 0), 2);
 
-        if ($fromBonus > 0 && $fromRecharge <= 0 && $fromWithdraw <= 0) {
+        // Cualquier uso de bono = origen bono (no existe mixed con bono)
+        if ($fromBonus > 0) {
             return 'bonus';
         }
-        if ($fromBonus > 0 && ($fromRecharge > 0 || $fromWithdraw > 0)) {
+
+        if ($fromRecharge > 0 && $fromWithdraw > 0) {
             return 'mixed';
+        }
+        if ($fromRecharge > 0) {
+            return 'recharge';
+        }
+        if ($fromWithdraw > 0) {
+            return 'withdraw';
         }
 
         return 'real';
@@ -673,10 +684,10 @@ if (!function_exists('bingo_pay_source_from_log')) {
 }
 
 if (!function_exists('bingo_award_goes_to_withdraw')) {
-    /** Premio a saldo retiro solo si el cartón se pagó 100% con dinero real. */
+    /** Premio a saldo retiro solo si el cartón se pagó con dinero real (recarga y/o retiro). */
     function bingo_award_goes_to_withdraw(string $paySource): bool
     {
-        return $paySource === 'real';
+        return in_array($paySource, ['real', 'recharge', 'withdraw', 'mixed'], true);
     }
 }
 
@@ -716,7 +727,7 @@ if (!function_exists('bingo_tag_cartons_pay_source')) {
         }
 
         $paySource = strtolower(trim($paySource));
-        if (! in_array($paySource, ['bonus', 'real', 'roulette', 'mixed'], true)) {
+        if (! in_array($paySource, ['bonus', 'real', 'recharge', 'withdraw', 'roulette', 'mixed'], true)) {
             $paySource = 'real';
         }
 
@@ -739,7 +750,8 @@ if (!function_exists('bingo_tag_cartons_pay_source')) {
 
 if (!function_exists('bingo_infer_carton_pay_source')) {
     /**
-     * Infiere origen del cartón por el log de compra más cercano en el tiempo (misma partida).
+     * Infiere origen del cartón por el log de compra más cercano (misma partida).
+     * El log manda sobre pay_source guardado: "mixed" antiguo podía ser bono+recarga.
      */
     function bingo_infer_carton_pay_source(int $cartonId, int $userId, int $gameId): ?string
     {
@@ -757,51 +769,48 @@ if (!function_exists('bingo_infer_carton_pay_source')) {
                 return null;
             }
 
-            $stored = strtolower(trim((string) ($carton['pay_source'] ?? '')));
-            if (in_array($stored, ['bonus', 'real', 'roulette', 'mixed'], true)) {
-                return $stored;
-            }
-
             $db = \Config\Database::connect();
-            if (! $db->tableExists('carton_purchase_logs')) {
-                return null;
-            }
+            if ($db->tableExists('carton_purchase_logs')) {
+                $logs = (new \App\Models\CartonPurchaseLogsModel())
+                    ->where('user_id', $userId)
+                    ->where('game_id', $gameId)
+                    ->orderBy('created_at', 'ASC')
+                    ->orderBy('id', 'ASC')
+                    ->findAll();
 
-            $logs = (new \App\Models\CartonPurchaseLogsModel())
-                ->where('user_id', $userId)
-                ->where('game_id', $gameId)
-                ->orderBy('created_at', 'ASC')
-                ->orderBy('id', 'ASC')
-                ->findAll();
+                if ($logs !== []) {
+                    $cartonTs = strtotime((string) ($carton['created_at'] ?? '')) ?: 0;
+                    $best = null;
+                    $bestDiff = PHP_INT_MAX;
 
-            if ($logs === []) {
-                return null;
-            }
+                    foreach ($logs as $log) {
+                        $logTs = strtotime((string) ($log['created_at'] ?? '')) ?: 0;
+                        $diff = abs($cartonTs - $logTs);
+                        if ($diff < $bestDiff) {
+                            $bestDiff = $diff;
+                            $best = $log;
+                        }
+                    }
 
-            $cartonTs = strtotime((string) ($carton['created_at'] ?? '')) ?: 0;
-            $best = null;
-            $bestDiff = PHP_INT_MAX;
-
-            foreach ($logs as $log) {
-                $logTs = strtotime((string) ($log['created_at'] ?? '')) ?: 0;
-                $diff = abs($cartonTs - $logTs);
-                if ($diff < $bestDiff) {
-                    $bestDiff = $diff;
-                    $best = $log;
+                    if (count($logs) === 1) {
+                        return bingo_pay_source_from_log($logs[0]);
+                    }
+                    if ($best !== null && $bestDiff <= 180) {
+                        return bingo_pay_source_from_log($best);
+                    }
+                    if ($best !== null) {
+                        return bingo_pay_source_from_log($best);
+                    }
                 }
             }
 
-            // Tolerancia 3 min: compra y cartones se crean juntos
-            if ($best !== null && $bestDiff <= 180) {
-                return bingo_pay_source_from_log($best);
+            $stored = strtolower(trim((string) ($carton['pay_source'] ?? '')));
+            // "mixed" sin log es ambiguo (legacy bono+recarga): no confiar → null
+            if (in_array($stored, ['bonus', 'real', 'recharge', 'withdraw', 'roulette'], true)) {
+                return $stored;
             }
 
-            // Único log de la partida
-            if (count($logs) === 1) {
-                return bingo_pay_source_from_log($logs[0]);
-            }
-
-            return $best !== null ? bingo_pay_source_from_log($best) : null;
+            return null;
         } catch (\Throwable $e) {
             log_message('error', 'bingo_infer_carton_pay_source: ' . $e->getMessage());
 
@@ -813,8 +822,8 @@ if (!function_exists('bingo_infer_carton_pay_source')) {
 if (!function_exists('bingo_resolve_award_credit_split')) {
     /**
      * Destino del premio según la compra del cartón ganador (no de toda la partida).
-     * Bono / ruleta / mixto → saldo recarga.
-     * Solo dinero real (recarga/retiro) → saldo retiro.
+     * Bono / ruleta → saldo recarga.
+     * Dinero real (recarga, retiro o Mixed Recarga+Retiro) → saldo retiro.
      *
      * @return array{to_recharge:float,to_withdraw:float,has_logs:bool,pay_source?:string}
      */
@@ -868,15 +877,15 @@ if (!function_exists('bingo_resolve_award_credit_split')) {
                 return $empty;
             }
 
-            // 2) Fallback sin cartón: si TODAS las compras son real → retiro; si hay bono/ruleta → recarga
+            // 2) Fallback sin cartón: solo retiro si TODAS las compras son dinero real (sin bono/ruleta)
             $hasBonusOrRoulette = false;
             $hasReal = false;
             foreach ($logs as $log) {
                 $src = bingo_pay_source_from_log($log);
-                if (in_array($src, ['bonus', 'roulette', 'mixed'], true)) {
+                if (in_array($src, ['bonus', 'roulette'], true)) {
                     $hasBonusOrRoulette = true;
                 }
-                if ($src === 'real') {
+                if (in_array($src, ['real', 'recharge', 'withdraw', 'mixed'], true)) {
                     $hasReal = true;
                 }
             }
@@ -1870,6 +1879,75 @@ if (!function_exists('bingo_user_requires_kyc')) {
     }
 }
 
+if (!function_exists('bingo_user_kyc_verified')) {
+    function bingo_user_kyc_verified(?array $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Tiendas/operadores no pasan por KYC de jugador.
+        if (!bingo_user_requires_kyc($user)) {
+            return true;
+        }
+
+        return (string) ($user['kyc_status'] ?? 'pending') === 'verified';
+    }
+}
+
+if (!function_exists('bingo_user_roulette_available')) {
+    /**
+     * Ruletazo visible/usable solo si el sistema lo tiene activo,
+     * el jugador tiene giro pendiente (roulette=0) y su KYC está verificado.
+     */
+    function bingo_user_roulette_available(?array $user): bool
+    {
+        if (!$user || (int) systemGet('activateRoulette') !== 1) {
+            return false;
+        }
+
+        if ((int) ($user['roulette'] ?? 1) !== 0) {
+            return false;
+        }
+
+        return bingo_user_kyc_verified($user);
+    }
+}
+
+if (!function_exists('bingo_activate_roulette_on_kyc_verified')) {
+    /**
+     * Activa el Ruletazo al aprobar KYC (una sola vez si aún no reclamó premio).
+     */
+    function bingo_activate_roulette_on_kyc_verified(int $userId): bool
+    {
+        if ($userId < 1 || (int) systemGet('activateRoulette') !== 1) {
+            return false;
+        }
+
+        $modelUsers = new \App\Models\UsersModel();
+        $user = $modelUsers->find($userId);
+        if (!$user || (int) ($user['group'] ?? -1) !== bingo_group_player()) {
+            return false;
+        }
+
+        if (!bingo_user_kyc_verified($user)) {
+            return false;
+        }
+
+        $alreadyClaimed = (new \App\Models\RoulettesModel())
+            ->where('user', $userId)
+            ->countAllResults() > 0;
+
+        if ($alreadyClaimed) {
+            return false;
+        }
+
+        $message = 'Tu cuenta fue verificada. ¡Ya puedes girar el Ruletazo y ganar cartones!';
+
+        return bingo_grant_player_roulette($userId, $message, true);
+    }
+}
+
 if (!function_exists('bingo_is_admin')) {
     function bingo_is_admin(?int $group = null): bool
     {
@@ -2498,17 +2576,17 @@ if (!function_exists('bingo_roulette_carton_price')) {
 }
 
 if (!function_exists('bingo_roulette_max_carton_price')) {
-    /** Precio máximo del cartón para permitir cartones de ruleta. */
+    /** Precio de cartón permitido para cartones de ruleta (solo 0.25). */
     function bingo_roulette_max_carton_price(): float
     {
-        return 0.50;
+        return bingo_roulette_carton_price();
     }
 }
 
 if (!function_exists('bingo_price_allows_roulette_cartons')) {
     function bingo_price_allows_roulette_cartons(float $price): bool
     {
-        return $price > 0 && $price <= (bingo_roulette_max_carton_price() + 0.001);
+        return abs($price - bingo_roulette_carton_price()) < 0.001;
     }
 }
 
@@ -2649,7 +2727,7 @@ if (!function_exists('bingo_game_allows_roulette_cartons')) {
             return false;
         }
 
-        // Solo salas con precio de cartón hasta 0.50
+        // Solo salas con cartón a 0.25
         return bingo_price_allows_roulette_cartons((float) ($game['price'] ?? 0));
     }
 }
@@ -3288,13 +3366,14 @@ if (!function_exists('bingo_log_carton_purchase')) {
 
 if (!function_exists('bingo_classify_purchase_source')) {
     /**
-     * Clasifica el origen de pago de un log o split agregado.
+     * Clasifica el origen de pago de un log o split.
+     * Mixed SOLO = Recarga + Retiro. Bono nunca combina con otros saldos.
      *
      * @param array{source?:string,from_bonus?:float,from_recharge?:float,from_withdraw?:float,amount?:float} $row
      */
     function bingo_classify_purchase_source(array $row): string
     {
-        $source = (string) ($row['source'] ?? 'wallet');
+        $source = strtolower(trim((string) ($row['source'] ?? 'wallet')));
         $fromBonus = round((float) ($row['from_bonus'] ?? 0), 2);
         $fromRecharge = round((float) ($row['from_recharge'] ?? 0), 2);
         $fromWithdraw = round((float) ($row['from_withdraw'] ?? 0), 2);
@@ -3302,20 +3381,29 @@ if (!function_exists('bingo_classify_purchase_source')) {
         if ($source === 'roulette') {
             return 'roulette';
         }
-        if ($source === 'mixed') {
-            return 'mixed';
-        }
         if ($source === 'wallet_legacy') {
             return 'wallet_legacy';
         }
-        if ($source === 'bonus' || ($fromBonus > 0 && $fromRecharge <= 0 && $fromWithdraw <= 0)) {
+
+        // Preferir montos reales del split sobre el string source
+        if ($fromBonus > 0) {
             return 'bonus';
         }
-        if ($fromBonus > 0 && ($fromRecharge > 0 || $fromWithdraw > 0)) {
+        if ($fromRecharge > 0 && $fromWithdraw > 0) {
             return 'mixed';
         }
+        if ($fromRecharge > 0) {
+            return 'recharge';
+        }
+        if ($fromWithdraw > 0) {
+            return 'withdraw';
+        }
 
-        return 'wallet';
+        if (in_array($source, ['bonus', 'recharge', 'withdraw', 'mixed', 'real'], true)) {
+            return $source === 'real' ? 'recharge' : $source;
+        }
+
+        return 'recharge';
     }
 }
 
@@ -3324,10 +3412,13 @@ if (!function_exists('bingo_purchase_source_label')) {
     {
         return match ($sourceKey) {
             'roulette' => translate('roulette cartons'),
-            'bonus' => translate('bonus balance'),
-            'mixed' => translate('mixed') . ' (' . translate('bonus') . ' + ' . translate('recharge') . ')',
+            'bonus' => 'Saldo Bono',
+            'recharge' => 'Saldo Recarga',
+            'withdraw' => 'Saldo Retiro',
+            'mixed' => 'Mixed (Recarga + Retiro)',
             'wallet_legacy' => translate('wallet historical'),
-            default => translate('real money wallet'),
+            'real' => 'Saldo Recarga',
+            default => 'Saldo Recarga',
         };
     }
 }
@@ -3416,44 +3507,50 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
         $rows = [];
         $coveredGameIds = [];
 
-        $aggregateGamePurchase = static function (array $gameLogs): array {
-            $agg = [
-                'source' => 'wallet',
-                'from_bonus' => 0.0,
-                'from_recharge' => 0.0,
-                'from_withdraw' => 0.0,
-                'amount' => 0.0,
-                'cartons_count' => 0,
-                'has_roulette' => false,
-                'has_wallet' => false,
-            ];
+        $pickNearestPurchaseLog = static function (array $gameLogs, string $cartonCreatedAt): ?array {
+            if ($gameLogs === []) {
+                return null;
+            }
+            $cartonTs = strtotime($cartonCreatedAt) ?: 0;
+            $best = null;
+            $bestDiff = PHP_INT_MAX;
             foreach ($gameLogs as $log) {
-                $agg['from_bonus'] += (float) ($log['from_bonus'] ?? 0);
-                $agg['from_recharge'] += (float) ($log['from_recharge'] ?? 0);
-                $agg['from_withdraw'] += (float) ($log['from_withdraw'] ?? 0);
-                $agg['amount'] += (float) ($log['amount'] ?? 0);
-                $agg['cartons_count'] += (int) ($log['cartons_count'] ?? 0);
-                $src = (string) ($log['source'] ?? 'wallet');
-                if ($src === 'roulette') {
-                    $agg['has_roulette'] = true;
-                } else {
-                    $agg['has_wallet'] = true;
+                $logTs = strtotime((string) ($log['created_at'] ?? '')) ?: 0;
+                $diff = abs($cartonTs - $logTs);
+                if ($diff < $bestDiff) {
+                    $bestDiff = $diff;
+                    $best = $log;
                 }
             }
-            $agg['from_bonus'] = round($agg['from_bonus'], 2);
-            $agg['from_recharge'] = round($agg['from_recharge'], 2);
-            $agg['from_withdraw'] = round($agg['from_withdraw'], 2);
-            $agg['amount'] = round($agg['amount'], 2);
-
-            if ($agg['has_roulette'] && ! $agg['has_wallet']) {
-                $agg['source'] = 'roulette';
-            } elseif ($agg['has_roulette'] && $agg['has_wallet']) {
-                $agg['source'] = 'mixed';
-            } else {
-                $agg['source'] = bingo_classify_purchase_source($agg);
+            // Preferir log cercano; si hay uno solo, usarlo siempre
+            if (count($gameLogs) === 1) {
+                return $gameLogs[0];
+            }
+            if ($best !== null && $bestDiff <= 300) {
+                return $best;
             }
 
-            return $agg;
+            return $best;
+        };
+
+        $splitFromSource = static function (string $sourceKey, float $unitCost, ?array $log): array {
+            $count = max(1, (int) ($log['cartons_count'] ?? 1));
+            if ($log !== null) {
+                return [
+                    'bonus' => round(((float) ($log['from_bonus'] ?? 0)) / $count, 2),
+                    'recharge' => round(((float) ($log['from_recharge'] ?? 0)) / $count, 2),
+                    'withdraw' => round(((float) ($log['from_withdraw'] ?? 0)) / $count, 2),
+                    'amount' => round(((float) ($log['amount'] ?? 0)) / $count, 2),
+                ];
+            }
+
+            return match ($sourceKey) {
+                'bonus' => ['bonus' => $unitCost, 'recharge' => 0.0, 'withdraw' => 0.0, 'amount' => $unitCost],
+                'withdraw' => ['bonus' => 0.0, 'recharge' => 0.0, 'withdraw' => $unitCost, 'amount' => $unitCost],
+                'mixed' => ['bonus' => 0.0, 'recharge' => round($unitCost / 2, 2), 'withdraw' => round($unitCost / 2, 2), 'amount' => $unitCost],
+                'roulette' => ['bonus' => 0.0, 'recharge' => 0.0, 'withdraw' => 0.0, 'amount' => 0.0],
+                default => ['bonus' => 0.0, 'recharge' => $unitCost, 'withdraw' => 0.0, 'amount' => $unitCost],
+            };
         };
 
         foreach ($cartons as $carton) {
@@ -3469,21 +3566,34 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
             $gameStatus = (int) ($game['status'] ?? 0);
 
             $gameLogs = $logsByGame[$gameId] ?? [];
-            if ($gameLogs !== []) {
-                $agg = $aggregateGamePurchase($gameLogs);
-                $sourceKey = $agg['source'] === 'mixed'
-                    ? 'mixed'
-                    : bingo_classify_purchase_source($agg);
-                $fromBonus = $agg['from_bonus'];
-                $fromRecharge = $agg['from_recharge'];
-                $fromWithdraw = $agg['from_withdraw'];
-                $unitCost = $agg['cartons_count'] > 0
-                    ? round($agg['amount'] / $agg['cartons_count'], 2)
-                    : $gamePrice;
-                // Split unitario aproximado
-                $unitBonus = $agg['cartons_count'] > 0 ? round($fromBonus / $agg['cartons_count'], 2) : 0.0;
-                $unitRecharge = $agg['cartons_count'] > 0 ? round($fromRecharge / $agg['cartons_count'], 2) : 0.0;
-                $unitWithdraw = $agg['cartons_count'] > 0 ? round($fromWithdraw / $agg['cartons_count'], 2) : 0.0;
+            $nearestLog = $pickNearestPurchaseLog($gameLogs, (string) ($carton['created_at'] ?? ''));
+
+            $storedSource = strtolower(trim((string) ($carton['pay_source'] ?? '')));
+            if ($nearestLog !== null) {
+                // El log manda (corrige "mixed" antiguo bono+recarga)
+                $sourceKey = bingo_classify_purchase_source($nearestLog);
+                $split = $splitFromSource($sourceKey, $gamePrice, $nearestLog);
+                // Si el split tenía bono+otro (legacy), normalizar a solo bono en columnas
+                if ($sourceKey === 'bonus' && ((float) $split['recharge'] > 0 || (float) $split['withdraw'] > 0)) {
+                    $split['bonus'] = round((float) $split['bonus'] + (float) $split['recharge'] + (float) $split['withdraw'], 2);
+                    $split['recharge'] = 0.0;
+                    $split['withdraw'] = 0.0;
+                }
+                $unitCost = (float) $split['amount'] > 0 ? (float) $split['amount'] : $gamePrice;
+                $unitBonus = (float) $split['bonus'];
+                $unitRecharge = (float) $split['recharge'];
+                $unitWithdraw = (float) $split['withdraw'];
+            } elseif (in_array($storedSource, ['bonus', 'real', 'recharge', 'withdraw', 'roulette', 'mixed'], true)) {
+                $sourceKey = $storedSource === 'real' ? 'recharge' : $storedSource;
+                // Tag "mixed" antiguo ambiguo → no asumir Recarga+Retiro sin log
+                if ($sourceKey === 'mixed') {
+                    $sourceKey = 'recharge';
+                }
+                $split = $splitFromSource($sourceKey, $gamePrice, null);
+                $unitCost = $gamePrice;
+                $unitBonus = (float) $split['bonus'];
+                $unitRecharge = (float) $split['recharge'];
+                $unitWithdraw = (float) $split['withdraw'];
             } else {
                 $sourceKey = 'wallet_legacy';
                 $unitCost = $gamePrice;
@@ -3674,6 +3784,410 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
         });
 
         return $rows;
+    }
+}
+
+if (!function_exists('bingo_status_label_short')) {
+    function bingo_status_label_short($status): string
+    {
+        return match ((int) $status) {
+            2 => 'Aprobado',
+            1 => 'Pendiente',
+            0 => 'Rechazado',
+            default => (string) $status,
+        };
+    }
+}
+
+if (!function_exists('bingo_build_user_movements_ledger')) {
+    /**
+     * Historial cronológico unificado de movimientos del jugador (admin).
+     * Incluye: recargas, retiros, compras de cartón, resultados, premios, bonos, ruleta, transferencias.
+     *
+     * @return list<array<string,mixed>>
+     */
+    function bingo_build_user_movements_ledger(int $userId, int $limit = 2000): array
+    {
+        if ($userId <= 0) {
+            return [];
+        }
+
+        helper(['bingo', 'wallet']);
+        if (function_exists('bingo_ensure_users_schema')) {
+            bingo_ensure_users_schema();
+        }
+
+        $rows = [];
+        $push = static function (array $row) use (&$rows): void {
+            $rows[] = array_merge([
+                'datetime' => '',
+                'type' => '',
+                'type_label' => '',
+                'direction' => '',
+                'amount' => 0.0,
+                'status' => '',
+                'status_label' => '',
+                'game' => '',
+                'game_id' => 0,
+                'carton_serial' => '',
+                'carton_id' => 0,
+                'modality' => '',
+                'result' => '',
+                'result_label' => '',
+                'prize_amount' => 0.0,
+                'source' => '',
+                'source_label' => '',
+                'from_bonus' => 0.0,
+                'from_recharge' => 0.0,
+                'from_withdraw' => 0.0,
+                'credit_wallet' => '',
+                'credit_label' => '',
+                'detail' => '',
+                'ref_table' => '',
+                'ref_id' => 0,
+            ], $row);
+        };
+
+        $modelDeposits = new \App\Models\DepositsModel();
+        $modelRetires = new \App\Models\RetiresModel();
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelGames = new \App\Models\GamesModel();
+        $modelSings = new \App\Models\SingsModel();
+        $modelModalities = new \App\Models\ModalitiesModel();
+        $modelRoulettes = new \App\Models\RoulettesModel();
+        $modelTransfers = new \App\Models\TransfersModel();
+
+        $gameCache = [];
+        $resolveGame = static function (int $gameId) use (&$gameCache, $modelGames): string {
+            if ($gameId <= 0) {
+                return '';
+            }
+            if (! isset($gameCache[$gameId])) {
+                $gameCache[$gameId] = $modelGames->find($gameId);
+            }
+            $g = $gameCache[$gameId] ?? null;
+
+            return (string) ($g['description'] ?? ('#' . $gameId));
+        };
+
+        // Recargas / depósitos
+        foreach ($modelDeposits->where('user', $userId)->orderBy('date', 'DESC')->findAll(800) as $d) {
+            $st = (int) ($d['status'] ?? 0);
+            $push([
+                'datetime' => (string) ($d['date'] ?? $d['created_at'] ?? ''),
+                'type' => 'deposit',
+                'type_label' => 'Recarga',
+                'direction' => '+',
+                'amount' => round((float) ($d['amount'] ?? 0), 2),
+                'status' => $st,
+                'status_label' => bingo_status_label_short($st),
+                'source' => 'recharge',
+                'source_label' => 'Saldo Recarga',
+                'detail' => trim(
+                    'Método: ' . (string) ($d['method'] ?? $d['bank'] ?? '-')
+                    . ' | Ref: ' . (string) ($d['reference'] ?? '-')
+                ),
+                'ref_table' => 'deposits',
+                'ref_id' => (int) ($d['id'] ?? 0),
+            ]);
+        }
+
+        // Retiros
+        foreach ($modelRetires->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(800) as $r) {
+            $st = (int) ($r['status'] ?? 0);
+            $push([
+                'datetime' => (string) ($r['created_at'] ?? ''),
+                'type' => 'retire',
+                'type_label' => 'Retiro',
+                'direction' => '-',
+                'amount' => round((float) ($r['amount'] ?? 0), 2),
+                'status' => $st,
+                'status_label' => bingo_status_label_short($st),
+                'source' => 'withdraw',
+                'source_label' => 'Saldo Retiro',
+                'detail' => trim(
+                    'Banco: ' . (string) ($r['bank'] ?? '-')
+                    . ' | Cuenta: ' . (string) ($r['account'] ?? '-')
+                    . (! empty($r['observation']) ? ' | ' . $r['observation'] : '')
+                ),
+                'ref_table' => 'retires',
+                'ref_id' => (int) ($r['id'] ?? 0),
+            ]);
+        }
+
+        // Compras de cartones + resultado (ganó / perdió / en juego)
+        $purchases = bingo_build_user_carton_purchase_report($userId, 1500);
+        foreach ($purchases as $p) {
+            $amount = round((float) ($p['amount'] ?? 0), 2);
+            $isRoulette = ((string) ($p['source'] ?? '')) === 'roulette' || $amount <= 0;
+            $push([
+                'datetime' => (string) ($p['created_at'] ?? ''),
+                'type' => 'purchase',
+                'type_label' => $isRoulette ? 'Compra cartón (ruleta)' : 'Compra cartón',
+                'direction' => $isRoulette ? '=' : '-',
+                'amount' => $amount,
+                'status' => 2,
+                'status_label' => 'Registrado',
+                'game' => (string) ($p['game'] ?? ''),
+                'game_id' => (int) ($p['game_id'] ?? 0),
+                'carton_serial' => (string) ($p['serial'] ?? ''),
+                'carton_id' => (int) ($p['id'] ?? 0),
+                'modality' => (string) ($p['modality'] ?? ''),
+                'result' => (string) ($p['result'] ?? ''),
+                'result_label' => (string) ($p['result_label'] ?? ''),
+                'prize_amount' => round((float) ($p['prize_amount'] ?? 0), 2),
+                'source' => (string) ($p['source'] ?? ''),
+                'source_label' => (string) ($p['source_label'] ?? ''),
+                'from_bonus' => round((float) ($p['from_bonus'] ?? 0), 2),
+                'from_recharge' => round((float) ($p['from_recharge'] ?? 0), 2),
+                'from_withdraw' => round((float) ($p['from_withdraw'] ?? 0), 2),
+                'credit_wallet' => (string) ($p['credit_wallet'] ?? ''),
+                'credit_label' => (string) ($p['credit_label'] ?? ''),
+                'detail' => trim(
+                    'Serie: ' . (string) ($p['serial'] ?? '-')
+                    . ' | Origen: ' . (string) ($p['source_label'] ?? '-')
+                    . ' | Resultado: ' . (string) ($p['result_label'] ?? '-')
+                    . (((float) ($p['prize_amount'] ?? 0) > 0)
+                        ? ' | Premio: ' . number_format((float) $p['prize_amount'], 2)
+                          . ' → ' . (string) ($p['credit_label'] ?? '-')
+                        : '')
+                ),
+                'ref_table' => 'cartons',
+                'ref_id' => (int) ($p['id'] ?? 0),
+            ]);
+        }
+
+        // Premios / bonos / referidos (payments)
+        $modalityCache = [];
+        $payments = $modelPayments
+            ->where('user', $userId)
+            ->orderBy('created_at', 'DESC')
+            ->findAll(1000);
+
+        foreach ($payments as $pay) {
+            $ptype = strtolower(trim((string) ($pay['type'] ?? '')));
+            $st = (int) ($pay['status'] ?? 0);
+            $amount = round((float) ($pay['amount'] ?? 0), 2);
+            $typeId = (int) ($pay['type_id'] ?? 0);
+
+            if ($ptype === 'award') {
+                $sing = $typeId > 0 ? $modelSings->find($typeId) : null;
+                $gameId = (int) ($sing['game'] ?? 0);
+                $cartonId = (int) ($sing['carton'] ?? 0);
+                $mid = (int) ($sing['modality'] ?? 0);
+                $modName = '';
+                if ($mid > 0) {
+                    if (! isset($modalityCache[$mid])) {
+                        $modalityCache[$mid] = $modelModalities->find($mid);
+                    }
+                    $modName = (string) (($modalityCache[$mid]['name'] ?? '') ?: $mid);
+                    if (function_exists('translate')) {
+                        $modName = translate($modName);
+                    }
+                }
+                $serial = '';
+                if ($cartonId > 0) {
+                    $carton = (new \App\Models\CartonsModel())->find($cartonId);
+                    $serial = (string) ($carton['serial'] ?? ('#' . $cartonId));
+                }
+                $credit = '';
+                $creditLabel = '';
+                if ($gameId > 0 && $amount > 0) {
+                    $split = bingo_resolve_award_credit_split($userId, $gameId, $amount, $cartonId > 0 ? $cartonId : null);
+                    if ((float) ($split['to_withdraw'] ?? 0) > 0 && (float) ($split['to_recharge'] ?? 0) <= 0) {
+                        $credit = 'withdraw';
+                        $creditLabel = 'Saldo Retiro';
+                    } else {
+                        $credit = 'recharge';
+                        $creditLabel = 'Saldo Recarga';
+                    }
+                }
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'prize',
+                    'type_label' => 'Premio ganado',
+                    'direction' => '+',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'game' => $resolveGame($gameId),
+                    'game_id' => $gameId,
+                    'carton_serial' => $serial,
+                    'carton_id' => $cartonId,
+                    'modality' => $modName,
+                    'result' => 'won',
+                    'result_label' => 'Ganó',
+                    'prize_amount' => $amount,
+                    'credit_wallet' => $credit,
+                    'credit_label' => $creditLabel,
+                    'detail' => trim(
+                        'Modalidad: ' . ($modName ?: '-')
+                        . ' | Cartón: ' . ($serial ?: '-')
+                        . ($creditLabel !== '' ? ' | Acreditado a: ' . $creditLabel : '')
+                    ),
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            $bonusLabels = [
+                'registration_bonus' => 'Bono de registro',
+                'admin_bonus' => 'Bono admin',
+                'bonus' => 'Bono',
+                'referred' => 'Comisión referido',
+                'referral' => 'Comisión referido',
+            ];
+            if (isset($bonusLabels[$ptype])) {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'bonus',
+                    'type_label' => $bonusLabels[$ptype],
+                    'direction' => '+',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'bonus',
+                    'source_label' => 'Saldo Bono',
+                    'detail' => 'Tipo: ' . $ptype,
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            $push([
+                'datetime' => (string) ($pay['created_at'] ?? ''),
+                'type' => 'payment',
+                'type_label' => 'Movimiento: ' . ($ptype !== '' ? $ptype : 'pago'),
+                'direction' => '+',
+                'amount' => $amount,
+                'status' => $st,
+                'status_label' => bingo_status_label_short($st),
+                'detail' => 'type_id=' . $typeId,
+                'ref_table' => 'payments',
+                'ref_id' => (int) ($pay['id'] ?? 0),
+            ]);
+        }
+
+        // Ruleta (premios de cartones)
+        foreach ($modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(300) as $roulette) {
+            $st = (int) ($roulette['status'] ?? 0);
+            $push([
+                'datetime' => (string) ($roulette['created_at'] ?? ''),
+                'type' => 'roulette',
+                'type_label' => 'Ruleta',
+                'direction' => '=',
+                'amount' => round((float) ($roulette['amount'] ?? 0), 2),
+                'status' => $st,
+                'status_label' => $st === 1 ? 'Usado' : 'Pendiente',
+                'game' => $resolveGame((int) ($roulette['game'] ?? 0)),
+                'game_id' => (int) ($roulette['game'] ?? 0),
+                'source' => 'roulette',
+                'source_label' => 'Cartones ruleta',
+                'detail' => 'Cartones otorgados: ' . (int) ($roulette['cartons'] ?? 0),
+                'ref_table' => 'roulettes',
+                'ref_id' => (int) ($roulette['id'] ?? 0),
+            ]);
+        }
+
+        // Transferencias (si existen)
+        try {
+            $db = \Config\Database::connect();
+            if ($db->tableExists('transfers')) {
+                foreach ($modelTransfers->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(300) as $t) {
+                    $st = (int) ($t['status'] ?? 0);
+                    $push([
+                        'datetime' => (string) ($t['created_at'] ?? ''),
+                        'type' => 'transfer',
+                        'type_label' => 'Transferencia',
+                        'direction' => '-',
+                        'amount' => round((float) ($t['amount'] ?? 0), 2),
+                        'status' => $st,
+                        'status_label' => bingo_status_label_short($st),
+                        'detail' => trim(
+                            'Destino: ' . (string) ($t['from'] ?? '-')
+                            . (! empty($t['note']) ? ' | ' . $t['note'] : '')
+                        ),
+                        'ref_table' => 'transfers',
+                        'ref_id' => (int) ($t['id'] ?? 0),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // tabla opcional
+        }
+
+        usort($rows, static function ($a, $b) {
+            $cmp = strcmp((string) ($b['datetime'] ?? ''), (string) ($a['datetime'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return ((int) ($b['ref_id'] ?? 0)) <=> ((int) ($a['ref_id'] ?? 0));
+        });
+
+        if ($limit > 0 && count($rows) > $limit) {
+            $rows = array_slice($rows, 0, $limit);
+        }
+
+        return $rows;
+    }
+}
+
+if (!function_exists('bingo_user_movements_export_rows')) {
+    /**
+     * Filas planas para Excel/CSV del ledger de movimientos.
+     *
+     * @param list<array<string,mixed>> $movements
+     * @return array{headers:list<string>,rows:list<list<mixed>>}
+     */
+    function bingo_user_movements_export_rows(array $movements): array
+    {
+        $headers = [
+            'Fecha',
+            'Tipo',
+            'Direccion',
+            'Monto',
+            'Estado',
+            'Juego',
+            'Carton serie',
+            'Modalidad',
+            'Resultado',
+            'Premio',
+            'Origen pago',
+            'Abono',
+            'Recarga',
+            'Retiro',
+            'Acreditado a',
+            'Detalle',
+            'Ref',
+        ];
+
+        $rows = [];
+        foreach ($movements as $m) {
+            $rows[] = [
+                (string) ($m['datetime'] ?? ''),
+                (string) ($m['type_label'] ?? $m['type'] ?? ''),
+                (string) ($m['direction'] ?? ''),
+                (float) ($m['amount'] ?? 0),
+                (string) ($m['status_label'] ?? ''),
+                (string) ($m['game'] ?? ''),
+                (string) ($m['carton_serial'] ?? ''),
+                (string) ($m['modality'] ?? ''),
+                (string) ($m['result_label'] ?? ''),
+                (float) ($m['prize_amount'] ?? 0),
+                (string) ($m['source_label'] ?? ''),
+                (float) ($m['from_bonus'] ?? 0),
+                (float) ($m['from_recharge'] ?? 0),
+                (float) ($m['from_withdraw'] ?? 0),
+                (string) ($m['credit_label'] ?? ''),
+                (string) ($m['detail'] ?? ''),
+                (string) (($m['ref_table'] ?? '') . '#' . ($m['ref_id'] ?? '')),
+            ];
+        }
+
+        return ['headers' => $headers, 'rows' => $rows];
     }
 }
 
@@ -5004,6 +5518,11 @@ if (!function_exists('bingo_grant_player_roulette')) {
             ->first();
 
         if (!$player) {
+            return false;
+        }
+
+        // El Ruletazo de bienvenida solo aplica con KYC verificado.
+        if (!bingo_user_kyc_verified($player)) {
             return false;
         }
 

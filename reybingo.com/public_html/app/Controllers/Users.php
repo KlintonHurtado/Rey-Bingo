@@ -893,6 +893,13 @@ class Users extends Controller {
             ]);
         }
 
+        if (! bingo_user_kyc_verified($player)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'El jugador debe tener KYC verificado para recibir el Ruletazo.',
+            ]);
+        }
+
         helper('bingo');
 
         if (! bingo_grant_player_roulette($userId, translate('roulette granted notification'), true)) {
@@ -1251,6 +1258,7 @@ class Users extends Controller {
         }
 
         bingo_ensure_users_schema();
+        helper(['bingo', 'wallet']);
 
         $model = new UsersModel();
         $modelCartons = new CartonsModel();
@@ -1272,7 +1280,6 @@ class Users extends Controller {
             ]);
         }
 
-        helper('wallet');
         $user = wallet_service()->normalizeUser($user);
         unset($user['password']);
 
@@ -1377,6 +1384,7 @@ class Users extends Controller {
         }
 
         $purchaseRows = bingo_build_user_carton_purchase_report((int) $userId, 500);
+        $movements = bingo_build_user_movements_ledger((int) $userId, 1500);
 
         $roulettes = $modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(80);
         $loginLogs = $modelLogs
@@ -1398,6 +1406,7 @@ class Users extends Controller {
             'retires' => $retires,
             'prizes' => $prizeRows,
             'purchases' => $purchaseRows,
+            'movements' => $movements,
             'roulettes' => $roulettes,
             'loginLogs' => $loginLogs,
             'ip' => $ip,
@@ -1440,6 +1449,37 @@ class Users extends Controller {
             $details,
             $filename,
             ['sheet_name' => 'Riesgo']
+        );
+    }
+
+    public function exportUserMovements($userId)
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return redirect()->to('/signin');
+        }
+
+        bingo_ensure_users_schema();
+        helper(['bingo', 'wallet']);
+
+        $model = new UsersModel();
+        $user = $model->find((int) $userId);
+        if (! $user) {
+            return redirect()->back()->with('error', translate('user not found'));
+        }
+
+        $movements = bingo_build_user_movements_ledger((int) $userId, 5000);
+        $export = bingo_user_movements_export_rows($movements);
+        $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($user['code'] ?? $userId)) ?: (string) $userId;
+        $filename = 'movimientos-usuario-' . $code . '-' . date('Ymd-His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => 'Movimientos',
+                'numeric_columns' => [3, 9, 11, 12, 13],
+            ]
         );
     }
 
@@ -1589,6 +1629,15 @@ class Users extends Controller {
             'kyc_selfie' => null,
             'kyc_observations' => $note,
         ]);
+
+        if ((int) ($user['roulette'] ?? 1) === 0) {
+            $alreadyClaimed = (new \App\Models\RoulettesModel())
+                ->where('user', $userId)
+                ->countAllResults() > 0;
+            if (! $alreadyClaimed) {
+                $model->update($userId, ['roulette' => 1]);
+            }
+        }
 
         return $this->response->setJSON([
             'success' => true,

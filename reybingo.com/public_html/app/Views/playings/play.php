@@ -167,34 +167,23 @@
     }
 
     @media (max-width: 768px) {
-        /* Teléfono: 2 cards visibles; si hay más, deslizar izquierda ↔ derecha */
+        /* Teléfono: rejilla 2 columnas con scroll vertical (sin carrusel horizontal) */
         .player-play-view .play-rooms-carousel {
-            overflow: hidden;
-            position: relative;
+            overflow: visible;
+        }
+
+        .player-play-view .play-rooms-scroll-hint,
+        .player-play-view .play-rooms-scroll-hint.is-visible {
+            display: none !important;
+        }
+
+        .player-play-view .play-rooms-carousel.has-scroll-right::after,
+        .player-play-view .play-rooms-carousel.has-scroll-left::before {
+            display: none !important;
         }
 
         .player-play-view .play-section--rooms,
-        .player-play-view .play-section--multi {
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: none !important;
-            width: 100% !important;
-            overflow-x: auto !important;
-            overflow-y: visible !important;
-            -webkit-overflow-scrolling: touch;
-            scroll-snap-type: x mandatory !important;
-            scrollbar-width: none;
-            display: flex !important;
-            align-items: flex-start !important;
-            justify-content: flex-start !important;
-            padding: 0.15rem 0 5rem !important;
-        }
-
-        .player-play-view .play-section--rooms::-webkit-scrollbar,
-        .player-play-view .play-section--multi::-webkit-scrollbar {
-            display: none;
-        }
-
+        .player-play-view .play-section--multi,
         .player-play-view .play-section--single {
             height: auto !important;
             min-height: 0 !important;
@@ -202,56 +191,42 @@
             width: 100% !important;
             overflow-x: hidden !important;
             overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
             scroll-snap-type: none !important;
             display: block !important;
+            align-items: stretch !important;
+            justify-content: flex-start !important;
             padding: 0.15rem 6px 5rem !important;
         }
 
-        .player-play-view .play-cards--multi {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            gap: 0 !important;
-            width: max-content !important;
-            min-width: 100% !important;
-            max-width: none !important;
-            margin: 0 !important;
-            padding: 0 0 8px !important;
-            grid-template-columns: unset !important;
-            align-items: stretch !important;
-        }
-
+        .player-play-view .play-cards,
+        .player-play-view .play-cards--multi,
         .player-play-view .play-cards--single {
             display: grid !important;
-            grid-template-columns: 1fr !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 0 !important;
             margin: 0 !important;
-            padding: 0 6px !important;
+            padding: 0 !important;
+            justify-items: stretch !important;
+            align-items: stretch !important;
+            flex-direction: unset !important;
+            flex-wrap: unset !important;
         }
 
-        .player-play-view .play-section--multi .play-room-slide {
-            flex: 0 0 var(--play-room-slide-step, 50%) !important;
-            width: var(--play-room-slide-step, 50%) !important;
-            min-width: var(--play-room-slide-step, 50%) !important;
-            max-width: var(--play-room-slide-step, 50%) !important;
-            display: flex !important;
-            justify-content: center;
-            align-items: stretch;
-            scroll-snap-align: start !important;
-            scroll-snap-stop: always !important;
-            box-sizing: border-box;
-            padding: 0 5px;
-        }
-
-        .player-play-view .play-section--single .play-room-slide {
+        .player-play-view .play-room-slide {
             flex: none !important;
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
             display: flex !important;
+            justify-content: stretch;
+            align-items: stretch;
             scroll-snap-align: none !important;
+            scroll-snap-stop: normal !important;
+            box-sizing: border-box;
         }
 
         .player-play-view .play-cards .card,
@@ -509,7 +484,7 @@
                                 <span style="color: #DD3A35; font-weight: bold;">Retiro: <span class="wallet-withdraw-value"><?= number_format($user['wallet_withdraw'], 2); ?></span></span>
                                 <span>Bono: <span class="wallet-bonus-value"><?= number_format($user['wallet_bonus'], 2); ?></span></span>
                             </div>
-                            <?php if (systemGet('activateRoulette') == 1 && ($user['roulette'] ?? 1) == 0) : ?>
+                            <?php if (bingo_user_roulette_available($user)) : ?>
                                 <button type="button" class="btn btn-primary btn-bingo btn-sm mt-2" onclick="var m=document.getElementById('modalactivateRoulette'); if(m){ new bootstrap.Modal(m).show(); }">Girar ruleta</button>
                             <?php endif; ?>
                         </div>
@@ -638,7 +613,7 @@
                                                     <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-<?= $game['id'] ?>" disabled><?= translate('come in to play'); ?></button>
                                                 <?php endif; ?>
                                                 <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
-                                                <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus<?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? ' disabled' : ''; ?>" id="card-button-buy-bonus-<?= $game['id'] ?>" onclick="generateCartonsGet(<?= $game['id'] ?>, 'bonus');" <?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? 'disabled' : ''; ?>>Comprar con bono</button>
+                                                <button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus<?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? ' disabled' : ''; ?>" id="card-button-buy-bonus-<?= $game['id'] ?>" data-no-bonus="<?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? '1' : '0'; ?>" onclick="generateCartonsGet(<?= $game['id'] ?>, 'bonus');" <?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? 'disabled' : ''; ?>>Comprar con bono</button>
                                             </div>
                                         </div>
                                         </div>
@@ -844,88 +819,31 @@
     <?php endif; ?>
 
     window.setPlayRoomSlideWidths = function setPlayRoomSlideWidths() {
-        const playSection = document.querySelector('.play-section--rooms.play-section--multi');
+        // Layout vertical (rejilla 2 columnas): no hay slide horizontal
         const carousel = document.getElementById('play-rooms-carousel');
-        if (!playSection || !carousel) {
-            return;
+        if (carousel) {
+            carousel.style.removeProperty('--play-room-slide-step');
         }
-
-        // En móvil: 2 cards visibles; el resto se ve deslizando.
-        if (window.innerWidth < 769) {
-            const step = Math.max(140, Math.floor(playSection.clientWidth / 2));
-            carousel.style.setProperty('--play-room-slide-step', step + 'px');
-            return;
-        }
-
-        carousel.style.removeProperty('--play-room-slide-step');
     };
 
     window.updatePlayRoomsScrollHints = function updatePlayRoomsScrollHints() {
         const carousel = document.getElementById('play-rooms-carousel');
-        const playSection = document.querySelector('.play-section--rooms');
         const prevBtn = document.getElementById('play-rooms-scroll-prev');
         const nextBtn = document.getElementById('play-rooms-scroll-next');
-
-        if (!carousel || !playSection || !prevBtn || !nextBtn) {
-            return;
-        }
-
-        window.setPlayRoomSlideWidths();
-
-        // Solo flechas cuando hay más contenido horizontal (más de 2 salas en móvil)
-        const canScroll = playSection.scrollWidth > playSection.clientWidth + 8;
-        if (!canScroll || !playSection.classList.contains('play-section--multi')) {
+        if (prevBtn) {
             prevBtn.classList.remove('is-visible');
-            nextBtn.classList.remove('is-visible');
-            carousel.classList.remove('has-scroll-right', 'has-scroll-left');
             prevBtn.setAttribute('aria-hidden', 'true');
-            nextBtn.setAttribute('aria-hidden', 'true');
-            return;
         }
-
-        const maxScroll = playSection.scrollWidth - playSection.clientWidth;
-        const left = playSection.scrollLeft;
-        const showPrev = left > 8;
-        const showNext = left < maxScroll - 8;
-
-        prevBtn.classList.toggle('is-visible', showPrev);
-        nextBtn.classList.toggle('is-visible', showNext);
-        carousel.classList.toggle('has-scroll-left', showPrev);
-        carousel.classList.toggle('has-scroll-right', showNext);
-        prevBtn.setAttribute('aria-hidden', showPrev ? 'false' : 'true');
-        nextBtn.setAttribute('aria-hidden', showNext ? 'false' : 'true');
+        if (nextBtn) {
+            nextBtn.classList.remove('is-visible');
+            nextBtn.setAttribute('aria-hidden', 'true');
+        }
+        if (carousel) {
+            carousel.classList.remove('has-scroll-right', 'has-scroll-left');
+        }
     };
 
     window.initPlayRoomsScrollHints = function initPlayRoomsScrollHints() {
-        const playSection = document.querySelector('.play-section--rooms');
-        const prevBtn = document.getElementById('play-rooms-scroll-prev');
-        const nextBtn = document.getElementById('play-rooms-scroll-next');
-
-        if (!playSection || !prevBtn || !nextBtn) {
-            return;
-        }
-
-        if (!window._playRoomsScrollHintsReady) {
-            window._playRoomsScrollHintsReady = true;
-
-            playSection.addEventListener('scroll', window.updatePlayRoomsScrollHints, { passive: true });
-            window.addEventListener('resize', function() {
-                window.setPlayRoomSlideWidths();
-                window.updatePlayRoomsScrollHints();
-            });
-
-            prevBtn.addEventListener('click', function() {
-                const step = playSection.clientWidth / 2;
-                playSection.scrollBy({ left: -step, behavior: 'smooth' });
-            });
-
-            nextBtn.addEventListener('click', function() {
-                const step = playSection.clientWidth / 2;
-                playSection.scrollBy({ left: step, behavior: 'smooth' });
-            });
-        }
-
-        window.setPlayRoomSlideWidths();
         window.updatePlayRoomsScrollHints();
     };
 
@@ -1039,58 +957,8 @@
         return `INICIA EN: ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MINUTO${minutes === 1 ? '' : 'S'}`;
     }
 
-    function initPlayRoomCountdowns() {
-        const cards = document.querySelectorAll('.play-cards .card[data-game-start]');
-        cards.forEach(function(card) {
-            const gameId = card.getAttribute('data-game-id');
-            const startValue = card.getAttribute('data-game-start');
-            const timeEl = document.querySelector(`#card-time-${gameId} .card-time-display`);
-            const btnPlay = document.getElementById(`card-button-play-${gameId}`);
-            const btnBuy = document.getElementById(`card-button-buy-${gameId}`);
-            const btnBuyBonus = document.getElementById(`card-button-buy-bonus-${gameId}`);
-
-            if (!gameId || !startValue || !timeEl) {
-                return;
-            }
-
-            const targetDate = new Date(startValue.replace(' ', 'T'));
-            if (Number.isNaN(targetDate.getTime())) {
-                return;
-            }
-
-            const tick = function() {
-                const text = formatPlayCountdownText(targetDate);
-                timeEl.textContent = text;
-                const started = text === '¡EL JUEGO YA INICIÓ!';
-
-                if (btnBuy) {
-                    btnBuy.disabled = started;
-                    btnBuy.classList.toggle('disabled', started);
-                    btnBuy.textContent = started ? 'Jugando...' : '<?= translate('buy cartons'); ?>';
-                }
-
-                if (btnBuyBonus) {
-                    const noBonus = <?= ((float) ($user['wallet_bonus'] ?? 0) <= 0) ? 'true' : 'false'; ?>;
-                    btnBuyBonus.disabled = started || noBonus;
-                    btnBuyBonus.classList.toggle('disabled', started || noBonus);
-                    btnBuyBonus.textContent = started ? 'Jugando...' : 'Comprar con bono';
-                }
-
-                if (btnPlay && started) {
-                    const hasCartons = card.getAttribute('data-has-cartons') === '1';
-                    btnPlay.disabled = !hasCartons;
-                    btnPlay.classList.toggle('disabled', !hasCartons);
-                    btnPlay.textContent = hasCartons ? '<?= translate('come in to play'); ?>' : 'No disponible';
-                }
-            };
-
-            tick();
-            if (!window._playRoomCountdownTimers) {
-                window._playRoomCountdownTimers = [];
-            }
-            window._playRoomCountdownTimers.push(setInterval(tick, 1000));
-        });
-    }
+    // Countdown unificado en layout (window.initPlayCardsCountdownsFromDom).
+    // No crear un segundo setInterval aquí: provoca el parpadeo Jugando... / Comprar cartones.
 
     document.getElementById('play-games-search')?.addEventListener('input', applyGameFiltersAndFavorites);
     document.getElementById('play-min-start-filter')?.addEventListener('input', applyGameFiltersAndFavorites);
@@ -1116,9 +984,16 @@
             window.initPlayRoomsScrollHints();
         }
 
-        if (typeof initPlayRoomCountdowns === 'function') {
-            initPlayRoomCountdowns();
-        }
+        // El layout define el countdown más abajo: reintentar hasta que exista
+        (function bootPlayCountdowns(attempt) {
+            if (typeof window.initPlayCardsCountdownsFromDom === 'function') {
+                window.initPlayCardsCountdownsFromDom();
+                return;
+            }
+            if ((attempt || 0) < 40) {
+                setTimeout(function() { bootPlayCountdowns((attempt || 0) + 1); }, 50);
+            }
+        })(0);
 
         if (typeof window.refreshWalletFromServer === 'function') {
             window.refreshWalletFromServer();
