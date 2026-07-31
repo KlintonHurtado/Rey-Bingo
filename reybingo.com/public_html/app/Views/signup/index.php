@@ -114,28 +114,8 @@
 </div>
 
 <div id="whatsapp-plugin"></div>
-    
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
-<div id="g_id_onload" data-client_id="<?= env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com') ?>" data-callback="handleCredentialResponse" data-auto_prompt="true">
-</div>
 
 <script type="text/javascript">
-    function handleCredentialResponse(response) {
-        fetch("<?= site_url('signup/google') ?>", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Requested-With": "XMLHttpRequest"
-            },
-            body: JSON.stringify({ credential: response.credential })
-        })
-        .then(res => res.json())
-        .then(data => {
-            window.location.href = "<?= site_url('signup/google') ?>";
-        });
-    }
-
     $(document).ready(function() {
         $('#signup-step-button').on('click', function() {
 
