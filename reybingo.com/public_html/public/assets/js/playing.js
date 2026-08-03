@@ -1478,35 +1478,68 @@ function syncAutoMarkedNumbers(drawnNumbers, options) {
 }
 
 function startWinnerSlider() {
-    // Ya no rotamos "GANADOR: ..." en el encabezado; solo se usa la notificación centrada.
+    // Ya no rotamos "GANADOR: ..." en el encabezado; solo se usa la notificación de ganador.
     return;
+}
+
+function resetWinnerNoticeUi(numberHe, container, textHe) {
+    if (container) {
+        container.style.display = 'none';
+        container.style.backgroundColor = '';
+    }
+    if (numberHe) {
+        numberHe.style.display = '';
+        numberHe.style.backgroundImage = '';
+        numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
+        numberHe.style.color = 'white';
+        numberHe.textContent = '';
+    }
+    if (textHe) {
+        textHe.innerHTML = '';
+    }
 }
 
 function showCountdown(data, callback) {
     const numberHe = $id('countdown');
     const container = $id('countdown-container');
     const textHe = $id('text-countdown');
-    
-    if (!numberHe || !container || !textHe) return;
 
+    if (!container || !textHe) {
+        if (callback) callback();
+        return;
+    }
+
+    // Notificación de ganador: sin círculo morado "¡Bingo!" ni cuenta 5-4-3-2-1
     container.style.display = 'block';
-    numberHe.textContent = __['bingo!'] || 'BINGO!';
-    textHe.innerHTML = `${data.modality}<br />${data.player}`;
-    numberHe.style.color = 'white';
-    numberHe.style.backgroundImage = '';
-    numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
+    container.style.backgroundColor = 'transparent';
+
+    if (numberHe) {
+        if (data.image) {
+            // Solo el avatar (la notificación visual), nunca el texto "¡Bingo!" en el círculo
+            numberHe.style.display = '';
+            numberHe.textContent = '';
+            numberHe.style.backgroundImage = `url(${data.image})`;
+            numberHe.style.backgroundSize = 'cover';
+            numberHe.style.backgroundPosition = 'center';
+            numberHe.style.color = 'transparent';
+            numberHe.style.background = 'transparent';
+        } else {
+            numberHe.style.display = 'none';
+            numberHe.style.backgroundImage = '';
+            numberHe.textContent = '';
+        }
+    }
+
+    textHe.innerHTML = `${data.modality || ''}<br />${data.player || ''}`;
 
     registerWinner(data.player, data.modality);
 
-    // Reproducir sonido de victoria
     audioManager.play(audioPath + 'winner.mp3');
 
-    // Actualizar cartón ganador
     const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
     cartns.forEach(cartn => {
         cartn.classList.add('cartn-sing');
 
-        // Encontrar el border-carton (puede ser padre o un nivel más arriba)
         let borderCarton = cartn.parentElement;
         while (borderCarton && !borderCarton.classList.contains('border-carton')) {
             borderCarton = borderCarton.parentElement;
@@ -1521,30 +1554,17 @@ function showCountdown(data, callback) {
         });
     });
 
-    // Mostrar avatar (si hay) y cerrar la notificación sin cuenta regresiva 5-4-3-2-1
     setTimeout(() => {
-        if (data.image) {
-            numberHe.style.backgroundImage = `url(${data.image})`;
-            numberHe.style.backgroundSize = 'cover';
-            numberHe.style.backgroundPosition = 'center';
-            numberHe.style.color = 'transparent';
+        resetWinnerNoticeUi(numberHe, container, textHe);
+
+        if (simultaneousBingos.length > 0) {
+            const nextBingo = simultaneousBingos.shift();
+            showCountdown(nextBingo, callback);
+        } else {
+            bingoInProgress = false;
+            if (callback) callback();
         }
-
-        setTimeout(() => {
-            container.style.display = 'none';
-            numberHe.style.backgroundImage = '';
-            numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
-            numberHe.style.color = 'white';
-
-            if (simultaneousBingos.length > 0) {
-                const nextBingo = simultaneousBingos.shift();
-                showCountdown(nextBingo, callback);
-            } else {
-                bingoInProgress = false;
-                if (callback) callback();
-            }
-        }, 3500);
-    }, 1500);
+    }, 4500);
 
     AppcreateConfetti();
 }
