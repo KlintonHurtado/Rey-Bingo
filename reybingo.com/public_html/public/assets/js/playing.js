@@ -1229,11 +1229,7 @@ function markGameAsStartedFromServer(totalNumbersGenerated) {
 
     const nextGameSpan = document.querySelector('.next-game');
     if (nextGameSpan && !window.gameIsFinished && !isGameFinishedShown) {
-        if (winners.length > 0) {
-            startWinnerSlider();
-        } else {
-            nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
-        }
+        nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
     }
 }
 
@@ -1482,21 +1478,8 @@ function syncAutoMarkedNumbers(drawnNumbers, options) {
 }
 
 function startWinnerSlider() {
-    if (winners.length === 0) return;
-
-    clearTimeout(winnerSliderTimeout);
-
-    function showNext() {
-        const current = winners[winnerIndex];
-        const nextGameSpan = document.querySelector('.next-game');
-        if (nextGameSpan) {
-            nextGameSpan.textContent = `GANADOR: ${current.player} - ${current.modality}`;
-        }
-        winnerIndex = (winnerIndex + 1) % winners.length;
-        winnerSliderTimeout = setTimeout(showNext, CONFIG.WINNER_SLIDER_INTERVAL);
-    }
-
-    showNext();
+    // Ya no rotamos "GANADOR: ..." en el encabezado; solo se usa la notificación centrada.
+    return;
 }
 
 function showCountdown(data, callback) {
@@ -1505,16 +1488,15 @@ function showCountdown(data, callback) {
     const textHe = $id('text-countdown');
     
     if (!numberHe || !container || !textHe) return;
-    
-    let countdown = 5;
 
     container.style.display = 'block';
     numberHe.textContent = __['bingo!'] || 'BINGO!';
     textHe.innerHTML = `${data.modality}<br />${data.player}`;
     numberHe.style.color = 'white';
+    numberHe.style.backgroundImage = '';
+    numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
 
     registerWinner(data.player, data.modality);
-    startWinnerSlider();
 
     // Reproducir sonido de victoria
     audioManager.play(audioPath + 'winner.mp3');
@@ -1539,7 +1521,7 @@ function showCountdown(data, callback) {
         });
     });
 
-    // Secuencia de countdown
+    // Mostrar avatar (si hay) y cerrar la notificación sin cuenta regresiva 5-4-3-2-1
     setTimeout(() => {
         if (data.image) {
             numberHe.style.backgroundImage = `url(${data.image})`;
@@ -1549,29 +1531,20 @@ function showCountdown(data, callback) {
         }
 
         setTimeout(() => {
+            container.style.display = 'none';
             numberHe.style.backgroundImage = '';
             numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
             numberHe.style.color = 'white';
-            numberHe.textContent = countdown;
 
-            const interval = setInterval(() => {
-                numberHe.textContent = --countdown;
-                if (countdown === 0) {
-                    clearInterval(interval);
-                    container.style.display = 'none';
-                    
-                    // Procesar el siguiente bingo simultáneo si existe
-                    if (simultaneousBingos.length > 0) {
-                        const nextBingo = simultaneousBingos.shift();
-                        showCountdown(nextBingo, callback);
-                    } else {
-                        bingoInProgress = false;
-                        if (callback) callback();
-                    }
-                }
-            }, 1000);
-        }, 3000);
-    }, 2000);
+            if (simultaneousBingos.length > 0) {
+                const nextBingo = simultaneousBingos.shift();
+                showCountdown(nextBingo, callback);
+            } else {
+                bingoInProgress = false;
+                if (callback) callback();
+            }
+        }, 3500);
+    }, 1500);
 
     AppcreateConfetti();
 }
@@ -1592,11 +1565,6 @@ function showOtherPlayerBingoNotice(data, callback) {
         registerWinner(data.player, data.modality);
     }
 
-    const nextGameSpan = document.querySelector('.next-game');
-    if (nextGameSpan) {
-        nextGameSpan.textContent = `GANADOR: ${data.player} - ${data.modality}`;
-    }
-    
     // Convertir visualmente la modalidad a "ganada" en tiempo real para todos los jugadores
     if (data.modalityId) {
         const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
@@ -1618,21 +1586,20 @@ function showOtherPlayerBingoNotice(data, callback) {
         });
     }
 
-    startWinnerSlider();
+    // Misma notificación centrada (sin texto GANADOR en el encabezado ni cuenta regresiva)
+    showCountdown(data, function () {
+        if (data.gameCompleted || window.gameIsFinished) {
+            setTimeout(showGameFinalized, 400);
+            return;
+        }
 
-    if (data.gameCompleted || window.gameIsFinished) {
-        setTimeout(showGameFinalized, 1200);
-        return;
-    }
-
-    setTimeout(function() {
         scheduleAutoSingCheck(400);
         if (typeof callback === 'function') {
             callback();
         } else {
             startAutomaticLast();
         }
-    }, 3500);
+    });
 }
 
 function updateBallsCounter(totalNumbersGenerated) {
@@ -1775,11 +1742,7 @@ function showGameFinalized() {
 
         const nextGameSpan = document.querySelector('.next-game');
         if (nextGameSpan) {
-            if (winners.length > 0) {
-                startWinnerSlider();
-            } else {
-                nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
-            }
+            nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
         }
 
         const container = $id('game-finalized');
@@ -2493,11 +2456,7 @@ function setupGameCountdown() {
         const timeDiff = targetDate - now;
 
         if (hasGameStarted()) {
-            if (winners.length > 0) {
-                startWinnerSlider();
-            } else {
-                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
-            }
+            nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
             return;
         }
 
@@ -2505,11 +2464,7 @@ function setupGameCountdown() {
             clearInterval(intervalNextGame);
 
             if (window.gameIsFinished || isGameFinishedShown) {
-                if (winners.length > 0) {
-                    startWinnerSlider();
-                } else {
-                    nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
-                }
+                nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
             } else {
                 nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
             }
@@ -2544,17 +2499,9 @@ function setupGameCountdown() {
         intervalNextGame = setInterval(updateCountdown, 1000);
     } else {
         if (window.gameIsFinished || isGameFinishedShown) {
-            if (winners.length > 0) {
-                startWinnerSlider();
-            } else {
-                nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
-            }
+            nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
         } else if (hasGameStarted()) {
-            if (winners.length > 0) {
-                startWinnerSlider();
-            } else {
-                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
-            }
+            nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
         } else {
             nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
         }
