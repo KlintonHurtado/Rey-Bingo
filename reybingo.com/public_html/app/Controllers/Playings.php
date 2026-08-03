@@ -1081,6 +1081,8 @@ class Playings extends Controller
             return redirect()->to('/play');
         }
 
+        helper('bingo');
+
         $drawnNumbersOrdered = $this->getOrderedDrawnNumbers((int) $game['id']);
         $totalNumbersGenerated = count($drawnNumbersOrdered);
         $selectedNumbers = $drawnNumbersOrdered;
@@ -1091,7 +1093,7 @@ class Playings extends Controller
             || ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
 
-        // Solo el cron (o admin) inicia la partida: no activar solo por entrar a /playing
+        // Solo el cron (o llegar la hora + mínimos) inicia la partida: no activar solo por entrar a /playing
         if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
             helper('bingo');
             if (bingo_game_is_due($game) && bingo_can_start_game($game, null, null, false)) {
@@ -1983,8 +1985,50 @@ class Playings extends Controller
             ]);
         }
 
-        // Si está programada (2) pero ya hay bolas o el jugador entró a jugar, activarla
+        // Programada: solo activar cuando ya llegó la hora (el cron también puede activarla)
         if ($gameStatus === 2) {
+            helper('bingo');
+            if (! bingo_game_is_due($game)) {
+                return $this->response->setJSON([
+                    'status' => 'waiting',
+                    'message' => translate('the game has not started yet') ?: 'El juego aún no inicia',
+                    'game_status' => 2,
+                    'date' => $game['date'] ?? null,
+                    'time' => $game['time'] ?? null,
+                    'totalNumbersGenerated' => 0,
+                    'drawnNumbers' => [],
+                    'number' => '',
+                    'player' => '',
+                ]);
+            }
+
+            if (! bingo_can_start_game($game, null, null, false)) {
+                $postpone = bingo_postpone_game($game);
+                $newIso = null;
+                if (! empty($postpone['new_datetime'])) {
+                    try {
+                        $tz = new \DateTimeZone(app_timezone());
+                        $newIso = (new \DateTime($postpone['new_datetime'], $tz))->format('c');
+                    } catch (\Exception $e) {
+                        $newIso = $postpone['new_datetime'];
+                    }
+                }
+
+                return $this->response->setJSON([
+                    'status' => 'waiting',
+                    'postponed' => true,
+                    'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
+                    'new_time' => $newIso,
+                    'date' => $postpone['new_datetime'] ?? null,
+                    'time' => $game['time'] ?? null,
+                    'game_status' => 2,
+                    'totalNumbersGenerated' => 0,
+                    'drawnNumbers' => [],
+                    'number' => '',
+                    'player' => '',
+                ]);
+            }
+
             $modelGames->update((int) $game['id'], [
                 'status' => 1,
                 'updated_at' => date('Y-m-d H:i:s'),
@@ -2358,6 +2402,18 @@ class Playings extends Controller
                     $modelNotifications = new NotificationsModel();
 
                     $currentUserId = session()->get('id');
+                    $modalitySing = $modelModalities->find($modality['id']);
+
+                    // Notificación al propio ganador (toast "¡HAS CANTADO BINGO!")
+                    $modelNotifications->insert([
+                        'user' => $currentUserId,
+                        'from' => 1,
+                        'type' => 'sing',
+                        'game' => $game['id'],
+                        'modality' => $modality['id'],
+                        'title' => '🎉 ¡HAS CANTADO BINGO!',
+                        'message' => '¡Felicidades ' . $userSing['firstname'] . ' ' . $userSing['lastname'] . '! Tu bingo ha sido registrado en la modalidad ' . translate($modalitySing['name'] ?? '') . '.',
+                    ]);
 
                     $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->where('user !=', $currentUserId)->groupBy('user')->findAll();
 
@@ -2368,8 +2424,6 @@ class Playings extends Controller
                     $adminIds = array_column($admins, 'id');
 
                     $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
-
-                    $modalitySing = $modelModalities->find($modality['id']);
 
                     foreach ($allUserIds as $userId) {
                         $notificationData = [

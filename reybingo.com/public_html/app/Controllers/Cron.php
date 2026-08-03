@@ -598,11 +598,14 @@ class Cron extends Controller
         // 1) Iniciar partidas automáticas cuya fecha/hora ya llegó (incluye días anteriores atrasados)
         $gamesToStart = $modelGames->where('type', 1)
             ->where('status', 2)
-            ->where("CONCAT(date, ' ', time) <=", $now)
             ->findAll();
 
         $startedIds = [];
         foreach ($gamesToStart as $gameToStart) {
+            if (! bingo_game_is_due($gameToStart)) {
+                continue;
+            }
+
             $postpone = bingo_postpone_game($gameToStart);
             if ($postpone['postponed']) {
                 log_message('info', "Juego {$gameToStart['id']} pospuesto automáticamente: {$postpone['message']}");
@@ -634,6 +637,17 @@ class Cron extends Controller
             $gamesProcessed[] = $gameId;
 
             $numbersDrawn = $modelBoards->where('game', $gameId)->countAllResults();
+
+            // Seguridad: si quedó activa antes de hora (p. ej. por un bug), no cantar y volver a programada
+            if ($numbersDrawn === 0 && ! bingo_game_is_due($game)) {
+                $modelGames->update($gameId, [
+                    'status' => 2,
+                    'updated_at' => $now,
+                ]);
+                log_message('warning', "Juego {$gameId} reprogramado (status 2): se intentó cantar antes de la hora");
+                continue;
+            }
+
             if ($numbersDrawn === 0) {
                 $postpone = bingo_postpone_game($game);
                 if ($postpone['postponed']) {

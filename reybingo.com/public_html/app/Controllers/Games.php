@@ -1759,6 +1759,16 @@ class Games extends Controller {
                 ]);
             }
 
+            // Automáticas: no activar antes de la hora programada
+            if ((int) ($game['type'] ?? 0) === 1
+                && bingo_count_drawn_numbers((int) $game['id']) === 0
+                && ! bingo_game_is_due($game)) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('the game has not started yet') ?: 'El juego aún no inicia. Espere la hora programada.',
+                ]);
+            }
+
             // Si estaba pospuesta (status 2), activarla al iniciar
             if ((int) ($game['status'] ?? 0) === 2) {
                 $modelGames->update($game_id, [
@@ -1833,6 +1843,16 @@ class Games extends Controller {
                     'new_time'  => $postpone['new_time'],
                 ]);
             }
+        }
+
+        // Automáticas: no activar antes de la hora programada
+        if ((int) ($game['type'] ?? 0) === 1
+            && bingo_count_drawn_numbers((int) $game['id']) === 0
+            && ! bingo_game_is_due($game)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('the game has not started yet') ?: 'El juego aún no inicia. Espere la hora programada.',
+            ]);
         }
 
         // Si estaba pospuesta (status 2), activarla al iniciar
@@ -2727,6 +2747,16 @@ class Games extends Controller {
                 'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
                 'new_time' => $postpone['new_time'] ?? null,
                 'date' => $postpone['new_datetime'] ?? null,
+            ]);
+        }
+
+        if ($game
+            && (int) ($game['type'] ?? 0) === 1
+            && bingo_count_drawn_numbers((int) $game['id']) === 0
+            && ! bingo_game_is_due($game)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('the game has not started yet') ?: 'El juego aún no inicia. Espere la hora programada.',
             ]);
         }
 

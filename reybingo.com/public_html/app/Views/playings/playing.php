@@ -1482,7 +1482,8 @@
     window.totalNumbersGenerated = <?= (int) ($totalNumbersGenerated ?? 0); ?>;
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
-    window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
+    window.gameDate = '<?= esc(function_exists('bingo_game_start_iso') ? bingo_game_start_iso($game) : ($game['date'] . 'T' . $game['time']), 'js') ?>';
+    window.gameStatus = <?= (int) ($game['status'] ?? 0) ?>;
     window.gameIsFinished = <?= !empty($gameIsFinished) ? 'true' : 'false' ?>;
     window.activeModalities = <?= json_encode($modalities ?? []) ?>;
     window.autoMarkEnabled = <?= (isset($user['autodial']) && $user['autodial'] == 1) ? 'true' : 'false' ?>;

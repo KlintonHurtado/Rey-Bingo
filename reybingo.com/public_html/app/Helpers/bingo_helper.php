@@ -1335,16 +1335,46 @@ if (!function_exists('bingo_game_is_due')) {
         $tz = new \DateTimeZone($tzName);
         $nowObj = new \DateTime('now', $tz);
 
+        $date = trim((string) ($game['date'] ?? ''));
+        $time = trim((string) ($game['time'] ?? ''));
+        if ($date === '') {
+            $date = $nowObj->format('Y-m-d');
+        }
+        if ($time === '') {
+            $time = $nowObj->format('H:i:s');
+        }
+        // Normalizar H:i → H:i:s
+        if (preg_match('/^\d{1,2}:\d{2}$/', $time)) {
+            $time .= ':00';
+        }
+
         try {
-            $gameDateTime = new \DateTime(
-                ($game['date'] ?? $nowObj->format('Y-m-d')) . ' ' . ($game['time'] ?? $nowObj->format('H:i:s')),
-                $tz
-            );
+            $gameDateTime = new \DateTime($date . ' ' . $time, $tz);
         } catch (\Exception $e) {
-            return true;
+            return false;
         }
 
         return $gameDateTime <= $nowObj;
+    }
+}
+
+if (!function_exists('bingo_game_start_iso')) {
+    /** ISO 8601 con offset de la zona app (para countdown JS fiable). */
+    function bingo_game_start_iso(array $game): string
+    {
+        $tzName = function_exists('app_timezone') ? app_timezone() : (config('App')->appTimezone ?? 'America/Guayaquil');
+        $tz = new \DateTimeZone($tzName);
+        $date = trim((string) ($game['date'] ?? ''));
+        $time = trim((string) ($game['time'] ?? '00:00:00'));
+        if (preg_match('/^\d{1,2}:\d{2}$/', $time)) {
+            $time .= ':00';
+        }
+        try {
+            $dt = new \DateTime(($date !== '' ? $date : 'now') . ($date !== '' ? ' ' . $time : ''), $tz);
+            return $dt->format('c');
+        } catch (\Exception $e) {
+            return (new \DateTime('now', $tz))->format('c');
+        }
     }
 }
 
@@ -1424,7 +1454,7 @@ if (!function_exists('bingo_postpone_game')) {
         try {
             if (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
                 \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:postponed', [
-                    'new_time' => $baseTime->format('Y-m-d H:i:s'),
+                    'new_time' => $baseTime->format('c'),
                     'message' => $postponeMsg,
                 ]);
             }

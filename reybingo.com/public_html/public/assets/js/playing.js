@@ -842,7 +842,8 @@ function handleBingoSuccess(data, resumeCallback) {
         player: data.player,
         modality: data.modality,
         modalityId: data.modalityId,
-        image: data.image
+        image: data.image,
+        isOwnBingo: true
     }, afterCountdown);
 }
 
@@ -1500,63 +1501,43 @@ function resetWinnerNoticeUi(numberHe, container, textHe) {
 }
 
 function showCountdown(data, callback) {
-    const numberHe = $id('countdown');
+    // Solo efectos de juego (marcar cartón / registrar). SIN círculo ni overlay.
+    // La UI de ganador es únicamente la notificación toast "¡HAS CANTADO BINGO!".
     const container = $id('countdown-container');
-    const textHe = $id('text-countdown');
-
-    if (!container || !textHe) {
-        if (callback) callback();
-        return;
+    if (container) {
+        container.style.display = 'none';
     }
-
-    // Notificación de ganador: sin círculo morado "¡Bingo!" ni cuenta 5-4-3-2-1
-    container.style.display = 'block';
-    container.style.backgroundColor = 'transparent';
-
-    if (numberHe) {
-        if (data.image) {
-            // Solo el avatar (la notificación visual), nunca el texto "¡Bingo!" en el círculo
-            numberHe.style.display = '';
-            numberHe.textContent = '';
-            numberHe.style.backgroundImage = `url(${data.image})`;
-            numberHe.style.backgroundSize = 'cover';
-            numberHe.style.backgroundPosition = 'center';
-            numberHe.style.color = 'transparent';
-            numberHe.style.background = 'transparent';
-        } else {
-            numberHe.style.display = 'none';
-            numberHe.style.backgroundImage = '';
-            numberHe.textContent = '';
-        }
-    }
-
-    textHe.innerHTML = `${data.modality || ''}<br />${data.player || ''}`;
 
     registerWinner(data.player, data.modality);
 
-    audioManager.play(audioPath + 'winner.mp3');
+    if (data.modalityId) {
+        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
+        cartns.forEach(cartn => {
+            cartn.classList.add('cartn-sing');
 
-    const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-    cartns.forEach(cartn => {
-        cartn.classList.add('cartn-sing');
+            let borderCarton = cartn.parentElement;
+            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+                borderCarton = borderCarton.parentElement;
+            }
+            if (borderCarton) {
+                borderCarton.classList.add('modality-won');
+            }
 
-        let borderCarton = cartn.parentElement;
-        while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-            borderCarton = borderCarton.parentElement;
-        }
-        if (borderCarton) {
-            borderCarton.classList.add('modality-won');
-        }
-
-        cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-            el.classList.add('sing');
-            el.innerText = '⭐️';
+            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+                el.classList.add('sing');
+                el.innerText = '⭐️';
+            });
         });
-    });
+    }
+
+    // Forzar carga inmediata de la notificación toast (sin círculo)
+    if (typeof window.loadNotifications === 'function') {
+        setTimeout(function () {
+            window.loadNotifications();
+        }, 300);
+    }
 
     setTimeout(() => {
-        resetWinnerNoticeUi(numberHe, container, textHe);
-
         if (simultaneousBingos.length > 0) {
             const nextBingo = simultaneousBingos.shift();
             showCountdown(nextBingo, callback);
@@ -1564,9 +1545,7 @@ function showCountdown(data, callback) {
             bingoInProgress = false;
             if (callback) callback();
         }
-    }, 4500);
-
-    AppcreateConfetti();
+    }, 1200);
 }
 
 function showOtherPlayerBingoNotice(data, callback) {
@@ -1606,7 +1585,10 @@ function showOtherPlayerBingoNotice(data, callback) {
         });
     }
 
-    // Misma notificación centrada (sin texto GANADOR en el encabezado ni cuenta regresiva)
+    // Sin overlay: solo la notificación toast del sistema
+    if (data && data.isOwnBingo !== true) {
+        data.isOwnBingo = false;
+    }
     showCountdown(data, function () {
         if (data.gameCompleted || window.gameIsFinished) {
             setTimeout(showGameFinalized, 400);
@@ -1653,6 +1635,14 @@ function processNumberGetResponse(data) {
         return;
     }
 
+    // Partida aún no inicia: mantener contador, no marcar como iniciada
+    if (data.status === 'waiting') {
+        if (data.postponed && data.new_time && typeof handleGamePostponed === 'function') {
+            handleGamePostponed(data.new_time, data.message);
+        }
+        return;
+    }
+
     applyNumberGetMeta(data);
     applyAutoMarkPreferenceFromServer(data.autodial);
 
@@ -1676,7 +1666,9 @@ function processNumberGetResponse(data) {
                         player: data.player,
                         modality: data.modality,
                         modalityId: data.modalityId,
-                        image: data.image
+                        image: data.image,
+                        isOwnBingo: true,
+                        winnerUserId: data.winnerUserId
                     }, function() {
                         if (data.gameCompleted) {
                             showGameFinalized();
@@ -2438,8 +2430,12 @@ function handleGamePostponed(newTimeStr, messageText) {
     if (lastPostponedTime === newTimeStr) return;
     lastPostponedTime = newTimeStr;
 
-    // Actualizar la fecha/hora del juego globalmente
-    window.gameDate = newTimeStr;
+    // Actualizar la fecha/hora del juego (acepta "Y-m-d H:i:s" o ISO)
+    let normalized = String(newTimeStr || '').trim();
+    if (/^\d{4}-\d{2}-\d{2} /.test(normalized)) {
+        normalized = normalized.replace(' ', 'T');
+    }
+    window.gameDate = normalized;
     
     // Si la función de actualizar el countdown existe, reiniciarla con la nueva fecha
     if (typeof setupGameCountdown === 'function') {
@@ -2866,7 +2862,22 @@ function initializeApp() {
     if (window.gameIsFinished) {
         showGameFinalized();
     } else if (typeof timeBallLast !== 'undefined') {
-        startAutomaticLast();
+        // Poll de bolas solo cuando ya inició (hora llegada o hay bolas).
+        // Antes de la hora: solo el contador; al llegar, el cron activa y este poll sincroniza.
+        if (hasGameStarted()) {
+            startAutomaticLast();
+        } else {
+            const waitForStart = setInterval(function () {
+                if (window.gameIsFinished || isGameFinishedShown) {
+                    clearInterval(waitForStart);
+                    return;
+                }
+                if (hasGameStarted()) {
+                    clearInterval(waitForStart);
+                    startAutomaticLast();
+                }
+            }, 1000);
+        }
     }
     
     // Limpiar mensajes antiguos periódicamente
