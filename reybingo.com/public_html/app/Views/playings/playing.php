@@ -1531,6 +1531,10 @@
             // Permitir la salida/recarga
             allowUnload = true;
             window.allowGameUnload = true;
+            window.onpopstate = null;
+
+            var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+            var targetUrl = exitUrl || playUrl;
 
             if (reloadAttempted) {
                 // Si fue un intento de recarga, recargar la página
@@ -1538,12 +1542,9 @@
                 setTimeout(() => {
                     location.reload();
                 }, 100);
-            } else if (exitUrl) {
-                // Si hay una URL específica, navegar a ella
-                window.location.href = exitUrl;
             } else {
-                // Si fue el botón atrás, permitir la navegación atrás
-                history.back();
+                // replace: no dejar /playing en el historial (evita bucle billetera → partida)
+                window.location.replace(targetUrl);
             }
         });
 
@@ -1556,14 +1557,22 @@
         });
 
         // Interceptar botón atrás del navegador
-        history.pushState(null, null, location.href);
+        history.pushState({ reybingoPlaying: 1 }, null, location.href);
         window.onpopstate = function () {
-            if (canLeaveGameWithoutWarning()) {
-                history.back();
+            // Si la billetera está abierta, app.js cierra el modal (no mostrar salida)
+            var walletEl = document.getElementById('modalPayments');
+            if (walletEl && walletEl.classList.contains('show')) {
                 return;
             }
-            history.pushState(null, null, location.href);
+            if (canLeaveGameWithoutWarning()) {
+                window.onpopstate = null;
+                var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+                window.location.replace(playUrl);
+                return;
+            }
+            history.pushState({ reybingoPlaying: 1 }, null, location.href);
             if (typeof showBsModal === 'function') showBsModal('#modalExit');
+            exitUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
         };
 
         // Interceptar F5/Ctrl+R

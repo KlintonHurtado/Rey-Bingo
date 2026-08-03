@@ -146,11 +146,17 @@ class Payments extends Controller {
 
     public function stripeSuccess()
     {
+        if ((int) session()->get('group') === 0) {
+            return redirect()->to('/play')->with('success', 'Pago completado. Estamos procesando la acreditación.');
+        }
         return redirect()->to('/payments')->with('success', 'Pago completado. Estamos procesando la acreditación.');
     }
 
     public function stripeCancel()
     {
+        if ((int) session()->get('group') === 0) {
+            return redirect()->to('/play')->with('error', 'Pago cancelado.');
+        }
         return redirect()->to('/payments')->with('error', 'Pago cancelado.');
     }
 
@@ -161,7 +167,15 @@ class Payments extends Controller {
         $game = $modelGames->find(session()->get('game_id'));
     
         if ($game) {
+            // Jugador: salas. Admin: tablero de la partida activa.
+            if ((int) session()->get('group') === 0) {
+                return redirect()->to('/play');
+            }
             return redirect()->to('/board');
+        }
+
+        if ((int) session()->get('group') === 0) {
+            return redirect()->to('/play');
         }
 
         $data = [

@@ -655,8 +655,86 @@ function paymentsGet() {
         }
         showBsModal('#modalPayments');
         refreshWalletFromServer();
+        armWalletModalHistory();
     });
 }
+
+var walletModalHistoryArmed = false;
+var walletModalIgnorePopstate = false;
+
+function isPlayingPage() {
+    return /\/playing\/?$/.test(window.location.pathname || '');
+}
+
+function playRoomsUrl() {
+    return (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+}
+
+function armWalletModalHistory() {
+    if (walletModalHistoryArmed) {
+        return;
+    }
+    try {
+        history.pushState({ reybingoWallet: 1 }, '', window.location.href);
+        walletModalHistoryArmed = true;
+    } catch (e) { /* ignore */ }
+}
+
+function disarmWalletModalHistory() {
+    if (!walletModalHistoryArmed) {
+        return;
+    }
+    walletModalHistoryArmed = false;
+    try {
+        if (history.state && history.state.reybingoWallet) {
+            walletModalIgnorePopstate = true;
+            history.back();
+            setTimeout(function () {
+                walletModalIgnorePopstate = false;
+            }, 300);
+        } else {
+            history.replaceState(null, '', window.location.href);
+        }
+    } catch (e) {
+        walletModalIgnorePopstate = false;
+    }
+}
+
+$(document).on('hidden.bs.modal', '#modalPayments', function () {
+    // Si cierra la billetera dentro de una partida, ir a la lista de salas
+    if (isPlayingPage()) {
+        walletModalHistoryArmed = false;
+        window.location.replace(playRoomsUrl());
+        return;
+    }
+    disarmWalletModalHistory();
+});
+
+window.addEventListener('popstate', function () {
+    if (walletModalIgnorePopstate) {
+        return;
+    }
+
+    var modalEl = document.getElementById('modalPayments');
+    var isOpen = modalEl && (
+        modalEl.classList.contains('show') ||
+        (typeof $ !== 'undefined' && $('#modalPayments').hasClass('show'))
+    );
+    if (!isOpen) {
+        return;
+    }
+
+    walletModalHistoryArmed = false;
+    if (typeof hideBsModal === 'function') {
+        hideBsModal('#modalPayments');
+    } else if (typeof $ !== 'undefined') {
+        $('#modalPayments').modal('hide');
+    }
+
+    if (isPlayingPage()) {
+        window.location.replace(playRoomsUrl());
+    }
+});
 
 function requestGet(type, id) {
     loadAndShowModal('#modalRequest', site_url + 'payments/requestGet/' + type + '/' + id);

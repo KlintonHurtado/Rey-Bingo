@@ -2460,12 +2460,21 @@
         });
 
         <?php if (systemGet('activateCron') == 1) : ?>
-        // Cron Virtual: Mantiene vivos los juegos automáticos llamando al backend
-        setInterval(() => {
-            fetch('<?= site_url('cron/run-auto-games') ?>', { method: 'GET', cache: 'no-store' })
-                .then(r => r.json())
-                .catch(e => console.log('Virtual Cron:', e));
-        }, 5000);
+        // Respaldo en navegador (el cron principal debe ser del servidor: spark bingo:cron o /cron/run-auto-games)
+        (function () {
+            var cronUrl = '<?= site_url('cron/run-auto-games') ?>';
+            var tickMs = 10000;
+            function runVirtualCron() {
+                if (document.hidden) {
+                    return;
+                }
+                fetch(cronUrl, { method: 'GET', cache: 'no-store' })
+                    .then(function (r) { return r.json(); })
+                    .catch(function (e) { console.log('Virtual Cron:', e); });
+            }
+            setInterval(runVirtualCron, tickMs);
+            setTimeout(runVirtualCron, 2000);
+        })();
         <?php endif; ?>
 
         <?php if (session()->get('group') == 1 && systemGet('activateAddGames') == 1) : ?>

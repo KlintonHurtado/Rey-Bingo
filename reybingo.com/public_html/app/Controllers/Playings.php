@@ -1091,13 +1091,16 @@ class Playings extends Controller
             || ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
 
-        // Partida programada (2) con cartones del jugador: activar al entrar a jugar
+        // Solo el cron (o admin) inicia la partida: no activar solo por entrar a /playing
         if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
-            $modelGames->update((int) $game['id'], [
-                'status' => 1,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
-            $game['status'] = 1;
+            helper('bingo');
+            if (bingo_game_is_due($game) && bingo_can_start_game($game, null, null, false)) {
+                $modelGames->update((int) $game['id'], [
+                    'status' => 1,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $game['status'] = 1;
+            }
         }
 
         $cartons = $this->getActivePlayingCartons($modelCartons, (int) session()->get('id'), $game);
