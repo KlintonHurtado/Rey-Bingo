@@ -7,16 +7,19 @@ const CONFIG = {
     BASE_POLL_INTERVAL: 3500,
     CHAT_POLL_INTERVAL: 3500,
     MAX_POLL_INTERVAL: 20000,
-    LIVE_STATUS_INTERVAL: 10000,
-    USER_COUNT_INTERVAL: 10000,
-    ACCUMULATED_COUNT_INTERVAL: 10000,
-    MESSAGE_LIFETIME: 30000, // 30 segundos para mensajes
-    FADE_OUT_TIME: 500,      // Tiempo de animación de desvanecimiento
+    LIVE_STATUS_INTERVAL: 20000,
+    USER_COUNT_INTERVAL: 20000,
+    ACCUMULATED_COUNT_INTERVAL: 20000,
+    MESSAGE_LIFETIME: 30000,
+    FADE_OUT_TIME: 500,
     DEBOUNCE_DELAY: 100,
     AUDIO_POOL_SIZE: 10,
     MESSAGE_POOL_SIZE: 15,
     WINNER_SLIDER_INTERVAL: 5000,
     COUNTDOWN_INTERVAL: 1000,
+    // Poll de bolas: rápido si no hay Pusher; lento si Pusher OK (escala con muchos jugadores)
+    BALL_POLL_FAST_MS: 1800,
+    BALL_POLL_PUSHER_MS: 8000,
     WAF_COOLDOWN_MS: 45000
 };
 
@@ -1793,11 +1796,28 @@ function lastNumberGet() {
 
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
-    if (typeof timeBallLast !== 'undefined') {
-        lastNumberGet();
-        // Respaldo de Pusher: 1.5–2s (evitar ráfagas que Hostinger CDN marca como 403)
-        const pollMs = Math.max(1500, Math.min(parseInt(timeBallLast, 10) || 1500, 2000));
-        intervalManager.set('lastNumber', lastNumberGet, pollMs);
+    if (typeof timeBallLast === 'undefined') {
+        return;
+    }
+
+    lastNumberGet();
+
+    // Con Pusher activo el poll es solo respaldo (mucho menos AJAX por jugador)
+    const pusherOk = window.__bingoPusherRealtime === true;
+    const fastMs = CONFIG.BALL_POLL_FAST_MS || 1800;
+    const slowMs = CONFIG.BALL_POLL_PUSHER_MS || 8000;
+    const configured = parseInt(timeBallLast, 10) || fastMs;
+    const pollMs = pusherOk
+        ? Math.max(slowMs, configured)
+        : Math.max(fastMs, Math.min(configured, 2000));
+
+    intervalManager.set('lastNumber', lastNumberGet, pollMs);
+}
+
+function setBingoPusherRealtime(enabled) {
+    window.__bingoPusherRealtime = !!enabled;
+    if (typeof timeBallLast !== 'undefined' && !window.gameIsFinished && !isGameFinishedShown) {
+        startAutomaticLast();
     }
 }
 
@@ -2956,7 +2976,19 @@ function initializeApp() {
         try {
             console.log('Instanciando PusherClient en el juego...');
             const pusherHelper = new PusherClient(GAME_ID, USER_ID);
+            window.__bingoPusherHelper = pusherHelper;
             pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL);
+
+            pusherHelper.on('connection:success', function() {
+                setBingoPusherRealtime(true);
+            });
+            pusherHelper.on('connection:failed', function() {
+                setBingoPusherRealtime(false);
+            });
+            pusherHelper.on('connection:error', function() {
+                setBingoPusherRealtime(false);
+            });
+
             pusherHelper.on('game:postponed', function(data) {
                 console.log('Pusher game:postponed received', data);
                 if (data && data.new_time) {
@@ -2967,6 +2999,9 @@ function initializeApp() {
                 if (!data || bingoInProgress || window.gameIsFinished || isGameFinishedShown) {
                     return;
                 }
+
+                // Marcamos realtime activo al recibir bolas (aunque subscription_succeeded fallara en logs)
+                setBingoPusherRealtime(true);
 
                 const number = data.n ?? data.number;
                 const drawn = data.drawnNumbers || data.drawn || null;
@@ -2980,7 +3015,10 @@ function initializeApp() {
             });
         } catch (pe) {
             console.warn('Error inicializando PusherClient en juego:', pe);
+            setBingoPusherRealtime(false);
         }
+    } else {
+        setBingoPusherRealtime(false);
     }
 
     console.log('Bingo App with Enhanced Chat initialized successfully');

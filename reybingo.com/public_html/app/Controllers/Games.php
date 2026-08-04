@@ -3143,6 +3143,24 @@ class Games extends Controller {
             ]);
         }
 
+        $gameId = (int) session()->get('game_id');
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'stop',
+                'userCount' => 0,
+                'gameAccumulated' => '0.00',
+                'message' => translate('game not found'),
+            ]);
+        }
+
+        // Cache corto: con muchos jugadores evita N consultas SQL iguales por segundo
+        $cacheKey = 'live_status_' . $gameId;
+        $cache = cache();
+        $cached = $cache ? $cache->get($cacheKey) : null;
+        if (is_array($cached)) {
+            return $this->response->setJSON($cached);
+        }
+
         $model = new GamesModel();
         $modelModalities = new ModalitiesModel();
         $modelBoards = new BoardsModel();
@@ -3150,7 +3168,7 @@ class Games extends Controller {
         $modelSings = new SingsModel();
         $modelAwards = new AwardsModel();
 
-        $game = $model->find(session()->get('game_id'));
+        $game = $model->find($gameId);
 
         if (! $game) {
             return $this->response->setStatusCode(404)->setJSON([
@@ -3201,12 +3219,18 @@ class Games extends Controller {
             $message = translate('the game is over, all the prizes have been awarded');
         }
 
-        return $this->response->setJSON([
+        $payload = [
             'status' => $status,
             'userCount' => $userCount,
             'gameAccumulated' => number_format($gameAccumulated, 2),
             'modalities' => $modalitiesData,
             'message' => $message,
-        ]);
+        ];
+
+        if ($cache) {
+            $cache->save($cacheKey, $payload, 3); // 3 segundos
+        }
+
+        return $this->response->setJSON($payload);
     }
 }
