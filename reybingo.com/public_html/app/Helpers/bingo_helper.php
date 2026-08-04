@@ -457,9 +457,7 @@ if (!function_exists('bingo_claim_pending_board_sing')) {
             }
             $modelSings->update($sing['id'], $update);
 
-            $imagePath = !empty($user['image'])
-                ? site_url('uploads/users/' . $user['image'])
-                : site_url('assets/img/avatar.jpg');
+            $imagePath = bingo_user_image_url($user);
 
             return [
                 'sing' => $sing,
@@ -2254,6 +2252,108 @@ if (!function_exists('bingo_ensure_deposits_schema')) {
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de deposits: ' . $e->getMessage());
         }
+    }
+}
+
+if (!function_exists('bingo_upload_candidate_dirs')) {
+    /**
+     * Carpetas posibles de uploads/{folder}/ (Hostinger: public, raíz, writable).
+     *
+     * @return list<string>
+     */
+    function bingo_upload_candidate_dirs(string $folder): array
+    {
+        $folder = trim(str_replace(['..', '\\'], '', $folder), '/');
+        if ($folder === '') {
+            return [];
+        }
+
+        $dirs = [];
+        $candidates = [
+            rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR,
+            rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR,
+        ];
+
+        if (defined('ROOTPATH')) {
+            $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+            $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+            // A veces el docroot es public_html y dejan uploads al lado de public/
+            $parent = dirname(rtrim(ROOTPATH, '/\\'));
+            if ($parent && $parent !== '.' && $parent !== DIRECTORY_SEPARATOR) {
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'public_html' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'public_html' . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+            }
+        }
+
+        foreach ($candidates as $dir) {
+            $normalized = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+            if (is_dir($normalized)) {
+                $dirs[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($dirs));
+    }
+}
+
+if (!function_exists('bingo_upload_sanitize_name')) {
+    function bingo_upload_sanitize_name(?string $filename): string
+    {
+        $filename = basename(str_replace(["\0", '\\', '/'], '', trim((string) $filename)));
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return '';
+        }
+
+        $filename = preg_replace('/[^A-Za-z0-9._-]/', '', $filename) ?? '';
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return '';
+        }
+
+        return $filename;
+    }
+}
+
+if (!function_exists('bingo_upload_resolve')) {
+    /**
+     * Resuelve ruta real de uploads/{folder}/{file} en varias ubicaciones.
+     */
+    function bingo_upload_resolve(string $folder, ?string $filename): string
+    {
+        $filename = bingo_upload_sanitize_name($filename);
+        if ($filename === '') {
+            return '';
+        }
+
+        foreach (bingo_upload_candidate_dirs($folder) as $dir) {
+            $path = $dir . $filename;
+            if (is_file($path) && is_readable($path)) {
+                return $path;
+            }
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('bingo_user_image_url')) {
+    /**
+     * URL de avatar: si el archivo existe (en cualquier ruta candidata) usa uploads/;
+     * si no, avatar por defecto (evita img rota aunque la BD tenga nombre).
+     */
+    function bingo_user_image_url(?array $user = null, ?string $image = null): string
+    {
+        $name = $image;
+        if ($name === null && is_array($user)) {
+            $name = (string) ($user['image'] ?? '');
+        }
+        $name = bingo_upload_sanitize_name($name);
+
+        if ($name !== '' && bingo_upload_resolve('users', $name) !== '') {
+            return site_url('uploads/users/' . $name);
+        }
+
+        return site_url('assets/img/avatar.jpg');
     }
 }
 

@@ -9,9 +9,12 @@ if (session()->get('logged_in')) {
         $user = $layoutUserModel->find(session()->get('id')) ?? [];
     }
     if (! isset($imagePath) || $imagePath === '') {
-        $imagePath = ! empty($user['image'])
-            ? site_url('uploads/users/' . $user['image'])
-            : site_url('assets/img/avatar.jpg');
+        helper('bingo');
+        $imagePath = function_exists('bingo_user_image_url')
+            ? bingo_user_image_url(is_array($user) ? $user : null)
+            : (! empty($user['image'])
+                ? site_url('uploads/users/' . $user['image'])
+                : site_url('assets/img/avatar.jpg'));
     }
 
     $lastTouch = (int) (session()->get('last_seen_touch') ?? 0);

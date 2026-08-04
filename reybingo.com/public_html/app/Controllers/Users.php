@@ -2004,12 +2004,17 @@ class Users extends Controller {
             $uploadPath = FCPATH . 'uploads/users/';
 
             if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0755, true); 
+                @mkdir($uploadPath, 0755, true); 
             }
 
-            file_put_contents($uploadPath . $fileName, $imageData);
-
-            $data['image'] = $fileName; 
+            if (is_dir($uploadPath) && $imageData !== false) {
+                $written = @file_put_contents($uploadPath . $fileName, $imageData);
+                if ($written !== false && is_file($uploadPath . $fileName)) {
+                    $data['image'] = $fileName;
+                } else {
+                    log_message('error', 'Profile: no se pudo guardar imagen en ' . $uploadPath . $fileName);
+                }
+            }
         }
 
         $model->update(session()->get('id'), $data);

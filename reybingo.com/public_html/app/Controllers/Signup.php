@@ -909,15 +909,41 @@ class Signup extends Controller {
 
         $picture = (string) ($pending['picture'] ?? '');
         if ($picture !== '') {
-            $uploadDir = FCPATH . 'uploads/users/';
-            if (! is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
             $newImageName = time() . '_' . bin2hex(random_bytes(10)) . '.jpg';
             $imageContents = @file_get_contents($picture);
             if ($imageContents !== false) {
-                file_put_contents($uploadDir . $newImageName, $imageContents);
-                $data['image'] = $newImageName;
+                $saved = false;
+                foreach (bingo_upload_candidate_dirs('users') as $uploadDir) {
+                    if (! is_dir($uploadDir)) {
+                        @mkdir($uploadDir, 0755, true);
+                    }
+                    if (! is_dir($uploadDir) || ! is_writable($uploadDir)) {
+                        continue;
+                    }
+                    $written = @file_put_contents($uploadDir . $newImageName, $imageContents);
+                    if ($written !== false && is_file($uploadDir . $newImageName)) {
+                        $saved = true;
+                        break;
+                    }
+                }
+                // Intento primario FCPATH si aún no hay carpetas candidatas
+                if (! $saved) {
+                    $uploadDir = FCPATH . 'uploads/users/';
+                    if (! is_dir($uploadDir)) {
+                        @mkdir($uploadDir, 0755, true);
+                    }
+                    if (is_dir($uploadDir)) {
+                        $written = @file_put_contents($uploadDir . $newImageName, $imageContents);
+                        $saved = ($written !== false && is_file($uploadDir . $newImageName));
+                    }
+                }
+                if ($saved) {
+                    $data['image'] = $newImageName;
+                } else {
+                    log_message('error', 'Google signup: no se pudo guardar avatar ' . $newImageName);
+                }
+            } else {
+                log_message('error', 'Google signup: no se pudo descargar avatar de Google');
             }
         }
 

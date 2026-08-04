@@ -262,6 +262,9 @@ $routes->get('payments/userAccreditationStatsGet/(:num)', 'Payments::userAccredi
 $routes->get('payments/modalVoucher/(:num)', 'Payments::modalVoucher/$1');
 $routes->get('payments/voucher/(:segment)', 'Payments::voucher/$1');
 
+// Imágenes/archivos uploads: si el estático 404 (Hostinger), PHP busca en varias carpetas
+$routes->get('uploads/(:segment)/(:segment)', 'Uploads::file/$1/$2');
+
 $routes->get('payments/show', 'Payments::show');
 $routes->post('payments/stripe/create', 'Payments::createStripeCheckoutSession');
 $routes->get('payments/stripe/success', 'Payments::stripeSuccess');
