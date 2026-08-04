@@ -7271,6 +7271,15 @@ a {
 
 .next-game {
     animation: blinkColor 1s infinite;
+    /* Evita “fantasma”/rastro al cambiar el texto de ganador */
+    text-shadow: none !important;
+    will-change: auto;
+    transform: none;
+}
+
+.next-game.is-winner {
+    animation: none;
+    color: #ffffff !important;
 }
 
 @keyframes blinkColor {

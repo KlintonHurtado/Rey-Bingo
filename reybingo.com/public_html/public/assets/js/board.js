@@ -13,7 +13,8 @@ const CONFIG = {
     FADE_OUT_TIME: 500,      // Tiempo de animación de desvanecimiento
     DEBOUNCE_DELAY: 100,
     AUDIO_POOL_SIZE: 10,
-    MESSAGE_POOL_SIZE: 15
+    MESSAGE_POOL_SIZE: 15,
+    WINNER_SLIDER_INTERVAL: 5000
 };
 
 // ==========================================
@@ -798,16 +799,31 @@ function getColumnClass(number) {
 function startWinnerSlider() {
     if (winners.length === 0) return;
 
-    clearTimeout(winnerSliderTimeout);
+    if (winnerSliderTimeout) {
+        clearTimeout(winnerSliderTimeout);
+        winnerSliderTimeout = null;
+    }
+
+    const intervalMs = Math.max(3000, parseInt(CONFIG.WINNER_SLIDER_INTERVAL, 10) || 5000);
+    const nextGameSpan = document.querySelector('.next-game');
+    if (!nextGameSpan) return;
+
+    nextGameSpan.classList.add('is-winner');
+
+    // Un solo ganador: texto fijo (sin bucle infinito)
+    if (winners.length === 1) {
+        const current = winners[0];
+        nextGameSpan.textContent = `GANADOR: ${current.player} - ${current.modality}`;
+        return;
+    }
 
     function showNext() {
-        const current = winners[winnerIndex];
-        const nextGameSpan = document.querySelector('.next-game');
-        if (nextGameSpan) {
+        const current = winners[winnerIndex % winners.length];
+        if (current && nextGameSpan) {
             nextGameSpan.textContent = `GANADOR: ${current.player} - ${current.modality}`;
         }
         winnerIndex = (winnerIndex + 1) % winners.length;
-        winnerSliderTimeout = setTimeout(showNext, CONFIG.WINNER_SLIDER_INTERVAL);
+        winnerSliderTimeout = setTimeout(showNext, intervalMs);
     }
 
     showNext();
@@ -817,32 +833,32 @@ function showCountdown(data, callback) {
     const numberHe = $id('countdown');
     const container = $id('countdown-container');
     const textHe = $id('text-countdown');
-    
-    if (!numberHe || !container || !textHe) return;
-    
-    let countdown = 5;
 
-    container.style.display = 'block';
-    numberHe.textContent = __['bingo!'] || 'BINGO!';
-    textHe.innerHTML = `${data.modality}<br />${data.player}`;
-    numberHe.style.color = 'white';
-
-    // Agregar ganador si no existe
-    if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
-        winners.push({ player: data.player, modality: data.modality });
+    if (data && data.player && data.modality) {
+        if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
+            winners.push({ player: data.player, modality: data.modality });
+        }
+        startWinnerSlider();
     }
 
-    startWinnerSlider();
+    // Sin círculo/cuenta regresiva: evita solapes con el texto GANADOR
+    if (container) {
+        container.style.display = 'none';
+    }
+    if (numberHe) {
+        numberHe.textContent = '';
+        numberHe.style.backgroundImage = '';
+    }
+    if (textHe) {
+        textHe.innerHTML = '';
+    }
 
-    // Reproducir sonido de victoria
     audioManager.play(audioPath + 'winner.mp3');
 
-    // Actualizar cartón ganador
     const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
     cartns.forEach(cartn => {
         cartn.classList.add('cartn-sing');
 
-        // Encontrar el border-carton (puede ser padre o un nivel más arriba)
         let borderCarton = cartn.parentElement;
         while (borderCarton && !borderCarton.classList.contains('border-carton')) {
             borderCarton = borderCarton.parentElement;
@@ -857,33 +873,15 @@ function showCountdown(data, callback) {
         });
     });
 
-    // Secuencia de countdown
-    setTimeout(() => {
-        if (data.image) {
-            numberHe.style.backgroundImage = `url(${data.image})`;
-            numberHe.style.backgroundSize = 'cover';
-            numberHe.style.backgroundPosition = 'center';
-            numberHe.style.color = 'transparent';
-        }
+    if (typeof window.loadNotifications === 'function') {
+        setTimeout(function () {
+            window.loadNotifications();
+        }, 300);
+    }
 
-        setTimeout(() => {
-            numberHe.style.backgroundImage = '';
-            numberHe.style.background = 'linear-gradient(145deg, #6236ff, #8767fa)';
-            numberHe.style.color = 'white';
-            numberHe.textContent = countdown;
-
-            const interval = setInterval(() => {
-                numberHe.textContent = --countdown;
-                if (countdown === 0) {
-                    clearInterval(interval);
-                    container.style.display = 'none';
-                    if (callback) callback();
-                }
-            }, 1000);
-        }, 3000);
-    }, 2000);
-
-    //AppcreateConfetti();
+    setTimeout(function () {
+        if (callback) callback();
+    }, 1500);
 }
 
 function updateBallsCounter(totalNumbersGenerated) {
