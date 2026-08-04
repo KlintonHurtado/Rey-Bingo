@@ -1988,7 +1988,17 @@ class Playings extends Controller
         // Programada: solo activar cuando ya llegó la hora (el cron también puede activarla)
         if ($gameStatus === 2) {
             helper('bingo');
-            if (! bingo_game_is_due($game)) {
+
+            // Si el admin ya cantó en LIVE, la partida debe sincronizarse aunque
+            // el cliente aún tenga la hora programada en el futuro.
+            $alreadyDrawn = bingo_count_drawn_numbers((int) $game['id']);
+            if ($alreadyDrawn > 0) {
+                $modelGames->update((int) $game['id'], [
+                    'status' => 1,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $game['status'] = 1;
+            } elseif (! bingo_game_is_due($game)) {
                 return $this->response->setJSON([
                     'status' => 'waiting',
                     'message' => translate('the game has not started yet') ?: 'El juego aún no inicia',
@@ -2002,7 +2012,7 @@ class Playings extends Controller
                 ]);
             }
 
-            if (! bingo_can_start_game($game, null, null, false)) {
+            if ((int) ($game['status'] ?? 0) === 2 && ! bingo_can_start_game($game, null, null, false)) {
                 $postpone = bingo_postpone_game($game);
                 $newIso = null;
                 if (! empty($postpone['new_datetime'])) {
@@ -2029,17 +2039,27 @@ class Playings extends Controller
                 ]);
             }
 
-            $modelGames->update((int) $game['id'], [
-                'status' => 1,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
-            $game['status'] = 1;
+            if ((int) ($game['status'] ?? 0) === 2) {
+                $modelGames->update((int) $game['id'], [
+                    'status' => 1,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                $game['status'] = 1;
+            }
         }
 
         $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if (!$lastNumber) {
-            return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no numbers drawn yet')]);
+            return $this->response->setJSON([
+                'status' => 'waiting',
+                'message' => translate('there are no numbers drawn yet') ?: 'Aún no hay bolas cantadas',
+                'totalNumbersGenerated' => 0,
+                'drawnNumbers' => [],
+                'number' => '',
+                'player' => '',
+                'game_status' => (int) ($game['status'] ?? 0),
+            ]);
         }
 
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);

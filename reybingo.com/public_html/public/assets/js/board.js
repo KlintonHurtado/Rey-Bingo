@@ -4,18 +4,42 @@
 const CONFIG = {
     MAX_MESSAGES: 50,        // Aumentado para el nuevo sistema
     MAX_CONFETTI: 100,
-    BASE_POLL_INTERVAL: 2000,
-    CHAT_POLL_INTERVAL: 600,
-    MAX_POLL_INTERVAL: 10000,
-    USER_COUNT_INTERVAL: 2500,
-    ACCUMULATED_COUNT_INTERVAL: 2500,
+    BASE_POLL_INTERVAL: 3500,
+    CHAT_POLL_INTERVAL: 3500,
+    MAX_POLL_INTERVAL: 20000,
+    LIVE_STATUS_INTERVAL: 10000,
+    USER_COUNT_INTERVAL: 10000,
+    ACCUMULATED_COUNT_INTERVAL: 10000,
     MESSAGE_LIFETIME: 30000, // 30 segundos para mensajes
     FADE_OUT_TIME: 500,      // Tiempo de animación de desvanecimiento
     DEBOUNCE_DELAY: 100,
     AUDIO_POOL_SIZE: 10,
     MESSAGE_POOL_SIZE: 15,
-    WINNER_SLIDER_INTERVAL: 5000
+    WINNER_SLIDER_INTERVAL: 5000,
+    WAF_COOLDOWN_MS: 45000
 };
+
+// Pausa global de polls cuando Hostinger CDN (hcdn) responde 403
+window.__bingoWafCooldownUntil = window.__bingoWafCooldownUntil || 0;
+
+function bingoIsWafCooling() {
+    return Date.now() < (window.__bingoWafCooldownUntil || 0);
+}
+
+function bingoTripWafCooldown(ms) {
+    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 45000;
+    window.__bingoWafCooldownUntil = Date.now() + wait;
+    console.warn('CDN/WAF 403: pausando polls AJAX ~' + Math.round(wait / 1000) + 's');
+}
+
+if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
+    window.__bingoAjaxWafHook = true;
+    $(document).ajaxComplete(function (_event, xhr) {
+        if (xhr && xhr.status === 403) {
+            bingoTripWafCooldown();
+        }
+    });
+}
 
 // ==========================================
 // VARIABLES GLOBALES
@@ -768,6 +792,10 @@ function sendMessageText() {
 // Polling de chat (mensajes de jugadores en la partida activa)
 function pollMessagesOptimized() {
     return new Promise((resolve) => {
+        if (bingoIsWafCooling()) {
+            return resolve({ status: 'success' });
+        }
+
         $.get(site_url + 'playings/messageGet', { after_id: getLastChatMessageId() })
             .done((data) => {
                 if (data.status === 'stop') {
@@ -777,8 +805,11 @@ function pollMessagesOptimized() {
                 processIncomingChatMessages(data);
                 resolve(data);
             })
-            .fail((error) => {
-                console.warn('Error en polling de mensajes:', error);
+            .fail((xhr) => {
+                if (xhr && xhr.status === 403) {
+                    bingoTripWafCooldown();
+                }
+                console.warn('Error en polling de mensajes:', xhr);
                 resolve({ status: 'error' });
             });
     });
@@ -1293,6 +1324,10 @@ function stopAutomaticGeneration() {
 }
 
 function lastNumberGet() {
+    if (bingoIsWafCooling()) {
+        return;
+    }
+
     $.get(site_url + 'boards/numberGet')
         .done((data) => {
             if (data.status === 'iscron') {
@@ -1303,13 +1338,17 @@ function lastNumberGet() {
             processNumberGetResponse(data);
         })
         .fail((xhr, status, error) => {
+            if (xhr && xhr.status === 403) {
+                bingoTripWafCooldown();
+            }
             console.warn('Failed to get last number:', error);
         });
 }
 
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
-    intervalManager.set('lastNumber', lastNumberGet, timeBallLast);
+    const pollMs = Math.max(2500, parseInt(timeBallLast, 10) || 3000);
+    intervalManager.set('lastNumber', lastNumberGet, pollMs);
 }
 
 function stopAutomaticLast() {
@@ -1357,8 +1396,7 @@ function showGameFinalized() {
 
     stopAutomaticGeneration();
     stopAutomaticLast();
-    stopUpdateUserCount();
-    stopUpdateGameAccumulated();
+    stopUpdateLiveStatus();
     messagePoller.stop();
 
     const controlsDiv = $id('controls');
@@ -1367,75 +1405,63 @@ function showGameFinalized() {
     }
 }
 
-// Contador de usuarios optimizado
-const updateUserCount = throttle(() => {
-    $.get(site_url + 'boards/playersGetCount')
-        .done((data) => {
-            const countEl = $('.count_notifications');
-            if (data.status === 'success') {
-                if (data.userCount && data.userCount > 0) {
-                    countEl.text(data.userCount).show();
-                } else {
-                    countEl.hide();
-                }
-            } else {
-                if (data.userCount && data.userCount > 0) {
-                    countEl.text(data.userCount).show();
-                } else {
-                    countEl.hide();
-                }
+function applyLiveStatusUi(data) {
+    if (!data) {
+        return;
+    }
 
-                stopUpdateUserCount();
+    const countEl = $('.count_notifications');
+    if (data.userCount && data.userCount > 0) {
+        countEl.text(data.userCount).show();
+    } else {
+        countEl.hide();
+    }
+
+    const accumulatedEl = $('#accumulated-counter');
+    if (accumulatedEl.length && typeof data.gameAccumulated !== 'undefined') {
+        accumulatedEl.text(currency + ' ' + data.gameAccumulated);
+    }
+
+    if (data.modalities && data.modalities.length > 0) {
+        data.modalities.forEach(modality => {
+            const modalityEl = $('#modality-amount-' + modality.id);
+            if (modalityEl.length > 0) {
+                modalityEl.text(currency + ' ' + modality.amount);
             }
-        })
-        .fail(() => {
-            console.warn('Failed to update user count');
         });
-}, 1000);
-
-function stopUpdateUserCount() {
-    intervalManager.clear('userCount');
+    }
 }
 
-// Contador de acumulado optimizado
-const updateGameAccumulated = throttle(() => {
-    $.get(site_url + 'games/gameGetAccumulated')
+const updateLiveStatus = throttle(() => {
+    if (bingoIsWafCooling()) {
+        return;
+    }
+
+    $.get(site_url + 'games/liveStatusGet')
         .done((data) => {
-            const accumulatedEl = $('#accumulated-counter');
-
-            if (data.status === 'success') {
-                accumulatedEl.text(currency + ' ' + data.gameAccumulated);
-
-                if (data.modalities && data.modalities.length > 0) {
-                    data.modalities.forEach(modality => {
-                        const modalityEl = $('#modality-amount-' + modality.id);
-                        if (modalityEl.length > 0) {
-                            modalityEl.text(currency + ' ' + modality.amount);
-                        }
-                    });
-                }
-            } else {
-                accumulatedEl.text(currency + ' ' + data.gameAccumulated);
-
-                if (data.modalities && data.modalities.length > 0) {
-                    data.modalities.forEach(modality => {
-                        const modalityEl = $('#modality-amount-' + modality.id);
-                        if (modalityEl.length > 0) {
-                            modalityEl.text(currency + ' ' + modality.amount);
-                        }
-                    });
-                }
-
-                stopUpdateGameAccumulated();
+            applyLiveStatusUi(data);
+            if (data.status === 'completed') {
+                stopUpdateLiveStatus();
             }
         })
-        .fail(() => {
-            console.warn('Failed to update user count');
+        .fail((xhr) => {
+            if (xhr && xhr.status === 403) {
+                bingoTripWafCooldown();
+            }
+            console.warn('Failed to update live status');
         });
-}, 1000);
+}, 2000);
+
+function stopUpdateLiveStatus() {
+    intervalManager.clear('liveStatus');
+}
+
+function stopUpdateUserCount() {
+    stopUpdateLiveStatus();
+}
 
 function stopUpdateGameAccumulated() {
-    intervalManager.clear('gameAccumulated');
+    stopUpdateLiveStatus();
 }
 
 function updateVolumeButtonIcon(enabled) {
@@ -1981,9 +2007,11 @@ function adjustConfigForDevice() {
         console.log('Low-end device detected, adjusting configuration...');
         
         // Reducir frecuencia de polling
-        CONFIG.BASE_POLL_INTERVAL = 3000;
-        CONFIG.USER_COUNT_INTERVAL = 5000;
-        CONFIG.ACCUMULATED_COUNT_INTERVAL = 5000;
+        CONFIG.BASE_POLL_INTERVAL = 5000;
+        CONFIG.CHAT_POLL_INTERVAL = 5000;
+        CONFIG.LIVE_STATUS_INTERVAL = 15000;
+        CONFIG.USER_COUNT_INTERVAL = 15000;
+        CONFIG.ACCUMULATED_COUNT_INTERVAL = 15000;
         
         // Reducir efectos visuales
         CONFIG.MAX_CONFETTI = 15;
@@ -2110,13 +2138,9 @@ function initializeApp() {
     messagePoller.lastCallback = pollMessagesOptimized;
     messagePoller.poll(pollMessagesOptimized);
     
-    // Iniciar contador de usuarios
-    intervalManager.set('userCount', updateUserCount, CONFIG.USER_COUNT_INTERVAL);
-    updateUserCount();
-
-    // Iniciar contador de acumulado
-    intervalManager.set('gameAccumulated', updateGameAccumulated, CONFIG.ACCUMULATED_COUNT_INTERVAL);
-    updateGameAccumulated();
+    // Un solo poll: jugadores + acumulado
+    intervalManager.set('liveStatus', updateLiveStatus, CONFIG.LIVE_STATUS_INTERVAL || 10000);
+    updateLiveStatus();
 
     if (window.totalNumbersGenerated !== undefined) {
         updateBallsCounter(window.totalNumbersGenerated);

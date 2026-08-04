@@ -97,6 +97,7 @@ $routes->get('game/(:num)', 'Games::game/$1');
 $routes->get('live/(:num)', 'Games::live/$1');
 $routes->get('games/playersGet/(:num)', 'Games::playersGet/$1');
 $routes->get('games/gameGetAccumulated', 'Games::gameGetAccumulated');
+$routes->get('games/liveStatusGet', 'Games::liveStatusGet');
 $routes->post('games/deleteGame', 'Games::deleteGame');
 $routes->post('games/uploadVideo', 'Games::uploadVideo');
 $routes->get('games/statisticsView', 'Games::statisticsView');

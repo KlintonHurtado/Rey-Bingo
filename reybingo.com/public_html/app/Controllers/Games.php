@@ -3068,27 +3068,33 @@ class Games extends Controller {
         }
 
         $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
-        $accumulated = $cartons * $game['price'];
-        $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+        $price = (float) ($game['price'] ?? 0);
+        $accumulated = $cartons * $price;
+        $rateEarnings = (float) (systemGet('rateEarnings') ?: 0);
+        $gameAccumulated = $accumulated - ($accumulated * $rateEarnings);
 
         $response = ['gameAccumulated' => number_format($gameAccumulated, 2)];
         $response['status'] = 'success';
 
-        $modalities = $modelModalities->whereIn('id', explode(',', $game['modalities']))->findAll();
+        $modalityIds = array_values(array_filter(array_map('intval', explode(',', (string) ($game['modalities'] ?? '')))));
+        $modalities = !empty($modalityIds)
+            ? $modelModalities->whereIn('id', $modalityIds)->findAll()
+            : [];
         $modalitiesData = [];
 
-        foreach ($modalities as &$modality) { 
+        foreach ($modalities as $modality) {
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
+            $awardAmount = (float) ($award['amount'] ?? 0);
 
-            if ($game['award'] == 2) {
-                $modality['amount'] = $award['amount'] ?? 0;
+            if ((int) ($game['award'] ?? 0) === 2) {
+                $amount = $awardAmount;
             } else {
-                $modality['amount'] = $gameAccumulated * $award['amount'] / 100;
+                $amount = $gameAccumulated * $awardAmount / 100;
             }
 
             $modalitiesData[] = [
                 'id' => $modality['id'],
-                'amount' => number_format($modality['amount'], 2)
+                'amount' => number_format($amount, 2),
             ];
         }
 
@@ -3109,7 +3115,8 @@ class Games extends Controller {
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($SingsCount >= $AwardsCount) {
+        // Solo finalizar por premios si hay premios activos configurados
+        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             return $this->response->setJSON([
                 'status' => 'completed',
                 'gameAccumulated' => number_format($gameAccumulated, 2),
@@ -3119,5 +3126,87 @@ class Games extends Controller {
         }
 
         return $this->response->setJSON($response);
+    }
+
+    /**
+     * Un solo poll para live/playing: jugadores + acumulado + modalidades.
+     * Reduce a la mitad las peticiones AJAX que Hostinger CDN marca como abuso (403).
+     */
+    public function liveStatusGet()
+    {
+        if (! session()->get('logged_in') || ! in_array((int) session()->get('group'), [0, 1], true)) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'userCount' => 0,
+                'gameAccumulated' => '0.00',
+                'message' => translate('unauthorized') ?: 'No autorizado',
+            ]);
+        }
+
+        $model = new GamesModel();
+        $modelModalities = new ModalitiesModel();
+        $modelBoards = new BoardsModel();
+        $modelCartons = new CartonsModel();
+        $modelSings = new SingsModel();
+        $modelAwards = new AwardsModel();
+
+        $game = $model->find(session()->get('game_id'));
+
+        if (! $game) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'stop',
+                'userCount' => 0,
+                'gameAccumulated' => '0.00',
+                'message' => translate('game not found'),
+            ]);
+        }
+
+        $userCount = $modelCartons->where('game', $game['id'])->where('user !=', 0)->select('user')->distinct()->countAllResults();
+        $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+        $price = (float) ($game['price'] ?? 0);
+        $accumulated = $cartons * $price;
+        $rateEarnings = (float) (systemGet('rateEarnings') ?: 0);
+        $gameAccumulated = $accumulated - ($accumulated * $rateEarnings);
+
+        $modalityIds = array_values(array_filter(array_map('intval', explode(',', (string) ($game['modalities'] ?? '')))));
+        $modalities = ! empty($modalityIds)
+            ? $modelModalities->whereIn('id', $modalityIds)->findAll()
+            : [];
+        $modalitiesData = [];
+
+        foreach ($modalities as $modality) {
+            $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
+            $awardAmount = (float) ($award['amount'] ?? 0);
+            $amount = ((int) ($game['award'] ?? 0) === 2)
+                ? $awardAmount
+                : ($gameAccumulated * $awardAmount / 100);
+
+            $modalitiesData[] = [
+                'id' => $modality['id'],
+                'amount' => number_format($amount, 2),
+            ];
+        }
+
+        $status = 'success';
+        $message = null;
+        $totalNumbersGenerated = $modelBoards->where('game', $game['id'])->countAllResults();
+        $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
+        $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
+
+        if ($totalNumbersGenerated >= 75) {
+            $status = 'completed';
+            $message = translate('the game has ended, all 75 numbers have already been generated');
+        } elseif ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
+            $status = 'completed';
+            $message = translate('the game is over, all the prizes have been awarded');
+        }
+
+        return $this->response->setJSON([
+            'status' => $status,
+            'userCount' => $userCount,
+            'gameAccumulated' => number_format($gameAccumulated, 2),
+            'modalities' => $modalitiesData,
+            'message' => $message,
+        ]);
     }
 }

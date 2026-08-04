@@ -814,8 +814,13 @@ class Boards extends Controller {
     }
 
     public function playersGetCount() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        // Admin (1) y jugadores (0): ambos necesitan el contador en live/playing
+        if (!session()->get('logged_in') || !in_array((int) session()->get('group'), [0, 1], true)) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'userCount' => 0,
+                'message' => translate('unauthorized') ?: 'No autorizado',
+            ]);
         }
 
         $model = new BoardsModel();
