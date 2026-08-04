@@ -60,6 +60,10 @@ let gameStarted = false;
 let centerBallTimer = null;
 let centerBallHideTimer = null;
 let pendingNumberSubmits = new Set();
+// LIVE = solo clic manual. Nunca cantar bolas con numberAutoSubmit.
+const LIVE_MANUAL_ONLY = true;
+let bingoPauseInProgress = false;
+let lastBingoPauseKey = '';
 
 // ==========================================
 // GESTORES DE RECURSOS
@@ -773,11 +777,25 @@ function startWinnerSlider() {
 }
 
 function showCountdown(data, callback) {
-    const numberHe = $id('countdown');
-    const container = $id('countdown-container');
-    const textHe = $id('text-countdown');
+    const pauseKey = [
+        data && data.player ? data.player : '',
+        data && data.modalityId ? data.modalityId : (data && data.modality ? data.modality : ''),
+        data && data.number ? data.number : ''
+    ].join('|');
 
-    // Registrar ganador siempre (aunque no exista el overlay)
+    // Evitar apilar pausas / audio / callbacks (traba la UI)
+    if (bingoPauseInProgress && pauseKey === lastBingoPauseKey) {
+        return;
+    }
+    bingoPauseInProgress = true;
+    lastBingoPauseKey = pauseKey;
+
+    // En LIVE nunca reanudar generación automática tras un bingo
+    stopAutomaticGeneration();
+    pendingNumberSubmits.clear();
+
+    const container = $id('countdown-container');
+
     if (data && data.player && data.modality) {
         if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
             winners.push({ player: data.player, modality: data.modality });
@@ -785,14 +803,15 @@ function showCountdown(data, callback) {
         startWinnerSlider();
     }
 
-    // Sin círculo/cuenta: solo el texto GANADOR estable + notificación
     if (container) {
         container.style.display = 'none';
     }
 
-    audioManager.play(audioPath + 'winner.mp3');
+    try {
+        audioManager.play(audioPath + 'winner.mp3');
+    } catch (e) {}
 
-    const cartn = $id(`modality-${data.modalityId}`);
+    const cartn = data && data.modalityId ? $id(`modality-${data.modalityId}`) : null;
     if (cartn) {
         cartn.classList.add('cartn-sing');
         cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
@@ -808,7 +827,13 @@ function showCountdown(data, callback) {
     }
 
     setTimeout(function () {
-        if (callback) callback();
+        bingoPauseInProgress = false;
+        // Solo reanudar poll de estado (bingos), NUNCA auto-cantar bolas
+        if (typeof callback === 'function' && callback !== startAutomaticGeneration) {
+            callback();
+        } else {
+            startAutomaticLast();
+        }
     }, 1500);
 }
 
@@ -956,9 +981,16 @@ function generateNumber(number) {
         return;
     }
 
+    if (bingoPauseInProgress || isGameFinishedShown) {
+        return;
+    }
+
     if (numbersgenerated.includes(parsed)) {
         return;
     }
+
+    // Por si quedó un intervalo auto activo, cortarlo (LIVE es manual)
+    stopAutomaticGeneration();
 
     // Iniciar conteo solo la primera vez que se llama manualmente
     if (!gameStarted) {
@@ -976,7 +1008,8 @@ function generateNumber(number) {
     $.get(site_url + 'boards/numberSubmit/' + parsed)
         .done(function(data) {
             if (data.status === 'pause') {
-                showCountdown(data, startAutomaticGeneration);
+                // IMPORTANTE: no pasar startAutomaticGeneration (cantaba bolas solas)
+                showCountdown(data, startAutomaticLast);
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
@@ -1047,10 +1080,21 @@ function updateGameTimer() {
 
 // Funciones de generación de números optimizadas
 function generateAutoNumber() {
+    // LIVE: jamás cantar bolas solas
+    if (LIVE_MANUAL_ONLY) {
+        stopAutomaticGeneration();
+        return;
+    }
+
+    if (bingoPauseInProgress || isGameFinishedShown || bingoIsWafCooling()) {
+        return;
+    }
+
     $.get(site_url + 'boards/numberAutoSubmit')
         .done((data) => {
             if (data.status === 'pause') {
-                showCountdown(data, startAutomaticGeneration);
+                stopAutomaticGeneration();
+                showCountdown(data, startAutomaticLast);
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
@@ -1063,6 +1107,12 @@ function generateAutoNumber() {
 }
 
 function startAutomaticGeneration() {
+    // LIVE es solo selección manual del admin
+    if (LIVE_MANUAL_ONLY) {
+        stopAutomaticGeneration();
+        console.warn('LIVE: generación automática desactivada (solo clic manual)');
+        return;
+    }
     intervalManager.clear('generation');
     intervalManager.set('generation', generateAutoNumber, timeBallGet);
 }
@@ -1071,24 +1121,59 @@ function stopAutomaticGeneration() {
     intervalManager.clear('generation');
 }
 
+function syncLiveDrawnFromServer(drawnNumbers, totalNumbersGenerated) {
+    if (!Array.isArray(drawnNumbers) || !drawnNumbers.length) {
+        return;
+    }
+
+    drawnNumbers.forEach(function(n) {
+        const parsed = parseInt(n, 10);
+        if (!parsed || numbersgenerated.includes(parsed)) {
+            return;
+        }
+        // Solo marcar en tablero (sin animación de centro en ráfaga)
+        numbersgenerated.push(parsed);
+        const numberEl = $("#number-" + parsed);
+        if (numberEl.length) {
+            numberEl.addClass('bingo-ball ' + getColumnClass(parsed) + ' size-50')
+                .removeAttr('onclick');
+        }
+    });
+
+    if (typeof totalNumbersGenerated !== 'undefined') {
+        updateBallsCounter(totalNumbersGenerated);
+    } else {
+        updateBallsCounter(numbersgenerated.length);
+    }
+}
+
 function lastNumberGet() {
-    if (bingoIsWafCooling()) {
+    if (bingoIsWafCooling() || isGameFinishedShown) {
+        return;
+    }
+
+    // Durante anuncio de bingo no spamear pause otra vez
+    if (bingoPauseInProgress) {
         return;
     }
 
     $.get(site_url + 'boards/numberGet')
         .done((data) => {
-            if (data.status === 'iscron') {
-                handleNewNumberCRON(data.number, data.totalNumbersGenerated);
-            } else if (data.status === 'pause') {
+            if (!data) {
+                return;
+            }
+
+            // Sincronizar bolas ya cantadas (sin auto-generar)
+            if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
+                syncLiveDrawnFromServer(data.drawnNumbers, data.totalNumbersGenerated);
+            }
+
+            if (data.status === 'pause') {
+                stopAutomaticGeneration();
                 intervalManager.clear('lastNumber');
                 showCountdown(data, startAutomaticLast);
-            } else if (data.status === 'success') {
-                if (data.number) {
-                    updateLastNumber(data.number, data.totalNumbersGenerated);
-                }
-                startAutomaticLast();
             } else if (data.status === 'completed') {
+                stopAutomaticGeneration();
                 intervalManager.clear('lastNumber');
                 if (data.player && data.player !== '') {
                     showCountdown(data, () => {
@@ -1097,6 +1182,8 @@ function lastNumberGet() {
                 } else {
                     setTimeout(showGameFinalized, timeBallGet);
                 }
+            } else if (data.status === 'iscron' || data.status === 'success') {
+                // En LIVE no tratamos iscron como "cantar sola": solo sync ya hecho arriba
             }
         })
         .fail((xhr, status, error) => {
@@ -1108,13 +1195,13 @@ function lastNumberGet() {
 }
 
 function updateLastNumber(number, total) {
-    console.log('Last number:', number, 'Total:', total);
+    // noop: la sync va por syncLiveDrawnFromServer / paintLiveBallUi
 }
 
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
-    // En live el admin ya pinta al click; el poll solo sincroniza bingos/estado
-    const pollMs = Math.max(2500, parseInt(timeBallLast, 10) || 3000);
+    // Poll solo para bingos/estado; NUNCA para cantar bolas
+    const pollMs = Math.max(3000, parseInt(timeBallLast, 10) || 3000);
     intervalManager.set('lastNumber', lastNumberGet, pollMs);
 }
 
@@ -1262,7 +1349,7 @@ function setupEvents() {
         sendEmoji(emoji);
     });
 
-    // Eventos de control del juego
+    // Eventos de control del juego (si existieran botones play/auto en otra vista)
     $('#start-button').on('click', () => {
         $('#start-button').hide();
         $('#stop-button, #next-number-button').show();
@@ -1275,6 +1362,12 @@ function setupEvents() {
             gameTimerInterval = setInterval(updateGameTimer, 1000);
         }
 
+        // LIVE: no arrancar auto-canto
+        if (LIVE_MANUAL_ONLY) {
+            stopAutomaticGeneration();
+            return;
+        }
+
         setTimeout(() => {
             generateAutoNumber();
             startAutomaticGeneration();
@@ -1282,6 +1375,10 @@ function setupEvents() {
     });
 
     $('#next-number-button').on('click', () => {
+        if (LIVE_MANUAL_ONLY) {
+            stopAutomaticGeneration();
+            return;
+        }
         intervalManager.clear('generation');
         generateAutoNumber();
         startAutomaticGeneration();
@@ -1294,6 +1391,10 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
+        if (LIVE_MANUAL_ONLY) {
+            stopAutomaticGeneration();
+            return;
+        }
         startAutomaticGeneration();
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();
@@ -1798,8 +1899,11 @@ function initializeApp() {
     // Un solo poll: jugadores + acumulado
     intervalManager.set('liveStatus', updateLiveStatus, CONFIG.LIVE_STATUS_INTERVAL || 10000);
     updateLiveStatus();
+
+    // LIVE: asegurar que no quede ningún auto-canto corriendo
+    stopAutomaticGeneration();
     
-    // Iniciar último número si es necesario
+    // Poll de estado/bingos (no canta bolas)
     if (typeof timeBallLast !== 'undefined') {
         startAutomaticLast();
     }
