@@ -1114,7 +1114,8 @@ function updateMainBall(newNumber) {
 }
 
 function getHistoryBallSizeClass() {
-    return document.querySelector('.top-section.live') ? 'size-40' : 'size-40';
+    // Un poco más grandes en el historial lateral (live / playing)
+    return 'size-50';
 }
 
 function renderBallHistory() {

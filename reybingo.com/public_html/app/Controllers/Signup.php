@@ -706,12 +706,18 @@ class Signup extends Controller {
             return redirect()->to('/play');
         }
 
+        helper('bingo');
+        bingo_apply_dynamic_base_url($this->request);
+
         $client = new Google_Client();
         $client->setClientId(env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com'));
         $client->setClientSecret(env('GOOGLE_CLIENT_SECRET', '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'));
         $client->setRedirectUri(site_url('signup/signupGoogleSubmit'));
-        $client->addScope("email");
-        $client->addScope("profile");
+        $client->addScope('email');
+        $client->addScope('profile');
+        $client->setAccessType('online');
+        $client->setPrompt('select_account');
+        $client->setIncludeGrantedScopes(true);
 
         return redirect()->to($client->createAuthUrl());
     }
@@ -720,27 +726,72 @@ class Signup extends Controller {
     {
         $model = new UsersModel();
         helper('bingo');
+        bingo_apply_dynamic_base_url($this->request);
+
+        $errorParam = (string) ($this->request->getGet('error') ?? '');
+        if ($errorParam !== '') {
+            log_message('error', 'Google OAuth denied: ' . $errorParam);
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
+        }
+
+        $authCode = (string) ($this->request->getGet('code') ?? '');
+        if ($authCode === '') {
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
+        }
 
         $client = new Google_Client();
         $client->setClientId(env('GOOGLE_CLIENT_ID', '171600430722-al53sbabidmetrr45v7t6l9ushl6fveb.apps.googleusercontent.com'));
         $client->setClientSecret(env('GOOGLE_CLIENT_SECRET', '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'));
         $client->setRedirectUri(site_url('signup/signupGoogleSubmit'));
 
-        $token = $client->fetchAccessTokenWithAuthCode($this->request->getGet('code'));
+        try {
+            $token = $client->fetchAccessTokenWithAuthCode($authCode);
+        } catch (\Throwable $e) {
+            log_message('error', 'Google OAuth token exception: ' . $e->getMessage());
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
+        }
 
         if (isset($token['error'])) {
-            return redirect()->to(site_url('signin'))->with('error', translate('error authenticating with google.'));
+            log_message('error', 'Google OAuth token error: ' . json_encode($token));
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
         }
 
         $client->setAccessToken($token);
 
-        $googleService = new Google_Service_Oauth2($client);
-        $googleInfo = $googleService->userinfo->get();
+        try {
+            $googleService = new Google_Service_Oauth2($client);
+            $googleInfo = $googleService->userinfo->get();
+        } catch (\Throwable $e) {
+            log_message('error', 'Google OAuth userinfo: ' . $e->getMessage());
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
+        }
 
         $email     = (string) $googleInfo->email;
         $firstname = (string) ($googleInfo->givenName ?: 'Jugador');
         $lastname  = (string) ($googleInfo->familyName ?: '');
         $picture   = (string) ($googleInfo->picture ?? '');
+
+        if ($email === '') {
+            return redirect()->to(site_url('signin'))->with(
+                'error',
+                translate('error authenticating with google.') ?: 'Error al autenticar con Google.'
+            );
+        }
 
         $existingUser = $model->where('email', $email)->first();
 

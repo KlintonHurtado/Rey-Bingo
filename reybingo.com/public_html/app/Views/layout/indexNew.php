@@ -2513,7 +2513,9 @@
     <script src="<?= asset_url('plugin/components/moment/moment.min.js') ?>"></script>
     <script src="<?= asset_url('plugin/components/moment/moment-timezone-with-data.min.js') ?>"></script>
     <script src="<?= asset_url('plugin/czm-chat-support.min.js') ?>"></script>
+    <?php if (session()->get('logged_in') && empty($skipPaypal)): ?>
     <script src="https://www.paypalobjects.com/api/checkout.js"></script>
+    <?php endif; ?>
 
     <script type="text/javascript">
         $('#whatsapp-plugin').czmChatSupport({

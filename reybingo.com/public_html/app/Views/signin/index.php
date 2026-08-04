@@ -48,6 +48,12 @@
                         <?php if (($registeredType ?? '') === 'store' || service('request')->getGet('registered') === 'store') : ?>
                             <div class="alert alert-success py-2 px-3 small mb-2"><?= translate('store account created sign in'); ?></div>
                         <?php endif; ?>
+                        <?php if (session()->getFlashdata('success')) : ?>
+                            <div class="alert alert-success py-2 px-3 small mb-2"><?= esc(session()->getFlashdata('success')); ?></div>
+                        <?php endif; ?>
+                        <?php if (session()->getFlashdata('error')) : ?>
+                            <div class="alert alert-danger py-2 px-3 small mb-2"><?= esc(session()->getFlashdata('error')); ?></div>
+                        <?php endif; ?>
                     </div>
             
                     <?php echo form_open(site_url() . 'signin/signinSubmit', array('enctype' => 'multipart/form-data', 'id' => 'signin-form'));?>

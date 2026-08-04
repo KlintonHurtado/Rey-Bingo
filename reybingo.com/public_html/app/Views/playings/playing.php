@@ -1118,7 +1118,7 @@
             <span id="last-five-numbers">
                 <?php foreach ($fourNumbers as $number): ?>
                     <?php $class = in_array($number, $fourNumbers) ? $getClass($number) : ''; ?>
-                    <div class="bingo-ball <?= $class ?> size-40">
+                    <div class="bingo-ball <?= $class ?> size-50">
                         <span><?= $number ?></span>
                     </div>
                 <?php endforeach; ?>

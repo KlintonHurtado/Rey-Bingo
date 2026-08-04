@@ -2199,7 +2199,14 @@
     <script src="<?= asset_url('plugin/components/moment/moment.min.js') ?>"></script>
     <script src="<?= asset_url('plugin/components/moment/moment-timezone-with-data.min.js') ?>"></script>
     <script src="<?= asset_url('plugin/czm-chat-support.min.js') ?>"></script>
+    <?php
+    // PayPal solo con sesión: en signin/signup genera ruido COOP (window.closed)
+    // y no hace falta para "Ingresar con Google" (redirect OAuth, no popup).
+    $loadPaypalSdk = session()->get('logged_in') && empty($skipPaypal);
+    ?>
+    <?php if ($loadPaypalSdk): ?>
     <script src="https://www.paypalobjects.com/api/checkout.js"></script>
+    <?php endif; ?>
 
     <script type="text/javascript">
         $('#whatsapp-plugin').czmChatSupport({
