@@ -369,17 +369,32 @@ class Boards extends Controller {
         }
 
         $number = $this->generateUniqueNumber();
+        $inserted = false;
+        for ($i = 0; $i < 8; $i++) {
+            if (!$number) {
+                $number = $this->generateUniqueNumber();
+            }
+            if (!$number) {
+                break;
+            }
+            $inserted = bingo_insert_drawn_number((int) $game['id'], (int) $number, [
+                'user' => session()->get('id'),
+            ]);
+            if ($inserted) {
+                break;
+            }
+            $number = $this->generateUniqueNumber();
+        }
 
-        $data = [
-            'user' => session()->get('id'),
-            'game' => $game['id'],
-            'number' => $number,
-            'status' => 1
-        ];
+        if (!$inserted) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => translate('could not generate a unique number') ?: 'No se pudo generar un número único',
+            ]);
+        }
 
-        $model->insert($data);
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
-        $totalAfter = $totalNumbersGenerated + 1;
+        $totalAfter = count($drawnNumbers);
         bingo_broadcast_number_drawn((int) $game['id'], (int) $number, $drawnNumbers, $totalAfter);
 
         return $this->response->setJSON([
@@ -409,7 +424,25 @@ class Boards extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('game not found')]);
         }
 
-        $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+        $number = (int) $number;
+        if ($number < 1 || $number > 75) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => translate('invalid number') ?: 'Número inválido',
+            ]);
+        }
+
+        // Respuesta rápida: validar/insertar primero (el live no debe esperar consultas pesadas)
+        if (bingo_number_already_drawn((int) $game['id'], $number)) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => translate('number already drawn') ?: 'Ese número ya fue cantado',
+                'totalNumbersGenerated' => bingo_count_drawn_numbers((int) $game['id']),
+                'drawnNumbers' => $this->getOrderedDrawnNumbers((int) $game['id']),
+            ]);
+        }
+
+        $totalNumbersGenerated = bingo_count_drawn_numbers((int) $game['id']);
 
         if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, true)) {
             $postpone = bingo_postpone_game($game);
@@ -421,13 +454,10 @@ class Boards extends Controller {
             ]);
         }
 
-        // Si el admin inicia, asegurar que la partida quede activa (1)
         if ((int) ($game['status'] ?? 0) === 2) {
             $modelGames->update((int) $game['id'], ['status' => 1]);
             $game['status'] = 1;
         }
-
-        $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
             $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
@@ -435,12 +465,11 @@ class Boards extends Controller {
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
-                'number' => $lastBall['number'] ?? null
+                'number' => null,
             ]);
         }
 
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
-
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
         if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
@@ -449,21 +478,20 @@ class Boards extends Controller {
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => $lastBall['number'] ?? null
+                'number' => null,
             ]);
-        }
-
-        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
-        foreach ($winners as &$winner) {
-            $user = $modelUsers->find($winner['user']);
-            $wmodality = $modelModalities->find($winner['modality']);
-
-            $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
-            $winner['modality'] = translate($wmodality['name']);
         }
 
         $pendingBoardSing = bingo_claim_pending_board_sing((int) $game['id']);
         if ($pendingBoardSing) {
+            $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
+            foreach ($winners as &$winner) {
+                $user = $modelUsers->find($winner['user']);
+                $wmodality = $modelModalities->find($winner['modality']);
+                $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
+                $winner['modality'] = translate($wmodality['name']);
+            }
+
             return $this->response->setJSON([
                 'status' => 'pause',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -476,19 +504,20 @@ class Boards extends Controller {
             ]);
         }
 
-        $number = $number;
-
-        $data = [
+        $inserted = bingo_insert_drawn_number((int) $game['id'], $number, [
             'user' => session()->get('id'),
-            'game' => $game['id'],
-            'number' => $number,
-            'status' => 1
-        ];
+        ]);
 
-        $model->insert($data);
+        if (! $inserted) {
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => translate('number already drawn') ?: 'Ese número ya fue cantado',
+            ]);
+        }
+
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
-        $totalAfter = $totalNumbersGenerated + 1;
-        bingo_broadcast_number_drawn((int) $game['id'], (int) $number, $drawnNumbers, $totalAfter);
+        $totalAfter = count($drawnNumbers);
+        bingo_broadcast_number_drawn((int) $game['id'], $number, $drawnNumbers, $totalAfter);
 
         return $this->response->setJSON([
             'status' => 'success',

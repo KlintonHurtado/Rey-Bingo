@@ -37,6 +37,7 @@ let winnerSliderTimeout;
 let gameTimerInterval;
 let startTime;
 let gameStarted = false;
+let pendingNumberSubmits = new Set();
 
 // ==========================================
 // GESTORES DE RECURSOS
@@ -934,7 +935,9 @@ function updateMainBall(newNumber) {
         return;
     }
 
-    lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
+    // Reemplazar contenido completo para evitar bolas apiladas (7 encima de 7)
+    lastNumberEl.empty()
+        .html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
         .removeClass()
         .addClass(`bingo-ball ${getColumnClass(parsed)} size-100`);
 }
@@ -980,9 +983,16 @@ function markBoardGridNumber(newNumber) {
 }
 
 function reconcileBallDisplay(orderedNumbers) {
-    const ordered = (orderedNumbers || window.drawnNumbers || [])
-        .map(parseBallNumber)
-        .filter(Boolean);
+    const ordered = [];
+    const seen = {};
+    (orderedNumbers || window.drawnNumbers || []).forEach(function(value) {
+        const parsed = parseBallNumber(value);
+        if (!parsed || seen[parsed]) {
+            return;
+        }
+        seen[parsed] = true;
+        ordered.push(parsed);
+    });
 
     if (!ordered.length) {
         return;
@@ -1010,13 +1020,14 @@ function showCenterBallAnimation(newNumber) {
     clearCenterBallTimers();
 
     centerBlock.style.display = 'flex';
+    centerBall.innerHTML = '';
     centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
     centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
     centerBall.style.display = 'flex';
     centerBall.style.transform = '';
     centerBall.style.opacity = '1';
 
-    const displayMs = parseInt(window.timeBallGet, 10) || 3000;
+    const displayMs = 1200;
 
     centerBallHideTimer = setTimeout(function() {
         centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
@@ -1026,13 +1037,23 @@ function showCenterBallAnimation(newNumber) {
             centerBall.removeAttribute('style');
             centerBall.className = '';
             centerBlock.style.display = 'none';
-        }, 500);
+        }, 350);
     }, displayMs);
 }
 
 function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
     if (Array.isArray(drawnNumbers) && drawnNumbers.length) {
-        return drawnNumbers.map(parseBallNumber).filter(Boolean);
+        const ordered = [];
+        const seen = {};
+        drawnNumbers.forEach(function(value) {
+            const parsed = parseBallNumber(value);
+            if (!parsed || seen[parsed]) {
+                return;
+            }
+            seen[parsed] = true;
+            ordered.push(parsed);
+        });
+        return ordered;
     }
 
     const ordered = numbersgenerated.slice();
@@ -1046,9 +1067,16 @@ function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
 
 function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options) {
     const opts = options || {};
-    const ordered = (drawnNumbers || [])
-        .map(parseBallNumber)
-        .filter(Boolean);
+    const ordered = [];
+    const seen = {};
+    (drawnNumbers || []).forEach(function(value) {
+        const parsed = parseBallNumber(value);
+        if (!parsed || seen[parsed]) {
+            return;
+        }
+        seen[parsed] = true;
+        ordered.push(parsed);
+    });
 
     if (!ordered.length) {
         return;
@@ -1063,7 +1091,9 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     window.drawnNumbers = ordered.slice();
 
     if (totalNumbersGenerated !== undefined) {
-        updateBallsCounter(totalNumbersGenerated);
+        updateBallsCounter(Math.max(parseInt(totalNumbersGenerated, 10) || 0, ordered.length));
+    } else {
+        updateBallsCounter(ordered.length);
     }
 
     reconcileBallDisplay(ordered);
@@ -1191,6 +1221,14 @@ function generateAutoNumber() {
 }
 
 function generateNumber(number) {
+    const parsed = parseInt(number, 10);
+    if (!parsed || pendingNumberSubmits.has(parsed)) {
+        return;
+    }
+    if (Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed)) {
+        return;
+    }
+
     // Iniciar conteo solo la primera vez que se llama manualmente
     if (!gameStarted) {
         gameStarted = true;
@@ -1200,16 +1238,33 @@ function generateNumber(number) {
         sendMessage((__['game started!'] || '¡JUEGO INICIADO!') + ' 🎯', 26);
     }
 
-    $.get(site_url + 'boards/numberSubmit/' + number)
+    // Pintar de inmediato en el tablero
+    pendingNumberSubmits.add(parsed);
+    handleNewNumber(parsed, (numbersgenerated.length || 0) + 1, null);
+
+    $.get(site_url + 'boards/numberSubmit/' + parsed)
         .done((data) => {
             if (data.status === 'pause') {
                 showCountdown(data, startAutomaticGeneration);
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
-                handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+                if (Array.isArray(data.drawnNumbers)) {
+                    syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
+                } else if (typeof data.totalNumbersGenerated !== 'undefined') {
+                    updateBallsCounter(data.totalNumbersGenerated);
+                }
             } else if (data.status === 'error') {
                 stopAutomaticGeneration();
+                numbersgenerated = numbersgenerated.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                if (Array.isArray(window.drawnNumbers)) {
+                    window.drawnNumbers = window.drawnNumbers.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                }
+                const numberEl = $("#number-" + parsed);
+                if (numberEl.length) {
+                    numberEl.removeClass('bingo-ball B I N G O size-50 size-70')
+                        .attr('onclick', 'generateNumber(' + parsed + ');');
+                }
                 if (typeof Toastify === 'function') {
                     Toastify({
                         text: data.message || 'No se pudo generar la bola',
@@ -1223,7 +1278,10 @@ function generateNumber(number) {
             }
         })
         .fail(() => {
-            console.warn('Error al generar el número:', number);
+            console.warn('Error al generar el número:', parsed);
+        })
+        .always(function() {
+            pendingNumberSubmits.delete(parsed);
         });
 }
 

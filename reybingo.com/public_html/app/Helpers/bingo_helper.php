@@ -19,9 +19,103 @@ if (!function_exists('bingo_get_ordered_drawn_numbers')) {
             ->where('game', $gameId)
             ->where('status', 1)
             ->orderBy('created_at', 'ASC')
+            ->orderBy('id', 'ASC')
             ->findAll();
 
-        return array_values(array_map('intval', array_column($rows, 'number')));
+        $unique = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $number = (int) ($row['number'] ?? 0);
+            if ($number < 1 || isset($seen[$number])) {
+                continue;
+            }
+            $seen[$number] = true;
+            $unique[] = $number;
+        }
+
+        return $unique;
+    }
+}
+
+if (!function_exists('bingo_number_already_drawn')) {
+    function bingo_number_already_drawn(int $gameId, int $number): bool
+    {
+        if ($gameId < 1 || $number < 1) {
+            return true;
+        }
+
+        $model = new BoardsModel();
+
+        return $model->where('game', $gameId)->where('number', $number)->countAllResults() > 0;
+    }
+}
+
+if (!function_exists('bingo_dedupe_drawn_number')) {
+    /** Deja solo la primera fila de un número en boards. */
+    function bingo_dedupe_drawn_number(int $gameId, int $number): void
+    {
+        $db = \Config\Database::connect();
+        $rows = $db->table('boards')
+            ->where('game', $gameId)
+            ->where('number', $number)
+            ->orderBy('created_at', 'ASC')
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        if (count($rows) <= 1) {
+            return;
+        }
+
+        $deleteIds = [];
+        foreach ($rows as $i => $row) {
+            if ($i === 0) {
+                continue;
+            }
+            $deleteIds[] = (int) $row['id'];
+        }
+
+        if ($deleteIds !== []) {
+            $db->table('boards')->whereIn('id', $deleteIds)->delete();
+            log_message('warning', "bingo_dedupe_drawn_number: eliminados duplicados del número {$number} en juego {$gameId}");
+        }
+    }
+}
+
+if (!function_exists('bingo_insert_drawn_number')) {
+    /**
+     * Inserta una bola solo si ese número aún no existe en la partida.
+     * @return bool true si se insertó
+     */
+    function bingo_insert_drawn_number(int $gameId, int $number, array $extra = []): bool
+    {
+        if ($gameId < 1 || $number < 1 || $number > 75) {
+            return false;
+        }
+
+        if (bingo_number_already_drawn($gameId, $number)) {
+            return false;
+        }
+
+        $model = new BoardsModel();
+        $payload = array_merge([
+            'game'   => $gameId,
+            'number' => $number,
+            'status' => 1,
+            'created_at' => date('Y-m-d H:i:s'),
+        ], $extra);
+
+        try {
+            $model->insert($payload);
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_insert_drawn_number: ' . $e->getMessage());
+
+            return false;
+        }
+
+        bingo_dedupe_drawn_number($gameId, $number);
+
+        return true;
     }
 }
 

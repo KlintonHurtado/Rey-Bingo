@@ -31,6 +31,9 @@ let winnerSliderTimeout;
 let gameTimerInterval;
 let startTime;
 let gameStarted = false;
+let centerBallTimer = null;
+let centerBallHideTimer = null;
+let pendingNumberSubmits = new Set();
 
 // ==========================================
 // GESTORES DE RECURSOS
@@ -805,120 +808,192 @@ function updateBallsCounter(totalNumbersGenerated) {
     }
 }
 
-function handleNewNumber(newNumber, totalNumbersGenerated) {
-    if (numbersgenerated.includes(newNumber)) return;
+function clearCenterBallTimers() {
+    if (centerBallTimer) {
+        clearTimeout(centerBallTimer);
+        centerBallTimer = null;
+    }
+    if (centerBallHideTimer) {
+        clearTimeout(centerBallHideTimer);
+        centerBallHideTimer = null;
+    }
+}
 
-    updateBallsCounter(totalNumbersGenerated);
-    numbersgenerated.push(newNumber);
-    
-    const el = $id('number-' + newNumber);
+function paintLiveBallUi(newNumber, totalNumbersGenerated) {
+    const parsed = parseInt(newNumber, 10);
+    if (!parsed) {
+        return;
+    }
+
+    if (!numbersgenerated.includes(parsed)) {
+        numbersgenerated.push(parsed);
+    }
+
+    if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated !== null) {
+        updateBallsCounter(totalNumbersGenerated);
+    } else {
+        updateBallsCounter(numbersgenerated.length);
+    }
+
+    const el = $id('number-' + parsed);
     if (el) el.removeAttribute('onclick');
 
-    // Actualizar header e historial de inmediato (antes el header esperaba 7s
-    // y el jugador/admin veían la bola anterior hasta la siguiente).
-    lastNumbers.push(newNumber);
+    lastNumbers = lastNumbers.filter(function(n) { return parseInt(n, 10) !== parsed; });
+    lastNumbers.push(parsed);
     if (lastNumbers.length > 5) lastNumbers.shift();
 
     const lastNumberEl = $('#last-number');
     if (lastNumberEl.length) {
-        lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
+        lastNumberEl.empty()
+            .html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
             .removeClass()
-            .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130 move-number`);
-        setTimeout(() => {
+            .addClass(`bingo-ball ${getColumnClass(parsed)} size-130 move-number`);
+        setTimeout(function() {
             lastNumberEl.removeClass('move-number');
-        }, 1000);
+        }, 400);
     }
 
     const latestUncurrent = lastNumbers.slice(0, -1);
     const container = $("#last-five-numbers");
     if (container.length) {
         container.empty();
-        latestUncurrent.forEach(num => {
+        latestUncurrent.forEach(function(num) {
             container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
         });
     }
 
-    const numberEl = $("#number-" + newNumber);
+    const numberEl = $("#number-" + parsed);
     if (numberEl.length) {
-        numberEl.addClass(`bingo-ball ${getColumnClass(newNumber)} size-50`);
+        numberEl.addClass(`bingo-ball ${getColumnClass(parsed)} size-70`);
     }
 
     const centerBlock = $id('block-number');
     const centerBall = $id('last-number-center');
-    
+
     if (centerBlock && centerBall) {
+        clearCenterBallTimers();
+
         centerBlock.style.display = 'flex';
-        centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`;
-        centerBall.className = `bingo-ball-200 ${getColumnClass(newNumber)} size-200`;
+        centerBall.innerHTML = '';
+        centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
+        centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
         centerBall.style.display = 'flex';
         centerBall.style.transform = '';
         centerBall.style.opacity = '1';
 
-        const displayMs = Math.min(parseInt(window.timeBallGet, 10) || 2500, 3500);
+        // Animación corta: no usar todo timeBallGet (eso causaba retraso/solapes)
+        const displayMs = 1200;
 
-        setTimeout(() => {
+        centerBallHideTimer = setTimeout(function() {
             centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
             centerBall.style.opacity = '0';
-            
-            setTimeout(() => {
+
+            centerBallTimer = setTimeout(function() {
                 centerBall.removeAttribute('style');
                 centerBall.className = '';
                 centerBlock.style.display = 'none';
-            }, 500);
+            }, 350);
         }, displayMs);
     }
 
-    // Reproducir narración si está activada
     if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
+        audioManager.play(audioPath + parsed + '.mp3');
     }
 }
 
+function handleNewNumber(newNumber, totalNumbersGenerated) {
+    const parsed = parseInt(newNumber, 10);
+    if (!parsed) {
+        return;
+    }
+
+    // Si ya se pintó de forma optimista, solo sincroniza contador
+    if (numbersgenerated.includes(parsed)) {
+        if (typeof totalNumbersGenerated !== 'undefined') {
+            updateBallsCounter(totalNumbersGenerated);
+        }
+        return;
+    }
+
+    paintLiveBallUi(parsed, totalNumbersGenerated);
+}
+
 function handleNewNumberCRON(newNumber, totalNumbersGenerated) {
-    if (numbersgenerated.includes(newNumber)) return;
+    handleNewNumber(newNumber, totalNumbersGenerated);
 
-    updateBallsCounter(totalNumbersGenerated);
-    numbersgenerated.push(newNumber);
-    
-    const el = $id('number-' + newNumber);
-    if (el) el.removeAttribute('onclick');
-
-    // Marcar número en cartones si está inicializado el gestor
     if (bingoCardManager.initialized) {
         bingoCardManager.markNumber(newNumber);
     }
+}
 
-    lastNumbers.push(newNumber);
-    if (lastNumbers.length > 5) lastNumbers.shift();
+function generateNumber(number) {
+    const parsed = parseInt(number, 10);
+    if (!parsed || pendingNumberSubmits.has(parsed)) {
+        return;
+    }
 
-    const latestUncurrent = lastNumbers.slice(0, -1);
-    const container = $("#last-five-numbers");
-    if (container.length) {
-        container.empty();
-        latestUncurrent.forEach(num => {
-            container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
+    if (numbersgenerated.includes(parsed)) {
+        return;
+    }
+
+    // Iniciar conteo solo la primera vez que se llama manualmente
+    if (!gameStarted) {
+        gameStarted = true;
+        startTime = new Date();
+        updateGameTimer();
+        gameTimerInterval = setInterval(updateGameTimer, 1000);
+        sendMessage((__['game started!'] || '¡JUEGO INICIADO!') + ' 🎯', 26);
+    }
+
+    // Mostrar al instante (sin esperar al servidor)
+    pendingNumberSubmits.add(parsed);
+    paintLiveBallUi(parsed);
+
+    $.get(site_url + 'boards/numberSubmit/' + parsed)
+        .done(function(data) {
+            if (data.status === 'pause') {
+                showCountdown(data, startAutomaticGeneration);
+            } else if (data.status === 'completed') {
+                showGameFinalized();
+            } else if (data.status === 'success') {
+                if (typeof data.totalNumbersGenerated !== 'undefined') {
+                    updateBallsCounter(data.totalNumbersGenerated);
+                }
+                if (Array.isArray(data.drawnNumbers)) {
+                    data.drawnNumbers.forEach(function(n) {
+                        const num = parseInt(n, 10);
+                        if (num && !numbersgenerated.includes(num)) {
+                            numbersgenerated.push(num);
+                        }
+                    });
+                }
+            } else if (data.status === 'error') {
+                numbersgenerated = numbersgenerated.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                lastNumbers = lastNumbers.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                updateBallsCounter(numbersgenerated.length);
+                const numberEl = $("#number-" + parsed);
+                if (numberEl.length) {
+                    numberEl.removeClass('bingo-ball B I N G O size-50 size-70')
+                        .attr('onclick', 'generateNumber(' + parsed + ');');
+                }
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: data.message || 'No se pudo cantar la bola',
+                        duration: 4000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            }
+        })
+        .fail(function() {
+            console.warn('Error al generar el número:', parsed);
+        })
+        .always(function() {
+            pendingNumberSubmits.delete(parsed);
         });
-    }
-
-    const lastNumberEl = $('#last-number');
-    if (lastNumberEl.length) {
-        lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(newNumber)}</small><span>${newNumber}</span>`)
-            .removeClass()
-            .addClass(`bingo-ball ${getColumnClass(newNumber)} size-130 move-number`);
-        setTimeout(() => {
-            lastNumberEl.removeClass('move-number');
-        }, 1000);
-    }
-
-    // Reproducir narración si está activada
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + newNumber + '.mp3');
-    }
-
-    const numberEl = $("#number-" + newNumber);
-    if (numberEl.length) {
-        numberEl.addClass(`bingo-ball ${getColumnClass(newNumber)} size-50`);
-    }
 }
 
 function formatTimeUnit(value) {
@@ -960,31 +1035,6 @@ function generateAutoNumber() {
         })
         .fail(() => {
             console.warn('Failed to generate auto number');
-        });
-}
-
-function generateNumber(number) {
-    // Iniciar conteo solo la primera vez que se llama manualmente
-    if (!gameStarted) {
-        gameStarted = true;
-        startTime = new Date();
-        updateGameTimer();
-        gameTimerInterval = setInterval(updateGameTimer, 1000);
-        sendMessage((__['game started!'] || '¡JUEGO INICIADO!') + ' 🎯', 26);
-    }
-
-    $.get(site_url + 'boards/numberSubmit/' + number)
-        .done((data) => {
-            if (data.status === 'pause') {
-                showCountdown(data, startAutomaticGeneration);
-            } else if (data.status === 'completed') {
-                showGameFinalized();
-            } else if (data.status === 'success') {
-                handleNewNumber(data.number, data.totalNumbersGenerated);
-            }
-        })
-        .fail(() => {
-            console.warn('Error al generar el número:', number);
         });
 }
 

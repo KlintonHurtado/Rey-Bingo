@@ -20,6 +20,9 @@ class Cron extends Controller
     // Variable para controlar el último tiempo de creación de juegos
     private static $lastGameCreation = null;
 
+    /** @var array<string, resource> */
+    private array $cronLockHandles = [];
+
     // Plantillas de descripciones creativas
     private $gameBaseTexts = [
         'SUPER PARTIDA',
@@ -656,6 +659,12 @@ class Cron extends Controller
                 }
             }
 
+            // No cantar en el mismo tick que se activó la partida (evita 2 bolas si hay 2 crons)
+            if ($numbersDrawn === 0 && in_array($gameId, $startedIds, true)) {
+                log_message('info', "Juego {$gameId} recién iniciado: primera bola en el siguiente ciclo");
+                continue;
+            }
+
             if ($this->isGameCompleted($gameId)) {
                 $modelGames->update($gameId, [
                     'status' => 0,
@@ -670,6 +679,11 @@ class Cron extends Controller
             $ballsToDraw = $fromSequence
                 ? 1
                 : $this->ballsDueCount($gameId, $timeBallGet, $now, $maxCatchUp);
+
+            // Primera bola: siempre máximo 1 (nunca catch-up de varias al arrancar)
+            if ($numbersDrawn === 0) {
+                $ballsToDraw = min(1, $ballsToDraw);
+            }
 
             if ($ballsToDraw <= 0) {
                 log_message('info', "Juego {$gameId} - aún no toca cantar bola");
@@ -688,40 +702,70 @@ class Cron extends Controller
                     break;
                 }
 
-                $number = $this->generateUniqueNumber($gameId);
-                if ($number === null || $number === false || $number === 0) {
+                // Candado por partida: evita 2 bolas si dos crons pasan a la vez
+                $ballLock = 'ball_game_' . $gameId;
+                if (! $this->acquireCronLock($ballLock, 8)) {
+                    log_message('info', "Juego {$gameId} - otro proceso está cantando bola");
                     break;
                 }
 
-                $createdAt = $now;
-                if ($ballsToDraw > 1 && ! $fromSequence) {
-                    try {
-                        $createdAtObj = clone $nowObj;
-                        $backSec = ($ballsToDraw - 1 - $b) * $intervalSec;
-                        if ($backSec > 0) {
-                            $createdAtObj->modify('-' . $backSec . ' seconds');
-                        }
-                        $createdAt = $createdAtObj->format('Y-m-d H:i:s');
-                    } catch (\Exception $e) {
-                        $createdAt = $now;
+                try {
+                    // Revalidar intervalo justo antes de cantar
+                    if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
+                        log_message('info', "Juego {$gameId} - bola omitida (intervalo o ya cantada por otro proceso)");
+                        break;
                     }
+
+                    $number = null;
+                    $inserted = false;
+                    for ($attempt = 0; $attempt < 8; $attempt++) {
+                        $candidate = $this->generateUniqueNumber($gameId);
+                        if ($candidate === null || $candidate === false || $candidate === 0) {
+                            break;
+                        }
+
+                        $createdAt = $now;
+                        if ($ballsToDraw > 1 && ! $fromSequence) {
+                            try {
+                                $createdAtObj = clone $nowObj;
+                                $backSec = ($ballsToDraw - 1 - $b) * $intervalSec;
+                                if ($backSec > 0) {
+                                    $createdAtObj->modify('-' . $backSec . ' seconds');
+                                }
+                                $createdAt = $createdAtObj->format('Y-m-d H:i:s');
+                            } catch (\Exception $e) {
+                                $createdAt = $now;
+                            }
+                        }
+
+                        $inserted = bingo_insert_drawn_number((int) $gameId, (int) $candidate, [
+                            'user'       => $game['user'] ?? 1,
+                            'isCRON'     => 1,
+                            'created_at' => $createdAt,
+                        ]);
+
+                        if ($inserted) {
+                            $number = (int) $candidate;
+                            break;
+                        }
+
+                        log_message('warning', "Juego {$gameId}: número {$candidate} duplicado, reintentando");
+                    }
+
+                    if (! $inserted || ! $number) {
+                        log_message('warning', "Juego {$gameId}: no se pudo insertar bola única");
+                        break;
+                    }
+
+                    $ballsCanted++;
+                    log_message('info', "BOLA CANTADA: {$number} en juego {$gameId} a las {$now} (catch-up " . ($b + 1) . "/{$ballsToDraw})");
+                    bingo_broadcast_number_drawn((int) $gameId, (int) $number);
+
+                    $this->dialNumber($number, $gameId);
+                    $this->singBingo($gameId);
+                } finally {
+                    $this->releaseCronLock($ballLock);
                 }
-
-                $modelBoards->insert([
-                    'user'       => $game['user'] ?? 1,
-                    'game'       => $gameId,
-                    'number'     => $number,
-                    'status'     => 1,
-                    'isCRON'     => 1,
-                    'created_at' => $createdAt,
-                ]);
-
-                $ballsCanted++;
-                log_message('info', "BOLA CANTADA: {$number} en juego {$gameId} a las {$createdAt} (catch-up " . ($b + 1) . "/{$ballsToDraw})");
-                bingo_broadcast_number_drawn((int) $gameId, (int) $number);
-
-                $this->dialNumber($number, $gameId);
-                $this->singBingo($gameId);
 
                 if ($this->isGameCompleted($gameId)) {
                     $modelGames->update($gameId, [
@@ -770,6 +814,17 @@ class Cron extends Controller
         return max(1, min($maxCatchUp, $due));
     }
 
+    /** True si corresponde cantar una bola ahora (relee DB para evitar duplicados). */
+    private function canDrawBallNow(int $gameId, int $timeBallGet, string $now): bool
+    {
+        $lastBall = $this->getLastBall($gameId);
+        if (! $lastBall) {
+            return true;
+        }
+
+        return $this->diffMs($lastBall['created_at'], $now) >= $timeBallGet;
+    }
+
     private function acquireCronLock(string $name, int $ttlSeconds): bool
     {
         $dir = WRITEPATH . 'cache';
@@ -777,19 +832,36 @@ class Cron extends Controller
             @mkdir($dir, 0755, true);
         }
         $path = $dir . DIRECTORY_SEPARATOR . 'cron_' . preg_replace('/[^a-z0-9_]/i', '', $name) . '.lock';
-        if (is_file($path) && (time() - (int) filemtime($path)) < $ttlSeconds) {
+
+        $fh = @fopen($path, 'c+');
+        if ($fh === false) {
             return false;
         }
-        @file_put_contents($path, (string) getmypid());
+
+        // Candado exclusivo no bloqueante (evita que dos crons canten a la vez)
+        if (! flock($fh, LOCK_EX | LOCK_NB)) {
+            fclose($fh);
+
+            return false;
+        }
+
+        $this->cronLockHandles[$name] = $fh;
+
+        ftruncate($fh, 0);
+        rewind($fh);
+        fwrite($fh, (string) getmypid() . "\n" . time() . "\n" . $ttlSeconds);
+        fflush($fh);
 
         return true;
     }
 
     private function releaseCronLock(string $name): void
     {
-        $path = WRITEPATH . 'cache' . DIRECTORY_SEPARATOR . 'cron_' . preg_replace('/[^a-z0-9_]/i', '', $name) . '.lock';
-        if (is_file($path)) {
-            @unlink($path);
+        if (! empty($this->cronLockHandles[$name]) && is_resource($this->cronLockHandles[$name])) {
+            $fh = $this->cronLockHandles[$name];
+            flock($fh, LOCK_UN);
+            fclose($fh);
+            unset($this->cronLockHandles[$name]);
         }
     }
 

@@ -1075,7 +1075,9 @@ function updateMainBall(newNumber) {
         return;
     }
 
-    lastNumberEl.html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
+    // Reemplazar contenido completo para evitar bolas apiladas (7 encima de 7)
+    lastNumberEl.empty()
+        .html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
         .removeClass()
         .addClass(`bingo-ball ${getColumnClass(parsed)} size-100`);
 }
@@ -1090,9 +1092,7 @@ function renderBallHistory() {
         return;
     }
 
-    const ordered = (window.drawnNumbers || [])
-        .map(parseBallNumber)
-        .filter(Boolean);
+    const ordered = uniqueOrderedBalls(window.drawnNumbers || []);
 
     if (!ordered.length) {
         container.empty();
@@ -1113,9 +1113,7 @@ function renderBallHistory() {
 }
 
 function reconcileBallDisplay(orderedNumbers) {
-    const ordered = (orderedNumbers || window.drawnNumbers || [])
-        .map(parseBallNumber)
-        .filter(Boolean);
+    const ordered = uniqueOrderedBalls(orderedNumbers || window.drawnNumbers || []);
 
     if (!ordered.length) {
         return;
@@ -1312,7 +1310,7 @@ function scheduleLatestBallMarks(latestNumber, options) {
 
 function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
     if (Array.isArray(drawnNumbers) && drawnNumbers.length) {
-        return drawnNumbers.map(parseBallNumber).filter(Boolean);
+        return uniqueOrderedBalls(drawnNumbers);
     }
 
     const ordered = numbersgenerated.slice();
@@ -1324,11 +1322,23 @@ function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
     return ordered;
 }
 
+function uniqueOrderedBalls(numbers) {
+    const ordered = [];
+    const seen = {};
+    (numbers || []).forEach(function(value) {
+        const parsed = parseBallNumber(value);
+        if (!parsed || seen[parsed]) {
+            return;
+        }
+        seen[parsed] = true;
+        ordered.push(parsed);
+    });
+    return ordered;
+}
+
 function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options) {
     const opts = options || {};
-    const ordered = (drawnNumbers || [])
-        .map(parseBallNumber)
-        .filter(Boolean);
+    const ordered = uniqueOrderedBalls(drawnNumbers);
 
     if (!ordered.length) {
         return;
