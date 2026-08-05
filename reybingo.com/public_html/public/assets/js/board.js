@@ -63,6 +63,12 @@ let gameTimerInterval;
 let startTime;
 let gameStarted = false;
 let pendingNumberSubmits = new Set();
+// Evita 2–3 numberAutoSubmit en paralelo (UI adelantada / bolas fuera de orden)
+let autoSubmitInFlight = false;
+let generationTimeoutId = null;
+let centerAnimBusy = false;
+let centerAnimQueue = [];
+let autoGenerationWanted = false;
 
 // ==========================================
 // GESTORES DE RECURSOS
@@ -861,6 +867,13 @@ function startWinnerSlider() {
 }
 
 function showCountdown(data, callback) {
+    // Al bingo: cortar auto-canto ya (si no, sigue sacando bolas encima del anuncio)
+    stopAutomaticGeneration();
+    autoGenerationWanted = false;
+    autoSubmitInFlight = false;
+    centerAnimQueue = [];
+    centerAnimBusy = false;
+
     const numberHe = $id('countdown');
     const container = $id('countdown-container');
     const textHe = $id('text-countdown');
@@ -910,9 +923,15 @@ function showCountdown(data, callback) {
         }, 300);
     }
 
+    const pauseMs = Math.max(5000, parseInt(timeBallGet, 10) || 5000);
     setTimeout(function () {
-        if (callback) callback();
-    }, 1500);
+        // Nunca reanudar startAutomaticGeneration aquí (eso “seguía cantando”)
+        if (typeof callback === 'function' && callback !== startAutomaticGeneration) {
+            callback();
+        } else {
+            startAutomaticLast();
+        }
+    }, pauseMs);
 }
 
 function updateBallsCounter(totalNumbersGenerated) {
@@ -1034,15 +1053,42 @@ function reconcileBallDisplay(orderedNumbers) {
     ordered.forEach(markBoardGridNumber);
 }
 
-function showCenterBallAnimation(newNumber) {
+function enqueueCenterBallAnimation(newNumber) {
     const parsed = parseBallNumber(newNumber);
     if (!parsed) {
+        return;
+    }
+    centerAnimQueue.push(parsed);
+    drainCenterBallQueue();
+}
+
+function drainCenterBallQueue() {
+    if (centerAnimBusy || !centerAnimQueue.length) {
+        return;
+    }
+    centerAnimBusy = true;
+    const next = centerAnimQueue.shift();
+    showCenterBallAnimation(next, function() {
+        centerAnimBusy = false;
+        drainCenterBallQueue();
+    });
+}
+
+function showCenterBallAnimation(newNumber, onDone) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        if (typeof onDone === 'function') {
+            onDone();
+        }
         return;
     }
 
     const centerBlock = $id('block-number');
     const centerBall = $id('last-number-center');
     if (!centerBlock || !centerBall) {
+        if (typeof onDone === 'function') {
+            onDone();
+        }
         return;
     }
 
@@ -1066,6 +1112,9 @@ function showCenterBallAnimation(newNumber) {
             centerBall.removeAttribute('style');
             centerBall.className = '';
             centerBlock.style.display = 'none';
+            if (typeof onDone === 'function') {
+                onDone();
+            }
         }, 350);
     }, displayMs);
 }
@@ -1131,8 +1180,9 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
     }
 
+    // Solo animar la última bola nueva (si hay varias por race, no apilar 2–3 a la vez)
     if (opts.showCenterAnimation && missing.length > 0) {
-        showCenterBallAnimation(missing[missing.length - 1]);
+        enqueueCenterBallAnimation(missing[missing.length - 1]);
     }
 
     if (bingoCardManager.initialized && missing.length > 0) {
@@ -1160,7 +1210,13 @@ function processNumberGetResponse(data) {
     if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
         syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
     } else if (data.number) {
-        handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+        // Con auto activo el poll solo sincroniza (no anime otra bola encima)
+        if (autoGenerationWanted || autoSubmitInFlight) {
+            const ordered = buildOrderedDrawnNumbers(data.number, data.drawnNumbers);
+            syncDrawnNumbersFromServer(ordered, data.totalNumbersGenerated, { showCenterAnimation: false });
+        } else {
+            handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+        }
     }
 
     if (data.status === 'pause') {
@@ -1206,18 +1262,53 @@ function updateGameTimer() {
     $('.init-count .time-text').text(timeText);
 }
 
-// Funciones de generación de números optimizadas
-function generateAutoNumber() {
+function ensureGameTimerStarted() {
+    if (gameStarted) {
+        return;
+    }
+    gameStarted = true;
+    startTime = new Date();
+    updateGameTimer();
+    if (gameTimerInterval) {
+        clearInterval(gameTimerInterval);
+    }
+    gameTimerInterval = setInterval(updateGameTimer, 1000);
+}
+
+// Una sola petición a la vez: el intervalo viejo disparaba otra antes de que terminara la anterior
+function generateAutoNumber(done) {
+    const finish = function() {
+        if (typeof done === 'function') {
+            done();
+        }
+    };
+
+    if (autoSubmitInFlight || isGameFinishedShown) {
+        finish();
+        return;
+    }
+
+    autoSubmitInFlight = true;
+    ensureGameTimerStarted();
+
     $.get(site_url + 'boards/numberAutoSubmit')
         .done((data) => {
+            if (!data) {
+                return;
+            }
             if (data.status === 'pause') {
-                showCountdown(data, startAutomaticGeneration);
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                showCountdown(data, startAutomaticLast);
             } else if (data.status === 'completed') {
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
                 showGameFinalized();
             } else if (data.status === 'success') {
                 handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
             } else if (data.status === 'error') {
                 stopAutomaticGeneration();
+                autoGenerationWanted = false;
                 $('#stop-button, #next-number-button, #play-button').hide();
                 $('#start-button').show();
                 if (typeof Toastify === 'function') {
@@ -1246,6 +1337,10 @@ function generateAutoNumber() {
                     stopOnFocus: true
                 }).showToast();
             }
+        })
+        .always(function() {
+            autoSubmitInFlight = false;
+            finish();
         });
 }
 
@@ -1274,7 +1369,9 @@ function generateNumber(number) {
     $.get(site_url + 'boards/numberSubmit/' + parsed)
         .done((data) => {
             if (data.status === 'pause') {
-                showCountdown(data, startAutomaticGeneration);
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                showCountdown(data, startAutomaticLast);
             } else if (data.status === 'completed') {
                 showGameFinalized();
             } else if (data.status === 'success') {
@@ -1315,12 +1412,42 @@ function generateNumber(number) {
 }
 
 function startAutomaticGeneration() {
-    intervalManager.clear('generation');
-    intervalManager.set('generation', generateAutoNumber, timeBallGet);
+    stopAutomaticGeneration();
+    autoGenerationWanted = true;
+    ensureGameTimerStarted();
+
+    const delay = Math.max(2500, parseInt(timeBallGet, 10) || 3000);
+
+    function scheduleNext() {
+        if (!autoGenerationWanted || isGameFinishedShown) {
+            return;
+        }
+        generationTimeoutId = setTimeout(function() {
+            generationTimeoutId = null;
+            runAutoTick();
+        }, delay);
+    }
+
+    function runAutoTick() {
+        if (!autoGenerationWanted || isGameFinishedShown) {
+            return;
+        }
+        // Espera a que termine el AJAX antes de programar la siguiente bola
+        generateAutoNumber(function() {
+            scheduleNext();
+        });
+    }
+
+    runAutoTick();
 }
 
 function stopAutomaticGeneration() {
+    autoGenerationWanted = false;
     intervalManager.clear('generation');
+    if (generationTimeoutId) {
+        clearTimeout(generationTimeoutId);
+        generationTimeoutId = null;
+    }
 }
 
 function lastNumberGet() {
@@ -1558,23 +1685,15 @@ function setupEvents() {
         $('#start-button').hide();
         $('#stop-button, #next-number-button').show();
         sendMessage((__['game started!'] || '¡JUEGO INICIADO!') + ' 😎', 26);
-
-        if (!gameStarted) {
-            gameStarted = true;
-            startTime = new Date();
-            updateGameTimer();
-            gameTimerInterval = setInterval(updateGameTimer, 1000);
-        }
+        ensureGameTimerStarted();
 
         setTimeout(() => {
-            generateAutoNumber();
             startAutomaticGeneration();
         }, 2000);
     });
 
     $('#next-number-button').on('click', () => {
-        intervalManager.clear('generation');
-        generateAutoNumber();
+        // Reinicia la cadena (no dispara un AJAX extra encima del que ya va)
         startAutomaticGeneration();
     });
 
@@ -1585,7 +1704,6 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
-        generateAutoNumber();
         startAutomaticGeneration();
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();

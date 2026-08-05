@@ -64,6 +64,9 @@ let pendingNumberSubmits = new Set();
 const LIVE_MANUAL_ONLY = true;
 let bingoPauseInProgress = false;
 let lastBingoPauseKey = '';
+let liveSubmitInFlight = false;
+let liveCenterAnimBusy = false;
+let liveCenterAnimQueue = [];
 
 // ==========================================
 // GESTORES DE RECURSOS
@@ -868,6 +871,65 @@ function clearCenterBallTimers() {
     }
 }
 
+function enqueueLiveCenterBall(parsed) {
+    liveCenterAnimQueue.push(parsed);
+    drainLiveCenterQueue();
+}
+
+function drainLiveCenterQueue() {
+    if (liveCenterAnimBusy || !liveCenterAnimQueue.length) {
+        return;
+    }
+    liveCenterAnimBusy = true;
+    const parsed = liveCenterAnimQueue.shift();
+    paintLiveCenterBallOnly(parsed, function() {
+        liveCenterAnimBusy = false;
+        drainLiveCenterQueue();
+    });
+}
+
+function paintLiveCenterBallOnly(parsed, onDone) {
+    const centerBlock = $id('block-number');
+    const centerBall = $id('last-number-center');
+
+    if (!centerBlock || !centerBall) {
+        if (typeof onDone === 'function') {
+            onDone();
+        }
+        return;
+    }
+
+    clearCenterBallTimers();
+
+    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + parsed + '.mp3');
+    }
+
+    centerBlock.style.display = 'flex';
+    centerBall.innerHTML = '';
+    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
+    centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
+    centerBall.style.display = 'flex';
+    centerBall.style.transform = '';
+    centerBall.style.opacity = '1';
+
+    const displayMs = 1200;
+
+    centerBallHideTimer = setTimeout(function() {
+        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
+        centerBall.style.opacity = '0';
+
+        centerBallTimer = setTimeout(function() {
+            centerBall.removeAttribute('style');
+            centerBall.className = '';
+            centerBlock.style.display = 'none';
+            if (typeof onDone === 'function') {
+                onDone();
+            }
+        }, 350);
+    }, displayMs);
+}
+
 function paintLiveBallUi(newNumber, totalNumbersGenerated) {
     const parsed = parseInt(newNumber, 10);
     if (!parsed) {
@@ -916,38 +978,8 @@ function paintLiveBallUi(newNumber, totalNumbersGenerated) {
         numberEl.addClass(`bingo-ball ${getColumnClass(parsed)} size-70`);
     }
 
-    const centerBlock = $id('block-number');
-    const centerBall = $id('last-number-center');
-
-    if (centerBlock && centerBall) {
-        clearCenterBallTimers();
-
-        centerBlock.style.display = 'flex';
-        centerBall.innerHTML = '';
-        centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
-        centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
-        centerBall.style.display = 'flex';
-        centerBall.style.transform = '';
-        centerBall.style.opacity = '1';
-
-        // Animación corta: no usar todo timeBallGet (eso causaba retraso/solapes)
-        const displayMs = 1200;
-
-        centerBallHideTimer = setTimeout(function() {
-            centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-            centerBall.style.opacity = '0';
-
-            centerBallTimer = setTimeout(function() {
-                centerBall.removeAttribute('style');
-                centerBall.className = '';
-                centerBlock.style.display = 'none';
-            }, 350);
-        }, displayMs);
-    }
-
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + parsed + '.mp3');
-    }
+    // Cola: evita dos bolas grandes / audios a la vez
+    enqueueLiveCenterBall(parsed);
 }
 
 function handleNewNumber(newNumber, totalNumbersGenerated) {
@@ -985,6 +1017,11 @@ function generateNumber(number) {
         return;
     }
 
+    // Un solo submit a la vez: evita 2 bolas cantadas / UI adelantada
+    if (liveSubmitInFlight) {
+        return;
+    }
+
     if (numbersgenerated.includes(parsed)) {
         return;
     }
@@ -1002,6 +1039,7 @@ function generateNumber(number) {
     }
 
     // Mostrar al instante (sin esperar al servidor)
+    liveSubmitInFlight = true;
     pendingNumberSubmits.add(parsed);
     paintLiveBallUi(parsed);
 
@@ -1050,6 +1088,7 @@ function generateNumber(number) {
         })
         .always(function() {
             pendingNumberSubmits.delete(parsed);
+            liveSubmitInFlight = false;
         });
 }
 
