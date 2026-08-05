@@ -1075,7 +1075,8 @@ function enqueueCenterBallAnimation(newNumber) {
     if (!parsed) {
         return;
     }
-    centerAnimQueue.push(parsed);
+    // Solo la última bola: si hay cola, no acumular atraso visual vs el jugador
+    centerAnimQueue = [parsed];
     drainCenterBallQueue();
 }
 
@@ -1084,7 +1085,9 @@ function drainCenterBallQueue() {
         return;
     }
     centerAnimBusy = true;
-    const next = centerAnimQueue.shift();
+    // Si llegaron más mientras esperábamos, tomar la más reciente
+    const next = centerAnimQueue[centerAnimQueue.length - 1];
+    centerAnimQueue = [];
     showCenterBallAnimation(next, function() {
         centerAnimBusy = false;
         drainCenterBallQueue();
@@ -1322,6 +1325,7 @@ function generateAutoNumber(done) {
                 autoGenerationWanted = false;
                 showGameFinalized();
             } else if (data.status === 'success') {
+                // Pintar al instante al recibir el AJAX (antes del broadcast a jugadores)
                 handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
             } else if (data.status === 'error') {
                 stopAutomaticGeneration();
@@ -2353,11 +2357,15 @@ function initBoardPusherRealtime() {
                 ? data.totalNumbersGenerated
                 : (Array.isArray(drawn) ? drawn.length : undefined);
 
+            // Si el auto AJAX ya pintó esta bola, no re-animar (evita doble flash)
+            const parsed = parseBallNumber(number);
+            const alreadyShown = parsed && Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed);
+
             if (Array.isArray(drawn) && drawn.length) {
                 syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, {
-                    showCenterAnimation: true
+                    showCenterAnimation: !alreadyShown && !autoSubmitInFlight
                 });
-            } else if (number) {
+            } else if (number && !alreadyShown) {
                 handleNewNumber(number, total, drawn);
             }
 

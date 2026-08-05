@@ -395,7 +395,13 @@ class Boards extends Controller {
 
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
         $totalAfter = count($drawnNumbers);
-        bingo_broadcast_number_drawn((int) $game['id'], (int) $number, $drawnNumbers, $totalAfter);
+
+        // Responder primero al admin; Pusher después (si va antes, el jugador canta y el admin aún espera el AJAX)
+        $gameId = (int) $game['id'];
+        $drawnNumber = (int) $number;
+        register_shutdown_function(static function () use ($gameId, $drawnNumber, $drawnNumbers, $totalAfter) {
+            bingo_broadcast_number_drawn($gameId, $drawnNumber, $drawnNumbers, $totalAfter);
+        });
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -517,7 +523,12 @@ class Boards extends Controller {
 
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
         $totalAfter = count($drawnNumbers);
-        bingo_broadcast_number_drawn((int) $game['id'], $number, $drawnNumbers, $totalAfter);
+
+        // Misma lógica: JSON al admin primero, broadcast a jugadores después
+        $gameId = (int) $game['id'];
+        register_shutdown_function(static function () use ($gameId, $number, $drawnNumbers, $totalAfter) {
+            bingo_broadcast_number_drawn($gameId, (int) $number, $drawnNumbers, $totalAfter);
+        });
 
         return $this->response->setJSON([
             'status' => 'success',
