@@ -16,26 +16,43 @@ const CONFIG = {
     AUDIO_POOL_SIZE: 10,
     MESSAGE_POOL_SIZE: 15,
     WINNER_SLIDER_INTERVAL: 5000,
-    WAF_COOLDOWN_MS: 45000
+    WAF_COOLDOWN_MS: 10000,
+    BALL_WAF_BACKOFF_MS: 2000
 };
 
-// Pausa global de polls cuando Hostinger CDN (hcdn) responde 403
+// Cooldown secundario (chat/status). Las bolas usan backoff corto aparte.
 window.__bingoWafCooldownUntil = 0;
+window.__bingoBallBackoffUntil = 0;
 
 function bingoIsWafCooling() {
     return Date.now() < (window.__bingoWafCooldownUntil || 0);
 }
 
+function bingoIsBallBackingOff() {
+    return Date.now() < (window.__bingoBallBackoffUntil || 0);
+}
+
 function bingoTripWafCooldown(ms) {
-    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 45000;
+    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 10000;
     window.__bingoWafCooldownUntil = Date.now() + wait;
-    console.warn('CDN/WAF 403: pausando polls AJAX ~' + Math.round(wait / 1000) + 's');
+    console.warn('CDN/WAF 403: pausando polls secundarios ~' + Math.round(wait / 1000) + 's');
+}
+
+function bingoTripBallBackoff(ms) {
+    const wait = ms || CONFIG.BALL_WAF_BACKOFF_MS || 2000;
+    window.__bingoBallBackoffUntil = Math.max(window.__bingoBallBackoffUntil || 0, Date.now() + wait);
 }
 
 if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
     window.__bingoAjaxWafHook = true;
-    $(document).ajaxComplete(function (_event, xhr) {
-        if (xhr && xhr.status === 403) {
+    $(document).ajaxComplete(function (_event, xhr, settings) {
+        if (!xhr || xhr.status !== 403) {
+            return;
+        }
+        const url = String((settings && settings.url) || '');
+        if (/numberGet|numberSubmit|numberAutoSubmit/i.test(url)) {
+            bingoTripBallBackoff();
+        } else {
             bingoTripWafCooldown();
         }
     });
@@ -1125,7 +1142,7 @@ function generateAutoNumber() {
         return;
     }
 
-    if (bingoPauseInProgress || isGameFinishedShown || bingoIsWafCooling()) {
+    if (bingoPauseInProgress || isGameFinishedShown || bingoIsBallBackingOff()) {
         return;
     }
 
@@ -1187,7 +1204,7 @@ function syncLiveDrawnFromServer(drawnNumbers, totalNumbersGenerated) {
 }
 
 function lastNumberGet() {
-    if (bingoIsWafCooling() || isGameFinishedShown) {
+    if (bingoIsBallBackingOff() || isGameFinishedShown) {
         return;
     }
 
@@ -1227,7 +1244,7 @@ function lastNumberGet() {
         })
         .fail((xhr, status, error) => {
             if (xhr && xhr.status === 403) {
-                bingoTripWafCooldown();
+                bingoTripBallBackoff();
             }
             console.warn('Failed to get last number:', error);
         });

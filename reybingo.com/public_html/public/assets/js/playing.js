@@ -17,29 +17,49 @@ const CONFIG = {
     MESSAGE_POOL_SIZE: 15,
     WINNER_SLIDER_INTERVAL: 5000,
     COUNTDOWN_INTERVAL: 1000,
-    // Poll de bolas: rápido si no hay Pusher; lento si Pusher OK (escala con muchos jugadores)
+    // Poll de bolas siempre rápido (no ralentizar por Pusher)
     BALL_POLL_FAST_MS: 1800,
-    BALL_POLL_PUSHER_MS: 8000,
-    WAF_COOLDOWN_MS: 45000
+    BALL_POLL_PUSHER_MS: 1800,
+    // Cooldown corto solo para chat/status. Las bolas NO se pausan 45s.
+    WAF_COOLDOWN_MS: 10000,
+    BALL_WAF_BACKOFF_MS: 2000
 };
 
-// Pausa global de polls cuando Hostinger CDN (hcdn) responde 403
+// Cooldown secundario (chat/acumulado). NO debe frenar el sync de bolas.
 window.__bingoWafCooldownUntil = window.__bingoWafCooldownUntil || 0;
+window.__bingoBallBackoffUntil = window.__bingoBallBackoffUntil || 0;
 
 function bingoIsWafCooling() {
     return Date.now() < (window.__bingoWafCooldownUntil || 0);
 }
 
+function bingoIsBallBackingOff() {
+    return Date.now() < (window.__bingoBallBackoffUntil || 0);
+}
+
 function bingoTripWafCooldown(ms) {
-    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 45000;
+    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 10000;
     window.__bingoWafCooldownUntil = Date.now() + wait;
-    console.warn('CDN/WAF 403: pausando polls AJAX ~' + Math.round(wait / 1000) + 's');
+    console.warn('CDN/WAF 403: pausando polls secundarios ~' + Math.round(wait / 1000) + 's (bolas siguen)');
+}
+
+function bingoTripBallBackoff(ms) {
+    const wait = ms || CONFIG.BALL_WAF_BACKOFF_MS || 2000;
+    window.__bingoBallBackoffUntil = Math.max(window.__bingoBallBackoffUntil || 0, Date.now() + wait);
+    console.warn('403 en bolas: reintento en ~' + Math.round(wait / 1000) + 's');
 }
 
 if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
     window.__bingoAjaxWafHook = true;
-    $(document).ajaxComplete(function (_event, xhr) {
-        if (xhr && xhr.status === 403) {
+    $(document).ajaxComplete(function (_event, xhr, settings) {
+        if (!xhr || xhr.status !== 403) {
+            return;
+        }
+        const url = String((settings && settings.url) || '');
+        // Bolas: backoff corto. Resto: cooldown secundario.
+        if (/numberGet|numberSubmit|numberAutoSubmit|dialNumber/i.test(url)) {
+            bingoTripBallBackoff();
+        } else {
             bingoTripWafCooldown();
         }
     });
@@ -1280,14 +1300,11 @@ function applyMarksForNumber(newNumber) {
     markBoardNumber(parsed);
 
     if (isAutoMarkEnabled()) {
+        // Marca local: el servidor ya sincroniza en playings/numberGet (syncAutoDialMarks).
+        // Evita 1 POST dialNumber por bola → menos 403 del WAF y menos desfase.
         markCartonNumberLocally(parsed, false);
-
-        if (!autoMarkedNumbers.has(parsed)) {
-            autoMarkedNumbers.add(parsed);
-            dialNumber(parsed);
-        } else {
-            scheduleAutoSingCheck();
-        }
+        autoMarkedNumbers.add(parsed);
+        scheduleAutoSingCheck();
     }
 }
 
@@ -1448,7 +1465,10 @@ function applyMarksForDrawnNumber(number) {
     markBoardNumber(number);
 
     if (isAutoMarkEnabled()) {
-        dialNumber(number);
+        // Sin POST: numberGet ya sincroniza marcas en servidor
+        markCartonNumberLocally(number, false);
+        autoMarkedNumbers.add(parseInt(number, 10));
+        scheduleAutoSingCheck();
     }
 }
 
@@ -1526,10 +1546,9 @@ function syncAutoMarkedNumbers(drawnNumbers, options) {
             return;
         }
 
-        if (!autoMarkedNumbers.has(parsed)) {
-            autoMarkedNumbers.add(parsed);
-            dialNumber(parsed);
-        }
+        // Por defecto también local (evita tormenta de dialNumber → 403)
+        markCartonNumberLocally(parsed, animate);
+        autoMarkedNumbers.add(parsed);
     });
 
     if (isAutoMarkEnabled()) {
@@ -1769,7 +1788,8 @@ function lastNumberGet() {
         return;
     }
 
-    if (bingoIsWafCooling()) {
+    // Solo backoff corto de bolas (2s). NUNCA el cooldown de 45s de chat/status.
+    if (bingoIsBallBackingOff()) {
         return;
     }
 
@@ -1788,7 +1808,7 @@ function lastNumberGet() {
         })
         .fail((xhr, status, error) => {
             if (xhr && xhr.status === 403) {
-                bingoTripWafCooldown();
+                bingoTripBallBackoff();
             }
             console.warn('Failed to get last number:', error);
         });
@@ -1802,20 +1822,17 @@ function startAutomaticLast() {
 
     lastNumberGet();
 
-    // Con Pusher activo el poll es solo respaldo (mucho menos AJAX por jugador)
-    const pusherOk = window.__bingoPusherRealtime === true;
+    // Siempre poll rápido: el juego no debe atrasarse respecto al admin
     const fastMs = CONFIG.BALL_POLL_FAST_MS || 1800;
-    const slowMs = CONFIG.BALL_POLL_PUSHER_MS || 8000;
     const configured = parseInt(timeBallLast, 10) || fastMs;
-    const pollMs = pusherOk
-        ? Math.max(slowMs, configured)
-        : Math.max(fastMs, Math.min(configured, 2000));
+    const pollMs = Math.max(fastMs, Math.min(configured, 2000));
 
     intervalManager.set('lastNumber', lastNumberGet, pollMs);
 }
 
 function setBingoPusherRealtime(enabled) {
-    window.__bingoPusherRealtime = !!enabled;
+    // No ralentizar el poll aunque Pusher conecte
+    window.__bingoPusherRealtime = false;
     if (typeof timeBallLast !== 'undefined' && !window.gameIsFinished && !isGameFinishedShown) {
         startAutomaticLast();
     }
