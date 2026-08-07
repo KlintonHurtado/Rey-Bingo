@@ -2456,25 +2456,75 @@ if (!function_exists('bingo_user_image_url')) {
     }
 }
 
+if (!function_exists('bingo_voucher_public_dir')) {
+    /**
+     * Única ruta canónica de comprobantes: public_html/public/uploads/vouchers/
+     */
+    function bingo_voucher_public_dir(): string
+    {
+        $candidates = [];
+
+        if (defined('FCPATH')) {
+            $fc = rtrim(FCPATH, '/\\');
+            // Entrada normal: .../public_html/public/
+            if (strtolower(basename($fc)) === 'public') {
+                $candidates[] = $fc . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            } else {
+                // Si el docroot apunta a public_html, forzar /public/uploads/vouchers/
+                $candidates[] = $fc . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            }
+        }
+
+        if (defined('ROOTPATH')) {
+            $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        }
+
+        foreach ($candidates as $dir) {
+            $dir = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            if (is_dir($dir)) {
+                return $dir;
+            }
+        }
+
+        // Último recurso (misma convención)
+        $fallback = (defined('FCPATH') ? rtrim(FCPATH, '/\\') : '.') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        if (! is_dir($fallback)) {
+            @mkdir($fallback, 0755, true);
+        }
+
+        return $fallback;
+    }
+}
+
 if (!function_exists('bingo_voucher_candidate_dirs')) {
     /**
-     * Carpetas donde pueden vivir los comprobantes (public y writable).
+     * Rutas donde BUSCAR comprobantes (legacy + canónica).
+     * El guardado nuevo solo usa bingo_voucher_public_dir().
      *
      * @return list<string>
      */
     function bingo_voucher_candidate_dirs(): array
     {
-        $dirs = [];
         $candidates = [
-            rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR,
-            rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR,
+            bingo_voucher_public_dir(),
         ];
 
-        // Hostinger / layouts raros: raíz del proyecto también puede tener uploads
+        if (defined('FCPATH')) {
+            $candidates[] = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        }
+
+        if (defined('WRITEPATH')) {
+            $candidates[] = rtrim(WRITEPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+        }
+
         if (defined('ROOTPATH')) {
-            $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
-            $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
-            $parent = dirname(rtrim(ROOTPATH, '/\\'));
+            $root = rtrim(ROOTPATH, '/\\');
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            $candidates[] = $root . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            $parent = dirname($root);
             if ($parent && $parent !== '.' && $parent !== DIRECTORY_SEPARATOR) {
                 $candidates[] = $parent . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
                 $candidates[] = $parent . DIRECTORY_SEPARATOR . 'public_html' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
@@ -2482,18 +2532,9 @@ if (!function_exists('bingo_voucher_candidate_dirs')) {
             }
         }
 
+        $dirs = [];
         foreach ($candidates as $dir) {
-            $normalized = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
-            // Incluir aunque aún no exista: resolve prueba is_file; mkdir ayuda al guardar
-            if (! is_dir($normalized)) {
-                @mkdir($normalized, 0755, true);
-            }
-            if (is_dir($normalized)) {
-                $dirs[] = $normalized;
-            } else {
-                // Aun así listar para intentos de lectura en rutas ya creadas fuera de este request
-                $dirs[] = $normalized;
-            }
+            $dirs[] = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
         }
 
         return array_values(array_unique($dirs));
@@ -2503,22 +2544,42 @@ if (!function_exists('bingo_voucher_candidate_dirs')) {
 if (!function_exists('bingo_voucher_dir')) {
     function bingo_voucher_dir(): string
     {
-        // Preferir siempre la carpeta pública (accesible y habitual)
-        $public = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
-        if (! is_dir($public)) {
-            @mkdir($public, 0755, true);
-        }
-        if (is_dir($public) && is_writable($public)) {
-            return $public;
+        return bingo_voucher_public_dir();
+    }
+}
+
+if (!function_exists('bingo_voucher_mirror_to_public')) {
+    /**
+     * Si el archivo está en una ruta vieja, lo copia a public/uploads/vouchers/.
+     */
+    function bingo_voucher_mirror_to_public(string $resolvedPath): string
+    {
+        if ($resolvedPath === '' || ! is_file($resolvedPath) || @filesize($resolvedPath) <= 0) {
+            return $resolvedPath;
         }
 
-        foreach (bingo_voucher_candidate_dirs() as $dir) {
-            if (is_writable($dir)) {
-                return $dir;
+        $publicDir = bingo_voucher_public_dir();
+        $normalizedPublic = rtrim(str_replace('\\', '/', $publicDir), '/') . '/';
+        $normalizedResolved = str_replace('\\', '/', $resolvedPath);
+
+        if (str_starts_with($normalizedResolved, $normalizedPublic)) {
+            return $resolvedPath;
+        }
+
+        $dest = $publicDir . basename($resolvedPath);
+        if (! is_file($dest) || @filesize($dest) <= 0) {
+            if (! is_dir($publicDir)) {
+                @mkdir($publicDir, 0755, true);
             }
+            @copy($resolvedPath, $dest);
+            @chmod($dest, 0644);
         }
 
-        return $public;
+        if (is_file($dest) && @filesize($dest) > 0) {
+            return $dest;
+        }
+
+        return $resolvedPath;
     }
 }
 
@@ -2542,7 +2603,7 @@ if (!function_exists('bingo_voucher_sanitize_name')) {
 
 if (!function_exists('bingo_voucher_resolve')) {
     /**
-     * Resuelve la ruta real del archivo (incluye nombres truncados en BD).
+     * Resuelve la ruta real del archivo (busca en rutas alternativas + nombres truncados).
      */
     function bingo_voucher_resolve(?string $filename): string
     {
@@ -2561,7 +2622,7 @@ if (!function_exists('bingo_voucher_resolve')) {
                 }
                 $path = $dir . $name;
                 if (is_file($path) && @filesize($path) > 0) {
-                    return $path;
+                    return bingo_voucher_mirror_to_public($path);
                 }
             }
         }
@@ -2584,7 +2645,7 @@ if (!function_exists('bingo_voucher_resolve')) {
                 }
                 foreach ($matches as $match) {
                     if (is_file($match) && @filesize($match) > 0) {
-                        return $match;
+                        return bingo_voucher_mirror_to_public($match);
                     }
                 }
             }
@@ -2644,6 +2705,8 @@ if (!function_exists('bingo_voucher_new_filename')) {
 
 if (!function_exists('bingo_save_voucher_bytes')) {
     /**
+     * Guarda el comprobante SOLO en public/uploads/vouchers/ (nunca en writable u otras).
+     *
      * @return array{success:bool,filename:string,error:string}
      */
     function bingo_save_voucher_bytes(string $imageData, string $ext = 'png'): array
@@ -2653,41 +2716,24 @@ if (!function_exists('bingo_save_voucher_bytes')) {
         }
 
         $fileName = bingo_voucher_new_filename($ext);
-        $dirs = bingo_voucher_candidate_dirs();
+        // Única carpeta de escritura
+        $dir = bingo_voucher_public_dir();
+        $path = $dir . $fileName;
 
-        // Preferir public (FCPATH) primero; writable como espejo de respaldo
-        $publicPrefix = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads';
-        usort($dirs, static function ($a, $b) use ($publicPrefix) {
-            $aPublic = str_starts_with($a, $publicPrefix) ? 0 : 1;
-            $bPublic = str_starts_with($b, $publicPrefix) ? 0 : 1;
-            if ($aPublic !== $bPublic) {
-                return $aPublic <=> $bPublic;
-            }
-
-            return (int) is_writable($b) <=> (int) is_writable($a);
-        });
-
-        $savedOk = false;
-        $lastError = 'write';
-
-        foreach ($dirs as $dir) {
-            $path = $dir . $fileName;
-            $written = @file_put_contents($path, $imageData);
-            if ($written !== false && is_file($path) && @filesize($path) > 0) {
-                @chmod($path, 0644);
-                $savedOk = true;
-                // Seguir escribiendo espejos en el resto de carpetas
-                continue;
-            }
-            log_message('error', 'No se pudo guardar voucher en ' . $path . ' (writable=' . (is_writable($dir) ? '1' : '0') . ')');
-            $lastError = 'write';
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0755, true);
         }
 
-        if ($savedOk && bingo_voucher_resolve($fileName) !== '') {
+        $written = @file_put_contents($path, $imageData);
+        if ($written !== false && is_file($path) && @filesize($path) > 0) {
+            @chmod($path, 0644);
+
             return ['success' => true, 'filename' => $fileName, 'error' => ''];
         }
 
-        return ['success' => false, 'filename' => '', 'error' => $lastError];
+        log_message('error', 'No se pudo guardar voucher en ' . $path . ' (writable=' . (is_writable($dir) ? '1' : '0') . ')');
+
+        return ['success' => false, 'filename' => '', 'error' => 'write'];
     }
 }
 
@@ -2793,16 +2839,15 @@ if (!function_exists('bingo_voucher_sync_after_insert')) {
                 return false;
             }
 
-            // Si BD truncó el nombre, copiar/renombrar al valor truncado en todas las carpetas
+            // Si BD truncó el nombre, copiar/renombrar al valor truncado en public/uploads/vouchers
             if ($stored !== '' && $stored !== $savedFilename) {
                 $safeStored = bingo_voucher_sanitize_name($stored);
                 if ($safeStored !== '') {
-                    foreach (bingo_voucher_candidate_dirs() as $dir) {
-                        $target = $dir . $safeStored;
-                        if (! is_file($target) || @filesize($target) <= 0) {
-                            @copy($resolved, $target);
-                            @chmod($target, 0644);
-                        }
+                    $dir = bingo_voucher_public_dir();
+                    $target = $dir . $safeStored;
+                    if (! is_file($target) || @filesize($target) <= 0) {
+                        @copy($resolved, $target);
+                        @chmod($target, 0644);
                     }
                     if (bingo_voucher_exists($safeStored)) {
                         return true;

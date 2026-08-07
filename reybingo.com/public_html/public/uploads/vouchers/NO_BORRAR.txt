@@ -1,0 +1,3 @@
+NO BORRAR esta carpeta al subir código a Hostinger.
+Aquí se guardan los comprobantes de depósito (vouchers).
+Al actualizar PHP/vistas, NO reemplaces ni vacíes public/uploads/

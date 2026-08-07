@@ -1384,7 +1384,7 @@ class Payments extends Controller {
         if (! $saved['success']) {
             $msg = translate('voucher') . ' ' . strtolower(translate('it is mandatory'));
             if (($saved['error'] ?? '') === 'write') {
-                $msg = 'No se pudo guardar el comprobante en el servidor. Verifique permisos de uploads/vouchers.';
+                $msg = 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.';
             }
 
             return $this->response->setJSON([
@@ -1436,7 +1436,7 @@ class Payments extends Controller {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => [
-                    'deposit-voucher' => 'No se pudo guardar el comprobante en el servidor. Verifique permisos de uploads/vouchers.',
+                    'deposit-voucher' => 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.',
                 ],
             ]);
         }
