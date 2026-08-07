@@ -14,6 +14,8 @@ class Kyc extends Controller
             return redirect()->to('/signin');
         }
 
+        helper('bingo');
+
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
         $user = $modelUsers->find(session()->get('id'));
@@ -22,7 +24,7 @@ class Kyc extends Controller
             return redirect()->to('/store');
         }
 
-        $imagePath = ! empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
+        $imagePath = bingo_user_image_url($user);
 
         $data = [
             'page' => [
@@ -49,6 +51,8 @@ class Kyc extends Controller
             return redirect()->to('/signin');
         }
 
+        helper('bingo');
+
         $modelUsers = new UsersModel();
         $user = $modelUsers->find(session()->get('id'));
         if (bingo_is_store((int) ($user['group'] ?? -1))) {
@@ -63,26 +67,36 @@ class Kyc extends Controller
             return redirect()->back()->with('error', 'Debe subir las 3 imágenes: frente, reverso y selfie con el documento en la barbilla.');
         }
 
-        $uploadPath = FCPATH . 'uploads/kyc';
-        if (! is_dir($uploadPath)) {
-            mkdir($uploadPath, 0755, true);
-        }
-
-        $userId = session()->get('id');
+        $userId = (int) session()->get('id');
         $timestamp = time();
         $frontName  = 'front_' . $userId . '_' . $timestamp . '.' . $front->getExtension();
         $backName   = 'back_' . $userId . '_' . $timestamp . '.' . $back->getExtension();
         $selfieName = 'selfie_' . $userId . '_' . $timestamp . '.' . $selfie->getExtension();
 
-        $front->move($uploadPath, $frontName);
-        $back->move($uploadPath, $backName);
-        $selfie->move($uploadPath, $selfieName);
+        // Guardar en todas las rutas candidatas (public + writable) para evitar 404 en Hostinger
+        $savedFront  = bingo_upload_store_file($front, 'kyc', $frontName);
+        $savedBack   = bingo_upload_store_file($back, 'kyc', $backName);
+        $savedSelfie = bingo_upload_store_file($selfie, 'kyc', $selfieName);
 
-        $modelUsers = new UsersModel();
+        if ($savedFront === '' || $savedBack === '' || $savedSelfie === '') {
+            log_message('error', 'KYC upload falló user=' . $userId . ' front=' . $savedFront . ' back=' . $savedBack . ' selfie=' . $savedSelfie);
+            return redirect()->back()->with('error', 'No se pudieron guardar las imágenes. Intenta de nuevo o contacta soporte.');
+        }
+
+        // Verificar que al menos se resuelven por la ruta de lectura
+        if (
+            bingo_upload_resolve('kyc', $savedFront) === ''
+            || bingo_upload_resolve('kyc', $savedBack) === ''
+            || bingo_upload_resolve('kyc', $savedSelfie) === ''
+        ) {
+            log_message('error', 'KYC guardado pero no resoluble user=' . $userId);
+            return redirect()->back()->with('error', 'Las imágenes se subieron pero no son accesibles. Contacta soporte.');
+        }
+
         $modelUsers->update($userId, [
-            'kyc_front'        => $frontName,
-            'kyc_back'         => $backName,
-            'kyc_selfie'       => $selfieName,
+            'kyc_front'        => $savedFront,
+            'kyc_back'         => $savedBack,
+            'kyc_selfie'       => $savedSelfie,
             'kyc_status'       => 'pending',
             'kyc_observations' => null,
         ]);

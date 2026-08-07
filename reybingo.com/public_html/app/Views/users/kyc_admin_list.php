@@ -337,21 +337,21 @@
                                     <div class="kyc-docs-row">
                                         <div class="kyc-doc-thumb">
                                             <div class="kyc-doc-thumb-label">Frente</div>
-                                            <a href="javascript:void(0);" onclick="showImageModal('<?= site_url('uploads/kyc/' . $u['kyc_front']); ?>', 'Frente del documento')">
-                                                <img src="<?= site_url('uploads/kyc/' . $u['kyc_front']); ?>" alt="Frente">
+                                            <a href="javascript:void(0);" onclick="showImageModal('<?= bingo_kyc_image_url($u['kyc_front'] ?? ''); ?>', 'Frente del documento')">
+                                                <img src="<?= bingo_kyc_image_url($u['kyc_front'] ?? ''); ?>" alt="Frente">
                                             </a>
                                         </div>
                                         <div class="kyc-doc-thumb">
                                             <div class="kyc-doc-thumb-label">Reverso</div>
-                                            <a href="javascript:void(0);" onclick="showImageModal('<?= site_url('uploads/kyc/' . $u['kyc_back']); ?>', 'Reverso del documento')">
-                                                <img src="<?= site_url('uploads/kyc/' . $u['kyc_back']); ?>" alt="Reverso">
+                                            <a href="javascript:void(0);" onclick="showImageModal('<?= bingo_kyc_image_url($u['kyc_back'] ?? ''); ?>', 'Reverso del documento')">
+                                                <img src="<?= bingo_kyc_image_url($u['kyc_back'] ?? ''); ?>" alt="Reverso">
                                             </a>
                                         </div>
                                         <?php if (! empty($u['kyc_selfie'])): ?>
                                         <div class="kyc-doc-thumb">
                                             <div class="kyc-doc-thumb-label">Selfie</div>
-                                            <a href="javascript:void(0);" onclick="showImageModal('<?= site_url('uploads/kyc/' . $u['kyc_selfie']); ?>', 'Selfie con documento en la barbilla')">
-                                                <img src="<?= site_url('uploads/kyc/' . $u['kyc_selfie']); ?>" alt="Selfie">
+                                            <a href="javascript:void(0);" onclick="showImageModal('<?= bingo_kyc_image_url($u['kyc_selfie'] ?? ''); ?>', 'Selfie con documento en la barbilla')">
+                                                <img src="<?= bingo_kyc_image_url($u['kyc_selfie'] ?? ''); ?>" alt="Selfie">
                                             </a>
                                         </div>
                                         <?php endif; ?>

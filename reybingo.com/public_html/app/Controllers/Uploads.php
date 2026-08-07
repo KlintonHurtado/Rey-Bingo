@@ -32,8 +32,8 @@ class Uploads extends Controller
 
         $path = bingo_upload_resolve($folder, $filename);
         if ($path === '') {
-            // Avatar: fallback en vez de 404 roto
-            if ($folder === 'users') {
+            // Avatar / KYC: fallback en vez de 404 roto
+            if ($folder === 'users' || $folder === 'kyc') {
                 $fallback = FCPATH . 'assets/img/avatar.jpg';
                 if (is_file($fallback)) {
                     return $this->respondFile($fallback, 'image/jpeg');

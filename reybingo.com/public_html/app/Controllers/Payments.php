@@ -1090,6 +1090,7 @@ class Payments extends Controller {
 
             return view('users/requestPayment', $data);
         } else if ($type === 'deposit') {
+            helper('bingo');
             $data['deposit'] = $modelDeposits->where('id', $id)->first();
 
             if ($data['deposit']) {
@@ -1107,9 +1108,12 @@ class Payments extends Controller {
                 if (! empty($data['deposit']['store'])) {
                     $data['storeUser'] = $modelUsers->find($data['deposit']['store']);
                 }
-            }
 
-            $data['status'] = $this->formatStatusDeposit($data['deposit']['status']);
+                $data['status'] = $this->formatStatusDeposit($data['deposit']['status']);
+            } else {
+                $data['status'] = '';
+                $data['user'] = null;
+            }
 
             $data['type'] = $type;
 
@@ -1143,9 +1147,14 @@ class Payments extends Controller {
     }
 
     public function modalVoucher($id = null) {
+        helper('bingo');
         $modelDeposits = new DepositsModel();
 
         $data['deposit'] = $modelDeposits->where('id', $id)->first();
+        if ($data['deposit'] && ! empty($data['deposit']['voucher']) && ! bingo_voucher_exists($data['deposit']['voucher'])) {
+            bingo_voucher_sync_after_insert((int) $data['deposit']['id'], (string) $data['deposit']['voucher']);
+            $data['deposit'] = $modelDeposits->where('id', $id)->first() ?: $data['deposit'];
+        }
 
         return view('users/modalVoucher', $data);
     }

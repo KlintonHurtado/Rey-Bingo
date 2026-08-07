@@ -549,8 +549,8 @@ $sourceLabel = static function ($source) {
                     <div class="col-4 text-center">
                         <div class="small mb-1"><?= esc($label); ?></div>
                         <?php if (! empty($user[$field])) : ?>
-                            <a href="<?= site_url('uploads/kyc/' . $user[$field]); ?>" target="_blank" rel="noopener">
-                                <img src="<?= site_url('uploads/kyc/' . $user[$field]); ?>" alt="<?= esc($label); ?>" class="img-fluid rounded border" style="max-height:120px;object-fit:cover;">
+                            <a href="<?= bingo_kyc_image_url($user[$field]); ?>" target="_blank" rel="noopener">
+                                <img src="<?= bingo_kyc_image_url($user[$field]); ?>" alt="<?= esc($label); ?>" class="img-fluid rounded border" style="max-height:120px;object-fit:cover;">
                             </a>
                         <?php else : ?>
                             <div class="text-muted small"><?= translate('not provided'); ?></div>

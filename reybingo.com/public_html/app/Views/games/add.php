@@ -502,14 +502,16 @@
 
         function syncRouletteCartonsToggle() {
             var price = parseGamePrice();
-            var maxPrice = <?= json_encode(bingo_roulette_max_carton_price()); ?>;
+            var roulettePrice = <?= json_encode(bingo_roulette_carton_price()); ?>;
             var $wrap = $('#allow-roulette-cartons-wrap');
             var $chk = $('#allow_roulette_cartons');
+            // Misma regla del backend: solo precio exacto 0.25
+            var allowed = Math.abs(price - roulettePrice) < 0.001;
 
             // Siempre visible
             $wrap.show();
 
-            if (price > maxPrice) {
+            if (!allowed) {
                 $chk.prop('checked', false);
                 $chk.prop('disabled', true);
                 $('#allow-roulette-cartons-help').text('<?= translate('allow roulette cartons disabled over max'); ?>');

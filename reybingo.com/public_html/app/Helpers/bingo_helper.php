@@ -2261,7 +2261,7 @@ if (!function_exists('bingo_upload_candidate_dirs')) {
      *
      * @return list<string>
      */
-    function bingo_upload_candidate_dirs(string $folder): array
+    function bingo_upload_candidate_dirs(string $folder, bool $onlyExisting = true): array
     {
         $folder = trim(str_replace(['..', '\\'], '', $folder), '/');
         if ($folder === '') {
@@ -2288,7 +2288,7 @@ if (!function_exists('bingo_upload_candidate_dirs')) {
 
         foreach ($candidates as $dir) {
             $normalized = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
-            if (is_dir($normalized)) {
+            if (! $onlyExisting || is_dir($normalized)) {
                 $dirs[] = $normalized;
             }
         }
@@ -2325,7 +2325,8 @@ if (!function_exists('bingo_upload_resolve')) {
             return '';
         }
 
-        foreach (bingo_upload_candidate_dirs($folder) as $dir) {
+        // Probar todas las rutas candidatas (aunque el dir no se haya listado antes)
+        foreach (bingo_upload_candidate_dirs($folder, false) as $dir) {
             $path = $dir . $filename;
             if (is_file($path) && is_readable($path)) {
                 return $path;
@@ -2333,6 +2334,104 @@ if (!function_exists('bingo_upload_resolve')) {
         }
 
         return '';
+    }
+}
+
+if (!function_exists('bingo_upload_store_file')) {
+    /**
+     * Guarda un UploadedFile en la primera carpeta escribible y copia a las demás.
+     * Evita 404 en Hostinger cuando FCPATH/public y writable no coinciden.
+     *
+     * @return string nombre final del archivo o '' si falla
+     */
+    function bingo_upload_store_file($file, string $folder, string $preferredName): string
+    {
+        if (! is_object($file) || ! method_exists($file, 'isValid') || ! $file->isValid()) {
+            return '';
+        }
+
+        $preferredName = bingo_upload_sanitize_name($preferredName);
+        if ($preferredName === '') {
+            return '';
+        }
+
+        $dirs = bingo_upload_candidate_dirs($folder, false);
+        if ($dirs === []) {
+            return '';
+        }
+
+        $primary = null;
+        $tmpPath = method_exists($file, 'getTempName') ? (string) $file->getTempName() : '';
+
+        foreach ($dirs as $dir) {
+            if (! is_dir($dir) && ! @mkdir($dir, 0755, true) && ! is_dir($dir)) {
+                continue;
+            }
+            if (! is_writable($dir)) {
+                continue;
+            }
+
+            $target = $dir . $preferredName;
+            try {
+                // move() solo una vez; luego copiamos
+                if ($primary === null) {
+                    if (is_file($tmpPath)) {
+                        if (! @copy($tmpPath, $target)) {
+                            continue;
+                        }
+                    } elseif (method_exists($file, 'move')) {
+                        $file->move($dir, $preferredName, true);
+                    } else {
+                        continue;
+                    }
+                    if (! is_file($target)) {
+                        continue;
+                    }
+                    $primary = $target;
+                } elseif (is_file($primary) && ! is_file($target)) {
+                    @copy($primary, $target);
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'bingo_upload_store_file: ' . $e->getMessage());
+            }
+        }
+
+        if ($primary === null || ! is_file($primary)) {
+            return '';
+        }
+
+        // Asegurar copia en FCPATH (URL estática / rewrite)
+        $publicDir = rtrim(FCPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR;
+        if (! is_dir($publicDir)) {
+            @mkdir($publicDir, 0755, true);
+        }
+        $publicPath = $publicDir . $preferredName;
+        if (is_dir($publicDir) && is_writable($publicDir) && ! is_file($publicPath) && is_file($primary)) {
+            @copy($primary, $publicPath);
+        }
+
+        return $preferredName;
+    }
+}
+
+if (!function_exists('bingo_kyc_image_url')) {
+    /**
+     * URL de imagen KYC; si el archivo no existe, placeholder (evita img rota).
+     */
+    function bingo_kyc_image_url(?string $filename): string
+    {
+        $name = bingo_upload_sanitize_name($filename);
+        if ($name !== '' && bingo_upload_resolve('kyc', $name) !== '') {
+            return site_url('uploads/kyc/' . $name);
+        }
+
+        // Placeholder genérico (mismo que avatar si no hay asset dedicado)
+        $placeholder = FCPATH . 'assets/img/avatar.jpg';
+        if (is_file($placeholder)) {
+            return site_url('assets/img/avatar.jpg');
+        }
+
+        return site_url('uploads/kyc/' . ($name !== '' ? $name : 'missing.jpg'));
     }
 }
 
@@ -2375,14 +2474,25 @@ if (!function_exists('bingo_voucher_candidate_dirs')) {
         if (defined('ROOTPATH')) {
             $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
             $candidates[] = rtrim(ROOTPATH, '/\\') . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            $parent = dirname(rtrim(ROOTPATH, '/\\'));
+            if ($parent && $parent !== '.' && $parent !== DIRECTORY_SEPARATOR) {
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'public_html' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+                $candidates[] = $parent . DIRECTORY_SEPARATOR . 'public_html' . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'vouchers' . DIRECTORY_SEPARATOR;
+            }
         }
 
         foreach ($candidates as $dir) {
-            if (! is_dir($dir)) {
-                @mkdir($dir, 0755, true);
+            $normalized = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+            // Incluir aunque aún no exista: resolve prueba is_file; mkdir ayuda al guardar
+            if (! is_dir($normalized)) {
+                @mkdir($normalized, 0755, true);
             }
-            if (is_dir($dir)) {
-                $dirs[] = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR;
+            if (is_dir($normalized)) {
+                $dirs[] = $normalized;
+            } else {
+                // Aun así listar para intentos de lectura en rutas ya creadas fuera de este request
+                $dirs[] = $normalized;
             }
         }
 
