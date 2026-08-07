@@ -143,7 +143,7 @@ class Ggr extends Controller
         if (! $validation->run($this->request->getPost(), [
             'rateStoreGgrCommission' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
             'rateOperatorCommission' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
-            'ggrSettlementMode'      => 'required|in_list[monthly,immediate]',
+            'ggrSettlementMode'      => 'required|in_list[monthly,immediate,daily,weekly]',
         ])) {
             return $this->response->setJSON([
                 'success' => false,
@@ -152,11 +152,18 @@ class Ggr extends Controller
         }
 
         $modelSystem = new \App\Models\SystemModel();
+        $settlementMode = strtolower(trim((string) ($this->request->getPost('ggrSettlementMode') ?: 'monthly')));
+        if ($settlementMode === 'immediate') {
+            $settlementMode = 'daily';
+        }
+        if (! in_array($settlementMode, ['daily', 'weekly', 'monthly'], true)) {
+            $settlementMode = 'monthly';
+        }
         $settings = [
             'rateStoreGgrCommission'    => ((float) ($this->request->getPost('rateStoreGgrCommission') ?: 0)) / 100,
             'rateOperatorCommission'    => ((float) ($this->request->getPost('rateOperatorCommission') ?: 0)) / 100,
-            'ggrSettlementMode'         => $this->request->getPost('ggrSettlementMode') === 'immediate' ? 'immediate' : 'monthly',
-            'autoApproveGgrCommissions' => $this->request->getPost('ggrSettlementMode') === 'immediate' ? '1' : '0',
+            'ggrSettlementMode'         => $settlementMode,
+            'autoApproveGgrCommissions' => $settlementMode === 'daily' ? '1' : '0',
         ];
 
         foreach ($settings as $key => $value) {

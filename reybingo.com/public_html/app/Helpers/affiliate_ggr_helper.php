@@ -155,15 +155,19 @@ if (! function_exists('bingo_ggr_settlement_mode')) {
     function bingo_ggr_settlement_mode(): string
     {
         $mode = strtolower(trim((string) (systemGet('ggrSettlementMode') ?? 'monthly')));
+        if ($mode === 'immediate') {
+            return 'daily';
+        }
 
-        return in_array($mode, ['monthly', 'immediate'], true) ? $mode : 'monthly';
+        return in_array($mode, ['daily', 'weekly', 'monthly'], true) ? $mode : 'monthly';
     }
 }
 
 if (! function_exists('bingo_ggr_pays_monthly')) {
     function bingo_ggr_pays_monthly(): bool
     {
-        return bingo_ggr_settlement_mode() === 'monthly';
+        // weekly acumula como mensual hasta tener cierre semanal dedicado
+        return in_array(bingo_ggr_settlement_mode(), ['monthly', 'weekly'], true);
     }
 }
 

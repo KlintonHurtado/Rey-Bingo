@@ -386,42 +386,91 @@
                                 <small id="registrationBonus-error" class="text-danger d-none"></small>
                             </div>
 
-                            <div class="col-md-12">
-                                <h6><?= translate('point of sale settings'); ?></h6>
-                                <hr class="my-1">
-                            </div>
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <label for="rateStoreCommission" class="form-label"><?= translate('store recharge commission rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStoreCommission" id="rateStoreCommission" placeholder="<?= translate('store recharge commission rate'); ?>" value="<?= (float) (systemGet('rateStoreCommission') ?? 0) * 100; ?>">
-                                <small id="rateStoreCommission-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <label for="rateStoreGgrCommission" class="form-label"><?= translate('store ggr commission rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStoreGgrCommission" id="rateStoreGgrCommission" placeholder="<?= translate('store ggr commission rate'); ?>" value="<?= (float) (systemGet('rateStoreGgrCommission') ?? 0) * 100; ?>">
-                                <small id="rateStoreGgrCommission-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <label for="rateStorePrizeCommission" class="form-label"><?= translate('store prize commission rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateStorePrizeCommission" id="rateStorePrizeCommission" placeholder="<?= translate('store prize commission rate'); ?>" value="<?= (float) (systemGet('rateStorePrizeCommission') ?? 0) * 100; ?>">
-                                <small id="rateStorePrizeCommission-error" class="text-danger d-none"></small>
-                            </div>
+                            <?php
+                            $commissionRatePct = static function (string $key, ?string $fallbackKey = null): float {
+                                $raw = systemGet($key);
+                                if (($raw === null || $raw === '') && $fallbackKey !== null) {
+                                    $raw = systemGet($fallbackKey);
+                                }
+
+                                return round((float) ($raw ?? 0) * 100, 2);
+                            };
+                            $opRetailPct = $commissionRatePct('rateOperatorGgrRetail', 'rateOperatorCommission');
+                            $opAffiliatePct = $commissionRatePct('rateOperatorGgrAffiliate');
+                            $opRechargePct = $commissionRatePct('rateOperatorRecharge');
+                            $opWithdrawPct = $commissionRatePct('rateOperatorWithdraw');
+                            $pvRetailPct = $commissionRatePct('rateStoreGgrCommission');
+                            $pvAffiliatePct = $commissionRatePct('rateStoreGgrAffiliate');
+                            $pvRechargePct = $commissionRatePct('rateStoreCommission');
+                            $pvWithdrawPct = $commissionRatePct('rateStorePrizeCommission');
+                            $ggrSettlementMode = bingo_ggr_settlement_mode();
+                            if ($ggrSettlementMode === 'immediate') {
+                                $ggrSettlementMode = 'daily';
+                            }
+                            ?>
 
                             <div class="col-md-12">
                                 <h6><?= translate('operator settings'); ?></h6>
                                 <hr class="my-1">
+                                <small class="text-muted d-block mb-2"><?= translate('operator settings help hierarchical'); ?></small>
                             </div>
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <label for="rateOperatorCommission" class="form-label"><?= translate('operator ggr total rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="rateOperatorCommission" id="rateOperatorCommission" placeholder="<?= translate('operator ggr total rate'); ?>" value="<?= (float) (systemGet('rateOperatorCommission') ?? 0) * 100; ?>">
-                                <small id="rateOperatorCommission-error" class="text-danger d-none"></small>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateOperatorGgrRetail" class="form-label"><?= translate('operator ggr ticket retail rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorGgrRetail" id="rateOperatorGgrRetail" data-category="retail" value="<?= $opRetailPct; ?>">
+                                <small id="rateOperatorGgrRetail-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateOperatorGgrAffiliate" class="form-label"><?= translate('operator ggr affiliate rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorGgrAffiliate" id="rateOperatorGgrAffiliate" data-category="affiliate" value="<?= $opAffiliatePct; ?>">
+                                <small id="rateOperatorGgrAffiliate-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateOperatorRecharge" class="form-label"><?= translate('operator recharge rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorRecharge" id="rateOperatorRecharge" data-category="recharge" value="<?= $opRechargePct; ?>">
+                                <small id="rateOperatorRecharge-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateOperatorWithdraw" class="form-label"><?= translate('operator withdraw rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorWithdraw" id="rateOperatorWithdraw" data-category="withdraw" value="<?= $opWithdrawPct; ?>">
+                                <small id="rateOperatorWithdraw-error" class="text-danger d-none"></small>
                             </div>
                             <div class="col-md-6 col-lg-4 mb-3">
                                 <label for="ggrSettlementMode" class="form-label"><?= translate('ggr settlement mode'); ?></label>
-                                <?php $ggrSettlementMode = bingo_ggr_settlement_mode(); ?>
                                 <select class="form-control form-control-lg form-bingo" name="ggrSettlementMode" id="ggrSettlementMode">
+                                    <option value="daily" <?= $ggrSettlementMode === 'daily' ? 'selected' : ''; ?>><?= translate('ggr settlement daily'); ?></option>
+                                    <option value="weekly" <?= $ggrSettlementMode === 'weekly' ? 'selected' : ''; ?>><?= translate('ggr settlement weekly'); ?></option>
                                     <option value="monthly" <?= $ggrSettlementMode === 'monthly' ? 'selected' : ''; ?>><?= translate('ggr settlement monthly'); ?></option>
-                                    <option value="immediate" <?= $ggrSettlementMode === 'immediate' ? 'selected' : ''; ?>><?= translate('ggr settlement immediate'); ?></option>
                                 </select>
+                            </div>
+
+                            <div class="col-md-12 mt-2">
+                                <h6><?= translate('point of sale settings'); ?></h6>
+                                <hr class="my-1">
+                                <small class="text-muted d-block mb-2"><?= translate('point of sale settings help hierarchical'); ?></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateStoreGgrCommission" class="form-label"><?= translate('store ggr ticket retail rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreGgrCommission" id="rateStoreGgrCommission" data-category="retail" data-op-field="rateOperatorGgrRetail" value="<?= $pvRetailPct; ?>">
+                                <small class="text-muted d-block js-margin-hint" data-category="retail"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
+                                <small id="rateStoreGgrCommission-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateStoreGgrAffiliate" class="form-label"><?= translate('store ggr affiliate rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreGgrAffiliate" id="rateStoreGgrAffiliate" data-category="affiliate" data-op-field="rateOperatorGgrAffiliate" value="<?= $pvAffiliatePct; ?>">
+                                <small class="text-muted d-block js-margin-hint" data-category="affiliate"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
+                                <small id="rateStoreGgrAffiliate-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateStoreCommission" class="form-label"><?= translate('store recharge commission rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreCommission" id="rateStoreCommission" data-category="recharge" data-op-field="rateOperatorRecharge" value="<?= $pvRechargePct; ?>">
+                                <small class="text-muted d-block js-margin-hint" data-category="recharge"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
+                                <small id="rateStoreCommission-error" class="text-danger d-none"></small>
+                            </div>
+                            <div class="col-md-6 col-lg-3 mb-3">
+                                <label for="rateStorePrizeCommission" class="form-label"><?= translate('store withdraw prize commission rate'); ?> %</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStorePrizeCommission" id="rateStorePrizeCommission" data-category="withdraw" data-op-field="rateOperatorWithdraw" value="<?= $pvWithdrawPct; ?>">
+                                <small class="text-muted d-block js-margin-hint" data-category="withdraw"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
+                                <small id="rateStorePrizeCommission-error" class="text-danger d-none"></small>
                             </div>
 
                             <div class="col-md-12">
@@ -797,7 +846,50 @@
         refreshRoulettePrizeUi();
     })();
 
+    function updateCommissionMargins() {
+        $('.js-pv-rate').each(function () {
+            var $pv = $(this);
+            var opId = $pv.data('op-field');
+            var opVal = parseFloat($('#' + opId).val());
+            var pvVal = parseFloat($pv.val());
+            if (isNaN(opVal)) opVal = 0;
+            if (isNaN(pvVal)) pvVal = 0;
+            var margin = Math.max(0, Math.round((opVal - pvVal) * 100) / 100);
+            var category = $pv.data('category');
+            $('.js-margin-hint[data-category="' + category + '"] .js-margin-value').text(margin.toFixed(2));
+            if (pvVal > opVal) {
+                $pv.addClass('is-invalid');
+            } else {
+                $pv.removeClass('is-invalid');
+            }
+        });
+    }
+
+    function validateCommissionHierarchy() {
+        var ok = true;
+        var firstInvalid = null;
+        $('.js-pv-rate').each(function () {
+            var $pv = $(this);
+            var opId = $pv.data('op-field');
+            var opVal = parseFloat($('#' + opId).val());
+            var pvVal = parseFloat($pv.val());
+            if (isNaN(opVal)) opVal = 0;
+            if (isNaN(pvVal)) pvVal = 0;
+            var errId = $pv.attr('id') + '-error';
+            if (pvVal > opVal) {
+                ok = false;
+                $pv.addClass('is-invalid');
+                $('#' + errId).text('<?= translate('store rate cannot exceed operator rate'); ?>').removeClass('d-none');
+                if (!firstInvalid) firstInvalid = $pv.attr('id');
+            }
+        });
+        return { ok: ok, firstInvalid: firstInvalid };
+    }
+
     $(document).ready(function () {
+        $(document).on('input change', '.js-op-rate, .js-pv-rate', updateCommissionMargins);
+        updateCommissionMargins();
+
         // Manejar envío del formulario
         $('#settings-form').on('submit', function (e) {
             e.preventDefault(); 
@@ -822,6 +914,27 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
+                return;
+            }
+
+            var hierarchy = validateCommissionHierarchy();
+            if (!hierarchy.ok) {
+                button.prop("disabled", false).html(originalHtml);
+                Toastify({
+                    text: '<?= translate('store rate cannot exceed operator rate'); ?>',
+                    duration: 4000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+                if (hierarchy.firstInvalid) {
+                    var tabPane = $('#' + hierarchy.firstInvalid).closest('.tab-pane');
+                    if (tabPane.length) {
+                        $('#' + tabPane.attr('id') + '-tab').tab('show');
+                    }
+                    $('#' + hierarchy.firstInvalid)[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
                 return;
             }
 

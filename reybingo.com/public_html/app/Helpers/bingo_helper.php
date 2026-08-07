@@ -3454,6 +3454,23 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
                 ]);
             }
 
+            $operatorCommissionRow = $db->table('system')->where('key', 'rateOperatorCommission')->get()->getRowArray();
+            $commissionDefaults = [
+                'rateOperatorGgrRetail' => (string) ($operatorCommissionRow['value'] ?? '0'),
+                'rateOperatorGgrAffiliate' => '0',
+                'rateOperatorRecharge' => '0',
+                'rateOperatorWithdraw' => '0',
+                'rateStoreGgrAffiliate' => '0',
+            ];
+            foreach ($commissionDefaults as $commissionKey => $commissionDefault) {
+                if ($db->table('system')->where('key', $commissionKey)->countAllResults() === 0) {
+                    $db->table('system')->insert([
+                        'key' => $commissionKey,
+                        'value' => $commissionDefault,
+                    ]);
+                }
+            }
+
             if ($db->table('system')->where('key', 'lowBalanceThreshold')->countAllResults() === 0) {
                 $db->table('system')->insert([
                     'key' => 'lowBalanceThreshold',
