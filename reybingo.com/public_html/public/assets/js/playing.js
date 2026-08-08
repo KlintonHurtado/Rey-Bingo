@@ -1154,15 +1154,18 @@ function renderBallHistory() {
         return;
     }
 
+    // Solo UI: mostrar máximo 4 balotas en el historial lateral (no afecta la lógica del juego).
+    const historyLimit = 4;
+
     // En LIVE no hay #last-number: el historial debe incluir la bola actual
     // (si no, el jugador ve la bola recién cantada solo cuando sale la siguiente).
     const hasMainBall = $('#last-number').length > 0;
     const history = hasMainBall
-        ? (ordered.length > 1 ? ordered.slice(Math.max(0, ordered.length - 5), -1) : [])
-        : ordered.slice(Math.max(0, ordered.length - 5));
+        ? (ordered.length > 1 ? ordered.slice(Math.max(0, ordered.length - (historyLimit + 1)), -1) : [])
+        : ordered.slice(Math.max(0, ordered.length - historyLimit));
 
     container.empty();
-    history.slice(-5).forEach(function(num) {
+    history.slice(-historyLimit).forEach(function(num) {
         container.append(`<div class="bingo-ball ${getColumnClass(num)} ${getHistoryBallSizeClass()}"><span>${num}</span></div>`);
     });
 }

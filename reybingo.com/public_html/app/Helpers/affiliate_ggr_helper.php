@@ -295,9 +295,16 @@ if (! function_exists('bingo_store_ggr_commission_rate')) {
     function bingo_store_ggr_commission_rate(array $store): float
     {
         $custom = $store['ggr_commission_rate'] ?? null;
-        $rate = ($custom !== null && $custom !== '')
-            ? max(0, (float) $custom)
-            : max(0, (float) (systemGet('rateStoreGgrCommission') ?? 0));
+        if ($custom !== null && $custom !== '') {
+            $rate = max(0, (float) $custom);
+        } else {
+            $affiliate = systemGet('rateStoreGgrAffiliate');
+            if ($affiliate !== null && $affiliate !== '') {
+                $rate = max(0, (float) $affiliate);
+            } else {
+                $rate = max(0, (float) (systemGet('rateStoreGgrCommission') ?? 0));
+            }
+        }
 
         $operator = bingo_resolve_store_operator($store);
         if ($operator) {
@@ -828,27 +835,60 @@ if (! function_exists('bingo_fetch_affiliate_ggr_dashboard')) {
      *   history: list<array>
      * }
      */
-    function bingo_fetch_affiliate_ggr_dashboard(int $affiliateId, string $affiliateType, int $days = 30): array
+    function bingo_fetch_affiliate_ggr_dashboard(int $affiliateId, string $affiliateType, int $days = 30, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         bingo_ensure_affiliate_ggr_schema();
 
         $modelCommissions = new \App\Models\AffiliateGgrCommissionsModel();
         $modelUsers = new \App\Models\UsersModel();
 
-        $since = date('Y-m-d', strtotime('-' . max(1, $days) . ' days'));
+        $dateFrom = $dateFrom !== null ? trim($dateFrom) : '';
+        $dateTo = $dateTo !== null ? trim($dateTo) : '';
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
 
-        $rows = $modelCommissions
+        $builder = $modelCommissions
             ->where('affiliate_id', $affiliateId)
-            ->where('affiliate_type', $affiliateType)
-            ->groupStart()
+            ->where('affiliate_type', $affiliateType);
+
+        if ($dateFrom !== '' || $dateTo !== '') {
+            if ($dateFrom !== '') {
+                $builder->groupStart()
+                    ->where('period_date >=', $dateFrom)
+                    ->orGroupStart()
+                        ->where('period_date', null)
+                        ->where('created_at >=', $dateFrom . ' 00:00:00')
+                    ->groupEnd()
+                ->groupEnd();
+            }
+            if ($dateTo !== '') {
+                $builder->groupStart()
+                    ->where('period_date <=', $dateTo)
+                    ->orGroupStart()
+                        ->where('period_date', null)
+                        ->where('created_at <=', $dateTo . ' 23:59:59')
+                    ->groupEnd()
+                ->groupEnd();
+            }
+        } else {
+            $since = date('Y-m-d', strtotime('-' . max(1, $days) . ' days'));
+            $builder->groupStart()
                 ->where('period_date >=', $since)
                 ->orGroupStart()
                     ->where('period_date', null)
                     ->where('DATE(created_at) >=', $since)
                 ->groupEnd()
-            ->groupEnd()
-            ->orderBy('created_at', 'DESC')
-            ->findAll(200);
+            ->groupEnd();
+        }
+
+        $rows = $builder->orderBy('created_at', 'DESC')->findAll(500);
 
         $totalCommission = 0.0;
         $pendingCommission = 0.0;
@@ -1017,7 +1057,7 @@ if (! function_exists('bingo_sum_affiliate_ggr_commissions')) {
     /**
      * @return array{total_commission:float,pending_commission:float,total_ggr:float,count:int}
      */
-    function bingo_sum_affiliate_ggr_commissions(int $affiliateId, string $affiliateType): array
+    function bingo_sum_affiliate_ggr_commissions(int $affiliateId, string $affiliateType, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         if ($affiliateId <= 0 || $affiliateType === '') {
             return [
@@ -1030,6 +1070,18 @@ if (! function_exists('bingo_sum_affiliate_ggr_commissions')) {
 
         bingo_ensure_affiliate_ggr_schema();
 
+        $dateFrom = $dateFrom !== null ? trim($dateFrom) : '';
+        $dateTo = $dateTo !== null ? trim($dateTo) : '';
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
         $modelCommissions = new \App\Models\AffiliateGgrCommissionsModel();
         $rows = $modelCommissions
             ->where('affiliate_id', $affiliateId)
@@ -1039,11 +1091,28 @@ if (! function_exists('bingo_sum_affiliate_ggr_commissions')) {
         $totalCommission = 0.0;
         $pendingCommission = 0.0;
         $totalGgr = 0.0;
+        $matched = 0;
 
         foreach ($rows as $row) {
+            $rowDate = ! empty($row['period_date'])
+                ? substr((string) $row['period_date'], 0, 10)
+                : date('Y-m-d', strtotime((string) ($row['created_at'] ?? 'now')));
+
+            if ($dateFrom !== '' && $rowDate < $dateFrom) {
+                continue;
+            }
+            if ($dateTo !== '' && $rowDate > $dateTo) {
+                continue;
+            }
+
+            $matched++;
             $ggr = (float) ($row['ggr_amount'] ?? 0);
             $commission = (float) ($row['commission_amount'] ?? 0);
             $status = (int) ($row['status'] ?? 0);
+
+            if ($status === 3) {
+                continue;
+            }
 
             $totalGgr += $ggr;
 
@@ -1058,7 +1127,7 @@ if (! function_exists('bingo_sum_affiliate_ggr_commissions')) {
             'total_commission'   => round($totalCommission, 2),
             'pending_commission' => round($pendingCommission, 2),
             'total_ggr'          => round($totalGgr, 2),
-            'count'              => count($rows),
+            'count'              => $matched,
         ];
     }
 }
@@ -1267,6 +1336,9 @@ if (! function_exists('bingo_fetch_operator_commissions_summary')) {
             'total_ggr'          => $ggrTotals['total_ggr'],
             'ggr_rate'           => bingo_ggr_commission_rate_for($operator ?? [], 'operator'),
             'operator_rate'      => bingo_operator_commission_rate($operator),
+            'affiliate_rate'     => bingo_operator_commission_rate($operator),
+            'recharge_rate'      => bingo_operator_recharge_rate($operator),
+            'withdraw_rate'      => bingo_operator_withdraw_rate($operator),
             'referred_operators' => $affiliatedStores,
             'affiliated_stores'  => $affiliatedStores,
             'ggr_dashboard'      => $ggrDashboard,
@@ -1288,7 +1360,7 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
      *   chart:list<array{label:string,ggr:float,commission:float}>
      * }
      */
-    function bingo_fetch_operator_stores_commissions_summary(array $stores, int $chartDays = 30, ?array $operator = null): array
+    function bingo_fetch_operator_stores_commissions_summary(array $stores, int $chartDays = 30, ?array $operator = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $totalAffiliate = 0.0;
         $totalGgrCommission = 0.0;
@@ -1299,6 +1371,22 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
         $operatorTotalGgrRate = bingo_ggr_commission_rate_for($operator, 'operator');
 
         $operatorId = (int) ($operator['id'] ?? 0);
+        $dateFrom = $dateFrom !== null ? trim($dateFrom) : '';
+        $dateTo = $dateTo !== null ? trim($dateTo) : '';
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $hasDateFilter = $dateFrom !== '' || $dateTo !== '';
+        if ($hasDateFilter && $dateFrom !== '' && $dateTo !== '') {
+            $chartDays = max(1, (int) ((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1);
+        }
 
         foreach ($stores as $store) {
             $storeId = (int) ($store['id'] ?? 0);
@@ -1307,10 +1395,20 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
             }
 
             $affiliateCommission = $operatorId > 0
-                ? bingo_sum_operator_store_affiliate_commissions($operatorId, $storeId)
+                ? bingo_sum_operator_store_affiliate_commissions(
+                    $operatorId,
+                    $storeId,
+                    $hasDateFilter ? ($dateFrom !== '' ? $dateFrom : null) : null,
+                    $hasDateFilter ? ($dateTo !== '' ? $dateTo : null) : null
+                )
                 : 0.0;
             $ggrTotals = bingo_ggr_affiliate_active()
-                ? bingo_sum_affiliate_ggr_commissions($storeId, 'store')
+                ? bingo_sum_affiliate_ggr_commissions(
+                    $storeId,
+                    'store',
+                    $hasDateFilter ? ($dateFrom !== '' ? $dateFrom : null) : null,
+                    $hasDateFilter ? ($dateTo !== '' ? $dateTo : null) : null
+                )
                 : [
                     'total_commission'   => 0.0,
                     'pending_commission' => 0.0,
@@ -1342,7 +1440,13 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
             $totalGgr += $ggrTotals['total_ggr'];
 
             if (bingo_ggr_affiliate_active()) {
-                $ggrDashboard = bingo_fetch_affiliate_ggr_dashboard($storeId, 'store', $chartDays);
+                $ggrDashboard = bingo_fetch_affiliate_ggr_dashboard(
+                    $storeId,
+                    'store',
+                    $chartDays,
+                    $hasDateFilter ? ($dateFrom !== '' ? $dateFrom : null) : null,
+                    $hasDateFilter ? ($dateTo !== '' ? $dateTo : null) : null
+                );
                 foreach ($ggrDashboard['chart'] ?? [] as $point) {
                     $label = (string) ($point['label'] ?? '');
                     if ($label === '') {
@@ -1372,6 +1476,8 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
             'total_ggr'            => round($totalGgr, 2),
             'stores'               => $breakdown,
             'chart'                => array_values($chartMap),
+            'date_from'            => $dateFrom,
+            'date_to'              => $dateTo,
         ];
     }
 }

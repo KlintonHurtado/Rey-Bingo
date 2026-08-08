@@ -53,18 +53,6 @@
                                 <span><?= translate('stores commissions panel'); ?></span>
                             </button>
                         </li>
-                        <?php if (bingo_ggr_affiliate_active()) : ?>
-                        <li class="nav-item">
-                            <button
-                                type="button"
-                                class="nav-link operator-panel-tab operator-tool-tab"
-                                data-operator-tab="ggr-rates"
-                            >
-                                <i class="fa-duotone fa-solid fa-percent"></i>
-                                <span><?= translate('operator ggr rates configuration'); ?></span>
-                            </button>
-                        </li>
-                        <?php endif; ?>
                         <li class="nav-item operator-panel-tab-affiliate">
                             <button
                                 type="button"
@@ -93,7 +81,7 @@
                             </div>
                             <div>
                                 <h5 class="mb-1"><?= translate('points of sale'); ?></h5>
-                                <p class="small text-muted mb-0"><?= translate('operator enter store hint'); ?></p>
+                                <p class="small text-muted mb-0"><?= translate('operator store balance actions hint'); ?></p>
                             </div>
                         </div>
 
@@ -140,28 +128,67 @@
                                                     <div class="d-flex flex-column gap-2 mb-3">
                                                         <div class="p-2 rounded" style="background: rgba(98, 54, 255, 0.05); border: 1px solid rgba(98, 54, 255, 0.08);">
                                                             <span class="d-block text-muted small" style="font-size: 0.75rem;"><?= translate('available store balance'); ?></span>
-                                                            <strong style="color: #6236ff; font-size: 1.15rem;">
+                                                            <strong class="js-operator-store-balance" data-store-id="<?= $storeId; ?>" style="color: #6236ff; font-size: 1.15rem;">
                                                                 <?= systemGet('currency'); ?>
-                                                                <?= number_format((float) ($wallet['recharge'] ?? 0), 2); ?>
-                                                            </strong>
-                                                        </div>
-                                                        <div class="p-2 rounded" style="background: rgba(25, 135, 84, 0.05); border: 1px solid rgba(25, 135, 84, 0.08);">
-                                                            <span class="d-block text-muted small" style="font-size: 0.75rem;"><?= translate('store commission rate'); ?></span>
-                                                            <strong style="color: #198754; font-size: 1.15rem;">
-                                                                <?= number_format(bingo_store_commission_rate($store) * 100, 2) ?>%
+                                                                <span class="js-operator-store-balance-value"><?= number_format((float) ($wallet['recharge'] ?? 0), 2); ?></span>
                                                             </strong>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div class="p-3 pt-0 mt-auto">
-                                                    <a
-                                                        href="<?= site_url('operator/enterStore/' . $storeId); ?>"
-                                                        class="btn btn-primary btn-bingo w-100 d-flex align-items-center justify-content-center gap-2 py-2"
+                                                    <?php
+                                                    $ggrPct = bingo_store_ggr_commission_rate($store) * 100;
+                                                    $rechargePct = bingo_store_commission_rate($store) * 100;
+                                                    $prizePct = bingo_store_prize_commission_rate($store) * 100;
+                                                    $ggrIsCustom = isset($store['ggr_commission_rate']) && $store['ggr_commission_rate'] !== null && $store['ggr_commission_rate'] !== '';
+                                                    $rechargeIsCustom = isset($store['store_commission_rate']) && $store['store_commission_rate'] !== null && $store['store_commission_rate'] !== '';
+                                                    $prizeIsCustom = isset($store['store_prize_commission_rate']) && $store['store_prize_commission_rate'] !== null && $store['store_prize_commission_rate'] !== '';
+                                                    ?>
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-primary btn-bingo flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
+                                                            style="font-size: 0.82rem; font-weight: 600;"
+                                                            data-action="add"
+                                                            data-store-id="<?= $storeId; ?>"
+                                                            data-store-name="<?= esc($store['business_name'] ?? '-', 'attr'); ?>"
+                                                            data-balance="<?= esc(number_format((float) ($wallet['recharge'] ?? 0), 2, '.', ''), 'attr'); ?>"
+                                                        >
+                                                            <i class="fa-duotone fa-solid fa-plus"></i>
+                                                            <?= translate('add store balance'); ?>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-outline-light flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
+                                                            style="font-size: 0.82rem; font-weight: 600; border-color: rgba(255,255,255,0.25);"
+                                                            data-action="remove"
+                                                            data-store-id="<?= $storeId; ?>"
+                                                            data-store-name="<?= esc($store['business_name'] ?? '-', 'attr'); ?>"
+                                                            data-balance="<?= esc(number_format((float) ($wallet['recharge'] ?? 0), 2, '.', ''), 'attr'); ?>"
+                                                        >
+                                                            <i class="fa-duotone fa-solid fa-minus"></i>
+                                                            <?= translate('remove store balance'); ?>
+                                                        </button>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-outline-primary btn-bingo w-100 d-flex align-items-center justify-content-center gap-2 py-2 js-operator-store-info-btn"
                                                         style="font-size: 0.9rem; font-weight: 600;"
+                                                        data-name="<?= esc($store['business_name'] ?? '-', 'attr'); ?>"
+                                                        data-code="<?= esc($store['code'] ?? '', 'attr'); ?>"
+                                                        data-email="<?= esc($store['email'] ?? '', 'attr'); ?>"
+                                                        data-address="<?= esc($store['address_line'] ?? '', 'attr'); ?>"
+                                                        data-balance="<?= esc(number_format((float) ($wallet['recharge'] ?? 0), 2, '.', ''), 'attr'); ?>"
+                                                        data-ggr="<?= esc(number_format($ggrPct, 2, '.', ''), 'attr'); ?>"
+                                                        data-recharge="<?= esc(number_format($rechargePct, 2, '.', ''), 'attr'); ?>"
+                                                        data-prize="<?= esc(number_format($prizePct, 2, '.', ''), 'attr'); ?>"
+                                                        data-ggr-source="<?= $ggrIsCustom ? 'custom' : 'global'; ?>"
+                                                        data-recharge-source="<?= $rechargeIsCustom ? 'custom' : 'global'; ?>"
+                                                        data-prize-source="<?= $prizeIsCustom ? 'custom' : 'global'; ?>"
                                                     >
-                                                        <i class="fa-duotone fa-solid fa-arrow-right-to-bracket"></i>
+                                                        <i class="fa-duotone fa-solid fa-store"></i>
                                                         <?= translate('manage point of sale'); ?>
-                                                    </a>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -225,20 +252,6 @@
                     ]); ?>
                 </div>
             </div>
-
-            <?php if (bingo_ggr_affiliate_active()) : ?>
-            <div
-                class="card store-panel-card operator-panel-pane"
-                id="operator-pane-ggr-rates"
-            >
-                <div class="card-body operator-panel-pane-body">
-                    <?= view('operator/partials/ggr_rates', [
-                        'stores' => $stores ?? [],
-                        'user' => $user ?? [],
-                    ]); ?>
-                </div>
-            </div>
-            <?php endif; ?>
 
             <div
                 class="card store-panel-card operator-panel-pane <?= empty($stores) ? 'is-active' : '' ?>"
@@ -353,6 +366,104 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalOperatorStoreBalance" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header pb-2">
+                <h6 class="modal-title" id="operator-store-balance-modal-title">
+                    <i class="fa-duotone fa-solid fa-wallet"></i>
+                    <span></span>
+                </h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="close"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body pt-0">
+                <p class="small text-muted mb-2" id="operator-store-balance-modal-store"></p>
+                <p class="small mb-3">
+                    <?= translate('available store balance'); ?>:
+                    <strong id="operator-store-balance-modal-current">0.00</strong>
+                </p>
+                <input type="hidden" id="operator-store-balance-store-id" value="">
+                <input type="hidden" id="operator-store-balance-action" value="">
+                <div class="mb-2">
+                    <label for="operator-store-balance-amount" class="form-label"><?= translate('amount'); ?></label>
+                    <input type="number" step="0.01" min="0.01" class="form-control form-control-lg form-bingo" id="operator-store-balance-amount" placeholder="0.00" autocomplete="off">
+                    <small id="operator-store-balance-amount-error" class="text-danger d-none"></small>
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <button type="button" class="btn btn-primary btn-bingo w-50" id="operator-store-balance-submit">
+                        <?= translate('confirm'); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalOperatorStoreInfo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header pb-2">
+                <h6 class="modal-title">
+                    <i class="fa-duotone fa-solid fa-store"></i>
+                    <?= translate('manage point of sale'); ?>
+                </h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="close"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body pt-0">
+                <p class="small text-muted mb-3"><?= translate('store info read only hint'); ?></p>
+
+                <div class="mb-3 p-3 rounded" style="background: rgba(98, 54, 255, 0.06); border: 1px solid rgba(98, 54, 255, 0.1);">
+                    <div class="mb-2">
+                        <span class="d-block text-muted small"><?= translate('point of sale'); ?></span>
+                        <strong id="operator-store-info-name">-</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="d-block text-muted small"><?= translate('code'); ?></span>
+                        <strong id="operator-store-info-code">-</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="d-block text-muted small"><?= translate('email'); ?></span>
+                        <strong id="operator-store-info-email">-</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="d-block text-muted small"><?= translate('address'); ?></span>
+                        <strong id="operator-store-info-address">-</strong>
+                    </div>
+                    <div>
+                        <span class="d-block text-muted small"><?= translate('available store balance'); ?></span>
+                        <strong id="operator-store-info-balance" style="color: #6236ff;">-</strong>
+                    </div>
+                </div>
+
+                <h6 class="mb-2"><?= translate('store commission rates'); ?></h6>
+                <div class="row g-2">
+                    <div class="col-12">
+                        <div class="p-2 rounded" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                            <span class="d-block text-muted small"><?= translate('store ggr affiliate rate'); ?></span>
+                            <strong id="operator-store-info-ggr">0.00%</strong>
+                            <small class="d-block text-muted" id="operator-store-info-ggr-source"></small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                            <span class="d-block text-muted small"><?= translate('store recharge commission rate'); ?></span>
+                            <strong id="operator-store-info-recharge">0.00%</strong>
+                            <small class="d-block text-muted" id="operator-store-info-recharge-source"></small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                            <span class="d-block text-muted small"><?= translate('store prize commission rate'); ?></span>
+                            <strong id="operator-store-info-prize">0.00%</strong>
+                            <small class="d-block text-muted" id="operator-store-info-prize-source"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php if (bingo_ggr_affiliate_active()) : ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <?php endif; ?>
@@ -360,6 +471,130 @@
     $(function() {
         let currentPage = 1;
         const pageSize = 6;
+        const currencyLabel = <?= json_encode((string) (systemGet('currency') ?? '')); ?>;
+        const labelsStoreBalance = {
+            add: <?= json_encode(translate('add store balance')); ?>,
+            remove: <?= json_encode(translate('remove store balance')); ?>,
+            confirmRequired: <?= json_encode(translate('amount is required')); ?>,
+            rateCustom: <?= json_encode(translate('custom rate')); ?>,
+            rateGlobal: <?= json_encode(translate('use global rate')); ?>,
+            noData: <?= json_encode(translate('not available')); ?>,
+        };
+
+        function operatorStoreRateSourceLabel(source) {
+            return source === 'custom' ? labelsStoreBalance.rateCustom : labelsStoreBalance.rateGlobal;
+        }
+
+        $(document).on('click', '.js-operator-store-info-btn', function() {
+            const $btn = $(this);
+            const name = $btn.data('name') || '-';
+            const code = $btn.data('code') || '-';
+            const email = $btn.data('email') || labelsStoreBalance.noData;
+            const address = $btn.data('address') || labelsStoreBalance.noData;
+            const balance = parseFloat($btn.data('balance')) || 0;
+            const ggr = parseFloat($btn.data('ggr')) || 0;
+            const recharge = parseFloat($btn.data('recharge')) || 0;
+            const prize = parseFloat($btn.data('prize')) || 0;
+
+            $('#operator-store-info-name').text(name);
+            $('#operator-store-info-code').text(code);
+            $('#operator-store-info-email').text(email);
+            $('#operator-store-info-address').text(address);
+            $('#operator-store-info-balance').text(currencyLabel + ' ' + balance.toFixed(2));
+            $('#operator-store-info-ggr').text(ggr.toFixed(2) + '%');
+            $('#operator-store-info-recharge').text(recharge.toFixed(2) + '%');
+            $('#operator-store-info-prize').text(prize.toFixed(2) + '%');
+            $('#operator-store-info-ggr-source').text(operatorStoreRateSourceLabel($btn.data('ggr-source')));
+            $('#operator-store-info-recharge-source').text(operatorStoreRateSourceLabel($btn.data('recharge-source')));
+            $('#operator-store-info-prize-source').text(operatorStoreRateSourceLabel($btn.data('prize-source')));
+            $('#modalOperatorStoreInfo').modal('show');
+        });
+
+        $(document).on('click', '.js-operator-store-balance-btn', function() {
+            const $btn = $(this);
+            const action = $btn.data('action');
+            const storeId = $btn.data('store-id');
+            const storeName = $btn.data('store-name') || '';
+            const balance = parseFloat($btn.data('balance')) || 0;
+
+            $('#operator-store-balance-store-id').val(storeId);
+            $('#operator-store-balance-action').val(action);
+            $('#operator-store-balance-amount').val('').removeClass('is-invalid');
+            $('#operator-store-balance-amount-error').addClass('d-none').text('');
+            $('#operator-store-balance-modal-title span').text(action === 'remove' ? labelsStoreBalance.remove : labelsStoreBalance.add);
+            $('#operator-store-balance-modal-store').text(storeName);
+            $('#operator-store-balance-modal-current').text(currencyLabel + ' ' + balance.toFixed(2));
+            $('#modalOperatorStoreBalance').modal('show');
+        });
+
+        $('#operator-store-balance-submit').on('click', function() {
+            const $btn = $(this);
+            const storeId = $('#operator-store-balance-store-id').val();
+            const action = $('#operator-store-balance-action').val();
+            const amount = parseFloat($('#operator-store-balance-amount').val());
+
+            $('#operator-store-balance-amount-error').addClass('d-none').text('');
+            $('#operator-store-balance-amount').removeClass('is-invalid');
+
+            if (!amount || amount <= 0 || isNaN(amount)) {
+                $('#operator-store-balance-amount').addClass('is-invalid');
+                $('#operator-store-balance-amount-error').text(labelsStoreBalance.confirmRequired).removeClass('d-none');
+                return;
+            }
+
+            $btn.prop('disabled', true);
+            $.post('<?= site_url('operator/adjustStoreBalance'); ?>', {
+                store_id: storeId,
+                action: action,
+                amount: amount,
+                <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+            }, function(res) {
+                if (res && res.success) {
+                    $('#modalOperatorStoreBalance').modal('hide');
+                    const newBalance = parseFloat(res.balance);
+                    const formatted = (isNaN(newBalance) ? 0 : newBalance).toFixed(2);
+                    const $cardBalance = $('.js-operator-store-balance[data-store-id="' + storeId + '"] .js-operator-store-balance-value');
+                    $cardBalance.text(formatted);
+                    $('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').attr('data-balance', formatted);
+                    $('.js-operator-store-info-btn').each(function() {
+                        const $infoBtn = $(this);
+                        // Match by sibling balance buttons on same card
+                        const $card = $infoBtn.closest('.store-list-subcard');
+                        if ($card.find('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').length) {
+                            $infoBtn.attr('data-balance', formatted);
+                        }
+                    });
+                    Toastify({
+                        text: res.message || 'OK',
+                        duration: 3000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#198754' }
+                    }).showToast();
+                } else {
+                    const msg = (res && res.message) ? res.message : '<?= esc(translate('error processing request'), 'js'); ?>';
+                    $('#operator-store-balance-amount').addClass('is-invalid');
+                    $('#operator-store-balance-amount-error').text(msg).removeClass('d-none');
+                    Toastify({
+                        text: msg,
+                        duration: 3500,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' }
+                    }).showToast();
+                }
+            }, 'json').fail(function() {
+                Toastify({
+                    text: '<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>',
+                    duration: 3500,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' }
+                }).showToast();
+            }).always(function() {
+                $btn.prop('disabled', false);
+            });
+        });
 
         function updateOperatorStoresPagination() {
             const $search = $('#operator-stores-search');
@@ -516,6 +751,7 @@
         });
 
         <?php if (bingo_ggr_affiliate_active()) : ?>
+        // Chart del panel GGR del operador (si existe canvas)
         const operatorGgrChartEl = document.getElementById('operator-ggr-chart');
         if (operatorGgrChartEl) {
             const operatorChartData = <?= json_encode(($operatorCommissions['ggr_dashboard']['chart'] ?? [])); ?>;
@@ -552,89 +788,123 @@
                 });
             }
         }
+        <?php endif; ?>
 
-        const operatorStoresGgrChartEl = document.getElementById('operator-stores-ggr-chart');
-        if (operatorStoresGgrChartEl) {
-            const storesChartData = <?= json_encode(($storesCommissions['chart'] ?? [])); ?>;
-            if (storesChartData.length) {
-                new Chart(operatorStoresGgrChartEl, {
-                    type: 'line',
-                    data: {
-                        labels: storesChartData.map(r => r.label),
-                        datasets: [
-                            {
-                                label: 'GGR',
-                                data: storesChartData.map(r => Number(r.ggr) || 0),
-                                borderColor: '#0d6efd',
-                                backgroundColor: 'rgba(13, 110, 253, 0.12)',
-                                tension: 0.3,
-                                pointRadius: 5,
-                                fill: false
-                            },
-                            {
-                                label: '<?= esc(translate('commission'), 'js'); ?>',
-                                data: storesChartData.map(r => Number(r.commission) || 0),
-                                borderColor: '#198754',
-                                backgroundColor: 'rgba(25, 135, 84, 0.12)',
-                                tension: 0.3,
-                                pointRadius: 5,
-                                fill: false
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }
-                });
+        window.operatorStoresGgrChart = null;
+        window.renderOperatorStoresGgrChart = function(chartData) {
+            const canvas = document.getElementById('operator-stores-ggr-chart');
+            if (! canvas || typeof Chart === 'undefined') {
+                return;
             }
+            if (window.operatorStoresGgrChart) {
+                window.operatorStoresGgrChart.destroy();
+                window.operatorStoresGgrChart = null;
+            }
+            const rows = Array.isArray(chartData) ? chartData : [];
+            if (! rows.length) {
+                return;
+            }
+            window.operatorStoresGgrChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: rows.map(r => r.label),
+                    datasets: [
+                        {
+                            label: 'GGR',
+                            data: rows.map(r => Number(r.ggr) || 0),
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.12)',
+                            tension: 0.3,
+                            pointRadius: 5,
+                            fill: false
+                        },
+                        {
+                            label: '<?= esc(translate('commission'), 'js'); ?>',
+                            data: rows.map(r => Number(r.commission) || 0),
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25, 135, 84, 0.12)',
+                            tension: 0.3,
+                            pointRadius: 5,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        };
+
+        <?php if (bingo_ggr_affiliate_active()) : ?>
+        if (document.getElementById('operator-stores-ggr-chart')) {
+            window.renderOperatorStoresGgrChart(<?= json_encode(($storesCommissions['chart'] ?? [])); ?>);
         }
         <?php endif; ?>
 
-        window.saveOperatorStoreGgrRate = function(storeId) {
-            const input = document.getElementById('operator-store-ggr-' + storeId);
-            if (!input) {
+        function loadOperatorStoresCommissions(dateFrom, dateTo) {
+            const $paneBody = $('#operator-pane-commissions-stores .operator-panel-pane-body');
+            if (! $paneBody.length) {
                 return;
             }
-            const data = {
-                store_id: storeId,
-                ggr_rate: input.value
-            };
-            data['<?= csrf_token() ?>'] = '<?= csrf_hash() ?>';
-            $.post('<?= site_url('operator/updateStoreGgrRate'); ?>', data, function(res) {
+            $paneBody.css('opacity', '0.55');
+            $.ajax({
+                url: '<?= site_url('operator/storesCommissionsGet'); ?>',
+                method: 'GET',
+                dataType: 'json',
+                data: {
+                    date_from: dateFrom || '',
+                    date_to: dateTo || '',
+                    <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+                }
+            }).done(function(res) {
+                if (! res || ! res.success || ! res.html) {
+                    Toastify({
+                        text: (res && res.message) ? res.message : '<?= esc(translate('error processing request'), 'js'); ?>',
+                        duration: 3000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' }
+                    }).showToast();
+                    return;
+                }
+                $paneBody.html(res.html);
+                window.renderOperatorStoresGgrChart(res.chart || []);
+            }).fail(function() {
                 Toastify({
-                    text: res.message || 'OK',
-                    duration: 3500,
+                    text: '<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>',
+                    duration: 3000,
                     gravity: 'top',
                     position: 'right',
-                    style: { background: res.success ? '#198754' : '#dc3545' }
+                    style: { background: '#dc3545' }
                 }).showToast();
-                if (res.success) {
-                    const row = document.querySelector('tr[data-store-id="' + storeId + '"]');
-                    if (row && res.margin_rate !== undefined) {
-                        const marginEl = row.querySelector('.operator-store-margin-value');
-                        if (marginEl) {
-                            marginEl.textContent = (parseFloat(res.margin_rate) * 100).toFixed(2);
-                        }
-                    }
-                }
-            }, 'json');
-        };
+            }).always(function() {
+                $paneBody.css('opacity', '1');
+            });
+        }
 
-        $(document).on('input', '.operator-store-ggr-input', function() {
-            const row = $(this).closest('tr');
-            const operatorTotal = <?= json_encode((float) bingo_operator_commission_rate($user ?? [])); ?>;
-            let storeRate = parseFloat($(this).val());
-            if (isNaN(storeRate) || $(this).val() === '') {
-                storeRate = Math.min(
-                    <?= json_encode((float) (systemGet('rateStoreGgrCommission') ?? 0) * 100); ?>,
-                    operatorTotal * 100
-                ) / 100;
-            } else {
-                storeRate = Math.min(storeRate / 100, operatorTotal);
+        $(document).on('click', '#operator-stores-commissions-apply', function() {
+            const from = $('#operator-stores-date-from').val() || '';
+            const to = $('#operator-stores-date-to').val() || '';
+            if (from && to && from > to) {
+                Toastify({
+                    text: '<?= esc(translate('invalid date range'), 'js'); ?>',
+                    duration: 3000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' }
+                }).showToast();
+                return;
             }
-            const margin = Math.max(0, operatorTotal - storeRate);
-            row.find('.operator-store-margin-value').text((margin * 100).toFixed(2));
+            loadOperatorStoresCommissions(from, to);
+        });
+
+        $(document).on('click', '#operator-stores-commissions-clear', function() {
+            const from = '<?= date('Y-m-d', strtotime('-30 days')); ?>';
+            const to = '<?= date('Y-m-d'); ?>';
+            $('#operator-stores-date-from').val(from);
+            $('#operator-stores-date-to').val(to);
+            loadOperatorStoresCommissions(from, to);
         });
     });
 </script>

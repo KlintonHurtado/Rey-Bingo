@@ -222,6 +222,7 @@ $sourceLabel = static function ($source) {
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <p class="small text-muted mb-0">
                     Historial unificado: recargas, retiros, compras, resultados, premios, bonos y ruleta.
+                    La columna <strong>Saldo Total</strong> muestra cómo queda el saldo después de cada movimiento.
                 </p>
                 <a class="btn btn-sm btn-outline-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-download"></i> Descargar Excel
@@ -233,6 +234,7 @@ $sourceLabel = static function ($source) {
                         <th><?= translate('date'); ?></th>
                         <th>Tipo</th>
                         <th>Monto</th>
+                        <th>Saldo Total</th>
                         <th><?= translate('status'); ?></th>
                         <th><?= translate('game'); ?></th>
                         <th>Serie</th>
@@ -242,11 +244,15 @@ $sourceLabel = static function ($source) {
                     </tr></thead>
                     <tbody>
                     <?php if (empty($movements)) : ?>
-                        <tr><td colspan="9" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
+                        <tr><td colspan="10" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
                     <?php else : foreach ($movements as $m) :
                         $dir = (string) ($m['direction'] ?? '');
                         $amt = (float) ($m['amount'] ?? 0);
                         $amtClass = $dir === '+' ? 'text-success' : ($dir === '-' ? 'text-danger' : 'text-muted');
+                        $balanceAfter = array_key_exists('balance_after', $m) ? (float) $m['balance_after'] : null;
+                        $balanceClass = $balanceAfter === null
+                            ? 'text-muted'
+                            : ($balanceAfter < 0 ? 'text-danger' : 'text-dark fw-semibold');
                         $type = (string) ($m['type'] ?? '');
                         $typeBadge = match ($type) {
                             'deposit' => 'bg-success',
@@ -270,6 +276,13 @@ $sourceLabel = static function ($source) {
                             <td><span class="badge <?= esc($typeBadge); ?>"><?= esc($m['type_label'] ?? $type); ?></span></td>
                             <td class="<?= esc($amtClass); ?> text-nowrap">
                                 <?= esc($dir); ?> <?= esc($currency); ?> <?= number_format($amt, 2); ?>
+                            </td>
+                            <td class="<?= esc($balanceClass); ?> text-nowrap">
+                                <?php if ($balanceAfter === null) : ?>
+                                    —
+                                <?php else : ?>
+                                    <?= esc($currency); ?> <?= number_format($balanceAfter, 2); ?>
+                                <?php endif; ?>
                             </td>
                             <td><?= esc($m['status_label'] ?? ''); ?></td>
                             <td><?= esc($m['game'] ?? '—'); ?></td>

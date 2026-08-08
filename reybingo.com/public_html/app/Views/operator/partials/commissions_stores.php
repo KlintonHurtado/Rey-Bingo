@@ -1,8 +1,10 @@
 <?php
 $storesCommissions = $storesCommissions ?? [];
 $currency = esc(systemGet('currency'));
+$dateFrom = (string) ($storesCommissions['date_from'] ?? date('Y-m-d', strtotime('-30 days')));
+$dateTo = (string) ($storesCommissions['date_to'] ?? date('Y-m-d'));
 ?>
-<div class="operator-pane-inner operator-pane-inner-commissions">
+<div class="operator-pane-inner operator-pane-inner-commissions" id="operator-stores-commissions-root">
     <div class="operator-panel-pane-head">
         <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
             <i class="fa-duotone fa-solid fa-store"></i>
@@ -13,6 +15,25 @@ $currency = esc(systemGet('currency'));
             <?php if (bingo_ggr_pays_monthly()) : ?>
                 <p class="small text-info mb-0 mt-1"><?= translate('ggr monthly settlement note'); ?></p>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="row g-2 align-items-end mb-3 operator-stores-commissions-filters">
+        <div class="col-md-3 col-sm-6">
+            <label class="form-label small mb-1" for="operator-stores-date-from"><?= translate('from date'); ?></label>
+            <input type="date" class="form-control form-bingo" id="operator-stores-date-from" value="<?= esc($dateFrom); ?>">
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <label class="form-label small mb-1" for="operator-stores-date-to"><?= translate('to date'); ?></label>
+            <input type="date" class="form-control form-bingo" id="operator-stores-date-to" value="<?= esc($dateTo); ?>">
+        </div>
+        <div class="col-md-6 col-sm-12 d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-primary btn-bingo" id="operator-stores-commissions-apply">
+                <i class="fa-duotone fa-solid fa-filter"></i> <?= translate('apply filters'); ?>
+            </button>
+            <button type="button" class="btn btn-outline-light" id="operator-stores-commissions-clear" style="border-color: rgba(255,255,255,0.25);">
+                <i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('clear filters'); ?>
+            </button>
         </div>
     </div>
 
@@ -60,15 +81,15 @@ $currency = esc(systemGet('currency'));
                     <tr>
                         <th><?= translate('business name'); ?></th>
                         <?php if (bingo_ggr_affiliate_active()) : ?>
-                        <th><?= translate('ggr commission rate'); ?> PV</th>
-                        <th><?= translate('operator ggr margin note'); ?></th>
+                        <th><?= translate('ggr rate short'); ?></th>
+                        <th><?= translate('operator margin short'); ?></th>
                         <?php endif; ?>
-                        <th><?= translate('affiliate commissions earned'); ?></th>
+                        <th><?= translate('affiliate commissions short'); ?></th>
                         <?php if (bingo_ggr_affiliate_active()) : ?>
-                        <th><?= translate('ggr commissions earned'); ?></th>
-                        <th><?= translate('ggr generated'); ?></th>
+                        <th><?= translate('ggr commissions short'); ?></th>
+                        <th><?= translate('ggr generated short'); ?></th>
                         <?php endif; ?>
-                        <th><?= translate('total commissions earned'); ?></th>
+                        <th><?= translate('total commissions short'); ?></th>
                     </tr>
                 </thead>
                 <tbody>

@@ -169,14 +169,28 @@ var App = function() {
     
         // Añadir el event listener para reproducir el soundtrack al hacer clic en la página
         const userSoundsAuto = document.querySelector(`#sounds`);
+        const noMusicRole = document.body && document.body.classList.contains('bingo-no-music');
 
-        if (userSoundsAuto && userSoundsAuto.value == 1) {
+        if (!noMusicRole && userSoundsAuto && userSoundsAuto.value == 1) {
             document.addEventListener('click', playSound);
         }
     });
 
     // Preferencias globales: silencio (volumen) y narración de balotas (micrófono)
     window.RemoveVolume = function RemoveVolume() {
+        if (document.body && document.body.classList.contains('bingo-no-music')) {
+            const soundsInput = document.getElementById('sounds');
+            if (soundsInput) {
+                soundsInput.value = '0';
+            }
+            try {
+                if (window.__bingoSoundtrack) {
+                    window.__bingoSoundtrack.pause();
+                }
+            } catch (e) { /* ignore */ }
+            return;
+        }
+
         const soundsInput = document.getElementById('sounds');
         const currentlyOn = soundsInput
             ? String(soundsInput.value) === '1'

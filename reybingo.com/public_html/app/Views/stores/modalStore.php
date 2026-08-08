@@ -69,7 +69,6 @@
                                 ? (float) $storeData['ggr_commission_rate'] * 100
                                 : '' ?>"
                             placeholder="<?= translate('use global rate'); ?>">
-                        <small class="text-muted d-block"><?= translate('ggr commission rate store help'); ?></small>
                     </div>
 
                     <div class="col-md-6 mb-2">
@@ -80,6 +79,10 @@
                                 : '' ?>"
                             placeholder="<?= translate('use global rate'); ?>">
                         <small id="store_prize_commission_rate-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-12 mb-2">
+                        <small class="text-muted d-block"><?= translate('ggr commission rate store help'); ?></small>
                     </div>
 
                     <div class="col-md-12 mb-2">

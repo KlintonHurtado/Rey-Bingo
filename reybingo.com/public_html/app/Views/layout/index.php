@@ -54,7 +54,7 @@
     <link href="<?= asset_url('plugin/components/font-awesome/css/fontawesome.min.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/czm-chat-support.css') ?>" rel="stylesheet">
 </head>
-<body class="bg-gradient-bingo">
+<body class="bg-gradient-bingo<?= (session()->get('logged_in') && function_exists('bingo_is_operator') && function_exists('bingo_is_store') && (bingo_is_operator() || bingo_is_store())) ? ' bingo-no-music' : ''; ?>">
 <?php include APPPATH . 'Views/layout/_layout_user_bootstrap.php'; ?>
     <div class="preloader">
         <div class="canvas">
@@ -78,7 +78,15 @@
     <span class="notification-indicator hidden" id="notificationIndicator"></span>
 
     <?php if (session()->get('logged_in')) : ?>
-        <input type="hidden" name="sounds" id="sounds" value="<?= esc($user['sounds'] ?? 0); ?>">
+        <?php
+            $layoutSounds = (int) ($user['sounds'] ?? 0);
+            // Operador y Punto de venta: sin música de fondo
+            if (function_exists('bingo_is_operator') && function_exists('bingo_is_store')
+                && (bingo_is_operator() || bingo_is_store())) {
+                $layoutSounds = 0;
+            }
+        ?>
+        <input type="hidden" name="sounds" id="sounds" value="<?= esc($layoutSounds); ?>">
         <input type="hidden" name="narration" id="narration" value="<?= esc($user['narration'] ?? 0); ?>">
         <input type="hidden" name="autodial" id="autodial" value="<?= esc($user['autodial'] ?? 0); ?>">
     <?php else : ?>

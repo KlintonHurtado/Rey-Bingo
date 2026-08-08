@@ -395,12 +395,10 @@
 
                                 return round((float) ($raw ?? 0) * 100, 2);
                             };
-                            $opRetailPct = $commissionRatePct('rateOperatorGgrRetail', 'rateOperatorCommission');
-                            $opAffiliatePct = $commissionRatePct('rateOperatorGgrAffiliate');
+                            $opAffiliatePct = $commissionRatePct('rateOperatorGgrAffiliate', 'rateOperatorCommission');
                             $opRechargePct = $commissionRatePct('rateOperatorRecharge');
                             $opWithdrawPct = $commissionRatePct('rateOperatorWithdraw');
-                            $pvRetailPct = $commissionRatePct('rateStoreGgrCommission');
-                            $pvAffiliatePct = $commissionRatePct('rateStoreGgrAffiliate');
+                            $pvAffiliatePct = $commissionRatePct('rateStoreGgrAffiliate', 'rateStoreGgrCommission');
                             $pvRechargePct = $commissionRatePct('rateStoreCommission');
                             $pvWithdrawPct = $commissionRatePct('rateStorePrizeCommission');
                             $ggrSettlementMode = bingo_ggr_settlement_mode();
@@ -413,11 +411,6 @@
                                 <h6><?= translate('operator settings'); ?></h6>
                                 <hr class="my-1">
                                 <small class="text-muted d-block mb-2"><?= translate('operator settings help hierarchical'); ?></small>
-                            </div>
-                            <div class="col-md-6 col-lg-3 mb-3">
-                                <label for="rateOperatorGgrRetail" class="form-label"><?= translate('operator ggr ticket retail rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorGgrRetail" id="rateOperatorGgrRetail" data-category="retail" value="<?= $opRetailPct; ?>">
-                                <small id="rateOperatorGgrRetail-error" class="text-danger d-none"></small>
                             </div>
                             <div class="col-md-6 col-lg-3 mb-3">
                                 <label for="rateOperatorGgrAffiliate" class="form-label"><?= translate('operator ggr affiliate rate'); ?> %</label>
@@ -434,7 +427,7 @@
                                 <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-op-rate" name="rateOperatorWithdraw" id="rateOperatorWithdraw" data-category="withdraw" value="<?= $opWithdrawPct; ?>">
                                 <small id="rateOperatorWithdraw-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="col-md-6 col-lg-3 mb-3">
                                 <label for="ggrSettlementMode" class="form-label"><?= translate('ggr settlement mode'); ?></label>
                                 <select class="form-control form-control-lg form-bingo" name="ggrSettlementMode" id="ggrSettlementMode">
                                     <option value="daily" <?= $ggrSettlementMode === 'daily' ? 'selected' : ''; ?>><?= translate('ggr settlement daily'); ?></option>
@@ -448,25 +441,19 @@
                                 <hr class="my-1">
                                 <small class="text-muted d-block mb-2"><?= translate('point of sale settings help hierarchical'); ?></small>
                             </div>
-                            <div class="col-md-6 col-lg-3 mb-3">
-                                <label for="rateStoreGgrCommission" class="form-label"><?= translate('store ggr ticket retail rate'); ?> %</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreGgrCommission" id="rateStoreGgrCommission" data-category="retail" data-op-field="rateOperatorGgrRetail" value="<?= $pvRetailPct; ?>">
-                                <small class="text-muted d-block js-margin-hint" data-category="retail"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
-                                <small id="rateStoreGgrCommission-error" class="text-danger d-none"></small>
-                            </div>
-                            <div class="col-md-6 col-lg-3 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label for="rateStoreGgrAffiliate" class="form-label"><?= translate('store ggr affiliate rate'); ?> %</label>
                                 <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreGgrAffiliate" id="rateStoreGgrAffiliate" data-category="affiliate" data-op-field="rateOperatorGgrAffiliate" value="<?= $pvAffiliatePct; ?>">
                                 <small class="text-muted d-block js-margin-hint" data-category="affiliate"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
                                 <small id="rateStoreGgrAffiliate-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-6 col-lg-3 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label for="rateStoreCommission" class="form-label"><?= translate('store recharge commission rate'); ?> %</label>
                                 <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStoreCommission" id="rateStoreCommission" data-category="recharge" data-op-field="rateOperatorRecharge" value="<?= $pvRechargePct; ?>">
                                 <small class="text-muted d-block js-margin-hint" data-category="recharge"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>
                                 <small id="rateStoreCommission-error" class="text-danger d-none"></small>
                             </div>
-                            <div class="col-md-6 col-lg-3 mb-3">
+                            <div class="col-md-6 col-lg-4 mb-3">
                                 <label for="rateStorePrizeCommission" class="form-label"><?= translate('store withdraw prize commission rate'); ?> %</label>
                                 <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo js-pv-rate" name="rateStorePrizeCommission" id="rateStorePrizeCommission" data-category="withdraw" data-op-field="rateOperatorWithdraw" value="<?= $pvWithdrawPct; ?>">
                                 <small class="text-muted d-block js-margin-hint" data-category="withdraw"><?= translate('operator margin label'); ?>: <span class="js-margin-value">0</span>%</small>

@@ -58,7 +58,15 @@ class Operator extends Controller
         $referredStoresCount = count($stores);
 
         $operatorCommissions = bingo_fetch_operator_commissions_summary($operatorId, $operator ?? []);
-        $storesCommissions = bingo_fetch_operator_stores_commissions_summary($stores, 30, $operator ?? []);
+        $defaultDateFrom = date('Y-m-d', strtotime('-30 days'));
+        $defaultDateTo = date('Y-m-d');
+        $storesCommissions = bingo_fetch_operator_stores_commissions_summary(
+            $stores,
+            30,
+            $operator ?? [],
+            $defaultDateFrom,
+            $defaultDateTo
+        );
 
         $operatorGgrDashboard = $operatorCommissions['ggr_dashboard'] ?? bingo_fetch_affiliate_ggr_dashboard($operatorId, 'operator', 30);
 
@@ -264,7 +272,7 @@ class Operator extends Controller
             'group' => bingo_group_store(),
             'operator_id' => $operatorId,
             'status' => 1,
-            'sounds' => 1,
+            'sounds' => 0,
             'narration' => 1,
             'autodial' => 1,
             'roulette' => 1,
@@ -358,6 +366,163 @@ class Operator extends Controller
             'store_rate'   => $storeRate,
             'margin_rate'  => $margin,
             'operator_total' => $operatorTotal,
+        ]);
+    }
+
+    public function adjustStoreBalance()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        helper('wallet');
+
+        $operatorId = (int) session()->get('id');
+        $storeId = (int) $this->request->getPost('store_id');
+        $action = strtolower(trim((string) $this->request->getPost('action')));
+        $amount = round((float) $this->request->getPost('amount'), 2);
+
+        if ($storeId <= 0 || ! bingo_operator_can_access_store($operatorId, $storeId)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('store not found'),
+            ]);
+        }
+
+        if (! in_array($action, ['add', 'remove'], true)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('invalid request'),
+            ]);
+        }
+
+        if ($amount < 0.01) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('invalid amount'),
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $store = $modelUsers->find($storeId);
+        if (! $store || (int) ($store['group'] ?? -1) !== bingo_group_store()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('store not found'),
+            ]);
+        }
+
+        $currentBalance = wallet_recharge_balance($store);
+
+        if ($action === 'add') {
+            wallet_credit_recharge($storeId, $amount);
+            $paymentType = 'operator_store_credit';
+            $message = translate('store balance added successfully');
+        } else {
+            if ($amount > $currentBalance + 0.00001) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('insufficient store balance'),
+                ]);
+            }
+
+            if (! wallet_deduct_recharge($storeId, $amount)) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('insufficient store balance'),
+                ]);
+            }
+
+            $paymentType = 'operator_store_debit';
+            $message = translate('store balance removed successfully');
+        }
+
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelPayments->insert([
+            'user' => $storeId,
+            'type' => $paymentType,
+            'type_id' => $operatorId,
+            'amount' => $amount,
+            'status' => 2,
+        ]);
+
+        $updatedStore = $modelUsers->find($storeId) ?? $store;
+        $newBalance = wallet_recharge_balance($updatedStore);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => $message,
+            'balance' => round($newBalance, 2),
+        ]);
+    }
+
+    public function storesCommissionsGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        $operatorId = (int) session()->get('id');
+        $modelUsers = new UsersModel();
+        $operator = $modelUsers->find($operatorId);
+        if (! $operator) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        $dateFrom = trim((string) ($this->request->getGet('date_from') ?? $this->request->getPost('date_from') ?? ''));
+        $dateTo = trim((string) ($this->request->getGet('date_to') ?? $this->request->getPost('date_to') ?? ''));
+
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom === '' && $dateTo === '') {
+            $dateFrom = date('Y-m-d', strtotime('-30 days'));
+            $dateTo = date('Y-m-d');
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $stores = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('operator_id', $operatorId)
+            ->where('deleted', 0)
+            ->orderBy('business_name', 'ASC')
+            ->findAll();
+
+        $chartDays = 30;
+        if ($dateFrom !== '' && $dateTo !== '') {
+            $chartDays = max(1, (int) ((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1);
+        }
+
+        $storesCommissions = bingo_fetch_operator_stores_commissions_summary(
+            $stores,
+            $chartDays,
+            $operator,
+            $dateFrom !== '' ? $dateFrom : null,
+            $dateTo !== '' ? $dateTo : null
+        );
+
+        $html = view('operator/partials/commissions_stores', [
+            'storesCommissions' => $storesCommissions,
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'html'    => $html,
+            'chart'   => $storesCommissions['chart'] ?? [],
         ]);
     }
 }

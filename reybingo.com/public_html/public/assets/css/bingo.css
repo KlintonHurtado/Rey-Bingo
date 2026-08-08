@@ -21,6 +21,7 @@ body {
 body:has(#content-page > .admin-profile-scroll),
 body:has(#content-page > .legal-page-scroll),
 body:has(#content-page > .admin-stores-scroll),
+body:has(#content-page > .store-signup-scroll),
 body:has(#content-page > .store-panel-fit),
 body:has(#content-page > .operator-panel-fit) {
     align-items: stretch;
@@ -37,6 +38,7 @@ body:has(#content-page > .operator-panel-fit) {
 html:has(#content-page > .admin-profile-scroll),
 html:has(#content-page > .legal-page-scroll),
 html:has(#content-page > .admin-stores-scroll),
+html:has(#content-page > .store-signup-scroll),
 html:has(#content-page > .start-section),
 html:has(#content-page > .store-panel-fit),
 html:has(#content-page > .operator-panel-fit) {
@@ -47,6 +49,7 @@ html:has(#content-page > .operator-panel-fit) {
 #content-page:has(> .admin-profile-scroll),
 #content-page:has(> .legal-page-scroll),
 #content-page:has(> .admin-stores-scroll),
+#content-page:has(> .store-signup-scroll),
 #content-page:has(> .start-section),
 #content-page:has(> .store-panel-fit),
 #content-page:has(> .operator-panel-fit) {
@@ -57,7 +60,8 @@ html:has(#content-page > .operator-panel-fit) {
 
 .admin-profile-scroll,
 .legal-page-scroll,
-.admin-stores-scroll {
+.admin-stores-scroll,
+.store-signup-scroll {
     max-height: 100dvh;
     height: 100dvh;
     overflow-x: hidden;
@@ -70,7 +74,8 @@ html:has(#content-page > .operator-panel-fit) {
 
 .admin-profile-scroll::-webkit-scrollbar,
 .legal-page-scroll::-webkit-scrollbar,
-.admin-stores-scroll::-webkit-scrollbar {
+.admin-stores-scroll::-webkit-scrollbar,
+.store-signup-scroll::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
@@ -3888,6 +3893,10 @@ small.text-danger {
     gap: 1rem;
 }
 
+.operator-commissions-stats-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .operator-commissions-stats .operator-affiliate-stat {
     padding: 1rem 1.15rem;
     min-height: 92px;
@@ -3934,18 +3943,65 @@ small.text-danger {
     border: 1px solid rgba(98, 54, 255, 0.12);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.72);
+    scrollbar-width: thin;
+    -ms-overflow-style: auto;
+}
+
+.operator-commissions-history .store-table-wrap::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+    height: 8px;
+}
+
+.operator-commissions-history .store-table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(98, 54, 255, 0.35);
+    border-radius: 8px;
+}
+
+.operator-commissions-history .store-table {
+    table-layout: auto !important;
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .operator-commissions-history .store-table th,
 .operator-commissions-history .store-table td {
-    padding: 0.85rem 1rem;
-    font-size: 0.92rem;
+    padding: 0.75rem 0.85rem;
+    font-size: 0.88rem;
     vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .operator-commissions-history .store-table thead th {
-    font-size: 0.88rem;
-    white-space: nowrap;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 120px;
+    max-width: 160px;
+    background: rgba(236, 230, 255, 0.98);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.operator-commissions-history .store-table thead th:first-child,
+.operator-commissions-history .store-table tbody td:first-child {
+    min-width: 150px;
+    max-width: 200px;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: rgba(236, 230, 255, 0.98);
+}
+
+.operator-commissions-history .store-table tbody td:first-child {
+    background: rgba(255, 255, 255, 0.96);
+    z-index: 1;
 }
 
 .operator-affiliate-form-section {
@@ -4052,6 +4108,10 @@ small.text-danger {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .operator-commissions-stats-three {
+        grid-template-columns: 1fr;
+    }
+
     .operator-pane-inner-commissions {
         padding: 1.1rem 1.15rem;
     }
@@ -4077,6 +4137,10 @@ small.text-danger {
 @media (min-width: 1200px) {
     .operator-commissions-stats {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .operator-commissions-stats-three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -8034,6 +8098,9 @@ a {
 .operator-stores-grid-scroll {
     flex: 1;
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 

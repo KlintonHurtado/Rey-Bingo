@@ -41,12 +41,34 @@
                         <small id="password-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-12 mb-2">
-                        <label for="operator_commission_rate" class="form-label"><?= translate('operator ggr total rate'); ?> %</label>
+                    <div class="col-md-4 mb-2">
+                        <label for="operator_commission_rate" class="form-label"><?= translate('operator ggr affiliate rate'); ?> %</label>
                         <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_commission_rate" id="operator_commission_rate"
                             value="<?= ($isUpdate && isset($operatorData['operator_commission_rate']) && $operatorData['operator_commission_rate'] !== null && $operatorData['operator_commission_rate'] !== '')
                                 ? (float) $operatorData['operator_commission_rate'] * 100 : '' ?>"
                             placeholder="<?= translate('use global rate'); ?>">
+                        <small id="operator_commission_rate-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-4 mb-2">
+                        <label for="operator_recharge_rate" class="form-label"><?= translate('operator recharge rate'); ?> %</label>
+                        <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_recharge_rate" id="operator_recharge_rate"
+                            value="<?= ($isUpdate && isset($operatorData['store_commission_rate']) && $operatorData['store_commission_rate'] !== null && $operatorData['store_commission_rate'] !== '')
+                                ? (float) $operatorData['store_commission_rate'] * 100 : '' ?>"
+                            placeholder="<?= translate('use global rate'); ?>">
+                        <small id="operator_recharge_rate-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-4 mb-2">
+                        <label for="operator_withdraw_rate" class="form-label"><?= translate('operator withdraw rate'); ?> %</label>
+                        <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_withdraw_rate" id="operator_withdraw_rate"
+                            value="<?= ($isUpdate && isset($operatorData['store_prize_commission_rate']) && $operatorData['store_prize_commission_rate'] !== null && $operatorData['store_prize_commission_rate'] !== '')
+                                ? (float) $operatorData['store_prize_commission_rate'] * 100 : '' ?>"
+                            placeholder="<?= translate('use global rate'); ?>">
+                        <small id="operator_withdraw_rate-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-12 mb-2">
                         <small class="text-muted d-block"><?= translate('operator commission rate global help short'); ?></small>
                     </div>
 

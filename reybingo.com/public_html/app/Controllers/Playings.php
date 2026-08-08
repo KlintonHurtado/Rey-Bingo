@@ -417,7 +417,8 @@ class Playings extends Controller
         }
 
         $price = (float) $game['price'];
-        $amount = round($cartonsToUse * $price, 2);
+        // Cartón de ruleta es gratis: no registrar valor nominal como cobro
+        $amount = 0.0;
         $gameLabel = trim((string) ($game['description'] ?? ''));
 
         // Actualizar el premio actual marcando los cartones usados
@@ -425,7 +426,7 @@ class Playings extends Controller
             'game' => $gameId,
             'cartons' => $cartonsToUse,
             'price' => $price,
-            'amount' => $amount,
+            'amount' => 0,
             'status' => 1,
         ]);
 
@@ -461,7 +462,7 @@ class Playings extends Controller
             'title' => '🎁 Cartones asignados',
             'message' => 'Se asignaron ' . $cartonsToUse . ' cartón' . ($cartonsToUse === 1 ? '' : 'es')
                 . ($gameLabel !== '' ? ' para la partida "' . $gameLabel . '"' : '')
-                . '. Valor: ' . systemGet('currency') . ' ' . number_format($amount, 2) . '.',
+                . ' (ruleta / sin costo).',
         ]);
 
         session()->set('game_id', $gameId);
@@ -1132,9 +1133,11 @@ class Playings extends Controller
 
         $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();
 
-        $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
-        // En LIVE no hay bola principal en header: incluir la actual en el historial.
+        // En LIVE no hay bola principal en header: el historial lateral incluye la actual (máx. 4).
+        // En juego normal: historial = últimas previas (sin la principal).
         $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
+        $historyFetchLimit = $isLiveGame ? 4 : 5;
+        $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit($historyFetchLimit)->findAll();
         if (!$isLiveGame) {
             array_shift($fourNumbers);
         }
@@ -2685,8 +2688,7 @@ class Playings extends Controller
         $this->ensureWinnersRegistered((int) $game['id']);
 
         $cartonsSold = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
-        $accumulated = $cartonsSold * $game['price'];
-        $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+        $gameAccumulated = bingo_calculate_game_prize_pool($game, $cartonsSold);
 
         $sings = bingo_get_official_sings_for_game((int) $game['id'], true);
 
@@ -2706,15 +2708,11 @@ class Playings extends Controller
             $sing['user_name'] = $user ? $user['firstname'] . ' ' . $user['lastname'] : translate('user not found');
             $sing['modality_name'] = $modality ? translate($modality['name']) : translate('modality not found');
 
-            $singsCount = count($singsByModality[$sing['modality']]);
-
             if ($award) {
-                if ($game['award'] == 2) {
-                    $prize = (float) $award['amount'];
-                } else {
-                    $prize = $gameAccumulated * (float) $award['amount'] / 100;
-                }
-                $sing['award_amount'] = number_format($prize / max(1, $singsCount), 2);
+                $sing['award_amount'] = number_format(
+                    bingo_calculate_award_per_sing($game, $award, (int) $game['id'], (int) $sing['modality']),
+                    2
+                );
             } else {
                 $sing['award_amount'] = translate('amount not available');
             }

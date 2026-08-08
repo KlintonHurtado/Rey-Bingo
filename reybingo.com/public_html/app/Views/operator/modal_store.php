@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-dialog-centered max-w-40">
+<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable max-w-40">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2" id="operator-store-modal-title">

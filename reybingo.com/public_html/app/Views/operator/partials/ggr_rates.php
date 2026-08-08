@@ -49,7 +49,7 @@ $operatorGgrTotalPct = number_format($operatorGgrTotal * 100, 2);
                                     class="form-control form-control-sm form-bingo text-center operator-store-ggr-input"
                                     id="operator-store-ggr-<?= $storeId; ?>"
                                     value="<?= $customValue !== '' ? number_format($customValue, 2, '.', '') : ''; ?>"
-                                    placeholder="<?= number_format(min((float) (systemGet('rateStoreGgrCommission') ?? 0) * 100, (float) $operatorGgrTotalPct), 2); ?>"
+                                    placeholder="<?= number_format(min((float) (systemGet('rateStoreGgrAffiliate') ?? systemGet('rateStoreGgrCommission') ?? 0) * 100, (float) $operatorGgrTotalPct), 2); ?>"
                                 >
                             </td>
                             <td class="operator-store-margin-cell">

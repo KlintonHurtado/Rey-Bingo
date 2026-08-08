@@ -579,6 +579,34 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
     }
 }
 
+if (!function_exists('bingo_money_to_cents')) {
+    /** Convierte dinero a centavos enteros (evita errores de float tipo +0.01). */
+    function bingo_money_to_cents(float $amount): int
+    {
+        return (int) round(((float) $amount) * 100 + 1e-6);
+    }
+}
+
+if (!function_exists('bingo_cents_to_money')) {
+    function bingo_cents_to_money(int $cents): float
+    {
+        return round(max(0, $cents) / 100, 2);
+    }
+}
+
+if (!function_exists('bingo_normalize_earnings_rate')) {
+    /** rateEarnings en BD como fracción (0.20). Si viniera como 20, normaliza. */
+    function bingo_normalize_earnings_rate(): float
+    {
+        $rate = (float) (systemGet('rateEarnings') ?? 0);
+        if ($rate > 1) {
+            $rate = $rate / 100;
+        }
+
+        return max(0.0, min(1.0, $rate));
+    }
+}
+
 if (!function_exists('bingo_calculate_award_per_sing')) {
     function bingo_calculate_award_per_sing(array $game, array $award, int $gameId, int $modalityId): float
     {
@@ -587,14 +615,19 @@ if (!function_exists('bingo_calculate_award_per_sing')) {
 
         $singsCount = max(1, $modelSings->where('game', $gameId)->where('modality', $modalityId)->countAllResults());
         $cartons = $modelCartons->where('game', $gameId)->where('user !=', 0)->countAllResults();
-        $accumulated = $cartons * (float) ($game['price'] ?? 0);
-        $totalAward = $accumulated - ($accumulated * (float) systemGet('rateEarnings'));
 
         if ((int) ($game['award'] ?? 0) === 2) {
-            return round((float) ($award['amount'] ?? 0) / $singsCount, 2);
+            $fixedCents = bingo_money_to_cents((float) ($award['amount'] ?? 0));
+
+            // Nunca repartir de más: centavos enteros hacia abajo
+            return bingo_cents_to_money(intdiv($fixedCents, $singsCount));
         }
 
-        return round(($totalAward * (float) ($award['amount'] ?? 0) / 100) / $singsCount, 2);
+        $poolCents = bingo_money_to_cents(bingo_calculate_game_prize_pool($game, $cartons));
+        $pct = (float) ($award['amount'] ?? 0);
+        $modalityCents = (int) round($poolCents * $pct / 100);
+
+        return bingo_cents_to_money(intdiv($modalityCents, $singsCount));
     }
 }
 
@@ -1629,9 +1662,12 @@ if (!function_exists('bingo_game_start_block_message')) {
 if (!function_exists('bingo_calculate_game_prize_pool')) {
     function bingo_calculate_game_prize_pool(array $game, int $cartonCount): float
     {
-        $accumulated = $cartonCount * (float) ($game['price'] ?? 0);
+        $priceCents = bingo_money_to_cents((float) ($game['price'] ?? 0));
+        $accumulatedCents = $priceCents * max(0, (int) $cartonCount);
+        $rate = bingo_normalize_earnings_rate();
+        $poolCents = (int) round($accumulatedCents * (1 - $rate));
 
-        return $accumulated - ($accumulated * (float) systemGet('rateEarnings'));
+        return bingo_cents_to_money($poolCents);
     }
 }
 
@@ -1689,12 +1725,15 @@ if (!function_exists('bingo_calculate_single_award_amount')) {
         $awardType = (int) ($game['award'] ?? 1);
 
         if ($awardType === 2) { // Fijo
-            return (float) ($award['amount'] ?? 0);
+            return bingo_cents_to_money(bingo_money_to_cents((float) ($award['amount'] ?? 0)));
         }
 
-        // Acumulado
-        $prizePool = bingo_calculate_game_prize_pool($game, $cartonCount);
-        return $prizePool * ((float) ($award['amount'] ?? 0) / 100);
+        // Acumulado (en centavos para no regalar centavos por float)
+        $poolCents = bingo_money_to_cents(bingo_calculate_game_prize_pool($game, $cartonCount));
+        $pct = (float) ($award['amount'] ?? 0);
+        $modalityCents = (int) round($poolCents * $pct / 100);
+
+        return bingo_cents_to_money($modalityCents);
     }
 }
 
@@ -3500,12 +3539,16 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
             }
 
             $operatorCommissionRow = $db->table('system')->where('key', 'rateOperatorCommission')->get()->getRowArray();
+            $storeGgrRow = $db->table('system')->where('key', 'rateStoreGgrCommission')->get()->getRowArray();
+            $legacyOperatorGgr = (string) ($operatorCommissionRow['value'] ?? '0');
+            $legacyStoreGgr = (string) ($storeGgrRow['value'] ?? '0');
             $commissionDefaults = [
-                'rateOperatorGgrRetail' => (string) ($operatorCommissionRow['value'] ?? '0'),
-                'rateOperatorGgrAffiliate' => '0',
+                // Ticket Retail ya no se configura: GGR usa tasas de afiliados
+                'rateOperatorGgrAffiliate' => $legacyOperatorGgr,
+                'rateOperatorGgrRetail' => $legacyOperatorGgr,
                 'rateOperatorRecharge' => '0',
                 'rateOperatorWithdraw' => '0',
-                'rateStoreGgrAffiliate' => '0',
+                'rateStoreGgrAffiliate' => $legacyStoreGgr,
             ];
             foreach ($commissionDefaults as $commissionKey => $commissionDefault) {
                 if ($db->table('system')->where('key', $commissionKey)->countAllResults() === 0) {
@@ -3514,6 +3557,16 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
                         'value' => $commissionDefault,
                     ]);
                 }
+            }
+
+            // Migrar valores legacy Ticket Retail → Afiliados si afiliados quedó en 0
+            $affiliateOpRow = $db->table('system')->where('key', 'rateOperatorGgrAffiliate')->get()->getRowArray();
+            if ($affiliateOpRow && (float) ($affiliateOpRow['value'] ?? 0) <= 0 && (float) $legacyOperatorGgr > 0) {
+                $db->table('system')->where('key', 'rateOperatorGgrAffiliate')->update(['value' => $legacyOperatorGgr]);
+            }
+            $affiliateStoreRow = $db->table('system')->where('key', 'rateStoreGgrAffiliate')->get()->getRowArray();
+            if ($affiliateStoreRow && (float) ($affiliateStoreRow['value'] ?? 0) <= 0 && (float) $legacyStoreGgr > 0) {
+                $db->table('system')->where('key', 'rateStoreGgrAffiliate')->update(['value' => $legacyStoreGgr]);
             }
 
             if ($db->table('system')->where('key', 'lowBalanceThreshold')->countAllResults() === 0) {
@@ -3930,6 +3983,10 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
         };
 
         $splitFromSource = static function (string $sourceKey, float $unitCost, ?array $log): array {
+            if ($sourceKey === 'roulette') {
+                return ['bonus' => 0.0, 'recharge' => 0.0, 'withdraw' => 0.0, 'amount' => 0.0];
+            }
+
             $count = max(1, (int) ($log['cartons_count'] ?? 1));
             if ($log !== null) {
                 return [
@@ -3944,7 +4001,6 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
                 'bonus' => ['bonus' => $unitCost, 'recharge' => 0.0, 'withdraw' => 0.0, 'amount' => $unitCost],
                 'withdraw' => ['bonus' => 0.0, 'recharge' => 0.0, 'withdraw' => $unitCost, 'amount' => $unitCost],
                 'mixed' => ['bonus' => 0.0, 'recharge' => round($unitCost / 2, 2), 'withdraw' => round($unitCost / 2, 2), 'amount' => $unitCost],
-                'roulette' => ['bonus' => 0.0, 'recharge' => 0.0, 'withdraw' => 0.0, 'amount' => 0.0],
                 default => ['bonus' => 0.0, 'recharge' => $unitCost, 'withdraw' => 0.0, 'amount' => $unitCost],
             };
         };
@@ -3975,7 +4031,11 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
                     $split['recharge'] = 0.0;
                     $split['withdraw'] = 0.0;
                 }
-                $unitCost = (float) $split['amount'] > 0 ? (float) $split['amount'] : $gamePrice;
+                if ($sourceKey === 'roulette') {
+                    $unitCost = 0.0;
+                } else {
+                    $unitCost = (float) $split['amount'] > 0 ? (float) $split['amount'] : $gamePrice;
+                }
                 $unitBonus = (float) $split['bonus'];
                 $unitRecharge = (float) $split['recharge'];
                 $unitWithdraw = (float) $split['withdraw'];
@@ -3986,7 +4046,7 @@ if (!function_exists('bingo_build_user_carton_purchase_report')) {
                     $sourceKey = 'recharge';
                 }
                 $split = $splitFromSource($sourceKey, $gamePrice, null);
-                $unitCost = $gamePrice;
+                $unitCost = $sourceKey === 'roulette' ? 0.0 : $gamePrice;
                 $unitBonus = (float) $split['bonus'];
                 $unitRecharge = (float) $split['recharge'];
                 $unitWithdraw = (float) $split['withdraw'];
@@ -4241,6 +4301,7 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                 'detail' => '',
                 'ref_table' => '',
                 'ref_id' => 0,
+                'balance_after' => null,
             ], $row);
         };
 
@@ -4514,6 +4575,31 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
             // tabla opcional
         }
 
+        // Orden cronológico ASC para calcular saldo corrido (después de cada movimiento)
+        usort($rows, static function ($a, $b) {
+            $cmp = strcmp((string) ($a['datetime'] ?? ''), (string) ($b['datetime'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return ((int) ($a['ref_id'] ?? 0)) <=> ((int) ($b['ref_id'] ?? 0));
+        });
+
+        $runningBalance = 0.0;
+        foreach ($rows as &$row) {
+            $dir = (string) ($row['direction'] ?? '');
+            $amt = round((float) ($row['amount'] ?? 0), 2);
+            if ($dir === '+') {
+                $runningBalance = round($runningBalance + $amt, 2);
+            } elseif ($dir === '-') {
+                $runningBalance = round($runningBalance - $amt, 2);
+            }
+            // direction '=' (p. ej. cartón ruleta gratis): no altera el saldo
+            $row['balance_after'] = $runningBalance;
+        }
+        unset($row);
+
+        // Vista admin: más reciente primero
         usort($rows, static function ($a, $b) {
             $cmp = strcmp((string) ($b['datetime'] ?? ''), (string) ($a['datetime'] ?? ''));
             if ($cmp !== 0) {
@@ -4545,6 +4631,7 @@ if (!function_exists('bingo_user_movements_export_rows')) {
             'Tipo',
             'Direccion',
             'Monto',
+            'Saldo Total',
             'Estado',
             'Juego',
             'Carton serie',
@@ -4567,6 +4654,7 @@ if (!function_exists('bingo_user_movements_export_rows')) {
                 (string) ($m['type_label'] ?? $m['type'] ?? ''),
                 (string) ($m['direction'] ?? ''),
                 (float) ($m['amount'] ?? 0),
+                isset($m['balance_after']) ? (float) $m['balance_after'] : '',
                 (string) ($m['status_label'] ?? ''),
                 (string) ($m['game'] ?? ''),
                 (string) ($m['carton_serial'] ?? ''),
@@ -4755,7 +4843,40 @@ if (!function_exists('bingo_operator_commission_rate')) {
             }
         }
 
+        $affiliate = systemGet('rateOperatorGgrAffiliate');
+        if ($affiliate !== null && $affiliate !== '') {
+            return max(0, (float) $affiliate);
+        }
+
         return max(0, (float) (systemGet('rateOperatorCommission') ?? 0));
+    }
+}
+
+if (! function_exists('bingo_operator_recharge_rate')) {
+    function bingo_operator_recharge_rate(?array $operator = null): float
+    {
+        if ($operator !== null) {
+            $custom = $operator['store_commission_rate'] ?? null;
+            if ($custom !== null && $custom !== '') {
+                return max(0, (float) $custom);
+            }
+        }
+
+        return max(0, (float) (systemGet('rateOperatorRecharge') ?? 0));
+    }
+}
+
+if (! function_exists('bingo_operator_withdraw_rate')) {
+    function bingo_operator_withdraw_rate(?array $operator = null): float
+    {
+        if ($operator !== null) {
+            $custom = $operator['store_prize_commission_rate'] ?? null;
+            if ($custom !== null && $custom !== '') {
+                return max(0, (float) $custom);
+            }
+        }
+
+        return max(0, (float) (systemGet('rateOperatorWithdraw') ?? 0));
     }
 }
 
@@ -5225,10 +5346,22 @@ if (!function_exists('bingo_sync_operator_store_affiliate_commissions')) {
 }
 
 if (!function_exists('bingo_sum_operator_store_affiliate_commissions')) {
-    function bingo_sum_operator_store_affiliate_commissions(int $operatorId, ?int $storeId = null): float
+    function bingo_sum_operator_store_affiliate_commissions(int $operatorId, ?int $storeId = null, ?string $dateFrom = null, ?string $dateTo = null): float
     {
         if ($operatorId <= 0) {
             return 0.0;
+        }
+
+        $dateFrom = $dateFrom !== null ? trim($dateFrom) : '';
+        $dateTo = $dateTo !== null ? trim($dateTo) : '';
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
         $modelPayments = new \App\Models\PaymentsModel();
@@ -5240,6 +5373,12 @@ if (!function_exists('bingo_sum_operator_store_affiliate_commissions')) {
 
         if ($storeId !== null && $storeId > 0) {
             $builder->where('type_id', $storeId);
+        }
+        if ($dateFrom !== '') {
+            $builder->where('created_at >=', $dateFrom . ' 00:00:00');
+        }
+        if ($dateTo !== '') {
+            $builder->where('created_at <=', $dateTo . ' 23:59:59');
         }
 
         $total = 0.0;

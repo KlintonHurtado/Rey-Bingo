@@ -216,7 +216,7 @@ class Users extends Controller {
             'username' => bingo_generate_store_username($email, $model, $storeId ?: null),
             'group' => bingo_group_store(),
             'status' => 1,
-            'sounds' => 1,
+            'sounds' => 0,
             'narration' => 1,
             'autodial' => 1,
             'roulette' => 1,
@@ -527,6 +527,8 @@ class Users extends Controller {
 
         $email = strtolower(trim((string) $this->request->getPost('email')));
         $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
+        $operatorRechargeRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_recharge_rate'));
+        $operatorWithdrawRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_withdraw_rate'));
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
@@ -534,7 +536,7 @@ class Users extends Controller {
             'username' => bingo_generate_operator_username($email, $model, $operatorId ?: null),
             'group' => bingo_group_operator(),
             'status' => 1,
-            'sounds' => 1,
+            'sounds' => 0,
             'narration' => 1,
             'autodial' => 1,
             'roulette' => 1,
@@ -550,6 +552,8 @@ class Users extends Controller {
             'restore_token' => '',
             'is_reseller' => 0,
             'operator_commission_rate' => $operatorCommissionRate,
+            'store_commission_rate' => $operatorRechargeRate,
+            'store_prize_commission_rate' => $operatorWithdrawRate,
             'ggr_commission_rate' => null,
             'kyc_status' => 'verified',
         ];
@@ -568,6 +572,8 @@ class Users extends Controller {
                 'lastname' => $data['lastname'],
                 'email' => $email,
                 'operator_commission_rate' => $operatorCommissionRate,
+                'store_commission_rate' => $operatorRechargeRate,
+                'store_prize_commission_rate' => $operatorWithdrawRate,
                 'ggr_commission_rate' => null,
             ];
 

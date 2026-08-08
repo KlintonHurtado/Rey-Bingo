@@ -384,20 +384,12 @@ class Home extends Controller {
                 'label' => translate('store recharge commission rate'),
                 'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
             ],
-            'rateStoreGgrCommission' => [
-                'label' => translate('store ggr ticket retail rate'),
-                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
-            ],
             'rateStoreGgrAffiliate' => [
                 'label' => translate('store ggr affiliate rate'),
                 'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
             ],
             'rateStorePrizeCommission' => [
                 'label' => translate('store withdraw prize commission rate'),
-                'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
-            ],
-            'rateOperatorGgrRetail' => [
-                'label' => translate('operator ggr ticket retail rate'),
                 'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
             ],
             'rateOperatorGgrAffiliate' => [
@@ -519,19 +511,14 @@ class Home extends Controller {
             return $this->response->setJSON($response);
         }
 
-        $opRetail = (float) ($this->request->getPost('rateOperatorGgrRetail') ?: 0);
         $opAffiliate = (float) ($this->request->getPost('rateOperatorGgrAffiliate') ?: 0);
         $opRecharge = (float) ($this->request->getPost('rateOperatorRecharge') ?: 0);
         $opWithdraw = (float) ($this->request->getPost('rateOperatorWithdraw') ?: 0);
-        $pvRetail = (float) ($this->request->getPost('rateStoreGgrCommission') ?: 0);
         $pvAffiliate = (float) ($this->request->getPost('rateStoreGgrAffiliate') ?: 0);
         $pvRecharge = (float) ($this->request->getPost('rateStoreCommission') ?: 0);
         $pvWithdraw = (float) ($this->request->getPost('rateStorePrizeCommission') ?: 0);
 
         $commissionHierarchyErrors = [];
-        if ($pvRetail > $opRetail) {
-            $commissionHierarchyErrors['rateStoreGgrCommission'] = translate('store rate cannot exceed operator rate');
-        }
         if ($pvAffiliate > $opAffiliate) {
             $commissionHierarchyErrors['rateStoreGgrAffiliate'] = translate('store rate cannot exceed operator rate');
         }
@@ -643,17 +630,17 @@ class Home extends Controller {
             'rateExchange' => $this->request->getPost('rateExchange'),
             'rateEarnings' => $this->request->getPost('rateEarnings') / 100,
             'rateReferrals' => $this->request->getPost('rateReferrals') / 100,
-            // Claves nuevas (por categoría)
-            'rateOperatorGgrRetail' => $opRetail / 100,
+            // Afiliados / Recargas / Retiros (UI)
             'rateOperatorGgrAffiliate' => $opAffiliate / 100,
             'rateOperatorRecharge' => $opRecharge / 100,
             'rateOperatorWithdraw' => $opWithdraw / 100,
             'rateStoreGgrAffiliate' => $pvAffiliate / 100,
-            // Claves existentes (compatibilidad: GGR retail / recargas / premios)
-            'rateOperatorCommission' => $opRetail / 100,
-            'rateStoreGgrCommission' => $pvRetail / 100,
             'rateStoreCommission' => $pvRecharge / 100,
             'rateStorePrizeCommission' => $pvWithdraw / 100,
+            // Motor GGR existente: alimentado por tasas de afiliados (sin Ticket Retail)
+            'rateOperatorCommission' => $opAffiliate / 100,
+            'rateStoreGgrCommission' => $pvAffiliate / 100,
+            'rateOperatorGgrRetail' => $opAffiliate / 100,
             'ggrSettlementMode' => $settlementMode,
             'autoApproveGgrCommissions' => $settlementMode === 'daily' ? '1' : '0',
             'valueBGC' => $this->request->getPost('valueBGC'),
