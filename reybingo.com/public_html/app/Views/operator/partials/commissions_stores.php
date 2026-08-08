@@ -19,18 +19,15 @@ $dateTo = (string) ($storesCommissions['date_to'] ?? date('Y-m-d'));
     </div>
 
     <div class="row g-2 align-items-end mb-3 operator-stores-commissions-filters">
-        <div class="col-md-3 col-sm-6">
+        <div class="col-md-4 col-sm-6">
             <label class="form-label small mb-1" for="operator-stores-date-from"><?= translate('from date'); ?></label>
             <input type="date" class="form-control form-bingo" id="operator-stores-date-from" value="<?= esc($dateFrom); ?>">
         </div>
-        <div class="col-md-3 col-sm-6">
+        <div class="col-md-4 col-sm-6">
             <label class="form-label small mb-1" for="operator-stores-date-to"><?= translate('to date'); ?></label>
             <input type="date" class="form-control form-bingo" id="operator-stores-date-to" value="<?= esc($dateTo); ?>">
         </div>
-        <div class="col-md-6 col-sm-12 d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-primary btn-bingo" id="operator-stores-commissions-apply">
-                <i class="fa-duotone fa-solid fa-filter"></i> <?= translate('apply filters'); ?>
-            </button>
+        <div class="col-md-4 col-sm-12 d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-outline-light" id="operator-stores-commissions-clear" style="border-color: rgba(255,255,255,0.25);">
                 <i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('clear filters'); ?>
             </button>

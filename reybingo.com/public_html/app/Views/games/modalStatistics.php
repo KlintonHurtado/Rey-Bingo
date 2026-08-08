@@ -110,6 +110,9 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="players-tab" data-bs-toggle="tab" data-bs-target="#players" type="button" role="tab" aria-controls="players" aria-selected="false" data-module="players"><?= translate('users'); ?></button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="operators-tab" data-bs-toggle="tab" data-bs-target="#operators" type="button" role="tab" aria-controls="operators" aria-selected="false" data-module="operators">Operadores</button>
+                    </li>
                 </ul>
             </div>
 
@@ -134,6 +137,9 @@
                 </div>
                 <div class="tab-pane fade" id="players" role="tabpanel" aria-labelledby="players-tab">
                     <div id="players-content" class="statistics-content"></div>
+                </div>
+                <div class="tab-pane fade" id="operators" role="tabpanel" aria-labelledby="operators-tab">
+                    <div id="operators-content" class="statistics-content"></div>
                 </div>
             </div>
         </div>
@@ -205,6 +211,7 @@
             'games': 'games',        // games va SOLO a summary
             'users': 'users',
             'players': 'players',
+            'operators': 'operators',
             'transactions': 'transactions',
             'deposits': 'transactions',
             'retires': 'transactions',
@@ -222,6 +229,7 @@
             'games': 'games',          // games tab usa módulo games
             'users': 'users',
             'players': 'players',
+            'operators': 'operators',
             'transactions': 'transactions',
             'roulette': 'roulette',
             'referrals': 'referrals'
@@ -261,6 +269,14 @@
             requestData.group = extraParams.group || $('#groupFilter').val() || 'all';
             requestData.page = extraParams.page || $('#currentPage').val() || 1;
             requestData.per_page = extraParams.per_page || 20;
+            break;
+
+        case 'operators':
+            // Parámetros específicos para operadores
+            requestData.search = extraParams.search || $('#searchOperators').val() || '';
+            requestData.status = extraParams.status || $('#statusFilterOperators').val() || 'all';
+            requestData.page = extraParams.page || $('#currentPageOperators').val() || 1;
+            requestData.per_page = extraParams.per_page || 10;
             break;
             
         case 'transactions':

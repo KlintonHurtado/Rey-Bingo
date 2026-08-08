@@ -147,7 +147,7 @@
                                                     <div class="d-flex gap-2 mb-2">
                                                         <button
                                                             type="button"
-                                                            class="btn btn-primary btn-bingo flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
+                                                            class="btn btn-success flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
                                                             style="font-size: 0.82rem; font-weight: 600;"
                                                             data-action="add"
                                                             data-store-id="<?= $storeId; ?>"
@@ -159,8 +159,8 @@
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            class="btn btn-outline-light flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
-                                                            style="font-size: 0.82rem; font-weight: 600; border-color: rgba(255,255,255,0.25);"
+                                                            class="btn btn-danger flex-fill d-flex align-items-center justify-content-center gap-1 py-2 js-operator-store-balance-btn"
+                                                            style="font-size: 0.82rem; font-weight: 600;"
                                                             data-action="remove"
                                                             data-store-id="<?= $storeId; ?>"
                                                             data-store-name="<?= esc($store['business_name'] ?? '-', 'attr'); ?>"
@@ -259,7 +259,7 @@
             >
                 <div class="card-body operator-panel-pane-body">
                     <div class="operator-pane-inner operator-pane-inner-affiliate">
-                        <div class="operator-panel-pane-head">
+                        <div class="operator-panel-pane-head mb-3">
                             <div class="operator-panel-pane-icon operator-panel-pane-icon-affiliate">
                                 <i class="fa-duotone fa-solid fa-link"></i>
                             </div>
@@ -269,96 +269,30 @@
                             </div>
                         </div>
 
-                        <div class="operator-affiliate-layout">
-                            <div class="operator-affiliate-qr-wrap">
-                                <a
-                                    href="<?= esc($affiliateLink ?? '#'); ?>"
-                                    class="operator-affiliate-qr-link"
-                                    title="<?= translate('create point of sale account'); ?>"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <img
-                                        src="<?= site_url('operator/affiliateCode'); ?>"
-                                        alt="<?= translate('operator affiliate link'); ?>"
-                                        class="operator-affiliate-qr-img"
-                                    >
-                                </a>
-                            </div>
-
-                            <div class="operator-affiliate-content">
-                                <p class="operator-affiliate-lead small text-muted mb-0">
-                                    <?= translate('operator store affiliate link description'); ?>
-                                </p>
-
-                                <label class="form-label" for="operator-affiliate-link-input"><?= translate('your affiliate link'); ?></label>
-                                <div class="operator-affiliate-link-row">
-                                    <input
-                                        type="text"
-                                        class="form-control form-bingo operator-affiliate-link-input"
-                                        id="operator-affiliate-link-input"
-                                        value="<?= esc($affiliateLink ?? ''); ?>"
-                                        readonly
-                                    >
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary btn-bingo operator-affiliate-copy-btn"
-                                        id="operator-affiliate-copy-btn"
-                                    >
-                                        <i class="fa-duotone fa-solid fa-copy"></i>
-                                        <?= translate('copy'); ?>
-                                    </button>
-                                </div>
-                                <p
-                                    class="operator-affiliate-copy-feedback"
-                                    id="operator-affiliate-copy-feedback"
-                                    role="status"
-                                    aria-live="polite"
-                                ></p>
-
-                                <div class="operator-affiliate-actions">
-                                    <a
-                                        href="https://api.whatsapp.com/send?text=<?= rawurlencode('🎉 ' . translate('create point of sale account') . ' ' . APP_NAME . ' 👉 ' . ($affiliateLink ?? '')); ?>"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="btn btn-success btn-bingo"
-                                    >
-                                        <i class="fa-brands fa-whatsapp"></i>
-                                        <?= translate('share on whatsapp'); ?>
-                                    </a>
-                                </div>
-
-                                <div class="operator-affiliate-stats">
-                                    <div class="operator-affiliate-stat">
-                                        <span><?= translate('affiliated stores'); ?></span>
-                                        <strong><?= (int) ($referredStoresCount ?? 0); ?></strong>
-                                    </div>
-
-                                    <?php if (bingo_ggr_affiliate_active()) : ?>
-                                    <?php $ggrDashboard = $ggrDashboard ?? []; ?>
-                                    <div class="operator-affiliate-stat">
-                                        <span><?= translate('ggr generated'); ?></span>
-                                        <strong><?= systemGet('currency'); ?> <?= number_format((float) ($ggrDashboard['total_ggr'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="operator-affiliate-stat">
-                                        <span><?= translate('ggr commissions earned'); ?></span>
-                                        <strong><?= systemGet('currency'); ?> <?= number_format((float) ($ggrDashboard['total_commission'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="operator-affiliate-stat">
-                                        <span><?= translate('operator ggr total rate'); ?></span>
-                                        <strong><?= number_format(($ggrRate ?? 0) * 100, 2); ?>%</strong>
-                                    </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <?php if (bingo_ggr_affiliate_active()) : ?>
-                                <p class="operator-affiliate-margin-note small text-muted mb-0">
-                                    <strong><?= translate('operator ggr margin note'); ?>:</strong>
-                                    <?= translate('operator ggr margin hint'); ?>
-                                </p>
-                                <?php endif; ?>
-                            </div>
+                        <label class="form-label" for="operator-affiliate-link-input"><?= translate('your affiliate link'); ?></label>
+                        <div class="operator-affiliate-link-row">
+                            <input
+                                type="text"
+                                class="form-control form-bingo operator-affiliate-link-input"
+                                id="operator-affiliate-link-input"
+                                value="<?= esc($affiliateLink ?? ''); ?>"
+                                readonly
+                            >
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-bingo operator-affiliate-copy-btn"
+                                id="operator-affiliate-copy-btn"
+                            >
+                                <i class="fa-duotone fa-solid fa-copy"></i>
+                                <?= translate('copy'); ?>
+                            </button>
                         </div>
+                        <p
+                            class="operator-affiliate-copy-feedback"
+                            id="operator-affiliate-copy-feedback"
+                            role="status"
+                            aria-live="polite"
+                        ></p>
                     </div>
                 </div>
             </div>
@@ -883,7 +817,9 @@
             });
         }
 
-        $(document).on('click', '#operator-stores-commissions-apply', function() {
+        let operatorStoresFilterTimer = null;
+
+        function applyOperatorStoresDateFilter() {
             const from = $('#operator-stores-date-from').val() || '';
             const to = $('#operator-stores-date-to').val() || '';
             if (from && to && from > to) {
@@ -897,6 +833,11 @@
                 return;
             }
             loadOperatorStoresCommissions(from, to);
+        }
+
+        $(document).on('change', '#operator-stores-date-from, #operator-stores-date-to', function() {
+            window.clearTimeout(operatorStoresFilterTimer);
+            operatorStoresFilterTimer = window.setTimeout(applyOperatorStoresDateFilter, 200);
         });
 
         $(document).on('click', '#operator-stores-commissions-clear', function() {

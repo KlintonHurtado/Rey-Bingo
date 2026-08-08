@@ -16,11 +16,11 @@ $kycLabels = [
 <div class="card border-0 shadow-sm mt-3">
     <div class="card-body">
         <h6 class="mb-2"><i class="fa-duotone fa-solid fa-id-card me-2"></i> Verificación KYC</h6>
-        <p class="text-muted small mb-2">Por tu seguridad y la transparencia del juego, verifica tu cuenta subiendo:</p>
+        <p class="text-muted small mb-2">Por tu seguridad, verifica tu cuenta subiendo tus documentos de identidad:</p>
         <p class="mb-2">Estado: <span class="badge bg-<?= $kycClass; ?>"><?= $kycLabel; ?></span></p>
         
         <?php if ($kycStatus === 'verified'): ?>
-            <p class="text-success fw-bold small mt-2">¡Listo! Así de fácil cobras tus premios.</p>
+            <p class="text-success fw-bold small mt-2">¡Listo! Tu identidad ha sido verificada correctamente.</p>
         <?php endif; ?>
 
         <?php if (! empty($user['kyc_observations'])): ?>

@@ -200,6 +200,7 @@ class Games extends Controller {
             'retires' => translate('retires'),
             'roulette' => translate('roulette'),
             'referrals' => translate('referrals'),
+            'operators' => 'Operadores',
         ];
         
         // Definir tipos de juego
@@ -1126,6 +1127,67 @@ class Games extends Controller {
                     $data['stats'] = $this->getUsersStats();
                 }
                 break;
+
+            case 'operators':
+                if ($activeTab == 'operators' || $activeTab == 'summary') {
+                    $page = (int) ($this->request->getGet('page') ?? 1);
+                    $perPage = 10;
+                    $search = $this->request->getGet('search') ?? '';
+                    $status = $this->request->getGet('status') ?? 'all';
+                    
+                    $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+                    $builder = $modelUsers->builder();
+                    
+                    $builder->where('group', $operatorGroup);
+                    $builder->where('deleted', 0);
+                    
+                    if (!empty($search)) {
+                        $builder->groupStart()
+                            ->like('firstname', $search)
+                            ->orLike('lastname', $search)
+                            ->orLike('username', $search)
+                            ->orLike('email', $search)
+                            ->orLike('phone', $search)
+                            ->orLike('document', $search)
+                            ->orLike('code', $search)
+                            ->groupEnd();
+                    }
+        
+                    if ($status !== 'all') {
+                        $builder->where('status', $status);
+                    }
+                    
+                    $totalRecords = $builder->countAllResults(false);
+                    $offset = ($page - 1) * $perPage;
+                    $operators = $builder->limit($perPage, $offset)->get()->getResultArray();
+                    
+                    $pager = \Config\Services::pager();
+                    $pager->store('default', $page, $perPage, $totalRecords);
+                    
+                    foreach ($operators as &$op) {
+                        $opId = (int) $op['id'];
+                        $depositsModel = new DepositsModel();
+                        $retiresModel = new RetiresModel();
+                        
+                        $op['total_deposits'] = (float) (($depositsModel->where('user', $opId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        $op['total_retires'] = (float) (($retiresModel->where('user', $opId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        
+                        $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+                        $op['stores_count'] = $modelUsers->where('group', $storeGroup)->where('operator_id', $opId)->where('deleted', 0)->countAllResults();
+                        
+                        $op['last_activity'] = $this->getLastActivity($opId);
+                    }
+                    unset($op);
+                    
+                    $data['operators'] = $operators;
+                    $data['pager'] = $pager;
+                    $data['search'] = $search;
+                    $data['status'] = $status;
+                    $data['current_page'] = $page;
+                    $data['per_page'] = $perPage;
+                    $data['stats'] = $this->getOperatorsStats();
+                }
+                break;
                 
             case 'deposits':
             case 'retires':
@@ -1422,6 +1484,8 @@ class Games extends Controller {
                 return view('games/statistics/referrals', $data);
             case 'players':
                 return view('games/statistics/players', $data);
+            case 'operators':
+                return view('games/statistics/operators', $data);
             default:
                 return view('games/statistics/summary', $data);
         }
@@ -1693,6 +1757,21 @@ class Games extends Controller {
         
         // Usuarios registrados este mes
         $stats['month_users'] = $modelUsers->where('created_at >=', date('Y-m-d', strtotime('-30 days')))->where('deleted', 0)->countAllResults();
+        
+        return $stats;
+    }
+
+    private function getOperatorsStats() {
+        $modelUsers = new UsersModel();
+        $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+
+        $stats = [];
+        $stats['total_operators'] = $modelUsers->where('group', $operatorGroup)->where('deleted', 0)->countAllResults();
+        $stats['active_operators'] = $modelUsers->where('group', $operatorGroup)->where('status', 1)->where('deleted', 0)->countAllResults();
+        $stats['banned_operators'] = $modelUsers->where('group', $operatorGroup)->where('status', 0)->where('deleted', 0)->countAllResults();
+        $stats['total_wallet'] = (float) ($modelUsers->where('group', $operatorGroup)->where('deleted', 0)->selectSum('wallet')->get()->getRow()->wallet ?? 0);
+        $stats['avg_wallet'] = $stats['total_operators'] > 0 ? $stats['total_wallet'] / $stats['total_operators'] : 0;
+        $stats['today_operators'] = $modelUsers->where('group', $operatorGroup)->where('DATE(created_at)', date('Y-m-d'))->where('deleted', 0)->countAllResults();
         
         return $stats;
     }

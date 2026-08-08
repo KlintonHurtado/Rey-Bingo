@@ -112,7 +112,7 @@ $roleLabel = translate('point of sale');
         <div class="text-center mt-3">
             <a href="<?= site_url('signin'); ?>" class="text-white"><?= translate('already have an account'); ?> <?= translate('sign in'); ?></a>
         </div>
-    <?php elseif (($storeRegistering || $operatorRegistering) && empty($embedded)) : ?>
+    <?php elseif ($storeRegistering && ! $operatorRegistering && empty($embedded)) : ?>
         <div class="text-center mt-3 mb-4">
             <a href="<?= esc($backUrl); ?>" class="text-white"><i class="fa-duotone fa-solid fa-arrow-left"></i> <?= esc($backLabel); ?></a>
         </div>

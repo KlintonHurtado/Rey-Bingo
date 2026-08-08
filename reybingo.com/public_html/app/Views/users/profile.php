@@ -6,6 +6,10 @@
         'showStatistics' => false,
         'showUsers' => true,
     ]) ?>
+<?php elseif (function_exists('bingo_is_operator') && bingo_is_operator()) : ?>
+    <a class="btn btn-small btn-home" href="<?= site_url('operator'); ?>" title="<?= translate('home'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
+<?php elseif (function_exists('bingo_is_store') && bingo_is_store()) : ?>
+    <a class="btn btn-small btn-home" href="<?= site_url('store'); ?>" title="<?= translate('home'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 <?php else : ?>
     <?= view('playings/partials/player_nav_cluster', [
         'mode' => 'home',

@@ -2030,13 +2030,7 @@ if (!function_exists('bingo_enrich_stores_with_operator')) {
 if (!function_exists('bingo_user_requires_kyc')) {
     function bingo_user_requires_kyc(?array $user = null): bool
     {
-        if ($user !== null) {
-            $group = (int) ($user['group'] ?? -1);
-
-            return !bingo_is_store($group) && !bingo_is_operator($group);
-        }
-
-        return !bingo_is_store() && !bingo_is_operator();
+        return true;
     }
 }
 

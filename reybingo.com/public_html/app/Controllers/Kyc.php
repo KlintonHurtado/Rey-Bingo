@@ -20,9 +20,7 @@ class Kyc extends Controller
         $modelContacts = new ContactsModel();
         $user = $modelUsers->find(session()->get('id'));
 
-        if (bingo_is_store((int) ($user['group'] ?? -1))) {
-            return redirect()->to('/store');
-        }
+
 
         $imagePath = bingo_user_image_url($user);
 
@@ -55,9 +53,7 @@ class Kyc extends Controller
 
         $modelUsers = new UsersModel();
         $user = $modelUsers->find(session()->get('id'));
-        if (bingo_is_store((int) ($user['group'] ?? -1))) {
-            return redirect()->to('/store');
-        }
+
 
         $front  = $this->request->getFile('kyc_front');
         $back   = $this->request->getFile('kyc_back');

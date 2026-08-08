@@ -100,9 +100,16 @@
     border-bottom: 1px solid rgba(255,255,255,0.1);
     background: rgba(40, 10, 100, 0.3);
 }
+.kyc-search-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
 .kyc-search-input {
-    width: 100%;
-    max-width: 420px;
+    flex: 1;
+    min-width: 240px;
+    max-width: 360px;
     border: 1.5px solid rgba(255,255,255,0.2);
     border-radius: 8px;
     padding: 7px 14px 7px 38px;
@@ -114,6 +121,33 @@
 }
 .kyc-search-input::placeholder { color: rgba(255,255,255,0.5); }
 .kyc-search-input:focus { border-color: #ff3fa4; background: rgba(255,255,255,0.18); }
+.kyc-role-filters {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.kyc-role-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.kyc-role-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+.kyc-role-btn.active {
+    background: #ff3fa4;
+    color: #fff;
+    border-color: #ff3fa4;
+    box-shadow: 0 2px 8px rgba(255, 63, 164, 0.4);
+}
 /* ─── Content area ───────────────────────────────────── */
 .kyc-content {
     flex: 1;
@@ -254,9 +288,25 @@
             </button>
         </div>
 
-        <!-- SEARCH BAR -->
+        <!-- SEARCH BAR & ROLE FILTERS -->
         <div class="kyc-search-bar">
-            <input type="text" id="kycSearchInput" class="kyc-search-input" placeholder="Buscar por nombre..." oninput="filterCards(this.value)">
+            <div class="kyc-search-wrapper">
+                <input type="text" id="kycSearchInput" class="kyc-search-input" placeholder="Buscar por nombre, documento o código..." oninput="filterCards()">
+                <div class="kyc-role-filters" role="group" aria-label="Filtro por tipo de usuario">
+                    <button type="button" class="kyc-role-btn active" data-role="all" onclick="setRoleFilter('all', this)">
+                        <i class="fa-solid fa-list me-1"></i> Todos
+                    </button>
+                    <button type="button" class="kyc-role-btn" data-role="0" onclick="setRoleFilter('0', this)">
+                        <i class="fa-solid fa-user me-1"></i> Jugadores
+                    </button>
+                    <button type="button" class="kyc-role-btn" data-role="2" onclick="setRoleFilter('2', this)">
+                        <i class="fa-solid fa-store me-1"></i> Puntos de Venta
+                    </button>
+                    <button type="button" class="kyc-role-btn" data-role="3" onclick="setRoleFilter('3', this)">
+                        <i class="fa-solid fa-user-tie me-1"></i> Operadores
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- CONTENT -->
@@ -289,7 +339,27 @@
                     <?php else: ?>
                         <div class="kyc-grid" id="grid-<?= $tabKey; ?>">
                             <?php foreach ($users as $u): ?>
-                                <div class="kyc-card" data-name="<?= strtolower(esc($u['firstname'] . ' ' . $u['lastname'])); ?>">
+                                <?php
+                                $groupVal = (int) ($u['group'] ?? 0);
+                                $groupLabel = 'Jugador';
+                                $groupBadgeClass = 'bg-info text-dark';
+                                $groupIcon = 'fa-user';
+
+                                if (function_exists('bingo_is_store') && bingo_is_store($groupVal)) {
+                                    $groupLabel = 'Punto de Venta';
+                                    $groupBadgeClass = 'bg-primary text-white';
+                                    $groupIcon = 'fa-store';
+                                } elseif (function_exists('bingo_is_operator') && bingo_is_operator($groupVal)) {
+                                    $groupLabel = 'Operador';
+                                    $groupBadgeClass = 'bg-warning text-dark';
+                                    $groupIcon = 'fa-user-tie';
+                                }
+                                ?>
+                                <div class="kyc-card" 
+                                     data-name="<?= strtolower(esc($u['firstname'] . ' ' . $u['lastname'])); ?>"
+                                     data-doc="<?= strtolower(esc($u['document'] ?? '')); ?>"
+                                     data-code="<?= strtolower(esc($u['code'] ?? '')); ?>"
+                                     data-group="<?= $groupVal; ?>">
                                     <!-- Avatar + Nombre -->
                                     <div class="kyc-card-top">
                                         <div class="kyc-avatar">
@@ -304,7 +374,12 @@
                                             <div class="kyc-user-name" title="<?= esc($u['firstname'] . ' ' . $u['lastname']); ?>">
                                                 <?= esc($u['firstname'] . ' ' . $u['lastname']); ?>
                                             </div>
-                                            <div class="kyc-user-code"><?= esc($u['code']); ?></div>
+                                            <div class="d-flex align-items-center gap-1 mt-1">
+                                                <span class="kyc-user-code"><?= esc($u['code']); ?></span>
+                                                <span class="badge <?= $groupBadgeClass; ?>" style="font-size: 0.68rem; padding: 2px 6px; border-radius: 4px;">
+                                                    <i class="fa-solid <?= $groupIcon; ?> me-1"></i><?= $groupLabel; ?>
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -442,19 +517,35 @@
 <script>
 // ── Tab switching ────────────────────────────────────────
 var currentTab = 'pending';
+var currentRoleFilter = 'all';
+
 function switchTab(key, btn) {
     document.querySelectorAll('.kyc-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.kyc-tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + key).classList.add('active');
     currentTab = key;
-    document.getElementById('kycSearchInput').value = '';
-    filterCards('');
+    var searchInput = document.getElementById('kycSearchInput');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    filterCards();
+}
+
+// ── Role filter switching ─────────────────────────────────
+function setRoleFilter(role, btn) {
+    currentRoleFilter = role;
+    document.querySelectorAll('.kyc-role-btn').forEach(b => b.classList.remove('active'));
+    if (btn) {
+        btn.classList.add('active');
+    }
+    filterCards();
 }
 
 // ── Search / filter ──────────────────────────────────────
-function filterCards(query) {
-    var q = query.toLowerCase().trim();
+function filterCards() {
+    var searchInput = document.getElementById('kycSearchInput');
+    var q = searchInput ? searchInput.value.toLowerCase().trim() : '';
     var panel = document.getElementById('tab-' + currentTab);
     if (!panel) return;
     var grid  = panel.querySelector('.kyc-grid');
@@ -463,8 +554,15 @@ function filterCards(query) {
     var cards = grid.querySelectorAll('.kyc-card');
     var visible = 0;
     cards.forEach(function(card) {
-        var name = card.getAttribute('data-name') || '';
-        if (!q || name.includes(q)) {
+        var name  = card.getAttribute('data-name') || '';
+        var doc   = card.getAttribute('data-doc') || '';
+        var code  = card.getAttribute('data-code') || '';
+        var group = card.getAttribute('data-group') || '0';
+
+        var matchesQuery = !q || name.includes(q) || doc.includes(q) || code.includes(q);
+        var matchesRole  = (currentRoleFilter === 'all') || (group === currentRoleFilter);
+
+        if (matchesQuery && matchesRole) {
             card.style.display = '';
             visible++;
         } else {
