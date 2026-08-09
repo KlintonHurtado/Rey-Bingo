@@ -10,6 +10,13 @@
                     <h5 class="store-sidebar-title mb-2"><i class="fa-duotone fa-solid fa-user-tie"></i> <?= translate('operator panel'); ?></h5>
                     <p class="small text-muted mb-0 operator-panel-sidebar-note"><?= translate('operator panel description'); ?></p>
 
+                    <div class="store-sidebar-stats mt-3 mb-3">
+                        <div class="store-balance-sidebar">
+                            <span class="store-balance-label">Saldo Disponible del Operador</span>
+                            <strong class="store-balance-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($user['wallet'] ?? 0), 2) ?></strong>
+                        </div>
+                    </div>
+
                     <div class="store-panel-sidebar-divider"></div>
 
                     <ul class="nav store-panel-tabs store-panel-nav operator-panel-tabs mb-0">
@@ -21,6 +28,16 @@
                             >
                                 <i class="fa-duotone fa-solid fa-store"></i>
                                 <span><?= translate('points of sale'); ?></span>
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button
+                                type="button"
+                                class="nav-link operator-panel-tab operator-tool-tab"
+                                data-operator-tab="balance-request"
+                            >
+                                <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
+                                <span>Pedir Saldo al Administrador</span>
                             </button>
                         </li>
                         <li class="nav-item">
@@ -296,6 +313,92 @@
                     </div>
                 </div>
             </div>
+
+            <div
+                class="card store-panel-card operator-panel-pane"
+                id="operator-pane-balance-request"
+            >
+                <div class="card-body operator-panel-pane-body">
+                    <div class="operator-pane-inner">
+                        <div class="operator-panel-pane-head mb-4">
+                            <div class="operator-panel-pane-icon">
+                                <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">Pedir Saldo al Administrador</h5>
+                                <p class="small text-muted mb-0">Solicite recarga de saldo al administrador completando el formulario y adjuntando el comprobante de pago.</p>
+                            </div>
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-12 col-lg-5">
+                                <div class="card p-3 shadow-sm border-0 bg-light">
+                                    <h6 class="fw-bold mb-3"><i class="fa-duotone fa-solid fa-pen-to-square me-1"></i> Nueva Solicitud de Saldo</h6>
+                                    <form id="operator-balance-request-form" enctype="multipart/form-data">
+                                        <?= csrf_field() ?>
+                                        <div class="mb-3">
+                                            <label for="op-balance-bank" class="form-label small fw-semibold">Banco de depósito</label>
+                                            <select class="form-select form-bingo" name="bank" id="op-balance-bank" required>
+                                                <option value="">Seleccione un banco...</option>
+                                                <?php foreach ($banks ?? [] as $bank) : ?>
+                                                    <option value="<?= (int) $bank['id']; ?>"><?= esc($bank['name']); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <small id="op-balance-bank-error" class="text-danger d-none"></small>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="op-balance-amount" class="form-label small fw-semibold">Monto a solicitar (<?= systemGet('currency'); ?>)</label>
+                                            <input type="number" step="0.01" min="0.01" class="form-control form-bingo" name="amount" id="op-balance-amount" placeholder="0.00" required>
+                                            <small id="op-balance-amount-error" class="text-danger d-none"></small>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label for="op-balance-reference" class="form-label small fw-semibold">Nº Referencia <span class="text-muted">(opcional)</span></label>
+                                            <input type="text" class="form-control form-bingo" name="reference" id="op-balance-reference" placeholder="Ej: 12345678">
+                                            <small id="op-balance-reference-error" class="text-danger d-none"></small>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold">Comprobante de Pago</label>
+                                            <div class="store-voucher-upload cover position-relative text-center p-3 border rounded bg-white" style="min-height:120px;">
+                                                <div id="op-voucher-placeholder" class="store-voucher-placeholder">
+                                                    <i class="fa-duotone fa-solid fa-receipt fs-2 text-muted mb-2"></i><br>
+                                                    <span class="small text-muted">Subir imagen de comprobante</span>
+                                                </div>
+                                                <img src="" alt="Comprobante" id="op-voucher-preview" class="store-voucher-preview d-none img-fluid rounded" style="max-height:150px;">
+                                                <label for="op-voucher-file" class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2" title="Seleccionar archivo"><i class="fa-duotone fa-solid fa-plus"></i></label>
+                                                <input type="file" id="op-voucher-file" accept="image/*" class="d-none" onchange="opVoucherPreview(event)">
+                                                <button type="button" id="op-voucher-remove" class="btn btn-sm btn-danger position-absolute bottom-0 end-0 m-2 d-none" onclick="opVoucherRemove()" title="Eliminar"><i class="fa-duotone fa-trash"></i></button>
+                                                <input type="hidden" name="voucher" id="op-voucher-input" value="">
+                                            </div>
+                                            <small id="op-voucher-error" class="text-danger d-none"></small>
+                                        </div>
+
+                                        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="op-balance-submit-btn">
+                                            <i class="fa-duotone fa-solid fa-paper-plane me-1"></i> Enviar Solicitud de Saldo
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-lg-7">
+                                <div class="card p-3 shadow-sm border-0">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="fw-bold mb-0"><i class="fa-duotone fa-solid fa-list me-1"></i> Historial de Solicitudes de Saldo</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="opRefreshBalanceRequests()">
+                                            <i class="fa-duotone fa-solid fa-arrows-rotate me-1"></i> Actualizar
+                                        </button>
+                                    </div>
+                                    <div id="op-balance-requests-list">
+                                        <?= view('operator/partials/balance_history', ['operatorDeposits' => $operatorDeposits ?? []]); ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 </div>
@@ -402,6 +505,89 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <?php endif; ?>
 <script type="text/javascript">
+    window.opVoucherPreview = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            $('#op-voucher-input').val(evt.target.result);
+            $('#op-voucher-preview').attr('src', evt.target.result).removeClass('d-none');
+            $('#op-voucher-placeholder').addClass('d-none');
+            $('#op-voucher-remove').removeClass('d-none');
+        };
+        reader.readAsDataURL(file);
+    };
+
+    window.opVoucherRemove = function() {
+        $('#op-voucher-file').val('');
+        $('#op-voucher-input').val('');
+        $('#op-voucher-preview').attr('src', '').addClass('d-none');
+        $('#op-voucher-placeholder').removeClass('d-none');
+        $('#op-voucher-remove').addClass('d-none');
+    };
+
+    window.opRefreshBalanceRequests = function() {
+        $.get('<?= site_url('operator/balanceListGet') ?>', function(html) {
+            $('#op-balance-requests-list').html(html);
+        });
+    };
+
+    $(document).on('submit', '#operator-balance-request-form', function(e) {
+        e.preventDefault();
+        $('#op-balance-bank-error, #op-balance-amount-error, #op-balance-reference-error, #op-voucher-error').addClass('d-none').text('');
+        
+        var $btn = $('#op-balance-submit-btn');
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Enviando...');
+        
+        $.ajax({
+            url: '<?= site_url('operator/balanceRequestSubmit') ?>',
+            method: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function(res) {
+                $btn.prop('disabled', false).html('<i class="fa-duotone fa-solid fa-paper-plane me-1"></i> Enviar Solicitud de Saldo');
+                if (res.success) {
+                    Toastify({
+                        text: res.message || 'Solicitud enviada con éxito',
+                        duration: 4000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#198754" }
+                    }).showToast();
+                    $('#operator-balance-request-form')[0].reset();
+                    opVoucherRemove();
+                    opRefreshBalanceRequests();
+                } else {
+                    if (res.errors) {
+                        if (res.errors.bank) $('#op-balance-bank-error').removeClass('d-none').text(res.errors.bank);
+                        if (res.errors.amount) $('#op-balance-amount-error').removeClass('d-none').text(res.errors.amount);
+                        if (res.errors.reference) $('#op-balance-reference-error').removeClass('d-none').text(res.errors.reference);
+                        if (res.errors.voucher) $('#op-voucher-error').removeClass('d-none').text(res.errors.voucher);
+                    }
+                    if (res.message) {
+                        Toastify({
+                            text: res.message,
+                            duration: 4000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#dc3545" }
+                        }).showToast();
+                    }
+                }
+            },
+            error: function() {
+                $btn.prop('disabled', false).html('<i class="fa-duotone fa-solid fa-paper-plane me-1"></i> Enviar Solicitud de Saldo');
+                Toastify({
+                    text: "Error al enviar la solicitud al servidor",
+                    duration: 4000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" }
+                }).showToast();
+            }
+        });
+    });
+
     $(function() {
         let currentPage = 1;
         const pageSize = 6;

@@ -591,4 +591,128 @@ function exportTabData(activeTab, format = 'excel') {
     form.appendTo('body').submit().remove();
 }
 
+// ── Global Helper for User Details Modal ───────────────────
+if (typeof window.viewUser !== 'function') {
+    window.viewUser = function(userId) {
+        $.ajax({
+            url: '<?= site_url('users/getUserDetails/'); ?>' + userId,
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.html) {
+                    $('#userDetailsContent').html(response.html);
+                    $('#modalUserDetails').modal('show');
+                } else {
+                    Toastify({
+                        text: (response && response.error) ? response.error : "<?= translate('user not found'); ?>",
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            },
+            error: function() {
+                Toastify({
+                    text: "<?= translate('there was an error in the request to the server'); ?>",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+            }
+        });
+    };
+}
+
+if (typeof window.revokeUserKyc !== 'function') {
+    window.revokeUserKyc = function(userId) {
+        if (!confirm("<?= translate('confirm remove kyc verification'); ?>")) {
+            return;
+        }
+        $.ajax({
+            url: '<?= site_url('users/revokeKyc'); ?>',
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                user_id: userId,
+                '<?= csrf_token(); ?>': '<?= csrf_hash(); ?>'
+            },
+            success: function(response) {
+                Toastify({
+                    text: response.message || (response.success ? 'OK' : 'Error'),
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: response.success ? "#198754" : "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+                if (response.success) {
+                    window.viewUser(userId);
+                }
+            }
+        });
+    };
+}
+
+if (typeof window.saveDocumentExpiry !== 'function') {
+    window.saveDocumentExpiry = function(userId) {
+        var value = $('#admin-document-expires-at').val() || '';
+        $.ajax({
+            url: '<?= site_url('users/saveDocumentExpiry'); ?>',
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                user_id: userId,
+                document_expires_at: value,
+                '<?= csrf_token(); ?>': '<?= csrf_hash(); ?>'
+            },
+            success: function(response) {
+                Toastify({
+                    text: response.message || (response.success ? 'OK' : 'Error'),
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: response.success ? "#198754" : "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+                if (response.success) {
+                    window.viewUser(userId);
+                }
+            }
+        });
+    };
+}
+
+if (typeof window.savePlayerWallets !== 'function') {
+    window.savePlayerWallets = function(userId) {
+        $.ajax({
+            url: '<?= site_url('users/updatePlayerWallets'); ?>',
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                user_id: userId,
+                wallet_bonus: $('#admin-wallet-bonus').val() || 0,
+                wallet_recharge: $('#admin-wallet-recharge').val() || 0,
+                wallet_withdraw: $('#admin-wallet-withdraw').val() || 0,
+                '<?= csrf_token(); ?>': '<?= csrf_hash(); ?>'
+            },
+            success: function(response) {
+                Toastify({
+                    text: response.message || response.error || (response.success ? 'OK' : 'Error'),
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: response.success ? "#198754" : "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+                if (response.success) {
+                    window.viewUser(userId);
+                }
+            }
+        });
+    };
+}
 </script>

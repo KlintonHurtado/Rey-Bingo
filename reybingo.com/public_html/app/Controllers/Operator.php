@@ -88,6 +88,15 @@ class Operator extends Controller
 
         $earningsSummary = bingo_fetch_operator_withdraw_summary($operatorId, $operator);
 
+        $modelBanks = new \App\Models\BanksModel();
+        $banks = $modelBanks->where('status', 1)->findAll();
+
+        $modelDeposits = new \App\Models\DepositsModel();
+        $operatorDeposits = $modelDeposits
+            ->where('user', $operatorId)
+            ->orderBy('created_at', 'DESC')
+            ->findAll(30);
+
         $data = [
             'page' => [
                 'title' => translate('operator panel'),
@@ -109,6 +118,8 @@ class Operator extends Controller
                 'retireEnabled' => (string) (systemGet('activateRetire') ?? '1') === '1',
                 'minimumRetire' => (float) (systemGet('minimumRetire') ?? 0),
                 'maximumRetire' => (float) (systemGet('maximumRetire') ?? 0),
+                'banks' => $banks,
+                'operatorDeposits' => $operatorDeposits,
             ]),
         ];
 
@@ -523,6 +534,167 @@ class Operator extends Controller
             'success' => true,
             'html'    => $html,
             'chart'   => $storesCommissions['chart'] ?? [],
+        ]);
+    }
+
+    public function balanceRequestSubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        $validationRules = [
+            'amount' => [
+                'label' => translate('amount'),
+                'rules' => 'required|decimal|greater_than[0]',
+            ],
+            'reference' => [
+                'label' => translate('reference'),
+                'rules' => 'permit_empty|min_length[3]|max_length[50]',
+            ],
+            'bank' => [
+                'label' => translate('bingo bank'),
+                'rules' => 'required|is_natural_no_zero',
+            ],
+        ];
+
+        if (! $this->validate($validationRules)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => $this->validator->getErrors(),
+            ]);
+        }
+
+        $voucherImage = (string) $this->request->getPost('voucher');
+        if ($voucherImage === '' || strpos($voucherImage, 'data:image') !== 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'voucher' => translate('enter a') . ' ' . strtolower(translate('voucher')),
+                ],
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $modelDeposits = new \App\Models\DepositsModel();
+        $modelNotifications = new \App\Models\NotificationsModel();
+        $modelBanks = new \App\Models\BanksModel();
+
+        $amount = round((float) $this->request->getPost('amount'), 2);
+        $reference = trim((string) $this->request->getPost('reference'));
+        $bankId = (int) $this->request->getPost('bank');
+        $bingoBank = $modelBanks->where('status', 1)->find($bankId);
+
+        if (! $bingoBank) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'bank' => translate('bank not found'),
+                ],
+            ]);
+        }
+
+        $operatorId = (int) session()->get('id');
+        $operator = $modelUsers->find($operatorId);
+        $operatorName = !empty($operator) ? trim(($operator['firstname'] ?? '') . ' ' . ($operator['lastname'] ?? '')) : 'Operador';
+        if ($operatorName === '') {
+            $operatorName = $operator['username'] ?? 'Operador';
+        }
+
+        $savedVoucher = bingo_save_voucher_base64($voucherImage);
+        $voucherFile = $savedVoucher['success'] ? $savedVoucher['filename'] : '';
+
+        if ($voucherFile === '') {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'voucher' => translate('there was an error in the request to the server.'),
+                ],
+            ]);
+        }
+
+        if (systemGet('activateDeposit') == 1) {
+            if ($amount < (float) systemGet('minimumDeposit')) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('minimum deposit amount is') . ' ' . systemGet('minimumDeposit') . ' ' . systemGet('currency'),
+                ]);
+            }
+            if ($amount > (float) systemGet('maximumDeposit')) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('maximum deposit amount is') . ' ' . systemGet('maximumDeposit') . ' ' . systemGet('currency'),
+                ]);
+            }
+        }
+
+        if ($reference === '') {
+            $reference = 'SOL-OP-' . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 8));
+        }
+
+        $depositData = [
+            'user' => $operatorId,
+            'store' => null,
+            'account' => (string) $bankId,
+            'method' => 'operator funding request',
+            'bank' => $bingoBank['name'],
+            'document' => $operator['document'] ?? '',
+            'phone' => $operator['phone'] ?? '',
+            'reference' => $reference,
+            'amount' => $amount,
+            'date' => date('Y-m-d'),
+            'voucher' => $voucherFile,
+            'observation' => 'Solicitud de saldo de Operador: ' . $operatorName,
+            'status' => 1,
+        ];
+
+        $modelDeposits->insert($depositData);
+        $depositId = (int) $modelDeposits->getInsertID();
+
+        if ($depositId > 0 && function_exists('bingo_voucher_sync_after_insert')) {
+            bingo_voucher_sync_after_insert($depositId, $voucherFile);
+        }
+
+        $admins = $modelUsers->select('id')->where('group', bingo_group_admin())->findAll();
+        foreach ($admins as $admin) {
+            $modelNotifications->insert([
+                'user' => $admin['id'],
+                'from' => $operatorId,
+                'type' => 'deposit',
+                'type_id' => $depositId,
+                'title' => '👔 SOLICITUD DE SALDO DE OPERADOR',
+                'message' => $operatorName . ' solicitó saldo de '
+                    . systemGet('currency') . ' ' . number_format($amount, 2)
+                    . ' | Ref: #' . $reference,
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Solicitud de saldo registrada con éxito, pendiente de aprobación por el administrador',
+            'deposit_id' => $depositId,
+            'reference' => $reference,
+        ]);
+    }
+
+    public function balanceListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $operatorId = (int) session()->get('id');
+        $modelDeposits = new \App\Models\DepositsModel();
+        $operatorDeposits = $modelDeposits
+            ->where('user', $operatorId)
+            ->orderBy('created_at', 'DESC')
+            ->findAll(30);
+
+        return view('operator/partials/balance_history', [
+            'operatorDeposits' => $operatorDeposits,
         ]);
     }
 }

@@ -240,6 +240,10 @@ $routes->post('users/testNotification', 'Users::testNotification');
 $routes->get('users/referralsGet', 'Users::referralsGet');
 $routes->get('users/referralCode', 'Users::referralCode');
 
+$routes->get('operator', 'Operator::index');
+$routes->post('operator/balanceRequestSubmit', 'Operator::balanceRequestSubmit');
+$routes->get('operator/balanceListGet', 'Operator::balanceListGet');
+
 $routes->get('payments', 'Payments::index');
 $routes->get('payments/depositGet', 'Payments::depositGet');
 $routes->post('payments/depositStepSubmit', 'Payments::depositStepSubmit');
