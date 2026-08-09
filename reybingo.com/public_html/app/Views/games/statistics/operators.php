@@ -249,45 +249,6 @@
 </div>
 
 <script type="text/javascript">
-    if (typeof window.viewUser !== 'function') {
-        window.viewUser = function(userId) {
-            $.ajax({
-                url: '<?= site_url('users/getUserDetails/'); ?>' + userId,
-                method: 'GET',
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success && response.html) {
-                        $('#userDetailsContent').html(response.html);
-                        $('#modalUserDetails').modal('show');
-                    } else {
-                        Toastify({
-                            text: (response && response.error) ? response.error : '<?= translate('user not found'); ?>',
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            style: { background: "#dc3545" },
-                            stopOnFocus: true
-                        }).showToast();
-                    }
-                },
-                error: function() {
-                    Toastify({
-                        text: '<?= translate('there was an error in the request to the server'); ?>',
-                        duration: 3000,
-                        gravity: "top",
-                        position: "right",
-                        style: { background: "#dc3545" },
-                        stopOnFocus: true
-                    }).showToast();
-                }
-            });
-        };
-    }
-
-    function viewUser(userId) {
-        window.viewUser(userId);
-    }
-
     function filterOperators() {
         var search = $('#searchOperators').val() || '';
         var status = $('#statusFilterOperators').val() || 'all';

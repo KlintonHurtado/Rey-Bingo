@@ -34,6 +34,16 @@
                             <button
                                 type="button"
                                 class="nav-link operator-panel-tab operator-tool-tab"
+                                data-operator-tab="account-details"
+                            >
+                                <i class="fa-duotone fa-solid fa-list-check"></i>
+                                <span>Detalles y Movimientos</span>
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button
+                                type="button"
+                                class="nav-link operator-panel-tab operator-tool-tab"
                                 data-operator-tab="balance-request"
                             >
                                 <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
@@ -206,6 +216,15 @@
                                                         <i class="fa-duotone fa-solid fa-store"></i>
                                                         <?= translate('manage point of sale'); ?>
                                                     </button>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-outline-info btn-bingo w-100 mt-2 d-flex align-items-center justify-content-center gap-2 py-2"
+                                                        onclick="opGoToStoreDetails(<?= $storeId; ?>)"
+                                                        style="font-size: 0.85rem; font-weight: 600;"
+                                                    >
+                                                        <i class="fa-duotone fa-solid fa-list-check"></i>
+                                                        Ver detalles de movimientos
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -319,7 +338,7 @@
                 id="operator-pane-balance-request"
             >
                 <div class="card-body operator-panel-pane-body">
-                    <div class="operator-pane-inner">
+                    <div class="operator-pane-inner operator-pane-inner-full">
                         <div class="operator-panel-pane-head mb-4">
                             <div class="operator-panel-pane-icon">
                                 <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
@@ -394,6 +413,45 @@
                                         <?= view('operator/partials/balance_history', ['operatorDeposits' => $operatorDeposits ?? []]); ?>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="card store-panel-card operator-panel-pane"
+                id="operator-pane-account-details"
+            >
+                <div class="card-body operator-panel-pane-body">
+                    <div class="operator-pane-inner operator-pane-inner-full">
+                        <div class="operator-panel-pane-head mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="operator-panel-pane-icon">
+                                    <i class="fa-duotone fa-solid fa-list-check"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">Detalles y Movimientos</h5>
+                                    <p class="small text-muted mb-0">Consulte el historial completo de movimientos, recargas, retiros y transacciones de su cuenta o Puntos de Venta.</p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <label for="op-details-user-select" class="form-label small fw-bold mb-0 text-nowrap"><i class="fa-duotone fa-solid fa-filter me-1"></i> Ver movimientos de:</label>
+                                <select id="op-details-user-select" class="form-select form-select-sm form-bingo" style="min-width: 240px;" onchange="opLoadAccountDetails(this.value)">
+                                    <option value="<?= (int) session()->get('id') ?>">👔 Mi Cuenta (Operador)</option>
+                                    <?php foreach ($stores ?? [] as $st) : ?>
+                                        <option value="<?= (int) $st['id'] ?>">🏪 PV: <?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])) ?> (<?= esc($st['username']) ?>)</option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="op-account-details-container" class="position-relative min-vh-50">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2 text-muted small">Cargando detalles de movimientos...</p>
                             </div>
                         </div>
                     </div>
@@ -531,6 +589,54 @@
             $('#op-balance-requests-list').html(html);
         });
     };
+
+    window.opLoadAccountDetails = function(userId) {
+        userId = userId || <?= (int) session()->get('id') ?>;
+        const $container = $('#op-account-details-container');
+        $container.html(`
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2 text-muted small">Cargando detalles...</p>
+            </div>
+        `);
+
+        $.ajax({
+            url: '<?= site_url('users/getUserDetails/'); ?>' + userId,
+            method: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.html) {
+                    $container.html(response.html);
+                } else {
+                    $container.html(`
+                        <div class="alert alert-danger my-3">
+                            <i class="fa-solid fa-triangle-exclamation me-2"></i> ${response.error || 'No se pudieron cargar los detalles'}
+                        </div>
+                    `);
+                }
+            },
+            error: function() {
+                $container.html(`
+                    <div class="alert alert-danger my-3">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i> Error al conectar con el servidor
+                    </div>
+                `);
+            }
+        });
+    };
+
+    window.opGoToStoreDetails = function(storeId) {
+        $('[data-operator-tab="account-details"]').trigger('click');
+        $('#op-details-user-select').val(storeId);
+        opLoadAccountDetails(storeId);
+    };
+
+    $(document).on('click', '[data-operator-tab="account-details"]', function() {
+        const selectedUser = $('#op-details-user-select').val() || <?= (int) session()->get('id') ?>;
+        opLoadAccountDetails(selectedUser);
+    });
 
     $(document).on('submit', '#operator-balance-request-form', function(e) {
         e.preventDefault();

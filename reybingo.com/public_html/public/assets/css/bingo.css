@@ -3841,13 +3841,25 @@ small.text-danger {
 }
 
 #operator-pane-commissions-operator .operator-panel-pane-body,
-#operator-pane-commissions-stores .operator-panel-pane-body {
+#operator-pane-commissions-stores .operator-panel-pane-body,
+#operator-pane-balance-request .operator-panel-pane-body,
+#operator-pane-account-details .operator-panel-pane-body {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
     padding: 1.35rem 1.5rem !important;
     overflow-y: auto;
+}
+
+.operator-pane-inner-full,
+#operator-pane-balance-request .operator-pane-inner,
+#operator-pane-account-details .operator-pane-inner {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    flex: 1;
+    align-self: stretch;
 }
 
 .operator-pane-inner-commissions {

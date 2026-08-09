@@ -1256,7 +1256,7 @@ class Users extends Controller {
     }
 
     public function getUserDetails($userId) {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+        if (! session()->get('logged_in')) {
             return $this->response->setStatusCode(403)->setJSON([
                 'success' => false,
                 'error' => translate('unauthorized access'),
@@ -1267,6 +1267,36 @@ class Users extends Controller {
         helper(['bingo', 'wallet']);
 
         $model = new UsersModel();
+        $userId = (int) $userId;
+        $user = $model->find($userId);
+        
+        if (!$user) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => translate('user not found')
+            ]);
+        }
+
+        $sessionGroup = (int) session()->get('group');
+        $sessionUserId = (int) session()->get('id');
+
+        $isAllowed = false;
+        if ($sessionGroup === 1) {
+            $isAllowed = true;
+        } elseif ($sessionGroup === 3) {
+            if ($userId === $sessionUserId) {
+                $isAllowed = true;
+            } elseif ((int) ($user['group'] ?? 0) === bingo_group_store() && (int) ($user['operator_id'] ?? 0) === $sessionUserId) {
+                $isAllowed = true;
+            }
+        }
+
+        if (!$isAllowed) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized access'),
+            ]);
+        }
         $modelCartons = new CartonsModel();
         $modelDeposits = new DepositsModel();
         $modelRetires = new RetiresModel();
