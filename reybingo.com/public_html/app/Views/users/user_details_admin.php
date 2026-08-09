@@ -1,5 +1,6 @@
 <?php
 $currency = $currency ?? systemGet('currency');
+$isOperator = (int) ($user['group'] ?? 0) === bingo_group_operator();
 $kycLabels = [
     'verified' => translate('kyc verified'),
     'pending' => translate('kyc not verified'),
@@ -97,40 +98,54 @@ $sourceLabel = static function ($source) {
                 <div class="col-6 col-md-3">
                     <div class="stat-chip" style="background:rgba(25,135,84,.12);">
                         <small><?= translate('bonus balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
-                                   value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
-                        </div>
+                        <?php if ($isOperator) : ?>
+                            <strong class="d-block mt-1"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2); ?></strong>
+                        <?php else : ?>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
+                                       value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
                         <small><?= translate('recharge balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
-                                   value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
-                        </div>
+                        <?php if ($isOperator) : ?>
+                            <strong class="d-block mt-1"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2); ?></strong>
+                        <?php else : ?>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
+                                       value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
                         <small><?= translate('withdraw balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
-                                   value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
-                        </div>
+                        <?php if ($isOperator) : ?>
+                            <strong class="d-block mt-1"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2); ?></strong>
+                        <?php else : ?>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
+                                       value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-            <div class="mb-2">
-                <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
-                    <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
-                </button>
-                <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
-            </div>
+            <?php if (! $isOperator) : ?>
+                <div class="mb-2">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
+                        <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
+                    </button>
+                    <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
+                </div>
+            <?php endif; ?>
             <div class="row g-2 mb-2">
                 <div class="col-6 col-md-3">
                     <div class="stat-chip">
@@ -185,15 +200,19 @@ $sourceLabel = static function ($source) {
             </table>
 
             <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
-                    <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
-                </button>
+                <?php if (! $isOperator) : ?>
+                    <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
+                        <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
+                    </button>
+                <?php endif; ?>
                 <a class="btn btn-sm btn-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-file-excel"></i> Descargar movimientos
                 </a>
-                <a class="btn btn-sm btn-warning" href="<?= site_url('users/exportRiskAnalysis/' . (int) $user['id']); ?>">
-                    <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('download risk analysis'); ?>
-                </a>
+                <?php if (! $isOperator) : ?>
+                    <a class="btn btn-sm btn-warning" href="<?= site_url('users/exportRiskAnalysis/' . (int) $user['id']); ?>">
+                        <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('download risk analysis'); ?>
+                    </a>
+                <?php endif; ?>
                 <?php if (($kycStatus ?? '') === 'verified') : ?>
                     <button type="button" class="btn btn-sm btn-danger" onclick="revokeUserKyc(<?= (int) $user['id']; ?>)">
                         <i class="fa-duotone fa-solid fa-user-shield"></i> <?= translate('remove kyc verification'); ?>
