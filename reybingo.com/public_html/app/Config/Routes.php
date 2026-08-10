@@ -174,6 +174,7 @@ $routes->get('users/addOperator/(:num)', 'Users::addOperator/$1');
 $routes->post('users/operatorSubmit', 'Users::operatorSubmit');
 $routes->post('users/operatorDeactivate', 'Users::operatorDeactivate');
 $routes->post('users/operatorDelete', 'Users::operatorDelete');
+$routes->post('users/operatorPaySubmit', 'Users::operatorPaySubmit');
 $routes->get('users/operatorsListGet', 'Users::operatorsListGet');
 $routes->get('operator', 'Operator::index');
 $routes->get('operator/register', 'Operator::registerAffiliate');

@@ -6,6 +6,7 @@
             <th><?= translate('email'); ?></th>
             <th><?= translate('username'); ?></th>
             <th class="text-center"><?= translate('points of sale'); ?></th>
+            <th class="text-center">Saldo / Ganancias</th>
             <th class="text-center"><?= translate('status'); ?></th>
             <th class="text-center"><?= translate('options'); ?></th>
         </tr>
@@ -25,6 +26,10 @@
                     <td><?= esc($operator['username']) ?><br><small class="text-muted"><?= esc($operator['code'] ?? '') ?></small></td>
                     <td class="text-center"><strong><?= (int) ($operator['stores_count'] ?? 0); ?></strong></td>
                     <td class="text-center">
+                        <small class="text-muted d-block">Saldo: <strong class="text-success"><?= systemGet('currency'); ?> <?= number_format((float) ($operator['wallet_balance'] ?? 0), 2) ?></strong></small>
+                        <small class="text-muted d-block">Ganancias: <strong class="text-primary"><?= systemGet('currency'); ?> <?= number_format((float) ($operator['total_earnings'] ?? 0), 2) ?></strong></small>
+                    </td>
+                    <td class="text-center">
                         <?php if ((int) $operator['status'] === 1) : ?>
                             <span class="badge bg-success"><?= translate('active'); ?></span>
                         <?php else : ?>
@@ -32,7 +37,10 @@
                         <?php endif; ?>
                     </td>
                     <td class="text-center">
-                        <div class="stores-actions" role="group">
+                        <div class="stores-actions d-flex justify-content-center gap-1" role="group">
+                            <button type="button" class="btn btn-sm btn-success text-white d-flex align-items-center gap-1" onclick="operatorPay(<?= (int) $operator['id'] ?>, '<?= esc($operator['firstname'] . ' ' . $operator['lastname'], 'js') ?>', '<?= esc($operator['code'] ?? '', 'js') ?>', '<?= esc($operator['document'] ?? '', 'js') ?>', <?= (float) ($operator['wallet_balance'] ?? 0) ?>, <?= (float) ($operator['total_earnings'] ?? 0) ?>)" title="Pagar / Cargar Saldo">
+                                <i class="fa-duotone fa-solid fa-money-bill-wave"></i> Pagar
+                            </button>
                             <button type="button" class="btn btn-sm btn-primary" onclick="operatorEdit(<?= (int) $operator['id'] ?>)" title="<?= translate('edit'); ?>">
                                 <i class="fa-duotone fa-solid fa-pen"></i>
                             </button>
@@ -54,7 +62,7 @@
             <?php endforeach; ?>
         <?php else : ?>
             <tr>
-                <td colspan="7" class="text-center"><?= translate('no operators found'); ?></td>
+                <td colspan="8" class="text-center"><?= translate('no operators found'); ?></td>
             </tr>
         <?php endif; ?>
     </tbody>

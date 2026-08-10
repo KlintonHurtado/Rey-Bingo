@@ -408,7 +408,7 @@ class Users extends Controller {
             return redirect()->to('/signin');
         }
 
-        helper('bingo');
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
 
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
@@ -425,8 +425,13 @@ class Users extends Controller {
             ->findAll();
 
         foreach ($operators as &$operator) {
-            $operator['stores_count'] = bingo_operator_store_count((int) $operator['id']);
+            $opId = (int) $operator['id'];
+            $operator['stores_count'] = bingo_operator_store_count($opId);
+            $operator['wallet_balance'] = wallet_recharge_balance($operator);
+            $earningsSummary = bingo_fetch_operator_withdraw_summary($opId, $operator);
+            $operator['total_earnings'] = (float) ($earningsSummary['display_total'] ?? 0);
         }
+        unset($operator);
 
         $data = [
             'page' => [
@@ -725,7 +730,7 @@ class Users extends Controller {
             return redirect()->to('/signin');
         }
 
-        helper('bingo');
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
 
         $modelUsers = new UsersModel();
         $operators = $modelUsers
@@ -735,10 +740,74 @@ class Users extends Controller {
             ->findAll();
 
         foreach ($operators as &$operator) {
-            $operator['stores_count'] = bingo_operator_store_count((int) $operator['id']);
+            $opId = (int) $operator['id'];
+            $operator['stores_count'] = bingo_operator_store_count($opId);
+            $operator['wallet_balance'] = wallet_recharge_balance($operator);
+            $earningsSummary = bingo_fetch_operator_withdraw_summary($opId, $operator);
+            $operator['total_earnings'] = (float) ($earningsSummary['display_total'] ?? 0);
         }
+        unset($operator);
 
         return view('operators/list', ['operators' => $operators]);
+    }
+
+    public function operatorPaySubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        helper(['bingo', 'wallet']);
+
+        $operatorId = (int) $this->request->getPost('operator_id');
+        $amount = round((float) $this->request->getPost('amount'), 2);
+
+        if ($operatorId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('operator not found'),
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $operator = $modelUsers->where('id', $operatorId)->where('group', bingo_group_operator())->first();
+        if (! $operator) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('operator not found'),
+            ]);
+        }
+
+        if ($amount <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('invalid amount') ?: 'Ingrese un monto mayor a 0.',
+            ]);
+        }
+
+        wallet_credit_recharge($operatorId, $amount);
+
+        $adminId = (int) session()->get('id');
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelPayments->insert([
+            'user' => $operatorId,
+            'type' => 'admin_operator_pay',
+            'type_id' => $adminId,
+            'amount' => $amount,
+            'status' => 2,
+        ]);
+
+        $updatedOperator = $modelUsers->find($operatorId) ?? $operator;
+        $newBalance = wallet_recharge_balance($updatedOperator);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => translate('operator payment successful') ?: 'Pago realizado exitosamente al operador.',
+            'balance' => round($newBalance, 2),
+        ]);
     }
 
     public function lowBalancePlayers()
