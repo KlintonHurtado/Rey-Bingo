@@ -1,6 +1,7 @@
 <?php
 $currency = $currency ?? systemGet('currency');
 $isOperator = (int) ($user['group'] ?? 0) === bingo_group_operator();
+$isOperatorRole = $isOperator || (function_exists('bingo_is_operator') && bingo_is_operator());
 $kycLabels = [
     'verified' => translate('kyc verified'),
     'pending' => translate('kyc not verified'),
@@ -213,27 +214,26 @@ $sourceLabel = static function ($source) {
                         <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('download risk analysis'); ?>
                     </a>
                 <?php endif; ?>
-                <?php if (($kycStatus ?? '') === 'verified') : ?>
+                <?php if (! $isOperatorRole && ($kycStatus ?? '') === 'verified') : ?>
                     <button type="button" class="btn btn-sm btn-danger" onclick="revokeUserKyc(<?= (int) $user['id']; ?>)">
                         <i class="fa-duotone fa-solid fa-user-shield"></i> <?= translate('remove kyc verification'); ?>
                     </button>
                 <?php endif; ?>
-                <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('kycAdmin'); ?>" target="_blank" rel="noopener">
-                    <?= translate('kyc admin'); ?>
-                </a>
+                <?php if (! $isOperatorRole) : ?>
+                    <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('kycAdmin'); ?>" target="_blank" rel="noopener">
+                        <?= translate('kyc admin'); ?>
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ud-movements" type="button">Movimientos</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-deposits" type="button"><?= translate('deposits'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-retires" type="button"><?= translate('retires'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-prizes" type="button"><?= translate('prizes'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-purchases" type="button"><?= translate('carton purchases'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-roulette" type="button"><?= translate('roulette'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-access" type="button"><?= translate('access logs'); ?></button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-kyc" type="button">KYC</button></li>
+        <?php if (! $isOperatorRole) : ?>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-access" type="button"><?= translate('access logs'); ?></button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-kyc" type="button">KYC</button></li>
+        <?php endif; ?>
     </ul>
 
     <div class="tab-content border border-top-0 p-2 bg-white text-dark">
@@ -349,247 +349,54 @@ $sourceLabel = static function ($source) {
             </p>
         </div>
 
-        <div class="tab-pane fade" id="ud-deposits">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr>
-                        <th>ID</th><th><?= translate('date'); ?></th><th><?= translate('amount'); ?></th>
-                        <th><?= translate('reference'); ?></th><th><?= translate('method'); ?></th><th><?= translate('status'); ?></th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($deposits)) : ?>
-                        <tr><td colspan="6" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($deposits as $row) : ?>
-                        <tr>
-                            <td><?= (int) $row['id']; ?></td>
-                            <td><?= esc($row['date'] ?? ''); ?></td>
-                            <td><?= esc($currency); ?> <?= number_format((float) $row['amount'], 2); ?></td>
-                            <td><?= esc($row['reference'] ?? ''); ?></td>
-                            <td><?= esc($row['method'] ?? ($row['bank'] ?? '')); ?></td>
-                            <td><?= esc($statusDeposit($row['status'] ?? 0)); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
+        <?php if (! $isOperatorRole) : ?>
+            <div class="tab-pane fade" id="ud-access">
+                <div class="scroll-pane">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead><tr>
+                            <th><?= translate('date'); ?></th><th><?= translate('action'); ?></th>
+                            <th>IP</th><th><?= translate('country'); ?></th><th>User-Agent</th>
+                        </tr></thead>
+                        <tbody>
+                        <?php if (empty($loginLogs)) : ?>
+                            <tr><td colspan="5" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
+                        <?php else : foreach ($loginLogs as $row) : ?>
+                            <tr>
+                                <td><?= esc($row['created_at'] ?? ''); ?></td>
+                                <td><?= esc($row['action'] ?? ''); ?></td>
+                                <td><code><?= esc($row['ip_address'] ?? ''); ?></code></td>
+                                <td><?= esc($row['country'] ?? ''); ?></td>
+                                <td class="small"><?= esc(mb_substr((string) ($row['user_agent'] ?? ''), 0, 80)); ?></td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <div class="tab-pane fade" id="ud-retires">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr>
-                        <th>ID</th><th><?= translate('date'); ?></th><th><?= translate('amount'); ?></th>
-                        <th><?= translate('bank'); ?></th><th><?= translate('account'); ?></th><th><?= translate('status'); ?></th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($retires)) : ?>
-                        <tr><td colspan="6" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($retires as $row) : ?>
-                        <tr>
-                            <td><?= (int) $row['id']; ?></td>
-                            <td><?= esc($row['created_at'] ?? ''); ?></td>
-                            <td><?= esc($currency); ?> <?= number_format((float) $row['amount'], 2); ?></td>
-                            <td><?= esc($row['bank'] ?? ''); ?></td>
-                            <td><?= esc($row['account'] ?? ''); ?></td>
-                            <td><?= esc($statusDeposit($row['status'] ?? 0)); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
+            <div class="tab-pane fade" id="ud-kyc">
+                <p>
+                    <strong><?= translate('status'); ?>:</strong>
+                    <span class="badge bg-<?= esc($kycClass); ?>"><?= esc($kycLabels[$kycStatus] ?? $kycStatus); ?></span>
+                </p>
+                <?php if (! empty($user['kyc_observations'])) : ?>
+                    <p><strong><?= translate('observations'); ?>:</strong> <?= esc($user['kyc_observations']); ?></p>
+                <?php endif; ?>
+                <div class="row g-2">
+                    <?php foreach (['kyc_front' => translate('front'), 'kyc_back' => translate('back'), 'kyc_selfie' => 'Selfie'] as $field => $label) : ?>
+                        <div class="col-4 text-center">
+                            <div class="small mb-1"><?= esc($label); ?></div>
+                            <?php if (! empty($user[$field])) : ?>
+                                <a href="<?= bingo_kyc_image_url($user[$field]); ?>" target="_blank" rel="noopener">
+                                    <img src="<?= bingo_kyc_image_url($user[$field]); ?>" alt="<?= esc($label); ?>" class="img-fluid rounded border" style="max-height:120px;object-fit:cover;">
+                                </a>
+                            <?php else : ?>
+                                <div class="text-muted small"><?= translate('not provided'); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
-        </div>
-
-        <div class="tab-pane fade" id="ud-prizes">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr>
-                        <th>ID</th><th><?= translate('date'); ?></th><th><?= translate('game'); ?></th>
-                        <th><?= translate('modality'); ?></th><th><?= translate('carton'); ?></th><th><?= translate('amount'); ?></th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($prizes)) : ?>
-                        <tr><td colspan="6" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($prizes as $row) : ?>
-                        <tr>
-                            <td><?= (int) $row['id']; ?></td>
-                            <td><?= esc($row['created_at'] ?? ''); ?></td>
-                            <td><?= esc($row['game'] ?? ''); ?></td>
-                            <td><?= esc($row['modality'] ?? ''); ?></td>
-                            <td><?= esc($row['carton'] ?? ''); ?></td>
-                            <td><?= esc($currency); ?> <?= number_format((float) $row['amount'], 2); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="ud-purchases">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0 ud-purchases-table">
-                    <thead><tr>
-                        <th><?= translate('date'); ?></th>
-                        <th><?= translate('game'); ?></th>
-                        <th><?= translate('carton'); ?></th>
-                        <th class="col-result">Resultado</th>
-                        <th><?= translate('prize'); ?> / premio</th>
-                        <th>Acreditado a</th>
-                        <th><?= translate('amount'); ?></th>
-                        <th><?= translate('source'); ?></th>
-                        <th><?= translate('bonus'); ?></th>
-                        <th><?= translate('recharge'); ?></th>
-                        <th><?= translate('withdraw'); ?></th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($purchases)) : ?>
-                        <tr><td colspan="11" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($purchases as $row) :
-                        $resultKey = (string) ($row['result'] ?? '');
-                        $resultLabel = (string) ($row['result_label'] ?? '');
-                        if ($resultLabel === '' || $resultLabel === '—') {
-                            $resultLabel = match ($resultKey) {
-                                'won' => 'Ganó',
-                                'lost' => 'Perdió',
-                                'pending' => 'En juego',
-                                default => '—',
-                            };
-                        }
-                        $resultBadgeClass = match ($resultKey) {
-                            'won' => 'ud-result-won',
-                            'lost' => 'ud-result-lost',
-                            'pending' => 'ud-result-pending',
-                            default => 'bg-secondary',
-                        };
-                        $src = (string) ($row['source'] ?? 'wallet');
-                        $srcLabel = $row['source_label'] ?? $sourceLabel($src);
-                        ?>
-                        <tr>
-                            <td><?= esc($row['created_at'] ?? ''); ?></td>
-                            <td><?= esc($row['game'] ?? ''); ?></td>
-                            <td>
-                                <?php if (! empty($row['serial']) && $row['serial'] !== '—') : ?>
-                                    <code><?= esc($row['serial']); ?></code>
-                                <?php else : ?>
-                                    <?= (int) ($row['cartons_count'] ?? 0); ?> <?= translate('cartons'); ?>
-                                <?php endif; ?>
-                            </td>
-                            <td class="col-result">
-                                <span class="badge <?= esc($resultBadgeClass); ?>">
-                                    <?= esc($resultLabel); ?>
-                                </span>
-                                <?php if (! empty($row['modality'])) : ?>
-                                    <div class="small text-muted"><?= esc($row['modality']); ?></div>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($resultKey === 'won') : ?>
-                                    <?= esc($currency); ?> <?= number_format((float) ($row['prize_amount'] ?? 0), 2); ?>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
-                            </td>
-                            <td><?= esc($row['credit_label'] ?? '—'); ?></td>
-                            <td><?= esc($currency); ?> <?= number_format((float) ($row['amount'] ?? 0), 2); ?></td>
-                            <td>
-                                <?php if ($src === 'bonus') : ?>
-                                    <span class="badge bg-info text-dark"><?= esc($srcLabel); ?></span>
-                                <?php elseif ($src === 'roulette') : ?>
-                                    <span class="badge bg-primary"><?= esc($srcLabel); ?></span>
-                                <?php elseif ($src === 'mixed') : ?>
-                                    <span class="badge bg-warning text-dark"><?= esc($srcLabel); ?></span>
-                                <?php elseif ($src === 'withdraw') : ?>
-                                    <span class="badge bg-success"><?= esc($srcLabel); ?></span>
-                                <?php elseif (in_array($src, ['recharge', 'real'], true)) : ?>
-                                    <span class="badge bg-secondary"><?= esc($srcLabel); ?></span>
-                                <?php else : ?>
-                                    <?= esc($srcLabel); ?>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= number_format((float) ($row['from_bonus'] ?? 0), 2); ?></td>
-                            <td><?= number_format((float) ($row['from_recharge'] ?? 0), 2); ?></td>
-                            <td><?= number_format((float) ($row['from_withdraw'] ?? 0), 2); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-            <p class="small text-muted mt-2 mb-0">
-                <strong>Resultado</strong>: Ganó / Perdió / En juego por cada cartón.
-                Origen: Saldo Bono, Saldo Recarga o Saldo Retiro.
-                <strong>Mixed</strong> solo aplica a Recarga + Retiro (nunca incluye bono).
-            </p>
-        </div>
-
-        <div class="tab-pane fade" id="ud-roulette">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr>
-                        <th>ID</th><th><?= translate('date'); ?></th><th><?= translate('cartons'); ?></th>
-                        <th><?= translate('amount'); ?></th><th><?= translate('status'); ?></th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($roulettes)) : ?>
-                        <tr><td colspan="5" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($roulettes as $row) : ?>
-                        <tr>
-                            <td><?= (int) $row['id']; ?></td>
-                            <td><?= esc($row['created_at'] ?? ''); ?></td>
-                            <td><?= (int) ($row['cartons'] ?? 0); ?></td>
-                            <td><?= esc($currency); ?> <?= number_format((float) ($row['amount'] ?? 0), 2); ?></td>
-                            <td><?= ((int) ($row['status'] ?? 0) === 1) ? translate('used') : translate('pending'); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="ud-access">
-            <div class="scroll-pane">
-                <table class="table table-sm table-striped mb-0">
-                    <thead><tr>
-                        <th><?= translate('date'); ?></th><th><?= translate('action'); ?></th>
-                        <th>IP</th><th><?= translate('country'); ?></th><th>User-Agent</th>
-                    </tr></thead>
-                    <tbody>
-                    <?php if (empty($loginLogs)) : ?>
-                        <tr><td colspan="5" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
-                    <?php else : foreach ($loginLogs as $row) : ?>
-                        <tr>
-                            <td><?= esc($row['created_at'] ?? ''); ?></td>
-                            <td><?= esc($row['action'] ?? ''); ?></td>
-                            <td><code><?= esc($row['ip_address'] ?? ''); ?></code></td>
-                            <td><?= esc($row['country'] ?? ''); ?></td>
-                            <td class="small"><?= esc(mb_substr((string) ($row['user_agent'] ?? ''), 0, 80)); ?></td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="ud-kyc">
-            <p>
-                <strong><?= translate('status'); ?>:</strong>
-                <span class="badge bg-<?= esc($kycClass); ?>"><?= esc($kycLabels[$kycStatus] ?? $kycStatus); ?></span>
-            </p>
-            <?php if (! empty($user['kyc_observations'])) : ?>
-                <p><strong><?= translate('observations'); ?>:</strong> <?= esc($user['kyc_observations']); ?></p>
-            <?php endif; ?>
-            <div class="row g-2">
-                <?php foreach (['kyc_front' => translate('front'), 'kyc_back' => translate('back'), 'kyc_selfie' => 'Selfie'] as $field => $label) : ?>
-                    <div class="col-4 text-center">
-                        <div class="small mb-1"><?= esc($label); ?></div>
-                        <?php if (! empty($user[$field])) : ?>
-                            <a href="<?= bingo_kyc_image_url($user[$field]); ?>" target="_blank" rel="noopener">
-                                <img src="<?= bingo_kyc_image_url($user[$field]); ?>" alt="<?= esc($label); ?>" class="img-fluid rounded border" style="max-height:120px;object-fit:cover;">
-                            </a>
-                        <?php else : ?>
-                            <div class="text-muted small"><?= translate('not provided'); ?></div>
-                        <?php endif; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
