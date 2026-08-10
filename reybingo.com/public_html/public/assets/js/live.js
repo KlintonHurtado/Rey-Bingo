@@ -1,3 +1,7 @@
+if (typeof site_url === 'undefined' || !site_url) {
+    var site_url = (window.site_url || (window.location.origin + '/')).replace(/\/+$/, '') + '/';
+}
+
 // ==========================================
 // CONFIGURACIÓN Y CONSTANTES
 // ==========================================
@@ -61,7 +65,7 @@ if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
 // ==========================================
 // VARIABLES GLOBALES
 // ==========================================
-let numbersgenerated = [];
+let numbersgenerated = Array.isArray(window.selectedNumbers) ? window.selectedNumbers.map(Number) : [];
 let lastNumbers = fiveNumbers || [];
 let narrationAudio;
 let soundWinner;

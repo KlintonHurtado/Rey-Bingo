@@ -506,6 +506,9 @@
   </div>
 </div>
 <script type="text/javascript">
+    window.site_url = "<?= site_url(); ?>/";
+    var site_url = window.site_url;
+    window.selectedNumbers = <?= json_encode($selectedNumbers ?? []); ?>;
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     window.timeBallLast = singBall.split('-')[1];
