@@ -74,9 +74,6 @@
                         <small id="operator_withdraw_rate-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-12 mb-2">
-                        <small class="text-muted d-block"><?= translate('operator commission rate global help short'); ?></small>
-                    </div>
 
                     <?php if ($isUpdate) : ?>
                         <div class="col-md-12 mb-2">
