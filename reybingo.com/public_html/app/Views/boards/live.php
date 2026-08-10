@@ -639,4 +639,5 @@
     });
 </script>
 
+<script src="<?= site_url('assets/js/app.js'); ?>?<?= md5(date("YmdH")); ?>"></script>
 <script src="<?= site_url('assets/js/live.js'); ?>?<?= md5(date("Hms")); ?>"></script>

@@ -626,7 +626,12 @@
   </div>
 </div>
 
+<div class="modal fade" id="modalPlayers" tabindex="-1" role="dialog"></div>
+
 <script type="text/javascript">
+    window.site_url = "<?= site_url(); ?>/";
+    var site_url = window.site_url;
+    window.selectedNumbers = <?= json_encode($selectedNumbers ?? []); ?>;
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     window.timeBallLast = singBall.split('-')[1];
@@ -775,6 +780,7 @@
 </script>
 <script src="https://js.pusher.com/8.2/pusher.min.js"></script>
 <script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
+<script src="<?= site_url('assets/js/app.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
 <script src="<?= site_url('assets/js/board.js'); ?>?<?= md5(date('YmdHis')) ?>"></script>
 
 <script>
