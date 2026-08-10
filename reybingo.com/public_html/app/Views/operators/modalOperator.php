@@ -26,7 +26,13 @@
                         <small id="lastname-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-12 mb-2">
+                    <div class="col-md-6 mb-2">
+                        <label for="operator-document" class="form-label"><?= translate('document'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="document" id="operator-document" value="<?= $isUpdate ? esc($operatorData['document'] ?? '') : '' ?>" autocomplete="off">
+                        <small id="document-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
                         <label for="operator-email" class="form-label"><?= translate('email'); ?></label>
                         <input type="email" class="form-control form-control-lg form-bingo" name="email" id="operator-email" value="<?= $isUpdate ? esc($operatorData['email']) : '' ?>" autocomplete="off">
                         <small id="email-error" class="text-danger d-none"></small>
@@ -41,8 +47,8 @@
                         <small id="password-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-4 mb-2">
-                        <label for="operator_commission_rate" class="form-label"><?= translate('operator ggr affiliate rate'); ?> %</label>
+                    <div class="col-md-4 d-flex flex-column justify-content-end mb-2">
+                        <label for="operator_commission_rate" class="form-label mb-1"><?= translate('operator ggr affiliate rate'); ?> %</label>
                         <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_commission_rate" id="operator_commission_rate"
                             value="<?= ($isUpdate && isset($operatorData['operator_commission_rate']) && $operatorData['operator_commission_rate'] !== null && $operatorData['operator_commission_rate'] !== '')
                                 ? (float) $operatorData['operator_commission_rate'] * 100 : '' ?>"
@@ -50,8 +56,8 @@
                         <small id="operator_commission_rate-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-4 mb-2">
-                        <label for="operator_recharge_rate" class="form-label"><?= translate('operator recharge rate'); ?> %</label>
+                    <div class="col-md-4 d-flex flex-column justify-content-end mb-2">
+                        <label for="operator_recharge_rate" class="form-label mb-1"><?= translate('operator recharge rate'); ?> %</label>
                         <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_recharge_rate" id="operator_recharge_rate"
                             value="<?= ($isUpdate && isset($operatorData['store_commission_rate']) && $operatorData['store_commission_rate'] !== null && $operatorData['store_commission_rate'] !== '')
                                 ? (float) $operatorData['store_commission_rate'] * 100 : '' ?>"
@@ -59,8 +65,8 @@
                         <small id="operator_recharge_rate-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-4 mb-2">
-                        <label for="operator_withdraw_rate" class="form-label"><?= translate('operator withdraw rate'); ?> %</label>
+                    <div class="col-md-4 d-flex flex-column justify-content-end mb-2">
+                        <label for="operator_withdraw_rate" class="form-label mb-1"><?= translate('operator withdraw rate'); ?> %</label>
                         <input type="number" step="0.01" min="0" max="100" class="form-control form-control-lg form-bingo" name="operator_withdraw_rate" id="operator_withdraw_rate"
                             value="<?= ($isUpdate && isset($operatorData['store_prize_commission_rate']) && $operatorData['store_prize_commission_rate'] !== null && $operatorData['store_prize_commission_rate'] !== '')
                                 ? (float) $operatorData['store_prize_commission_rate'] * 100 : '' ?>"

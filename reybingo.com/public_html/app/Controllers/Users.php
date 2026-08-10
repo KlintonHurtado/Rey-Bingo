@@ -179,6 +179,10 @@ class Users extends Controller {
                 'label' => translate('business name'),
                 'rules' => 'required|min_length[2]|max_length[255]',
             ],
+            'document' => [
+                'label' => translate('document'),
+                'rules' => 'permit_empty|max_length[50]',
+            ],
             'store_commission_rate' => [
                 'label' => translate('store commission rate'),
                 'rules' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[100]',
@@ -205,6 +209,7 @@ class Users extends Controller {
         }
 
         $email = strtolower(trim((string) $this->request->getPost('email')));
+        $document = trim((string) $this->request->getPost('document'));
         $storeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_commission_rate'));
         $ggrCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('ggr_commission_rate'));
         $prizeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_prize_commission_rate'));
@@ -221,7 +226,7 @@ class Users extends Controller {
             'autodial' => 1,
             'roulette' => 1,
             'wallet' => 0,
-            'document' => '',
+            'document' => $document,
             'phone' => '',
             'bank' => '',
             'account' => '',
@@ -251,6 +256,7 @@ class Users extends Controller {
                 'lastname' => $data['lastname'],
                 'business_name' => $data['business_name'],
                 'email' => $email,
+                'document' => $document,
                 'store_commission_rate' => $storeCommissionRate,
                 'ggr_commission_rate' => $ggrCommissionRate,
                 'store_prize_commission_rate' => $prizeCommissionRate,
@@ -276,7 +282,9 @@ class Users extends Controller {
             $lastUser = $model->orderBy('id', 'DESC')->first();
             $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
             $data['code'] = 'BGC-T' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT);
-            $data['document'] = 'ST-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            if ($document === '') {
+                $data['document'] = 'ST-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            }
             $data['phone'] = '9' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT);
             $data['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
             $data['referred_code'] = strtoupper(substr(md5(uniqid()), 0, 8));
@@ -504,6 +512,10 @@ class Users extends Controller {
                 'label' => translate('email'),
                 'rules' => 'required|valid_email|is_unique[users.email,id,' . $operatorId . ']',
             ],
+            'document' => [
+                'label' => translate('document'),
+                'rules' => 'permit_empty|max_length[50]',
+            ],
         ];
 
         if ($action === 'add') {
@@ -526,6 +538,7 @@ class Users extends Controller {
         }
 
         $email = strtolower(trim((string) $this->request->getPost('email')));
+        $document = trim((string) $this->request->getPost('document'));
         $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
         $operatorRechargeRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_recharge_rate'));
         $operatorWithdrawRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_withdraw_rate'));
@@ -541,7 +554,7 @@ class Users extends Controller {
             'autodial' => 1,
             'roulette' => 1,
             'wallet' => 0,
-            'document' => '',
+            'document' => $document,
             'phone' => '',
             'bank' => '',
             'account' => '',
@@ -571,6 +584,7 @@ class Users extends Controller {
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
                 'email' => $email,
+                'document' => $document,
                 'operator_commission_rate' => $operatorCommissionRate,
                 'store_commission_rate' => $operatorRechargeRate,
                 'store_prize_commission_rate' => $operatorWithdrawRate,
@@ -597,7 +611,9 @@ class Users extends Controller {
             $lastUser = $model->orderBy('id', 'DESC')->first();
             $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
             $data['code'] = 'BGC-O' . str_pad((string) $nextId, 5, '0', STR_PAD_LEFT);
-            $data['document'] = 'OP-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            if ($document === '') {
+                $data['document'] = 'OP-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT);
+            }
             $data['phone'] = '8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT);
             $data['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
             $data['referred_code'] = strtoupper(substr(md5(uniqid('operator', true)), 0, 8));

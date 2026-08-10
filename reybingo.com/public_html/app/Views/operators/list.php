@@ -14,7 +14,12 @@
         <?php if (! empty($operators)) : ?>
             <?php foreach ($operators as $operator) : ?>
                 <tr>
-                    <td><?= esc($operator['firstname']) ?></td>
+                    <td>
+                        <?= esc($operator['firstname']) ?>
+                        <?php if (! empty($operator['document'])) : ?>
+                            <br><small class="text-muted"><?= esc($operator['document']) ?></small>
+                        <?php endif; ?>
+                    </td>
                     <td><?= esc($operator['lastname']) ?></td>
                     <td><?= esc($operator['email']) ?></td>
                     <td><?= esc($operator['username']) ?><br><small class="text-muted"><?= esc($operator['code'] ?? '') ?></small></td>

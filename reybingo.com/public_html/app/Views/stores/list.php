@@ -17,7 +17,12 @@
             <?php foreach ($stores as $store) : ?>
                 <tr>
                     <td><strong><?= esc($store['business_name'] ?? '-') ?></strong><br><small class="text-muted"><?= esc($store['code']) ?></small></td>
-                    <td><?= esc($store['firstname']) ?></td>
+                    <td>
+                        <?= esc($store['firstname']) ?>
+                        <?php if (! empty($store['document'])) : ?>
+                            <br><small class="text-muted"><?= esc($store['document']) ?></small>
+                        <?php endif; ?>
+                    </td>
                     <td><?= esc($store['lastname']) ?></td>
                     <td><?= esc($store['email']) ?></td>
                     <td><?= esc($store['username']) ?></td>

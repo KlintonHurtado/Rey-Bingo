@@ -32,7 +32,13 @@
                         <small id="business_name-error" class="text-danger d-none"></small>
                     </div>
 
-                    <div class="col-md-12 mb-2">
+                    <div class="col-md-6 mb-2">
+                        <label for="document" class="form-label"><?= translate('document'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="document" id="document" value="<?= $isUpdate ? esc($storeData['document'] ?? '') : '' ?>" autocomplete="off">
+                        <small id="document-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
                         <label for="email" class="form-label"><?= translate('email'); ?></label>
                         <input type="email" class="form-control form-control-lg form-bingo" name="email" id="email" value="<?= $isUpdate ? esc($storeData['email']) : '' ?>" autocomplete="off">
                         <small id="email-error" class="text-danger d-none"></small>
