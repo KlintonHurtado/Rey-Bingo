@@ -77,8 +77,8 @@ let gameStarted = false;
 let centerBallTimer = null;
 let centerBallHideTimer = null;
 let pendingNumberSubmits = new Set();
-// LIVE = solo clic manual. Nunca cantar bolas con numberAutoSubmit.
-const LIVE_MANUAL_ONLY = true;
+// LIVE: auto-canto habilitado al presionar reproducir (play)
+const LIVE_MANUAL_ONLY = false;
 let bingoPauseInProgress = false;
 let lastBingoPauseKey = '';
 let liveSubmitInFlight = false;
@@ -1405,7 +1405,7 @@ function setupEvents() {
         sendEmoji(emoji);
     });
 
-    // Eventos de control del juego (si existieran botones play/auto en otra vista)
+    // Eventos de control del juego (Play, Pausa, Siguiente Bola)
     $('#start-button').on('click', () => {
         $('#start-button').hide();
         $('#stop-button, #next-number-button').show();
@@ -1418,23 +1418,13 @@ function setupEvents() {
             gameTimerInterval = setInterval(updateGameTimer, 1000);
         }
 
-        // LIVE: no arrancar auto-canto
-        if (LIVE_MANUAL_ONLY) {
-            stopAutomaticGeneration();
-            return;
-        }
-
         setTimeout(() => {
             generateAutoNumber();
             startAutomaticGeneration();
-        }, 2000);
+        }, 1500);
     });
 
     $('#next-number-button').on('click', () => {
-        if (LIVE_MANUAL_ONLY) {
-            stopAutomaticGeneration();
-            return;
-        }
         intervalManager.clear('generation');
         generateAutoNumber();
         startAutomaticGeneration();
@@ -1447,10 +1437,7 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
-        if (LIVE_MANUAL_ONLY) {
-            stopAutomaticGeneration();
-            return;
-        }
+        generateAutoNumber();
         startAutomaticGeneration();
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();

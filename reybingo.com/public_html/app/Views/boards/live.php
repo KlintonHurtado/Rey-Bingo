@@ -352,6 +352,17 @@
     </div>
 </div>
 
+<div class="bottom-section">
+    <?php if ($status != 'stop') : ?>
+    <div class="controls-board text-center my-3" id="controls">
+        <button id="start-button" class="btn btn-small btn-primary size-50"><i class="fa-duotone fa-solid fa-play"></i></button>
+        <button id="play-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-play"></i></button>
+        <button id="stop-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-pause"></i></button>
+        <button id="next-number-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-forward-step"></i></button>
+    </div>
+    <?php endif; ?>
+</div>
+
 <button type="button" class="btn btn-small btn-chat" id="toggle-messages-btn" aria-label="Chat" aria-expanded="false"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
 
 <div class="message-display-container board-admin-chat" id="message-display-container" aria-hidden="true">
@@ -453,6 +464,8 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalPlayers" tabindex="-1" role="dialog"></div>
 
 <div id="countdown-container" style="position: fixed; display: none;">
     <div class="countdown-container"> 

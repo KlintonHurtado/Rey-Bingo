@@ -178,7 +178,7 @@ class Boards extends Controller {
     }
 
     public function live() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
+        if (!session()->get('logged_in') || !in_array((int) session()->get('group'), [0, 1, 2, 3], true)) {
             return redirect()->to('/signin');
         }
 
@@ -284,7 +284,7 @@ class Boards extends Controller {
     }
 
     public function numberAutoSubmit() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
+        if (!session()->get('logged_in') || !in_array((int) session()->get('group'), [0, 1, 2, 3], true)) {
             return redirect()->to('/signin');
         }
 
@@ -413,7 +413,7 @@ class Boards extends Controller {
     }
 
     public function numberSubmit($number) {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
+        if (!session()->get('logged_in') || !in_array((int) session()->get('group'), [0, 1, 2, 3], true)) {
             return redirect()->to('/signin');
         }
 
@@ -785,7 +785,7 @@ class Boards extends Controller {
     }
 
     public function playersGet() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
+        if (!session()->get('logged_in') || !in_array((int) session()->get('group'), [0, 1, 2, 3], true)) {
             return redirect()->to('/signin');
         }
 
