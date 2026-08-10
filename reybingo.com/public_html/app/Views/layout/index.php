@@ -2478,17 +2478,20 @@
         // Respaldo en navegador (el cron principal debe ser del servidor: spark bingo:cron o /cron/run-auto-games)
         (function () {
             var cronUrl = '<?= site_url('cron/run-auto-games') ?>';
-            var tickMs = 10000;
+            var tickMs = 45000;
+            var isRunning = false;
             function runVirtualCron() {
-                if (document.hidden) {
+                if (document.hidden || isRunning) {
                     return;
                 }
+                isRunning = true;
                 fetch(cronUrl, { method: 'GET', cache: 'no-store' })
                     .then(function (r) { return r.json(); })
-                    .catch(function (e) { console.log('Virtual Cron:', e); });
+                    .catch(function (e) { console.log('Virtual Cron:', e); })
+                    .finally(function () { isRunning = false; });
             }
             setInterval(runVirtualCron, tickMs);
-            setTimeout(runVirtualCron, 2000);
+            setTimeout(runVirtualCron, 5000);
         })();
         <?php endif; ?>
 

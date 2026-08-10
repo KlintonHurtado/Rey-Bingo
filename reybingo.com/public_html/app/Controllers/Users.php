@@ -2581,6 +2581,11 @@ class Users extends Controller {
     }
 
     public function userNotifications() {
+        $userId = (int) session()->get('id');
+        if (function_exists('session_write_close')) {
+            session_write_close();
+        }
+
         $model = new UsersModel();
         $modelNotifications = new NotificationsModel();
         $modelGames = new GamesModel();
@@ -2590,7 +2595,7 @@ class Users extends Controller {
         $modelAwards = new AwardsModel();
         $modelSings = new SingsModel();
 
-        $user = $model->find(session()->get('id'));
+        $user = $model->find($userId);
 
         $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->findAll();
 
