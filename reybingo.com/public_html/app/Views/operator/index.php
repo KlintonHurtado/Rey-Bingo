@@ -13,7 +13,8 @@
                     <div class="store-sidebar-stats mt-3 mb-3">
                         <div class="store-balance-sidebar">
                             <span class="store-balance-label">Saldo Disponible del Operador</span>
-                            <strong class="store-balance-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($user['wallet'] ?? 0), 2) ?></strong>
+                            <?php $opBalanceVal = function_exists('wallet_recharge_balance') ? wallet_recharge_balance($user) : (float) ($user['wallet'] ?? 0); ?>
+                            <strong class="store-balance-amount" id="operator-header-balance" data-operator-balance="<?= esc(number_format($opBalanceVal, 2, '.', ''), 'attr'); ?>"><?= systemGet('currency'); ?> <?= number_format($opBalanceVal, 2) ?></strong>
                         </div>
                     </div>
 
@@ -473,10 +474,17 @@
             </div>
             <div class="modal-body pt-0">
                 <p class="small text-muted mb-2" id="operator-store-balance-modal-store"></p>
-                <p class="small mb-3">
-                    <?= translate('available store balance'); ?>:
-                    <strong id="operator-store-balance-modal-current">0.00</strong>
-                </p>
+                <div class="mb-3 p-2 rounded bg-light border">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="text-muted">Saldo Disponible del Operador:</span>
+                        <strong id="operator-store-balance-modal-operator" class="text-primary">0.00</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-muted">Saldo Disponible del Punto de venta:</span>
+                        <strong id="operator-store-balance-modal-current" class="text-dark">0.00</strong>
+                    </div>
+                </div>
+                <div class="alert alert-info py-2 px-3 small mb-2" id="operator-store-balance-hint"></div>
                 <input type="hidden" id="operator-store-balance-store-id" value="">
                 <input type="hidden" id="operator-store-balance-action" value="">
                 <div class="mb-2">
@@ -741,7 +749,8 @@
             const action = $btn.data('action');
             const storeId = $btn.data('store-id');
             const storeName = $btn.data('store-name') || '';
-            const balance = parseFloat($btn.data('balance')) || 0;
+            const storeBalance = parseFloat($btn.data('balance')) || 0;
+            const operatorBalance = parseFloat($('#operator-header-balance').attr('data-operator-balance')) || 0;
 
             $('#operator-store-balance-store-id').val(storeId);
             $('#operator-store-balance-action').val(action);
@@ -749,7 +758,15 @@
             $('#operator-store-balance-amount-error').addClass('d-none').text('');
             $('#operator-store-balance-modal-title span').text(action === 'remove' ? labelsStoreBalance.remove : labelsStoreBalance.add);
             $('#operator-store-balance-modal-store').text(storeName);
-            $('#operator-store-balance-modal-current').text(currencyLabel + ' ' + balance.toFixed(2));
+            $('#operator-store-balance-modal-current').text(currencyLabel + ' ' + storeBalance.toFixed(2));
+            $('#operator-store-balance-modal-operator').text(currencyLabel + ' ' + operatorBalance.toFixed(2));
+
+            if (action === 'add') {
+                $('#operator-store-balance-hint').html('<strong>Límite a añadir:</strong> máximo ' + currencyLabel + ' ' + operatorBalance.toFixed(2) + ' (Saldo disponible del Operador).');
+            } else {
+                $('#operator-store-balance-hint').html('<strong>Límite a retirar:</strong> máximo ' + currencyLabel + ' ' + storeBalance.toFixed(2) + ' (Saldo disponible del Punto de venta).');
+            }
+
             $('#modalOperatorStoreBalance').modal('show');
         });
 
@@ -758,6 +775,8 @@
             const storeId = $('#operator-store-balance-store-id').val();
             const action = $('#operator-store-balance-action').val();
             const amount = parseFloat($('#operator-store-balance-amount').val());
+            const storeBalance = parseFloat($('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').first().attr('data-balance')) || 0;
+            const operatorBalance = parseFloat($('#operator-header-balance').attr('data-operator-balance')) || 0;
 
             $('#operator-store-balance-amount-error').addClass('d-none').text('');
             $('#operator-store-balance-amount').removeClass('is-invalid');
@@ -765,6 +784,18 @@
             if (!amount || amount <= 0 || isNaN(amount)) {
                 $('#operator-store-balance-amount').addClass('is-invalid');
                 $('#operator-store-balance-amount-error').text(labelsStoreBalance.confirmRequired).removeClass('d-none');
+                return;
+            }
+
+            if (action === 'add' && amount > operatorBalance + 0.00001) {
+                $('#operator-store-balance-amount').addClass('is-invalid');
+                $('#operator-store-balance-amount-error').text('Saldo insuficiente del operador. Saldo disponible: ' + currencyLabel + ' ' + operatorBalance.toFixed(2)).removeClass('d-none');
+                return;
+            }
+
+            if (action === 'remove' && amount > storeBalance + 0.00001) {
+                $('#operator-store-balance-amount').addClass('is-invalid');
+                $('#operator-store-balance-amount-error').text('El monto a retirar excede el saldo disponible del Punto de venta (' + currencyLabel + ' ' + storeBalance.toFixed(2) + ')').removeClass('d-none');
                 return;
             }
 
@@ -777,19 +808,25 @@
             }, function(res) {
                 if (res && res.success) {
                     $('#modalOperatorStoreBalance').modal('hide');
-                    const newBalance = parseFloat(res.balance);
-                    const formatted = (isNaN(newBalance) ? 0 : newBalance).toFixed(2);
+                    const newStoreBalance = parseFloat(res.balance);
+                    const formattedStoreBalance = (isNaN(newStoreBalance) ? 0 : newStoreBalance).toFixed(2);
                     const $cardBalance = $('.js-operator-store-balance[data-store-id="' + storeId + '"] .js-operator-store-balance-value');
-                    $cardBalance.text(formatted);
-                    $('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').attr('data-balance', formatted);
+                    $cardBalance.text(formattedStoreBalance);
+                    $('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').attr('data-balance', formattedStoreBalance);
                     $('.js-operator-store-info-btn').each(function() {
                         const $infoBtn = $(this);
-                        // Match by sibling balance buttons on same card
                         const $card = $infoBtn.closest('.store-list-subcard');
                         if ($card.find('.js-operator-store-balance-btn[data-store-id="' + storeId + '"]').length) {
-                            $infoBtn.attr('data-balance', formatted);
+                            $infoBtn.attr('data-balance', formattedStoreBalance);
                         }
                     });
+
+                    if (res.operatorBalance !== undefined) {
+                        const newOpBalance = parseFloat(res.operatorBalance);
+                        const formattedOpBalance = (isNaN(newOpBalance) ? 0 : newOpBalance).toFixed(2);
+                        $('#operator-header-balance').attr('data-operator-balance', formattedOpBalance).text(currencyLabel + ' ' + formattedOpBalance);
+                    }
+
                     Toastify({
                         text: res.message || 'OK',
                         duration: 3000,

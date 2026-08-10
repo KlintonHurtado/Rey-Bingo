@@ -426,17 +426,40 @@ class Operator extends Controller
             ]);
         }
 
-        $currentBalance = wallet_recharge_balance($store);
+        $operator = $modelUsers->find($operatorId);
+        if (! $operator) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        $currentStoreBalance = wallet_recharge_balance($store);
+        $currentOperatorBalance = wallet_recharge_balance($operator);
 
         if ($action === 'add') {
+            if ($amount > $currentOperatorBalance + 0.00001) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('insufficient operator balance') ?: ('Saldo insuficiente del operador. Saldo disponible: ' . systemGet('currency') . ' ' . number_format($currentOperatorBalance, 2)),
+                ]);
+            }
+
+            if (! wallet_deduct_recharge($operatorId, $amount)) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => translate('insufficient operator balance') ?: 'Saldo insuficiente del operador',
+                ]);
+            }
+
             wallet_credit_recharge($storeId, $amount);
             $paymentType = 'operator_store_credit';
             $message = translate('store balance added successfully');
         } else {
-            if ($amount > $currentBalance + 0.00001) {
+            if ($amount > $currentStoreBalance + 0.00001) {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => translate('insufficient store balance'),
+                    'message' => translate('insufficient store balance') ?: 'El monto a retirar excede el saldo disponible del Punto de venta',
                 ]);
             }
 
@@ -447,6 +470,7 @@ class Operator extends Controller
                 ]);
             }
 
+            wallet_credit_recharge($operatorId, $amount);
             $paymentType = 'operator_store_debit';
             $message = translate('store balance removed successfully');
         }
@@ -461,12 +485,16 @@ class Operator extends Controller
         ]);
 
         $updatedStore = $modelUsers->find($storeId) ?? $store;
-        $newBalance = wallet_recharge_balance($updatedStore);
+        $updatedOperator = $modelUsers->find($operatorId) ?? $operator;
+
+        $newStoreBalance = wallet_recharge_balance($updatedStore);
+        $newOperatorBalance = wallet_recharge_balance($updatedOperator);
 
         return $this->response->setJSON([
             'success' => true,
             'message' => $message,
-            'balance' => round($newBalance, 2),
+            'balance' => round($newStoreBalance, 2),
+            'operatorBalance' => round($newOperatorBalance, 2),
         ]);
     }
 
