@@ -884,6 +884,9 @@ function startWinnerSlider() {
 }
 
 function showCountdown(data, callback) {
+    // Recordar si la extracción automática estaba activa antes de la pausa por bingo
+    const wasAutoRunning = autoGenerationWanted || $('#stop-button').is(':visible');
+
     // Al bingo: cortar auto-canto ya (si no, sigue sacando bolas encima del anuncio)
     stopAutomaticGeneration();
     autoGenerationWanted = false;
@@ -902,7 +905,7 @@ function showCountdown(data, callback) {
         startWinnerSlider();
     }
 
-    // Sin c├¡rculo/cuenta regresiva: evita solapes con el texto GANADOR
+    // Sin círculo/cuenta regresiva: evita solapes con el texto GANADOR
     if (container) {
         container.style.display = 'none';
     }
@@ -930,7 +933,7 @@ function showCountdown(data, callback) {
 
         cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
             el.classList.add('sing');
-            el.innerText = 'Γ¡É∩╕Å';
+            el.innerText = '⭐️';
         });
     });
 
@@ -942,9 +945,14 @@ function showCountdown(data, callback) {
 
     const pauseMs = Math.max(5000, parseInt(timeBallGet, 10) || 5000);
     setTimeout(function () {
-        // Nunca reanudar startAutomaticGeneration aqu├¡ (eso ΓÇ£segu├¡a cantandoΓÇ¥)
-        if (typeof callback === 'function' && callback !== startAutomaticGeneration) {
+        if (isGameFinishedShown) {
+            return;
+        }
+        if (typeof callback === 'function' && callback !== startAutomaticGeneration && callback !== startAutomaticLast) {
             callback();
+        } else if (wasAutoRunning || $('#stop-button').is(':visible')) {
+            // Reanudar extracción automática tras finalizar los 5 segundos de celebración del bingo
+            startAutomaticGeneration(false);
         } else {
             startAutomaticLast();
         }

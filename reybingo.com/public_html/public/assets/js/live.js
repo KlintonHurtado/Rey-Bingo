@@ -814,7 +814,7 @@ function showCountdown(data, callback) {
     bingoPauseInProgress = true;
     lastBingoPauseKey = pauseKey;
 
-    // En LIVE nunca reanudar generación automática tras un bingo
+    const wasAutoRunning = autoGenerationWanted || $('#stop-button').is(':visible');
     stopAutomaticGeneration();
     pendingNumberSubmits.clear();
 
@@ -852,9 +852,13 @@ function showCountdown(data, callback) {
 
     setTimeout(function () {
         bingoPauseInProgress = false;
-        // Solo reanudar poll de estado (bingos), NUNCA auto-cantar bolas
-        if (typeof callback === 'function' && callback !== startAutomaticGeneration) {
+        if (isGameFinishedShown) {
+            return;
+        }
+        if (typeof callback === 'function' && callback !== startAutomaticGeneration && callback !== startAutomaticLast) {
             callback();
+        } else if (wasAutoRunning || $('#stop-button').is(':visible')) {
+            startAutomaticGeneration(false);
         } else {
             startAutomaticLast();
         }
