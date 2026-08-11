@@ -620,6 +620,7 @@ class Cron extends Controller
                 'updated_at' => $now,
             ]);
             $startedIds[] = (int) $gameToStart['id'];
+            bingo_broadcast_game_status((int) $gameToStart['id'], 'game:started', ['status' => 1]);
             log_message('info', "Juego {$gameToStart['id']} iniciado automáticamente a las {$now}");
         }
 
@@ -671,6 +672,7 @@ class Cron extends Controller
                     'updated_at' => $now,
                 ]);
                 bingo_on_game_finished($gameId);
+                bingo_broadcast_game_status((int) $gameId, 'game:game_finished', ['status' => 0]);
                 $gamesCompleted[] = $gameId;
                 log_message('info', "Juego {$gameId} finalizado automáticamente - ya completado");
                 continue;
@@ -773,6 +775,7 @@ class Cron extends Controller
                         'updated_at' => $now,
                     ]);
                     bingo_on_game_finished($gameId);
+                    bingo_broadcast_game_status((int) $gameId, 'game:game_finished', ['status' => 0]);
                     $gamesCompleted[] = $gameId;
                     log_message('info', "Juego {$gameId} completado tras cantar bola {$number}");
                     break;
@@ -1828,6 +1831,20 @@ class Cron extends Controller
                         $modelSings->insert($data);
                         $id = $modelSings->insertID();
 
+                        // Notificar el bingo cantado en tiempo real a todos los clientes por Pusher
+                        bingo_broadcast_sing_accepted((int) $game['id'], [
+                            'singId'       => $id,
+                            'userId'       => (int) $singUser['id'],
+                            'playerId'     => (string) $singUser['id'],
+                            'player'       => trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')),
+                            'playerName'   => trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')),
+                            'modality'     => translate($modality['name'] ?? ''),
+                            'modalityId'   => (int) $modality['id'],
+                            'modalityName' => translate($modality['name'] ?? ''),
+                            'cartonId'     => (int) $carton['id'],
+                            'lastNumber'   => (int) ($lastBall['number'] ?? 0),
+                        ]);
+
                         $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->groupBy('user')->findAll();
 
                         $cartonUserIds = array_column($usersFromCartons, 'user');
@@ -1895,5 +1912,193 @@ class Cron extends Controller
         $result = bingo_settle_monthly_ggr_commissions($yearMonth);
 
         return $this->response->setJSON($result);
+    }
+
+    /**
+     * Valida el token de seguridad X-Cron-Token para prevenir peticiones externas no autorizadas.
+     */
+    private function validateCronToken(): bool
+    {
+        $expectedToken = env('CRON_TOKEN') ?: systemGet('cronToken') ?: 'reybingo_cron_secret_key_2026';
+        $providedToken = $this->request->getHeaderLine('X-Cron-Token') 
+            ?: $this->request->getGet('cron_token') 
+            ?: $this->request->getPost('cron_token');
+
+        if (empty($providedToken) || !hash_equals((string) $expectedToken, (string) $providedToken)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Endpoint API Sub-segundo: Retorna partidas automáticas activas para el runner Node.js.
+     */
+    public function activeAutoGames()
+    {
+        if (!$this->validateCronToken()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'ok' => false,
+                'message' => 'Unauthorized: Invalid or missing X-Cron-Token',
+            ]);
+        }
+
+        helper('bingo');
+        $modelGames = new GamesModel();
+        $modelBoards = new BoardsModel();
+
+        $singBall = (string) (systemGet('singBall') ?: '15000-5000');
+        $parts = explode('-', $singBall);
+        $timeBallGet = max(1000, (int) ($parts[0] ?? 15000));
+
+        // 1) Iniciar partidas automáticas pendientes cuya hora ya llegó
+        $gamesToStart = $modelGames->where('type', 1)->where('status', 2)->findAll();
+        foreach ($gamesToStart as $gameToStart) {
+            if (bingo_game_is_due($gameToStart)) {
+                $postpone = bingo_postpone_game($gameToStart);
+                if (!$postpone['postponed']) {
+                    $modelGames->update($gameToStart['id'], [
+                        'status' => 1,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                    bingo_broadcast_game_status((int) $gameToStart['id'], 'game:started', ['status' => 1]);
+                }
+            }
+        }
+
+        // 2) Obtener partidas automáticas activas
+        $activeGames = $modelGames->where('type', 1)->where('status', 1)->findAll();
+        $gamesList = [];
+
+        foreach ($activeGames as $game) {
+            $gameId = (int) $game['id'];
+
+            // Verificar si el juego ya completó todas las modalidades
+            if ($this->isGameCompleted($gameId)) {
+                $modelGames->update($gameId, [
+                    'status' => 0,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+                bingo_on_game_finished($gameId);
+                bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+                continue;
+            }
+
+            $numbersDrawnCount = $modelBoards->where('game', $gameId)->countAllResults();
+
+            $gamesList[] = [
+                'id' => $gameId,
+                'description' => $game['description'] ?? '',
+                'numbersDrawn' => $numbersDrawnCount,
+                'intervalMs' => $timeBallGet,
+                'date' => $game['date'] ?? '',
+                'time' => $game['time'] ?? '',
+            ];
+        }
+
+        return $this->response->setJSON([
+            'ok' => true,
+            'activeGames' => $gamesList,
+            'timestamp' => date('c'),
+        ]);
+    }
+
+    /**
+     * Endpoint API Sub-segundo: Extrae 1 sola balota en <15ms sin sleep() para el runner Node.js.
+     */
+    public function tickAutoGame()
+    {
+        if (!$this->validateCronToken()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'ok' => false,
+                'message' => 'Unauthorized: Invalid or missing X-Cron-Token',
+            ]);
+        }
+
+        helper('bingo');
+        $gameId = (int) ($this->request->getPost('game_id') ?: $this->request->getGet('game_id') ?: 0);
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'ok' => false,
+                'message' => 'game_id es requerido',
+            ]);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game || (int)$game['type'] !== 1 || (int)$game['status'] !== 1) {
+            return $this->response->setJSON([
+                'ok' => false,
+                'message' => 'Juego no activo o no es automático',
+            ]);
+        }
+
+        if ($this->isGameCompleted($gameId)) {
+            $modelGames->update($gameId, [
+                'status' => 0,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            bingo_on_game_finished($gameId);
+            bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+            return $this->response->setJSON([
+                'ok' => true,
+                'completed' => true,
+                'message' => 'Partida finalizada',
+            ]);
+        }
+
+        if ($this->hasRecentSingPause($gameId, 10)) {
+            return $this->response->setJSON([
+                'ok' => true,
+                'paused' => true,
+                'message' => 'Pausa por bingo reciente',
+            ]);
+        }
+
+        $candidate = $this->generateUniqueNumber($gameId);
+        if (!$candidate) {
+            return $this->response->setJSON([
+                'ok' => false,
+                'message' => 'No hay números disponibles para cantar',
+            ]);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $inserted = bingo_insert_drawn_number($gameId, (int) $candidate, [
+            'user'       => $game['user'] ?? 1,
+            'isCRON'     => 1,
+            'created_at' => $now,
+        ]);
+
+        if (!$inserted) {
+            return $this->response->setJSON([
+                'ok' => false,
+                'message' => 'Número duplicado o ya cantado',
+            ]);
+        }
+
+        $number = (int) $candidate;
+        bingo_broadcast_number_drawn($gameId, $number);
+
+        $this->dialNumber($number, $gameId);
+        $this->singBingo($gameId);
+
+        $completedNow = $this->isGameCompleted($gameId);
+        if ($completedNow) {
+            $modelGames->update($gameId, [
+                'status' => 0,
+                'updated_at' => $now,
+            ]);
+            bingo_on_game_finished($gameId);
+            bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+        }
+
+        return $this->response->setJSON([
+            'ok' => true,
+            'gameId' => $gameId,
+            'number' => $number,
+            'completed' => $completedNow,
+            'timestamp' => $now,
+        ]);
     }
 }

@@ -157,6 +157,70 @@ if (!function_exists('bingo_broadcast_number_drawn')) {
     }
 }
 
+if (!function_exists('bingo_broadcast_sing_accepted')) {
+    /**
+     * Notifica en tiempo real a los jugadores por Pusher cuando se canta/acepta un Bingo.
+     */
+    function bingo_broadcast_sing_accepted(int $gameId, array $payload): void
+    {
+        if ($gameId < 1) {
+            return;
+        }
+
+        try {
+            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
+                return;
+            }
+
+            $pusher = \App\Libraries\PusherFactory::make();
+            $channel = 'private-game-' . $gameId;
+
+            // Emitir evento bingo_claimed
+            $pusher->trigger($channel, 'game:bingo_claimed', array_merge([
+                'gameId' => $gameId,
+                'at' => date('c'),
+            ], $payload));
+
+            // Emitir evento bingo_accepted
+            $pusher->trigger($channel, 'game:bingo_accepted', array_merge([
+                'gameId' => $gameId,
+                'stopped' => true,
+                'at' => date('c'),
+            ], $payload));
+        } catch (\Throwable $e) {
+            log_message('error', 'Error al notificar Bingo por Pusher: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_broadcast_game_status')) {
+    /**
+     * Notifica en tiempo real a los jugadores por Pusher cambios de estado del juego (inicio, fin, posposición).
+     */
+    function bingo_broadcast_game_status(int $gameId, string $statusEvent, array $extraData = []): void
+    {
+        if ($gameId < 1) {
+            return;
+        }
+
+        try {
+            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
+                return;
+            }
+
+            $pusher = \App\Libraries\PusherFactory::make();
+            $channel = 'private-game-' . $gameId;
+
+            $pusher->trigger($channel, $statusEvent, array_merge([
+                'gameId' => $gameId,
+                'timestamp' => date('c'),
+            ], $extraData));
+        } catch (\Throwable $e) {
+            log_message('error', 'Error al notificar cambio de estado por Pusher: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('bingo_sync_drawn_marks_for_user')) {
     function bingo_sync_drawn_marks_for_user(int $userId, int $gameId, array $drawnNumbers): void
     {
@@ -386,7 +450,32 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
         $db->transComplete();
 
-        return $inserted !== false && $db->transStatus();
+        $success = $inserted !== false && $db->transStatus();
+        if ($success) {
+            try {
+                $singId = $modelSings->insertID();
+                $modelUsers = new \App\Models\UsersModel();
+                $userSing = $modelUsers->find($userId);
+                $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : ('Jugador #' . $userId);
+
+                bingo_broadcast_sing_accepted($gameId, [
+                    'singId'       => $singId,
+                    'userId'       => $userId,
+                    'playerId'     => (string) $userId,
+                    'player'       => $userName,
+                    'playerName'   => $userName,
+                    'modality'     => translate($modality['name'] ?? ''),
+                    'modalityId'   => (int) $modality['id'],
+                    'modalityName' => translate($modality['name'] ?? ''),
+                    'cartonId'     => $cartonId,
+                    'lastNumber'   => $lastBallNumber,
+                ]);
+            } catch (\Throwable $pe) {
+                log_message('error', 'Error broadcasting sing in bingo_register_sing_if_missing: ' . $pe->getMessage());
+            }
+        }
+
+        return $success;
     }
 }
 

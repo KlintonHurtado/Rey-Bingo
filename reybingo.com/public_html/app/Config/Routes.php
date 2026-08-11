@@ -24,6 +24,8 @@ $routes->group('cron', ['namespace' => 'App\Controllers'], function($routes) {
     $routes->get('run-autoadd-games', 'Cron::runAutoAddGames');
     $routes->get('ball-sequence', 'Cron::ballSequence');
     $routes->get('settle-monthly-ggr', 'Cron::settleMonthlyGgr');
+    $routes->get('active-auto-games', 'Cron::activeAutoGames');
+    $routes->post('tick-auto-game', 'Cron::tickAutoGame');
 });
 
 $routes->get('/', 'Signin::index');

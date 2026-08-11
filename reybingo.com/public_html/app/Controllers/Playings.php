@@ -2779,6 +2779,27 @@ class Playings extends Controller
 
         $insertId = $modelMessages->insert($data, true);
 
+        try {
+            if (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
+                $modelUsers = new UsersModel();
+                $sender = $modelUsers->find(session()->get('id'));
+                $senderName = $sender ? trim(($sender['firstname'] ?? '') . ' ' . ($sender['lastname'] ?? '')) : ('Jugador #' . session()->get('id'));
+                $imagePath = !empty($sender['image']) ? site_url('uploads/users/' . $sender['image']) : site_url('assets/img/avatar.jpg');
+
+                \App\Libraries\PusherFactory::make()->trigger('private-game-' . $game['id'], 'game:chat_message', [
+                    'id'          => $insertId,
+                    'user'        => session()->get('id'),
+                    'userId'      => session()->get('id'),
+                    'name'        => $senderName,
+                    'message'     => $message,
+                    'profile_pic' => $imagePath,
+                    'timestamp'   => date('c'),
+                ]);
+            }
+        } catch (\Throwable $pe) {
+            log_message('error', 'Error al notificar mensaje por Pusher: ' . $pe->getMessage());
+        }
+
         return $this->response->setJSON([
             'status' => 'success',
             'message' => translate('message sent'),

@@ -1,0 +1,12 @@
+{
+  "name": "bingo-runner",
+  "version": "1.0.0",
+  "description": "Microservicio asíncrono runner para controlar el ritmo de bingo automáticos sin bloquear workers PHP",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["bingo", "runner", "realtime", "pusher"],
+  "author": "Rey Bingo",
+  "license": "ISC"
+}
