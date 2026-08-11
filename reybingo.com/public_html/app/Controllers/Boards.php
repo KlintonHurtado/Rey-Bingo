@@ -794,10 +794,14 @@ class Boards extends Controller {
         $modelSings = new SingsModel();
         $modelUsers = new UsersModel();
         
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = session()->get('game_id');
+        if (!$gameId) {
+            return view('boards/players', ['users' => []]);
+        }
 
+        $game = $modelGames->find($gameId);
         if (!$game) {
-            return $this->response->setStatusCode(404)->setJSON(['userCount' => 0, 'message' => translate('game not found')]);
+            return view('boards/players', ['users' => []]);
         }
 
         $data['game'] = $game;
@@ -806,16 +810,25 @@ class Boards extends Controller {
 
         $userCartons = [];
         foreach ($cartons as $carton) {
-            $userId = $carton['user'];
+            $userId = (int) ($carton['user'] ?? 0);
+            if (!$userId) continue;
+
             if (!isset($userCartons[$userId])) {
+                $userData = $modelUsers->find($userId);
+                $userName = $userData ? trim(($userData['firstname'] ?? '') . ' ' . ($userData['lastname'] ?? '')) : '';
+                if (empty($userName) && $userData) {
+                    $userName = $userData['username'] ?? ('Jugador #' . $userId);
+                } elseif (empty($userName)) {
+                    $userName = 'Jugador #' . $userId;
+                }
+
                 $userCartons[$userId] = [
-                    'user_name' => $modelUsers->find($userId)['firstname'] . ' ' . $modelUsers->find($userId)['lastname'],
+                    'user_name' => $userName,
                     'cartons_count' => 0,
                     'bingo_count' => 0
                 ];
             }
             $userCartons[$userId]['cartons_count']++;
-
             $userCartons[$userId]['bingo_count'] = $modelSings->where('game', $game['id'])->where('user', $userId)->countAllResults();
         }
 
