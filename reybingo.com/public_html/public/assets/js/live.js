@@ -1441,7 +1441,6 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
-        generateAutoNumber();
         startAutomaticGeneration();
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();

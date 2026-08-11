@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // CONFIGURACI├ôN Y CONSTANTES
 // ==========================================
 const CONFIG = {
@@ -1432,7 +1432,7 @@ function generateNumber(number) {
         });
 }
 
-function startAutomaticGeneration() {
+function startAutomaticGeneration(immediate) {
     stopAutomaticGeneration();
     autoGenerationWanted = true;
     ensureGameTimerStarted();
@@ -1459,7 +1459,11 @@ function startAutomaticGeneration() {
         });
     }
 
-    runAutoTick();
+    if (immediate === true) {
+        runAutoTick();
+    } else {
+        scheduleNext();
+    }
 }
 
 function stopAutomaticGeneration() {
@@ -1720,8 +1724,8 @@ function setupEvents() {
     });
 
     $('#next-number-button').on('click', () => {
-        // Reinicia la cadena (no dispara un AJAX extra encima del que ya va)
-        startAutomaticGeneration();
+        // Siguiente bola manual: dibuja 1 bola al instante y luego mantiene el ritmo
+        startAutomaticGeneration(true);
     });
 
     $('#stop-button').on('click', () => {
@@ -1731,7 +1735,8 @@ function setupEvents() {
     });
 
     $('#play-button').on('click', () => {
-        startAutomaticGeneration();
+        // Reanudar juego: respeta el intervalo de tiempo antes de sacar la siguiente bola (evita ráfaga doble)
+        startAutomaticGeneration(false);
         $('#play-button').hide();
         $('#stop-button, #next-number-button').show();
     });
