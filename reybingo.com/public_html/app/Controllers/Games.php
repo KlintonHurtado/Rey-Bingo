@@ -3003,9 +3003,8 @@ class Games extends Controller {
 
         $data['game'] = $game;
 
-        $sings = $modelSings->where('game', $game['id'])->findAll();
-
-        $cartonsCount = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+        helper('bingo');
+        $cartonsCount = bingo_count_game_cartons((int) $game['id']);
 
         // Contar ganadores por modalidad para dividir el premio en caso de empate
         $winnersCountByModality = [];

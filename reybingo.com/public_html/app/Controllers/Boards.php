@@ -942,23 +942,11 @@ class Boards extends Controller {
 
             $singsCount = count($singsByModality[$sing['modality']]);
 
-            $accumulated = $cartons * $game['price'];
-
-            $total_award = $accumulated - ($accumulated * systemGet('rateEarnings'));
-
-            if ($game['award'] == 2) {
-                if ($award) {
-                    $sing['award_amount'] = number_format($award['amount'] / $total_sing, 2);
-                } else {
-                    $sing['award_amount'] = translate('amount not available');
-                }
+            if ($award) {
+                $awardPerSing = bingo_calculate_award_per_sing($game, $award, (int) $game['id'], (int) $sing['modality']);
+                $sing['award_amount'] = number_format($awardPerSing, 2);
             } else {
-                if ($award) {
-                    $accumulated_modality = ($total_award * $award['amount']) / 100;
-                    $sing['award_amount'] = number_format($accumulated_modality / $total_sing, 2);
-                } else {
-                    $sing['award_amount'] = translate('amount not available');
-                }
+                $sing['award_amount'] = translate('amount not available');
             }
 
             $sing['status_raw'] = (int) ($sing['status'] ?? 0);

@@ -2687,7 +2687,7 @@ class Playings extends Controller
 
         $this->ensureWinnersRegistered((int) $game['id']);
 
-        $cartonsSold = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
+        $cartonsSold = bingo_count_game_cartons((int) $game['id']);
         $gameAccumulated = bingo_calculate_game_prize_pool($game, $cartonsSold);
 
         $sings = bingo_get_official_sings_for_game((int) $game['id'], true);

@@ -700,10 +700,9 @@ if (!function_exists('bingo_calculate_award_per_sing')) {
     function bingo_calculate_award_per_sing(array $game, array $award, int $gameId, int $modalityId): float
     {
         $modelSings = new SingsModel();
-        $modelCartons = new CartonsModel();
 
         $singsCount = max(1, $modelSings->where('game', $gameId)->where('modality', $modalityId)->countAllResults());
-        $cartons = $modelCartons->where('game', $gameId)->where('user !=', 0)->countAllResults();
+        $cartons = bingo_count_game_cartons($gameId);
 
         if ((int) ($game['award'] ?? 0) === 2) {
             $fixedCents = bingo_money_to_cents((float) ($award['amount'] ?? 0));
@@ -715,6 +714,11 @@ if (!function_exists('bingo_calculate_award_per_sing')) {
         $poolCents = bingo_money_to_cents(bingo_calculate_game_prize_pool($game, $cartons));
         $pct = (float) ($award['amount'] ?? 0);
         $modalityCents = (int) round($poolCents * $pct / 100);
+
+        if ($modalityCents <= 0 && $pct > 0) {
+            $fallbackCents = bingo_money_to_cents($pct);
+            return bingo_cents_to_money(intdiv($fallbackCents, $singsCount));
+        }
 
         return bingo_cents_to_money(intdiv($modalityCents, $singsCount));
     }
@@ -1821,6 +1825,10 @@ if (!function_exists('bingo_calculate_single_award_amount')) {
         $poolCents = bingo_money_to_cents(bingo_calculate_game_prize_pool($game, $cartonCount));
         $pct = (float) ($award['amount'] ?? 0);
         $modalityCents = (int) round($poolCents * $pct / 100);
+
+        if ($modalityCents <= 0 && $pct > 0) {
+            return bingo_cents_to_money(bingo_money_to_cents($pct));
+        }
 
         return bingo_cents_to_money($modalityCents);
     }
