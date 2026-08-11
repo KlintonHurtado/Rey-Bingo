@@ -2686,6 +2686,7 @@ class Playings extends Controller
         }
 
         $this->ensureWinnersRegistered((int) $game['id']);
+        bingo_pay_pending_awards_for_game((int) $game['id']);
 
         $cartonsSold = bingo_count_game_cartons((int) $game['id']);
         $gameAccumulated = bingo_calculate_game_prize_pool($game, $cartonsSold);

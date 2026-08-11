@@ -1831,6 +1831,13 @@ class Cron extends Controller
                         $modelSings->insert($data);
                         $id = $modelSings->insertID();
 
+                        // Pagar el premio AUTOMÁTICAMENTE al instante
+                        try {
+                            bingo_pay_sing_award($id, 1);
+                        } catch (\Throwable $pe) {
+                            log_message('error', 'Error al pagar premio automático en Cron::singBingo: ' . $pe->getMessage());
+                        }
+
                         // Notificar el bingo cantado en tiempo real a todos los clientes por Pusher
                         bingo_broadcast_sing_accepted((int) $game['id'], [
                             'singId'       => $id,

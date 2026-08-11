@@ -454,6 +454,12 @@ if (!function_exists('bingo_register_sing_if_missing')) {
         if ($success) {
             try {
                 $singId = $modelSings->insertID();
+
+                // Pagar el premio AUTOMÁTICAMENTE de inmediato al confirmar el bingo
+                if ($finalize) {
+                    bingo_pay_sing_award($singId, 1);
+                }
+
                 $modelUsers = new \App\Models\UsersModel();
                 $userSing = $modelUsers->find($userId);
                 $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : ('Jugador #' . $userId);
@@ -471,7 +477,7 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                     'lastNumber'   => $lastBallNumber,
                 ]);
             } catch (\Throwable $pe) {
-                log_message('error', 'Error broadcasting sing in bingo_register_sing_if_missing: ' . $pe->getMessage());
+                log_message('error', 'Error broadcasting/paying sing in bingo_register_sing_if_missing: ' . $pe->getMessage());
             }
         }
 

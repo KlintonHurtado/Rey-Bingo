@@ -15,10 +15,7 @@
                                     <th class="text-center"><?= translate('carton'); ?></th>
                                     <th class="text-center"><?= translate('modality'); ?></th>
                                     <th class="text-center"><?= translate('award'); ?></th>
-                                    <?php if (session()->get('group') == 1) : ?>
                                     <th class="text-center"><?= translate('status'); ?></th>
-                                    <th class="text-center"><?= translate('option'); ?></th>
-                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
@@ -31,32 +28,14 @@
                                                 <small class="text-muted"><?= esc($sing['user_name']) ?></small>
                                             </td>
                                             <td class="text-center">C<?= esc($sing['serial']) ?></td>
-                                           <td class="text-center"><?= esc($sing['modality_name']) ?></td>
+                                            <td class="text-center"><?= esc($sing['modality_name']) ?></td>
                                             <td class="text-center"><?= systemGet('currency'); ?> <?= esc($sing['award_amount']) ?></td>
-                                            <?php if (session()->get('group') == 1) : ?>
                                             <td class="text-center" id="award-<?= $sing['id'] ?>"><?= $sing['status'] ?></td>
-                                            <td class="text-center">
-                                                <?php if (($sing['status_raw'] ?? 0) == 1) : ?>
-                                                    <a class="btn btn-primary btn-modal text-white" onclick="payawardSubmit('<?= $sing['id'] ?>', '<?= $sing['user_name'] ?>', '<?= $sing['award_amount'] ?>', 'pay');"><i class="fa-duotone fa-hand-holding-dollar"></i></a>
-                                                <?php endif; ?>
-                                                <!--  
-                                                <div class="dropdown">
-                                                    <a href="javascript:void(0);" data-bs-toggle="dropdown" aria-expanded="false">
-                                                        <i class="fa-duotone fa-solid fa-ellipsis-vertical"></i>
-                                                    </a>
-                                                    <div class="dropdown-menu" style="font-size: 0.8rem;">
-                                                        <a class="dropdown-item" onclick="payawardSubmit('<?= $sing['id'] ?>', 'pay');"><i class="fa-duotone fa-solid fa-money-check-dollar-pen"></i> <?= translate('pay'); ?></a>
-                                                        <a class="dropdown-item" onclick="payawardSubmit('<?= $sing['id'] ?>', 'earring');"><i class="fa-duotone fa-solid fa-eye-slash"></i> <?= translate('earring'); ?></a>
-                                                    </div>
-                                                </div>
-                                                -->
-                                            </td>
-                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else : ?>
                                     <tr>
-                                        <td <?php if (session()->get('group') == 1) : ?> colspan="6" <?php else : ?> colspan="5" <?php endif; ?> class="text-center"><?= translate('no data available'); ?></td>
+                                        <td colspan="5" class="text-center"><?= translate('no data available'); ?></td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>

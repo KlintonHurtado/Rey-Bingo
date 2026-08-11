@@ -904,6 +904,7 @@ class Boards extends Controller {
 
         if ($game) {
             bingo_ensure_winners_registered((int) $game['id']);
+            bingo_pay_pending_awards_for_game((int) $game['id']);
         }
 
         if (! $game) {
