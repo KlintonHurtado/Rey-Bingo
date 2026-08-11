@@ -1354,17 +1354,10 @@ function generateAutoNumber(done) {
                 }
             }
         })
-        .fail(() => {
-            console.warn('Failed to generate auto number');
-            if (typeof Toastify === 'function') {
-                Toastify({
-                    text: 'Error al generar la bola. Intenta de nuevo.',
-                    duration: 4000,
-                    gravity: 'top',
-                    position: 'right',
-                    style: { background: '#dc3545' },
-                    stopOnFocus: true
-                }).showToast();
+        .fail((xhr) => {
+            console.warn('Failed to generate auto number:', xhr ? xhr.status : 'network error');
+            if (xhr && xhr.status === 403) {
+                bingoTripBallBackoff();
             }
         })
         .always(function() {
