@@ -584,7 +584,24 @@ function refreshLowBalancePendingBadge() {
 }
 
 function playersGet() {
-    $("#modalPlayers").load(site_url + 'boards/playersGet', function() {
+    var $modal = $("#modalPlayers");
+    if (!$modal.length) {
+        console.warn('playersGet: #modalPlayers no encontrado en el DOM');
+        return;
+    }
+    var url = (typeof site_url !== 'undefined' ? site_url : window.location.origin + '/') + 'boards/playersGet';
+    $modal.load(url, function(response, status, xhr) {
+        if (status === 'error') {
+            console.warn('playersGet: Error al cargar jugadores', xhr.status, xhr.statusText);
+            $modal.html('<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h6 class="modal-title">Jugadores</h6><button type="button" class="btn-close me-1" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button></div><div class="modal-body text-center p-4"><p class="text-muted">No se pudieron cargar los jugadores.</p></div></div></div>');
+            showBsModal('#modalPlayers');
+            return;
+        }
+        // Detect silent redirect (full HTML page loaded instead of modal fragment)
+        if (!$modal.find('.modal-dialog').length) {
+            console.warn('playersGet: respuesta inesperada del servidor (posible redirect)');
+            $modal.html('<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h6 class="modal-title">Jugadores</h6><button type="button" class="btn-close me-1" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button></div><div class="modal-body text-center p-4"><p class="text-muted">Sin jugadores conectados en este momento.</p></div></div></div>');
+        }
         showBsModal('#modalPlayers');
     });
 }
