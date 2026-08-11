@@ -47,6 +47,16 @@
         filter: grayscale(100%) !important;
     }
 
+    /* Barra inferior no debe bloquear el botón de chat o controles */
+    .bottom-section {
+        pointer-events: none !important;
+        z-index: 1051 !important;
+    }
+    .bottom-section .controls-board,
+    .bottom-section .controls-board * {
+        pointer-events: auto !important;
+    }
+
     .container-transmission {
         display: flex;
         flex-direction: column;

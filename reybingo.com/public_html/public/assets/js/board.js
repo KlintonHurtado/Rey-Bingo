@@ -1,0 +1,2554 @@
+﻿// ==========================================
+// CONFIGURACI├ôN Y CONSTANTES
+// ==========================================
+const CONFIG = {
+    MAX_MESSAGES: 50,        // Aumentado para el nuevo sistema
+    MAX_CONFETTI: 100,
+    BASE_POLL_INTERVAL: 3500,
+    CHAT_POLL_INTERVAL: 3500,
+    MAX_POLL_INTERVAL: 20000,
+    LIVE_STATUS_INTERVAL: 10000,
+    USER_COUNT_INTERVAL: 10000,
+    ACCUMULATED_COUNT_INTERVAL: 10000,
+    MESSAGE_LIFETIME: 30000, // 30 segundos para mensajes
+    FADE_OUT_TIME: 500,      // Tiempo de animaci├│n de desvanecimiento
+    DEBOUNCE_DELAY: 100,
+    AUDIO_POOL_SIZE: 10,
+    MESSAGE_POOL_SIZE: 15,
+    WINNER_SLIDER_INTERVAL: 5000,
+    WAF_COOLDOWN_MS: 10000,
+    BALL_WAF_BACKOFF_MS: 2000
+};
+
+// Cooldown secundario (chat/status). Auto-canto/bolas usan backoff corto.
+window.__bingoWafCooldownUntil = window.__bingoWafCooldownUntil || 0;
+window.__bingoBallBackoffUntil = window.__bingoBallBackoffUntil || 0;
+
+function bingoIsWafCooling() {
+    return Date.now() < (window.__bingoWafCooldownUntil || 0);
+}
+
+function bingoIsBallBackingOff() {
+    return Date.now() < (window.__bingoBallBackoffUntil || 0);
+}
+
+function bingoTripWafCooldown(ms) {
+    const wait = ms || CONFIG.WAF_COOLDOWN_MS || 10000;
+    window.__bingoWafCooldownUntil = Date.now() + wait;
+    console.warn('CDN/WAF 403: pausando polls secundarios ~' + Math.round(wait / 1000) + 's');
+}
+
+function bingoTripBallBackoff(ms) {
+    const wait = ms || CONFIG.BALL_WAF_BACKOFF_MS || 2000;
+    window.__bingoBallBackoffUntil = Math.max(window.__bingoBallBackoffUntil || 0, Date.now() + wait);
+}
+
+if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
+    window.__bingoAjaxWafHook = true;
+    $(document).ajaxComplete(function (_event, xhr, settings) {
+        if (!xhr || xhr.status !== 403) {
+            return;
+        }
+        const url = String((settings && settings.url) || '');
+        if (/numberGet|numberSubmit|numberAutoSubmit/i.test(url)) {
+            bingoTripBallBackoff();
+        } else {
+            bingoTripWafCooldown();
+        }
+    });
+}
+
+// ==========================================
+// VARIABLES GLOBALES
+// ==========================================
+let numbersgenerated = [];
+let lastNumbers = fiveNumbers || [];
+let centerBallTimer = null;
+let centerBallHideTimer = null;
+let narrationAudio;
+let soundWinner;
+let isGameFinishedShown = false;
+let messagesDisplayed = [];
+let lastChatPollId = 0;
+let pendingOutgoingMessageIds = new Set();
+let chatSendInFlight = false;
+let intervalNextGame;
+let winners = [];
+let winnerIndex = 0;
+let winnerSliderTimeout;
+let gameTimerInterval;
+let startTime;
+let gameStarted = false;
+let pendingNumberSubmits = new Set();
+// Evita 2ΓÇô3 numberAutoSubmit en paralelo (UI adelantada / bolas fuera de orden)
+let autoSubmitInFlight = false;
+let generationTimeoutId = null;
+let centerAnimBusy = false;
+let centerAnimQueue = [];
+let autoGenerationWanted = false;
+
+// ==========================================
+// GESTORES DE RECURSOS
+// ==========================================
+
+// Gestor centralizado de intervalos
+class IntervalManager {
+    constructor() {
+        this.intervals = new Map();
+    }
+    
+    set(name, callback, delay) {
+        this.clear(name);
+        this.intervals.set(name, setInterval(callback, delay));
+    }
+    
+    clear(name) {
+        if (this.intervals.has(name)) {
+            clearInterval(this.intervals.get(name));
+            this.intervals.delete(name);
+        }
+    }
+    
+    clearAll() {
+        this.intervals.forEach(interval => clearInterval(interval));
+        this.intervals.clear();
+    }
+}
+
+// Cache de elementos DOM
+class DOMCache {
+    constructor() {
+        this.cache = new Map();
+    }
+    
+    get(id) {
+        if (!this.cache.has(id)) {
+            const element = document.getElementById(id);
+            if (element) {
+                this.cache.set(id, element);
+            }
+        }
+        return this.cache.get(id);
+    }
+    
+    clear() {
+        this.cache.clear();
+    }
+}
+
+// Pool de elementos de mensajes mejorado para el nuevo chat
+class MessagePool {
+    constructor(maxSize = CONFIG.MESSAGE_POOL_SIZE) {
+        this.pool = [];
+        this.maxSize = maxSize;
+    }
+    
+    get() {
+        if (this.pool.length > 0) {
+            const bubble = this.pool.pop();
+            bubble.classList.remove("fade-out");
+            bubble.style.display = "flex";
+            return bubble;
+        }
+        return this.createNew();
+    }
+    
+    release(element) {
+        if (this.pool.length < this.maxSize) {
+            // Reset element
+            element.className = 'message-bubble';
+            element.style.display = 'none';
+            element.innerHTML = '';
+            this.pool.push(element);
+        }
+    }
+    
+    createNew() {
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble";
+        return bubble;
+    }
+}
+
+// Gestor inteligente de audio
+class AudioManager {
+    constructor() {
+        this.audioCache = new Map();
+        this.preloadedAudios = new Set();
+        this.audioPool = [];
+    }
+    
+    preload(src) {
+        if (this.preloadedAudios.has(src)) return;
+        
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = src;
+        this.audioCache.set(src, audio);
+        this.preloadedAudios.add(src);
+    }
+    
+    play(src) {
+        let audio = this.audioCache.get(src);
+        if (!audio) {
+            audio = new Audio();
+            audio.src = src;
+            this.audioCache.set(src, audio);
+        }
+        
+        // Clone para permitir m├║ltiples reproducciones simult├íneas
+        const audioClone = audio.cloneNode();
+        audioClone.play().catch(e => console.warn('Audio play failed:', e));
+        
+        return audioClone;
+    }
+    
+    preloadNumberAudios() {
+        // Precargar audios de n├║meros 1-75
+        for (let i = 1; i <= 75; i++) {
+            this.preload(audioPath + i + '.mp3');
+        }
+        this.preload(audioPath + 'winner.mp3');
+    }
+}
+
+// Polling inteligente con backoff exponencial
+class SmartPoller {
+    constructor(baseInterval = CONFIG.BASE_POLL_INTERVAL) {
+        this.baseInterval = baseInterval;
+        this.currentInterval = baseInterval;
+        this.maxInterval = CONFIG.MAX_POLL_INTERVAL;
+        this.consecutiveErrors = 0;
+        this.isActive = true;
+        this.timeoutId = null;
+    }
+    
+    async poll(callback) {
+        if (!this.isActive) return;
+        
+        try {
+            const result = await callback();
+            
+            // Reset interval on success or empty poll
+            if (result && (result.status === 'success' || result.status === 'empty')) {
+                this.currentInterval = this.baseInterval;
+                this.consecutiveErrors = 0;
+            }
+            
+        } catch (error) {
+            this.consecutiveErrors++;
+            // Exponential backoff on errors
+            this.currentInterval = Math.min(
+                this.baseInterval * Math.pow(2, this.consecutiveErrors),
+                this.maxInterval
+            );
+            console.warn('Polling error:', error);
+        }
+        
+        this.timeoutId = setTimeout(() => this.poll(callback), this.currentInterval);
+    }
+    
+    stop() {
+        this.isActive = false;
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+    }
+    
+    restart() {
+        this.stop();
+        this.isActive = true;
+        this.currentInterval = this.baseInterval;
+        this.consecutiveErrors = 0;
+        this.poll(this.lastCallback);
+    }
+}
+
+// Confetti optimizado con Canvas
+class CanvasConfetti {
+    constructor() {
+        this.particles = [];
+        this.isActive = false;
+        this.activeElements = new Set();
+    }
+    
+    createParticles() {
+        const emojis = ['≡ƒÄë', '≡ƒÄè', 'Γ£¿', '≡ƒîƒ', '≡ƒÑ│', '≡ƒì╛', '≡ƒÆÑ', '≡ƒöÑ', '≡ƒÆ½', '≡ƒì¼', '≡ƒÄê'];
+        this.particles = [];
+        
+        // Limpiar part├¡culas anteriores si existen
+        this.cleanup();
+        
+        for (let i = 0; i < CONFIG.MAX_CONFETTI; i++) {
+            // Crear elemento DOM para cada part├¡cula
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            
+            // Propiedades mejoradas basadas en tu funci├│n preferida
+            const particle = {
+                element: confetti,
+                emoji: confetti.textContent,
+                x: Math.random() * 100,
+                y: Math.random() * -100,
+                vx: (Math.random() - 0.5) * 2,
+                vy: Math.random() * 1.5 + 0.5, // velocidad m├ís lenta
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 3,
+                size: Math.random() * 30 + 10,
+                alpha: 1,
+                decay: Math.random() * 0.02 + 0.01,
+                animationDuration: Math.random() * 6 + 4, // animaci├│n m├ís lenta
+                animationDelay: Math.random()
+            };
+            
+            // Aplicar estilos CSS mejorados
+            confetti.style.cssText = `
+                position: fixed;
+                left: ${particle.x}vw;
+                top: ${particle.y}vh;
+                font-size: ${particle.size}px;
+                animation-duration: ${particle.animationDuration}s;
+                animation-delay: ${particle.animationDelay}s;
+                animation-name: confettiFall;
+                animation-timing-function: ease-out;
+                animation-fill-mode: forwards;
+                pointer-events: none;
+                z-index: 9999;
+                transform: rotate(${particle.rotation}deg);
+                user-select: none;
+            `;
+            
+            // Agregar al DOM
+            document.body.appendChild(confetti);
+            this.activeElements.add(confetti);
+            
+            // Auto-eliminar cuando termine la animaci├│n
+            const handleAnimationEnd = () => {
+                if (confetti.parentNode) {
+                    confetti.parentNode.removeChild(confetti);
+                }
+                this.activeElements.delete(confetti);
+                confetti.removeEventListener('animationend', handleAnimationEnd);
+            };
+            
+            confetti.addEventListener('animationend', handleAnimationEnd);
+            
+            this.particles.push(particle);
+        }
+    }
+    
+    cleanup() {
+        // Limpiar elementos activos
+        this.activeElements.forEach(element => {
+            if (element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+        this.activeElements.clear();
+        this.particles = [];
+    }
+    
+    start() {
+        if (this.isActive) return;
+        
+        this.isActive = true;
+        this.createParticles();
+        
+        // Auto-stop despu├⌐s de la duraci├│n m├íxima de animaci├│n
+        setTimeout(() => {
+            this.stop();
+        }, 6000); // 5s max duration + 1s buffer
+    }
+    
+    stop() {
+        this.isActive = false;
+        // Los elementos se limpiar├ín autom├íticamente cuando termine su animaci├│n
+    }
+    
+    forceStop() {
+        this.isActive = false;
+        this.cleanup();
+    }
+    
+    resize() {
+        // M├⌐todo para manejar cambios de tama├▒o
+        if (this.isActive) {
+            this.forceStop();
+            setTimeout(() => this.start(), 100);
+        }
+    }
+}
+
+// Sistema de marcado de n├║meros en cartones
+class BingoCardManager {
+    constructor() {
+        this.markedNumbers = new Set();
+        this.cardElements = new Map(); // Mapeo de n├║meros a elementos DOM
+        this.storageKey = 'bingo_marked_numbers';
+        this.gameId = null;
+        this.initialized = false;
+    }
+    
+    init(gameId) {
+        if (this.initialized) return;
+        
+        this.gameId = gameId || 'default';
+        this.storageKey = `bingo_marked_numbers_${this.gameId}`;
+        
+        // Cargar n├║meros marcados desde localStorage
+        this.loadMarkedNumbers();
+        
+        // Indexar todos los elementos de cart├│n para acceso r├ípido
+        this.indexCardElements();
+        
+        // Aplicar marcas a los elementos
+        this.applyMarkedNumbers();
+        
+        // Configurar observador para cambios din├ímicos en el DOM
+        this.setupMutationObserver();
+        
+        this.initialized = true;
+        console.log('BingoCardManager inicializado para el juego:', this.gameId);
+    }
+    
+    indexCardElements() {
+        this.cardElements.clear();
+        
+        // Seleccionar todas las celdas de n├║meros en cartones
+        document.querySelectorAll('.card-number').forEach(element => {
+            const number = this.extractNumber(element);
+            if (number > 0) {
+                if (!this.cardElements.has(number)) {
+                    this.cardElements.set(number, []);
+                }
+                this.cardElements.get(number).push(element);
+            }
+        });
+        
+        console.log(`Indexados ${this.cardElements.size} n├║meros ├║nicos en cartones`);
+    }
+    
+    extractNumber(element) {
+        // Obtener el texto y limpiarlo
+        const text = element.textContent.trim();
+        
+        // Intentar extraer un n├║mero
+        const match = text.match(/\d+/);
+        if (match) {
+            return parseInt(match[0], 10);
+        }
+        
+        return 0;
+    }
+    
+    loadMarkedNumbers() {
+        try {
+            const saved = localStorage.getItem(this.storageKey);
+            if (saved) {
+                const numbers = JSON.parse(saved);
+                this.markedNumbers = new Set(numbers);
+                console.log(`Cargados ${this.markedNumbers.size} n├║meros marcados desde localStorage`);
+            }
+        } catch (error) {
+            console.error('Error al cargar n├║meros marcados:', error);
+            // Reiniciar en caso de error
+            this.markedNumbers = new Set();
+            localStorage.removeItem(this.storageKey);
+        }
+    }
+    
+    saveMarkedNumbers() {
+        try {
+            const numbers = Array.from(this.markedNumbers);
+            localStorage.setItem(this.storageKey, JSON.stringify(numbers));
+        } catch (error) {
+            console.error('Error al guardar n├║meros marcados:', error);
+        }
+    }
+    
+    applyMarkedNumbers() {
+        // Aplicar marcas seg├║n los n├║meros guardados
+        this.markedNumbers.forEach(number => {
+            this.markNumberWithoutSaving(number);
+        });
+        
+        console.log(`Aplicadas marcas a ${this.markedNumbers.size} n├║meros`);
+    }
+    
+    markNumber(number) {
+        number = parseInt(number, 10);
+        if (isNaN(number)) return;
+        
+        // Marcar el n├║mero
+        const marked = this.markNumberWithoutSaving(number);
+        
+        // Si se marc├│ correctamente, guardar
+        if (marked) {
+            this.markedNumbers.add(number);
+            this.saveMarkedNumbers();
+        }
+    }
+    
+    markNumberWithoutSaving(number) {
+        const elements = this.cardElements.get(number) || [];
+        
+        if (elements.length === 0) {
+            return false;
+        }
+        
+        elements.forEach(element => {
+            // Marcar el elemento
+            element.classList.add('marked');
+            
+            // A├▒adir efecto visual temporal
+            element.classList.add('just-marked');
+            setTimeout(() => {
+                element.classList.remove('just-marked');
+            }, 2000);
+        });
+        
+        return true;
+    }
+    
+    setupMutationObserver() {
+        // Crear un observador que detecte cuando se a├▒aden nuevos cartones
+        const observer = new MutationObserver((mutations) => {
+            let needsReindex = false;
+            
+            mutations.forEach(mutation => {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Verificar si alguno de los nodos a├▒adidos contiene cartones
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1 && // Es un elemento
+                            (node.classList?.contains('bingo-card') || 
+                             node.querySelector?.('.bingo-card'))) {
+                            needsReindex = true;
+                        }
+                    });
+                }
+            });
+            
+            if (needsReindex) {
+                console.log('Detectados nuevos cartones, reindexando...');
+                this.indexCardElements();
+                this.applyMarkedNumbers();
+            }
+        });
+        
+        // Observar cambios en todo el documento
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+// ==========================================
+// INSTANCIAS GLOBALES
+// ==========================================
+const intervalManager = new IntervalManager();
+const domCache = new DOMCache();
+const messagePool = new MessagePool();
+const audioManager = new AudioManager();
+const messagePoller = new SmartPoller(CONFIG.CHAT_POLL_INTERVAL);
+const confettiManager = new CanvasConfetti();
+const bingoCardManager = new BingoCardManager();
+
+// ==========================================
+// UTILIDADES
+// ==========================================
+const $id = (id) => domCache.get(id);
+
+// Debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Throttle function
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
+
+// ==========================================
+// FUNCIONES DE CHAT MEJORADAS
+// ==========================================
+
+// Funci├│n para crear burbujas de mensaje estilo redes sociales
+function createMessageBubble(content, profilePicUrl, isOwn = false) {
+    const bubble = messagePool.get();
+    bubble.style.display = "flex";
+    
+    // Configurar alineaci├│n
+    if (isOwn) {
+        bubble.classList.add("own-message");
+    } else {
+        bubble.classList.remove("own-message");
+    }
+    
+    // Reutilizar o crear imagen de perfil
+    let img = bubble.querySelector('.profile-pic');
+    if (!img) {
+        img = document.createElement("img");
+        img.classList.add("profile-pic");
+        bubble.appendChild(img);
+    }
+    img.src = profilePicUrl || 'default-avatar.png';
+    
+    // Reutilizar o crear span para el contenido
+    let span = bubble.querySelector('span');
+    if (!span) {
+        span = document.createElement("span");
+        bubble.appendChild(span);
+    }
+    
+    span.textContent = content;
+    span.style.fontSize = '';
+    
+    // Check if the content is only emojis (no alphanumeric or standard punctuation characters)
+    const trimmed = content.trim();
+    const isOnlyEmoji = !/[\p{L}\p{N}┬í!┬┐?.,;]/u.test(trimmed) && trimmed.length <= 8;
+    span.className = isOnlyEmoji ? 'emoji-message' : 'text-message';
+    bubble.style.background = '';
+
+    return bubble;
+}
+
+// Funci├│n para eliminar mensajes con animaci├│n mejorada
+function removeMessageWithFade(el) {
+    el.classList.add("fade-out");
+    setTimeout(() => {
+        if (el.parentNode) {
+            el.parentNode.removeChild(el);
+            messagePool.release(el);
+        }
+    }, CONFIG.FADE_OUT_TIME);
+}
+
+// Funci├│n para limitar mensajes con el nuevo sistema
+function limitMessages() {
+    const display = $id("message-display");
+    if (!display) return;
+    
+    const bubbles = display.getElementsByClassName("message-bubble");
+    while (bubbles.length >= CONFIG.MAX_MESSAGES) {
+        removeMessageWithFade(bubbles[0]);
+    }
+}
+
+// Scroll optimizado con debounce para el nuevo chat
+const debouncedScroll = debounce(() => {
+    const el = $id("message-display");
+    if (el) {
+        // Para el nuevo sistema que usa column-reverse, scroll al final
+        el.scrollTop = el.scrollHeight;
+    }
+}, CONFIG.DEBOUNCE_DELAY);
+
+function scrollToBottom() {
+    debouncedScroll();
+}
+
+function getMessageText(messageData) {
+    if (!messageData) return '';
+    if (typeof messageData === 'string') return messageData;
+    return messageData.message || messageData.text || '';
+}
+
+function getCurrentUserId() {
+    if (typeof window.currentUserId !== 'undefined' && window.currentUserId !== null && window.currentUserId !== '') {
+        return parseInt(window.currentUserId, 10) || 0;
+    }
+
+    if (typeof USER_ID !== 'undefined' && USER_ID !== null && USER_ID !== '') {
+        return parseInt(USER_ID, 10) || 0;
+    }
+
+    return 0;
+}
+
+function registerChatMessageId(messageId) {
+    const parsed = parseInt(messageId, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+        return;
+    }
+
+    lastChatPollId = Math.max(lastChatPollId, parsed);
+    if (!messagesDisplayed.includes(parsed)) {
+        messagesDisplayed.push(parsed);
+    }
+}
+
+function getLastChatMessageId() {
+    return lastChatPollId;
+}
+
+function processIncomingChatMessages(data) {
+    if (!data) return;
+
+    const list = Array.isArray(data.messages)
+        ? data.messages
+        : (data.status === 'success' && data.message ? [data.message] : []);
+
+    const currentUserId = getCurrentUserId();
+
+    list.forEach((row) => {
+        const id = parseInt(row.id, 10);
+        const text = getMessageText(row);
+        if (!text) return;
+
+        if (!Number.isNaN(id) && id > 0) {
+            if (messagesDisplayed.includes(id)) {
+                return;
+            }
+
+            if (pendingOutgoingMessageIds.has(id)) {
+                pendingOutgoingMessageIds.delete(id);
+                registerChatMessageId(id);
+                return;
+            }
+
+            registerChatMessageId(id);
+        }
+
+        const rowUserId = parseInt(row.user, 10);
+        const isOwn = !Number.isNaN(rowUserId) && rowUserId > 0
+            ? rowUserId === currentUserId
+            : false;
+
+        displayMessage(
+            { message: text, id: Number.isNaN(id) || id <= 0 ? undefined : id },
+            row.image || data.image,
+            isOwn
+        );
+    });
+}
+
+// Funci├│n mejorada para mostrar mensajes estilo redes sociales
+function displayMessage(messageData, imageUrl, isOwn = false) {
+    const display = $id("message-display");
+    if (!display) return;
+    
+    limitMessages();
+    
+    const bubble = createMessageBubble(
+        getMessageText(messageData),
+        imageUrl || imagePath || 'default-avatar.png',
+        isOwn
+    );
+    
+    // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
+    display.insertBefore(bubble, display.firstChild);
+    
+    if (messageData.id) {
+        const msgId = parseInt(messageData.id, 10);
+        if (!Number.isNaN(msgId) && msgId > 0) {
+            registerChatMessageId(msgId);
+        }
+    }
+    
+    // Programar eliminaci├│n autom├ítica
+    setTimeout(() => removeMessageWithFade(bubble), CONFIG.MESSAGE_LIFETIME);
+}
+
+// Funci├│n mejorada para enviar mensajes
+function sendMessage(content, id) {
+    if (!content || !content.trim()) return;
+    if (chatSendInFlight) return;
+
+    const trimmedContent = content.trim();
+    chatSendInFlight = true;
+
+    const inputField = $('#message-send-new');
+    if (inputField.length) {
+        inputField.val('');
+    }
+
+    displayMessage({ message: trimmedContent }, imagePath, true);
+
+    $.post(site_url + 'playings/messageSubmit', { message: trimmedContent })
+        .done((data) => {
+            if (data.status === 'success') {
+                const msgId = parseInt(data.id, 10);
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    pendingOutgoingMessageIds.add(msgId);
+                    registerChatMessageId(msgId);
+                }
+            }
+        })
+        .fail(() => {
+            console.warn('Error al enviar mensaje');
+        })
+        .always(() => {
+            chatSendInFlight = false;
+        });
+}
+
+function sendEmoji(content, id) {
+    sendMessage(content, id);
+}
+
+function sendMessageText() {
+    const inputField = $id('message-send-new');
+    if (!inputField || !inputField.value.trim()) return;
+    sendMessage(inputField.value);
+}
+
+// Polling de chat (mensajes de jugadores en la partida activa)
+function pollMessagesOptimized() {
+    return new Promise((resolve) => {
+        if (bingoIsWafCooling()) {
+            return resolve({ status: 'success' });
+        }
+
+        $.get(site_url + 'playings/messageGet', { after_id: getLastChatMessageId() })
+            .done((data) => {
+                if (data.status === 'stop') {
+                    messagePoller.stop();
+                    return resolve(data);
+                }
+                processIncomingChatMessages(data);
+                resolve(data);
+            })
+            .fail((xhr) => {
+                if (xhr && xhr.status === 403) {
+                    bingoTripWafCooldown();
+                }
+                console.warn('Error en polling de mensajes:', xhr);
+                resolve({ status: 'error' });
+            });
+    });
+}
+
+// ==========================================
+// FUNCIONES PRINCIPALES (mantenidas del c├│digo original)
+// ==========================================
+
+function getColumnClass(number) {
+    if (number <= 15) return 'B';
+    if (number <= 30) return 'I';
+    if (number <= 45) return 'N';
+    if (number <= 60) return 'G';
+    return 'O';
+}
+
+function startWinnerSlider() {
+    if (winners.length === 0) return;
+
+    if (winnerSliderTimeout) {
+        clearTimeout(winnerSliderTimeout);
+        winnerSliderTimeout = null;
+    }
+
+    const intervalMs = Math.max(3000, parseInt(CONFIG.WINNER_SLIDER_INTERVAL, 10) || 5000);
+    const nextGameSpan = document.querySelector('.next-game');
+    if (!nextGameSpan) return;
+
+    nextGameSpan.classList.add('is-winner');
+
+    // Un solo ganador: texto fijo (sin bucle infinito)
+    if (winners.length === 1) {
+        const current = winners[0];
+        nextGameSpan.textContent = `GANADOR: ${current.player} - ${current.modality}`;
+        return;
+    }
+
+    function showNext() {
+        const current = winners[winnerIndex % winners.length];
+        if (current && nextGameSpan) {
+            nextGameSpan.textContent = `GANADOR: ${current.player} - ${current.modality}`;
+        }
+        winnerIndex = (winnerIndex + 1) % winners.length;
+        winnerSliderTimeout = setTimeout(showNext, intervalMs);
+    }
+
+    showNext();
+}
+
+function showCountdown(data, callback) {
+    // Al bingo: cortar auto-canto ya (si no, sigue sacando bolas encima del anuncio)
+    stopAutomaticGeneration();
+    autoGenerationWanted = false;
+    autoSubmitInFlight = false;
+    centerAnimQueue = [];
+    centerAnimBusy = false;
+
+    const numberHe = $id('countdown');
+    const container = $id('countdown-container');
+    const textHe = $id('text-countdown');
+
+    if (data && data.player && data.modality) {
+        if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
+            winners.push({ player: data.player, modality: data.modality });
+        }
+        startWinnerSlider();
+    }
+
+    // Sin c├¡rculo/cuenta regresiva: evita solapes con el texto GANADOR
+    if (container) {
+        container.style.display = 'none';
+    }
+    if (numberHe) {
+        numberHe.textContent = '';
+        numberHe.style.backgroundImage = '';
+    }
+    if (textHe) {
+        textHe.innerHTML = '';
+    }
+
+    audioManager.play(audioPath + 'winner.mp3');
+
+    const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
+    cartns.forEach(cartn => {
+        cartn.classList.add('cartn-sing');
+
+        let borderCarton = cartn.parentElement;
+        while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+            borderCarton = borderCarton.parentElement;
+        }
+        if (borderCarton) {
+            borderCarton.classList.add('modality-won');
+        }
+
+        cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+            el.classList.add('sing');
+            el.innerText = 'Γ¡É∩╕Å';
+        });
+    });
+
+    if (typeof window.loadNotifications === 'function') {
+        setTimeout(function () {
+            window.loadNotifications();
+        }, 300);
+    }
+
+    const pauseMs = Math.max(5000, parseInt(timeBallGet, 10) || 5000);
+    setTimeout(function () {
+        // Nunca reanudar startAutomaticGeneration aqu├¡ (eso ΓÇ£segu├¡a cantandoΓÇ¥)
+        if (typeof callback === 'function' && callback !== startAutomaticGeneration) {
+            callback();
+        } else {
+            startAutomaticLast();
+        }
+    }, pauseMs);
+}
+
+function updateBallsCounter(totalNumbersGenerated) {
+    const totalBalls = 75;
+    const drawn = parseInt(totalNumbersGenerated, 10) || 0;
+    window.totalNumbersGenerated = drawn;
+    const remaining = totalBalls - drawn;
+    
+    const counter = $('#balls-counter');
+    if (counter.length) {
+        counter.text(`${drawn} - ${remaining}`);
+    }
+
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan && drawn === 1) {
+        if (intervalNextGame) {
+            clearInterval(intervalNextGame);
+            intervalNextGame = null;
+        }
+        nextGameSpan.textContent = '┬íEL JUEGO HA INICIADO!';
+    }
+}
+
+function parseBallNumber(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function clearCenterBallTimers() {
+    if (centerBallTimer) {
+        clearTimeout(centerBallTimer);
+        centerBallTimer = null;
+    }
+
+    if (centerBallHideTimer) {
+        clearTimeout(centerBallHideTimer);
+        centerBallHideTimer = null;
+    }
+}
+
+function updateMainBall(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const lastNumberEl = $('#last-number');
+    if (!lastNumberEl.length) {
+        return;
+    }
+
+    // Reemplazar contenido completo para evitar bolas apiladas (7 encima de 7)
+    lastNumberEl.empty()
+        .html(`<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`)
+        .removeClass()
+        .addClass(`bingo-ball ${getColumnClass(parsed)} size-100`);
+}
+
+function renderBallHistory() {
+    const container = $("#last-five-numbers");
+    if (!container.length) {
+        return;
+    }
+
+    const ordered = (window.drawnNumbers || [])
+        .map(parseBallNumber)
+        .filter(Boolean);
+
+    if (!ordered.length) {
+        container.empty();
+        return;
+    }
+
+    const history = ordered.length > 1
+        ? ordered.slice(Math.max(0, ordered.length - 5), -1)
+        : [];
+
+    container.empty();
+    history.slice(-4).forEach(function(num) {
+        container.append(`<div class="bingo-ball ${getColumnClass(num)} size-40"><span>${num}</span></div>`);
+    });
+}
+
+function markBoardGridNumber(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+
+    const numberEl = $("#number-" + parsed);
+    if (!numberEl.length) {
+        return;
+    }
+
+    numberEl.addClass(`bingo-ball ${getColumnClass(parsed)} size-50`);
+    numberEl.removeAttr('onclick');
+}
+
+function reconcileBallDisplay(orderedNumbers) {
+    const ordered = [];
+    const seen = {};
+    (orderedNumbers || window.drawnNumbers || []).forEach(function(value) {
+        const parsed = parseBallNumber(value);
+        if (!parsed || seen[parsed]) {
+            return;
+        }
+        seen[parsed] = true;
+        ordered.push(parsed);
+    });
+
+    if (!ordered.length) {
+        return;
+    }
+
+    window.drawnNumbers = ordered.slice();
+    lastNumbers = ordered.slice(-5);
+    updateMainBall(ordered[ordered.length - 1]);
+    renderBallHistory();
+    ordered.forEach(markBoardGridNumber);
+}
+
+function enqueueCenterBallAnimation(newNumber) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        return;
+    }
+    // Solo la ├║ltima bola: si hay cola, no acumular atraso visual vs el jugador
+    centerAnimQueue = [parsed];
+    drainCenterBallQueue();
+}
+
+function drainCenterBallQueue() {
+    if (centerAnimBusy || !centerAnimQueue.length) {
+        return;
+    }
+    centerAnimBusy = true;
+    // Si llegaron m├ís mientras esper├íbamos, tomar la m├ís reciente
+    const next = centerAnimQueue[centerAnimQueue.length - 1];
+    centerAnimQueue = [];
+    showCenterBallAnimation(next, function() {
+        centerAnimBusy = false;
+        drainCenterBallQueue();
+    });
+}
+
+function showCenterBallAnimation(newNumber, onDone) {
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        if (typeof onDone === 'function') {
+            onDone();
+        }
+        return;
+    }
+
+    const centerBlock = $id('block-number');
+    const centerBall = $id('last-number-center');
+    if (!centerBlock || !centerBall) {
+        if (typeof onDone === 'function') {
+            onDone();
+        }
+        return;
+    }
+
+    clearCenterBallTimers();
+
+    centerBlock.style.display = 'flex';
+    centerBall.innerHTML = '';
+    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
+    centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
+    centerBall.style.display = 'flex';
+    centerBall.style.transform = '';
+    centerBall.style.opacity = '1';
+
+    const displayMs = 1200;
+
+    centerBallHideTimer = setTimeout(function() {
+        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
+        centerBall.style.opacity = '0';
+
+        centerBallTimer = setTimeout(function() {
+            centerBall.removeAttribute('style');
+            centerBall.className = '';
+            centerBlock.style.display = 'none';
+            if (typeof onDone === 'function') {
+                onDone();
+            }
+        }, 350);
+    }, displayMs);
+}
+
+function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
+    if (Array.isArray(drawnNumbers) && drawnNumbers.length) {
+        const ordered = [];
+        const seen = {};
+        drawnNumbers.forEach(function(value) {
+            const parsed = parseBallNumber(value);
+            if (!parsed || seen[parsed]) {
+                return;
+            }
+            seen[parsed] = true;
+            ordered.push(parsed);
+        });
+        return ordered;
+    }
+
+    const ordered = numbersgenerated.slice();
+    const parsed = parseBallNumber(newNumber);
+    if (parsed && !ordered.includes(parsed)) {
+        ordered.push(parsed);
+    }
+
+    return ordered;
+}
+
+function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options) {
+    const opts = options || {};
+    const ordered = [];
+    const seen = {};
+    (drawnNumbers || []).forEach(function(value) {
+        const parsed = parseBallNumber(value);
+        if (!parsed || seen[parsed]) {
+            return;
+        }
+        seen[parsed] = true;
+        ordered.push(parsed);
+    });
+
+    if (!ordered.length) {
+        return;
+    }
+
+    const previous = numbersgenerated.slice();
+    const missing = ordered.filter(function(num) {
+        return !previous.includes(num);
+    });
+
+    numbersgenerated = ordered.slice();
+    window.drawnNumbers = ordered.slice();
+
+    if (totalNumbersGenerated !== undefined) {
+        updateBallsCounter(Math.max(parseInt(totalNumbersGenerated, 10) || 0, ordered.length));
+    } else {
+        updateBallsCounter(ordered.length);
+    }
+
+    reconcileBallDisplay(ordered);
+
+    if (missing.length && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
+    }
+
+    // Solo animar la ├║ltima bola nueva (si hay varias por race, no apilar 2ΓÇô3 a la vez)
+    if (opts.showCenterAnimation && missing.length > 0) {
+        enqueueCenterBallAnimation(missing[missing.length - 1]);
+    }
+
+    if (bingoCardManager.initialized && missing.length > 0) {
+        missing.forEach(function(num) {
+            bingoCardManager.markNumber(num);
+        });
+    }
+}
+
+function handleNewNumber(newNumber, totalNumbersGenerated, drawnNumbers) {
+    const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { showCenterAnimation: true });
+}
+
+function handleNewNumberCRON(newNumber, totalNumbersGenerated, drawnNumbers) {
+    const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { showCenterAnimation: false });
+}
+
+function processNumberGetResponse(data) {
+    if (!data) {
+        return;
+    }
+
+    if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
+        syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
+    } else if (data.number) {
+        // Con auto activo el poll solo sincroniza (no anime otra bola encima)
+        if (autoGenerationWanted || autoSubmitInFlight) {
+            const ordered = buildOrderedDrawnNumbers(data.number, data.drawnNumbers);
+            syncDrawnNumbersFromServer(ordered, data.totalNumbersGenerated, { showCenterAnimation: false });
+        } else {
+            handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+        }
+    }
+
+    if (data.status === 'pause') {
+        intervalManager.clear('lastNumber');
+        showCountdown(data, startAutomaticLast);
+    } else if (data.status === 'success') {
+        startAutomaticLast();
+    } else if (data.status === 'completed') {
+        intervalManager.clear('lastNumber');
+
+        if (data.player && data.player !== '') {
+            showCountdown(data, function() {
+                setTimeout(showGameFinalized, timeBallGet);
+            });
+        } else {
+            setTimeout(showGameFinalized, timeBallGet);
+        }
+    }
+}
+
+function formatTimeUnit(value) {
+    return value < 10 ? `0${value}` : value;
+}
+
+function updateGameTimer() {
+    const now = new Date();
+    const diffMs = now - startTime;
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const label = hours > 0
+        ? `HORA${hours > 1 ? 'S' : ''}`
+        : minutes > 0
+            ? `MINUTO${minutes > 1 ? 'S' : ''}`
+            : `SEGUNDO${seconds > 1 ? 'S' : ''}`;
+
+    const timeText = `${formatTimeUnit(hours)}:${formatTimeUnit(minutes)}:${formatTimeUnit(seconds)}`;
+
+    $('.init-count small').text(label);
+    $('.init-count .time-text').text(timeText);
+}
+
+function ensureGameTimerStarted() {
+    if (gameStarted) {
+        return;
+    }
+    gameStarted = true;
+    startTime = new Date();
+    updateGameTimer();
+    if (gameTimerInterval) {
+        clearInterval(gameTimerInterval);
+    }
+    gameTimerInterval = setInterval(updateGameTimer, 1000);
+}
+
+// Una sola petici├│n a la vez: el intervalo viejo disparaba otra antes de que terminara la anterior
+function generateAutoNumber(done) {
+    const finish = function() {
+        if (typeof done === 'function') {
+            done();
+        }
+    };
+
+    if (autoSubmitInFlight || isGameFinishedShown || bingoIsBallBackingOff()) {
+        finish();
+        return;
+    }
+
+    autoSubmitInFlight = true;
+    ensureGameTimerStarted();
+
+    $.get(site_url + 'boards/numberAutoSubmit')
+        .done((data) => {
+            if (!data) {
+                return;
+            }
+            if (data.status === 'pause') {
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                showCountdown(data, startAutomaticLast);
+            } else if (data.status === 'completed') {
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                showGameFinalized();
+            } else if (data.status === 'success') {
+                // Pintar al instante al recibir el AJAX (antes del broadcast a jugadores)
+                handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+            } else if (data.status === 'error') {
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                $('#stop-button, #next-number-button, #play-button').hide();
+                $('#start-button').show();
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: data.message || 'No se pudo iniciar el sorteo',
+                        duration: 5000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' },
+                        stopOnFocus: true
+                    }).showToast();
+                } else {
+                    alert(data.message || 'No se pudo iniciar el sorteo');
+                }
+            }
+        })
+        .fail(() => {
+            console.warn('Failed to generate auto number');
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: 'Error al generar la bola. Intenta de nuevo.',
+                    duration: 4000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' },
+                    stopOnFocus: true
+                }).showToast();
+            }
+        })
+        .always(function() {
+            autoSubmitInFlight = false;
+            finish();
+        });
+}
+
+function generateNumber(number) {
+    const parsed = parseInt(number, 10);
+    if (!parsed || pendingNumberSubmits.has(parsed)) {
+        return;
+    }
+    if (Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed)) {
+        return;
+    }
+
+    // Iniciar conteo solo la primera vez que se llama manualmente
+    if (!gameStarted) {
+        gameStarted = true;
+        startTime = new Date();
+        updateGameTimer();
+        gameTimerInterval = setInterval(updateGameTimer, 1000);
+        sendMessage((__['game started!'] || '┬íJUEGO INICIADO!') + ' ≡ƒÄ»', 26);
+    }
+
+    // Pintar de inmediato en el tablero
+    pendingNumberSubmits.add(parsed);
+    handleNewNumber(parsed, (numbersgenerated.length || 0) + 1, null);
+
+    $.get(site_url + 'boards/numberSubmit/' + parsed)
+        .done((data) => {
+            if (data.status === 'pause') {
+                stopAutomaticGeneration();
+                autoGenerationWanted = false;
+                showCountdown(data, startAutomaticLast);
+            } else if (data.status === 'completed') {
+                showGameFinalized();
+            } else if (data.status === 'success') {
+                if (Array.isArray(data.drawnNumbers)) {
+                    syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
+                } else if (typeof data.totalNumbersGenerated !== 'undefined') {
+                    updateBallsCounter(data.totalNumbersGenerated);
+                }
+            } else if (data.status === 'error') {
+                stopAutomaticGeneration();
+                numbersgenerated = numbersgenerated.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                if (Array.isArray(window.drawnNumbers)) {
+                    window.drawnNumbers = window.drawnNumbers.filter(function(n) { return parseInt(n, 10) !== parsed; });
+                }
+                const numberEl = $("#number-" + parsed);
+                if (numberEl.length) {
+                    numberEl.removeClass('bingo-ball B I N G O size-50 size-70')
+                        .attr('onclick', 'generateNumber(' + parsed + ');');
+                }
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: data.message || 'No se pudo generar la bola',
+                        duration: 5000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            }
+        })
+        .fail(() => {
+            console.warn('Error al generar el n├║mero:', parsed);
+        })
+        .always(function() {
+            pendingNumberSubmits.delete(parsed);
+        });
+}
+
+function startAutomaticGeneration() {
+    stopAutomaticGeneration();
+    autoGenerationWanted = true;
+    ensureGameTimerStarted();
+
+    const delay = Math.max(2500, parseInt(timeBallGet, 10) || 3000);
+
+    function scheduleNext() {
+        if (!autoGenerationWanted || isGameFinishedShown) {
+            return;
+        }
+        generationTimeoutId = setTimeout(function() {
+            generationTimeoutId = null;
+            runAutoTick();
+        }, delay);
+    }
+
+    function runAutoTick() {
+        if (!autoGenerationWanted || isGameFinishedShown) {
+            return;
+        }
+        // Espera a que termine el AJAX antes de programar la siguiente bola
+        generateAutoNumber(function() {
+            scheduleNext();
+        });
+    }
+
+    runAutoTick();
+}
+
+function stopAutomaticGeneration() {
+    autoGenerationWanted = false;
+    intervalManager.clear('generation');
+    if (generationTimeoutId) {
+        clearTimeout(generationTimeoutId);
+        generationTimeoutId = null;
+    }
+}
+
+function lastNumberGet() {
+    // Con autom├ítico activo, numberAutoSubmit ya pinta y detecta pause:
+    // no hace falta otro poll de bolas (menos AJAX ΓåÆ menos 403).
+    if (autoGenerationWanted || autoSubmitInFlight) {
+        return;
+    }
+
+    if (bingoIsBallBackingOff()) {
+        return;
+    }
+
+    $.get(site_url + 'boards/numberGet')
+        .done((data) => {
+            if (data.status === 'iscron') {
+                handleNewNumberCRON(data.number, data.totalNumbersGenerated, data.drawnNumbers);
+                return;
+            }
+
+            processNumberGetResponse(data);
+        })
+        .fail((xhr, status, error) => {
+            if (xhr && xhr.status === 403) {
+                bingoTripBallBackoff();
+            }
+            console.warn('Failed to get last number:', error);
+        });
+}
+
+function startAutomaticLast() {
+    intervalManager.clear('lastNumber');
+    const pollMs = Math.max(2500, parseInt(timeBallLast, 10) || 3000);
+    intervalManager.set('lastNumber', lastNumberGet, pollMs);
+}
+
+function stopAutomaticLast() {
+    intervalManager.clear('lastNumber');
+}
+
+function showGameFinalized() {
+    if (isGameFinishedShown) return;
+    isGameFinishedShown = true;
+    
+    const container = $id('game-finalized');
+    const text = $id('finalized');
+    
+    if (container && text) {
+        container.style.display = 'block';
+        text.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
+        
+        setTimeout(() => {
+            if (typeof awardsGet === 'function') {
+                awardsGet();
+            }
+            container.style.display = 'none';
+
+            // Mostrar modal con bot├│n para volver al inicio
+            const bodyEl = document.getElementById('modalGameFinalizedBody');
+            if (bodyEl) {
+                bodyEl.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
+            }
+
+            const modalEl = document.getElementById('modalGameFinalized');
+            if (modalEl) {
+                const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+                bsModal.show();
+
+                const btnVolver = document.getElementById('btnVolverInicio');
+                if (btnVolver) {
+                    btnVolver.addEventListener('click', function() {
+                        bsModal.hide();
+                        window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
+                    }, { once: true });
+                }
+            }
+        }, 5000);
+    }
+
+    stopAutomaticGeneration();
+    stopAutomaticLast();
+    stopUpdateLiveStatus();
+    messagePoller.stop();
+
+    const controlsDiv = $id('controls');
+    if (controlsDiv) {
+        controlsDiv.remove();
+    }
+}
+
+function applyLiveStatusUi(data) {
+    if (!data) {
+        return;
+    }
+
+    const countEl = $('.count_notifications');
+    if (data.userCount && data.userCount > 0) {
+        countEl.text(data.userCount).show();
+    } else {
+        countEl.hide();
+    }
+
+    const accumulatedEl = $('#accumulated-counter');
+    if (accumulatedEl.length && typeof data.gameAccumulated !== 'undefined') {
+        accumulatedEl.text(currency + ' ' + data.gameAccumulated);
+    }
+
+    if (data.modalities && data.modalities.length > 0) {
+        data.modalities.forEach(modality => {
+            const modalityEl = $('#modality-amount-' + modality.id);
+            if (modalityEl.length > 0) {
+                modalityEl.text(currency + ' ' + modality.amount);
+            }
+        });
+    }
+}
+
+const updateLiveStatus = throttle(() => {
+    if (bingoIsWafCooling()) {
+        return;
+    }
+
+    $.get(site_url + 'games/liveStatusGet')
+        .done((data) => {
+            applyLiveStatusUi(data);
+            if (data.status === 'completed') {
+                stopUpdateLiveStatus();
+            }
+        })
+        .fail((xhr) => {
+            if (xhr && xhr.status === 403) {
+                bingoTripWafCooldown();
+            }
+            console.warn('Failed to update live status');
+        });
+}, 2000);
+
+function stopUpdateLiveStatus() {
+    intervalManager.clear('liveStatus');
+}
+
+function stopUpdateUserCount() {
+    stopUpdateLiveStatus();
+}
+
+function stopUpdateGameAccumulated() {
+    stopUpdateLiveStatus();
+}
+
+function updateVolumeButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-volume');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-volume"></i>'
+        : '<i class="fa-duotone fa-solid fa-volume-slash"></i>';
+}
+
+function updateMicrophoneButtonIcon(enabled) {
+    const btn = document.querySelector('.btn-microphone');
+    if (!btn) {
+        return;
+    }
+    btn.innerHTML = enabled
+        ? '<i class="fa-duotone fa-solid fa-microphone"></i>'
+        : '<i class="fa-duotone fa-solid fa-microphone-slash"></i>';
+}
+
+function RemoveVolume() {
+    const soundsInput = document.getElementById('sounds');
+    const currentlyOn = soundsInput
+        ? String(soundsInput.value) === '1'
+        : !document.querySelector('.btn-volume .fa-volume-slash');
+    const nextOn = !currentlyOn;
+
+    if (soundsInput) {
+        soundsInput.value = nextOn ? '1' : '0';
+    }
+    updateVolumeButtonIcon(nextOn);
+
+    try {
+        const track = window.__bingoSoundtrack;
+        if (track) {
+            if (nextOn) {
+                track.play().catch(() => {});
+            } else {
+                track.pause();
+            }
+        } else if (nextOn && typeof window.startBingoSoundtrack === 'function') {
+            window.startBingoSoundtrack();
+        }
+    } catch (e) { /* ignore */ }
+
+    $.ajax({
+        url: site_url + 'playings/volumeSubmit',
+        method: 'POST',
+        error: function() {
+            console.warn('Error disabling sound');
+        }
+    });
+}
+
+function RemoveMicrophone() {
+    if (typeof narrationPlaying === 'undefined') {
+        window.narrationPlaying = true;
+    }
+    narrationPlaying = !narrationPlaying;
+    updateMicrophoneButtonIcon(narrationPlaying);
+
+    $.ajax({
+        url: site_url + 'playings/microphoneSubmit',
+        method: 'POST',
+        error: function() {
+            console.warn('Error disabling narrator');
+        }
+    });
+}
+
+// ==========================================
+// CONFIGURACI├ôN DE EVENTOS MEJORADA
+// ==========================================
+function setupEvents() {
+    $('#message-button').off('click.chatSend').on('click.chatSend', sendMessageText);
+
+    $('#message-send-new').off('keydown.chatSend').on('keydown.chatSend', (e) => {
+        if (e.key === 'Enter' || e.which === 13) {
+            e.preventDefault();
+            sendMessageText();
+        }
+    });
+
+    // Eventos para emojis (si tienes botones de emoji)
+    $('.emoji-button').on('click', function() {
+        const emoji = $(this).data('emoji') || $(this).text();
+        sendEmoji(emoji);
+    });
+
+    // Eventos de control del juego
+    $('#start-button').on('click', () => {
+        $('#start-button').hide();
+        $('#stop-button, #next-number-button').show();
+        sendMessage((__['game started!'] || '┬íJUEGO INICIADO!') + ' ≡ƒÿÄ', 26);
+        ensureGameTimerStarted();
+
+        setTimeout(() => {
+            startAutomaticGeneration();
+        }, 2000);
+    });
+
+    $('#next-number-button').on('click', () => {
+        // Reinicia la cadena (no dispara un AJAX extra encima del que ya va)
+        startAutomaticGeneration();
+    });
+
+    $('#stop-button').on('click', () => {
+        stopAutomaticGeneration();
+        $('#stop-button, #next-number-button').hide();
+        $('#play-button').show();
+    });
+
+    $('#play-button').on('click', () => {
+        startAutomaticGeneration();
+        $('#play-button').hide();
+        $('#stop-button, #next-number-button').show();
+    });
+
+    // Eventos de control del juego
+    // Silencio/micr├│fono: solo onclick RemoveVolume/RemoveMicrophone (sin doble toggle)
+    $('.modal').on("hidden.bs.modal", function(e) {
+        if ($('.modal:visible').length) {
+            $('.modal-backdrop').first().css('z-index', parseInt($('.modal:visible').last().css('z-index')) - 10);
+            $('body').addClass('modal-open');
+        }
+    }).on("show.bs.modal", function(e) {
+        if ($('.modal:visible').length) {
+            $('.modal-backdrop.in').first().css('z-index', parseInt($('.modal:visible').last().css('z-index')) + 10);
+            $(this).css('z-index', parseInt($('.modal-backdrop.in').first().css('z-index')) + 10);
+        }
+    });
+
+    function setModalitiesPanelOpen(open) {
+        const panel = document.getElementById("playing-modalities-panel");
+        const toggleBtn = document.getElementById("toggle-modalities-btn");
+        if (!panel) {
+            return;
+        }
+        panel.classList.toggle("is-open", open);
+        panel.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("modalities-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+    }
+
+    function isModalitiesPanelOpen() {
+        const panel = document.getElementById("playing-modalities-panel");
+        return !!(panel && panel.classList.contains("is-open"));
+    }
+
+    function setChatPanelOpen(open) {
+        const messageContainer = document.getElementById("message-display-container");
+        const toggleBtn = document.getElementById("toggle-messages-btn");
+        if (!messageContainer) {
+            return;
+        }
+        // Clase is-open = fuente de verdad (CSS con !important en board.php)
+        messageContainer.classList.toggle("is-open", open);
+        messageContainer.style.display = open ? "flex" : "none";
+        messageContainer.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("chat-panel-open", open);
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+        if (open && isModalitiesPanelOpen()) {
+            setModalitiesPanelOpen(false);
+        }
+    }
+
+    function isChatPanelOpen() {
+        const messageContainer = document.getElementById("message-display-container");
+        if (!messageContainer) {
+            return false;
+        }
+        return messageContainer.classList.contains("is-open")
+            || messageContainer.style.display === "flex";
+    }
+
+    // Delegaci├│n: funciona aunque el bot├│n se re-renderice o el init se atrase
+    $(document).off("click.boardChatToggle", "#toggle-messages-btn")
+        .on("click.boardChatToggle", "#toggle-messages-btn", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(!isChatPanelOpen());
+        });
+
+    $(document).off("click.boardChatClose", "#message-display-close")
+        .on("click.boardChatClose", "#message-display-close", function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setChatPanelOpen(false);
+        });
+
+    $(document).off("click.boardChatOutside").on("click.boardChatOutside", function(event) {
+        if (!isChatPanelOpen()) {
+            return;
+        }
+        const target = event.target;
+        if ($(target).closest("#message-display-container, #toggle-messages-btn, #message-display-close").length) {
+            return;
+        }
+        setChatPanelOpen(false);
+    });
+
+    // Exponer para el script inline de modalidades en board.php
+    window.__boardSetChatPanelOpen = setChatPanelOpen;
+    window.__boardIsChatPanelOpen = isChatPanelOpen;
+
+    // Eventos para auto-scroll del chat
+    const messageDisplay = $id("message-display");
+    if (messageDisplay) {
+        // Detectar cuando el usuario hace scroll manual
+        let userScrolled = false;
+        messageDisplay.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = messageDisplay;
+            userScrolled = scrollTop < scrollHeight - clientHeight - 50; // 50px de tolerancia
+        });
+
+        // Observer para nuevos mensajes
+        const observer = new MutationObserver(() => {
+            if (!userScrolled) {
+                scrollToBottom();
+            }
+        });
+
+        observer.observe(messageDisplay, { childList: true });
+    }
+}
+
+// ==========================================
+// CONFIGURACI├ôN DE M├üSCARAS Y SCROLL
+// ==========================================
+function setupScrollMask() {
+    const container = document.querySelector(".board-section");
+    if (!container) return;
+
+    function isMobile() {
+        return window.innerWidth <= 700;
+    }
+
+    function isTablet() {
+        return window.innerWidth >= 701 && window.innerWidth <= 1024;
+    }
+
+    function shouldApplyMask() {
+        return isMobile() || isTablet();
+    }
+
+    const updateMask = debounce(() => {
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        if (!shouldApplyMask()) {
+            container.style.maskImage = "none";
+            container.style.webkitMaskImage = "none";
+            return;
+        }
+
+        if (scrollHeight <= clientHeight) {
+            container.style.maskImage = "none";
+            container.style.webkitMaskImage = "none";
+            return;
+        }
+
+        let maskValue;
+        if (scrollTop === 0) {
+            maskValue = "linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 0) 100%)";
+        } else if (scrollTop + clientHeight >= scrollHeight) {
+            maskValue = "linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 0) 100%)";
+        } else {
+            maskValue = "linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 15%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 0) 100%)";
+        }
+
+        container.style.maskImage = maskValue;
+        container.style.webkitMaskImage = maskValue;
+    }, 50);
+
+    container.addEventListener("scroll", updateMask);
+    window.addEventListener("resize", updateMask);
+    updateMask();
+}
+
+// ==========================================
+// CONFIGURACI├ôN DE COUNTDOWN Y GANADORES
+// ==========================================
+function setupGameCountdown() {
+    const nextGameSpan = document.querySelector('.next-game');
+    if (!nextGameSpan || typeof gameDate === 'undefined') return;
+
+    const targetDate = new Date(gameDate);
+    let winnerIndex = 0;
+
+    function hasGameStarted() {
+        if (numbersgenerated.length > 0) {
+            return true;
+        }
+
+        const drawn = parseInt(window.totalNumbersGenerated, 10);
+        return Number.isFinite(drawn) && drawn > 0;
+    }
+
+    function updateCountdown() {
+        const now = new Date();
+        const timeDiff = targetDate - now;
+
+        if (hasGameStarted()) {
+            clearInterval(intervalNextGame);
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = '┬íEL JUEGO HA INICIADO!';
+            }
+            return;
+        }
+
+        if (timeDiff <= 0) {
+            clearInterval(intervalNextGame);
+
+            if (hasGameStarted()) {
+                if (winners.length > 0) {
+                    startWinnerSlider();
+                } else {
+                    nextGameSpan.textContent = '┬íEL JUEGO HA INICIADO!';
+                }
+            } else {
+                nextGameSpan.textContent = 'LOS JUGADORES ESPERAN EL INICIO DE LA PARTIDA...';
+            }
+            return;
+        }
+
+        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+
+        let text = '';
+        if (days > 0) {
+            text = `EL JUEGO INICIA EN: ${days} D├ìA${days > 1 ? 'S' : ''} ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        } else if (hours > 0) {
+            text = `EL JUEGO INICIA EN: ${hours} HORA${hours > 1 ? 'S' : ''} - ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MIN`;
+        } else {
+            if (minutes === 0) {
+                const sec = Math.max(0, seconds);
+                text = `EL JUEGO INICIA EN: ${sec} SEGUNDO${sec === 1 ? '' : 'S'}`;
+            } else {
+                text = `EL JUEGO INICIA EN: ${minutes}:${seconds < 10 ? '0' : ''}${seconds} MINUTO${minutes === 1 ? '' : 'S'}`;
+            }
+        }
+
+        nextGameSpan.textContent = text;
+    }
+
+    const now = new Date();
+    if (now < targetDate && !hasGameStarted()) {
+        updateCountdown();
+        intervalNextGame = setInterval(updateCountdown, 1000);
+    } else {
+        if (hasGameStarted()) {
+            if (winners.length > 0) {
+                startWinnerSlider();
+            } else {
+                nextGameSpan.textContent = '┬íEL JUEGO HA INICIADO!';
+            }
+        } else {
+            nextGameSpan.textContent = 'LOS JUGADORES ESPERAN EL INICIO DE LA PARTIDA...';
+        }
+    }
+}
+
+// ==========================================
+// GESTI├ôN DE RECURSOS Y LIMPIEZA
+// ==========================================
+class ResourceManager {
+    constructor() {
+        this.isCleaningUp = false;
+    }
+
+    cleanup() {
+        if (this.isCleaningUp) return;
+        this.isCleaningUp = true;
+
+        console.log('Cleaning up resources...');
+
+        // Limpiar intervalos
+        intervalManager.clearAll();
+        
+        // Detener polling
+        messagePoller.stop();
+        
+        // Limpiar timeouts
+        if (winnerSliderTimeout) {
+            clearTimeout(winnerSliderTimeout);
+            winnerSliderTimeout = null;
+        }
+        
+        if (intervalNextGame) {
+            clearInterval(intervalNextGame);
+            intervalNextGame = null;
+        }
+
+        if (gameTimerInterval) {
+            clearInterval(gameTimerInterval);
+            gameTimerInterval = null;
+        }
+
+        // Detener confetti
+        confettiManager.forceStop();
+        
+        // Limpiar cache DOM
+        domCache.clear();
+        
+        // Limpiar arrays
+        messagesDisplayed.length = 0;
+        winners.length = 0;
+        
+        console.log('Resource cleanup completed');
+    }
+
+    initialize() {
+        this.isCleaningUp = false;
+        
+        // Precargar recursos de audio
+        audioManager.preloadNumberAudios();
+        
+        // Configurar eventos de limpieza
+        window.addEventListener('beforeunload', () => this.cleanup());
+        window.addEventListener('unload', () => this.cleanup());
+        
+        // Limpiar recursos cuando la p├ígina pierde el foco por mucho tiempo
+        let pageHiddenTime = 0;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                pageHiddenTime = Date.now();
+            } else {
+                const hiddenDuration = Date.now() - pageHiddenTime;
+                // Si la p├ígina estuvo oculta por m├ís de 5 minutos, reiniciar algunos recursos
+                if (hiddenDuration > 300000) {
+                    this.softReset();
+                }
+            }
+        });
+    }
+
+    softReset() {
+        console.log('Performing soft reset...');
+        
+        // Reiniciar polling si est├í detenido
+        if (!messagePoller.isActive) {
+            messagePoller.restart();
+        }
+        
+        // Limpiar mensajes antiguos
+        const display = $id("message-display");
+        if (display) {
+            const bubbles = display.getElementsByClassName("message-bubble");
+            Array.from(bubbles).forEach(bubble => {
+                messagePool.release(bubble);
+                bubble.remove();
+            });
+        }
+        
+        // Resetear arrays de mensajes mostrados
+        messagesDisplayed.length = 0;
+        lastChatPollId = 0;
+        pendingOutgoingMessageIds.clear();
+        pollMessagesOptimized();
+    }
+}
+
+// ==========================================
+// FUNCIONES DE UTILIDAD ADICIONALES
+// ==========================================
+
+// Funci├│n para manejar errores de red de forma elegante
+function handleNetworkError(error, context = '') {
+    console.warn(`Network error in ${context}:`, error);
+    
+    // Mostrar notificaci├│n discreta al usuario
+    const notification = document.createElement('div');
+    notification.className = 'network-error-notification';
+    notification.textContent = 'Conexi├│n inestable. Reintentando...';
+    notification.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ff6b6b;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        z-index: 10000;
+        font-size: 13px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+    
+    //document.body.appendChild(notification);
+    
+    // Fade in
+    setTimeout(() => {
+        notification.style.display = 'block';
+        notification.style.opacity = '1';
+    }, 100);
+    
+    // Fade out y remover despu├⌐s de 3 segundos
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Funci├│n para detectar si el dispositivo tiene recursos limitados
+function isLowEndDevice() {
+    // Detectar dispositivos con recursos limitados
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const isSlowConnection = connection && (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g');
+    const isLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
+    const isOldDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
+    
+    return isSlowConnection || isLowMemory || isOldDevice;
+}
+
+// Ajustar configuraci├│n seg├║n el dispositivo
+function adjustConfigForDevice() {
+    if (isLowEndDevice()) {
+        console.log('Low-end device detected, adjusting configuration...');
+        
+        // Reducir frecuencia de polling
+        CONFIG.BASE_POLL_INTERVAL = 5000;
+        CONFIG.CHAT_POLL_INTERVAL = 5000;
+        CONFIG.LIVE_STATUS_INTERVAL = 15000;
+        CONFIG.USER_COUNT_INTERVAL = 15000;
+        CONFIG.ACCUMULATED_COUNT_INTERVAL = 15000;
+        
+        // Reducir efectos visuales
+        CONFIG.MAX_CONFETTI = 15;
+        CONFIG.MESSAGE_LIFETIME = 20000; // 20 segundos en lugar de 30
+        
+        // Reducir tama├▒os de pool
+        CONFIG.MESSAGE_POOL_SIZE = 8;
+        CONFIG.AUDIO_POOL_SIZE = 5;
+        CONFIG.MAX_MESSAGES = 30; // Menos mensajes en pantalla
+    }
+}
+
+// ==========================================
+// FUNCIONES ESPEC├ìFICAS PARA EL CHAT MEJORADO
+// ==========================================
+
+// Funci├│n para limpiar mensajes antiguos autom├íticamente
+function cleanupOldMessages() {
+    const display = $id("message-display");
+    if (!display) return;
+    
+    const bubbles = Array.from(display.getElementsByClassName("message-bubble"));
+    const now = Date.now();
+    
+    bubbles.forEach(bubble => {
+        const timestamp = parseInt(bubble.dataset.timestamp || '0');
+        if (now - timestamp > CONFIG.MESSAGE_LIFETIME) {
+            removeMessageWithFade(bubble);
+        }
+    });
+}
+
+// Funci├│n para formatear mensajes con menciones y enlaces
+function formatMessageContent(content) {
+    // Detectar menciones (@usuario)
+    content = content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+    
+    // Detectar URLs simples
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    content = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    
+    return content;
+}
+
+// Funci├│n para mostrar indicador de escritura
+function showTypingIndicator(show = true) {
+    const display = $id("message-display");
+    if (!display) return;
+    
+    let indicator = display.querySelector('.typing-indicator');
+    
+    if (show && !indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'typing-indicator message-bubble';
+        indicator.innerHTML = `
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `;
+        display.appendChild(indicator);
+        scrollToBottom();
+    } else if (!show && indicator) {
+        indicator.remove();
+    }
+}
+
+// Funci├│n para validar mensajes antes de enviar
+function validateMessage(content) {
+    if (!content || !content.trim()) {
+        return { valid: false, error: 'El mensaje no puede estar vac├¡o' };
+    }
+    
+    if (content.length > 500) {
+        return { valid: false, error: 'El mensaje es demasiado largo (m├íximo 500 caracteres)' };
+    }
+    
+    // Filtro b├ísico de spam
+    const spamPatterns = [
+        /(.)\1{10,}/, // Caracteres repetidos
+        /^[A-Z\s!]{20,}$/, // Solo may├║sculas y espacios
+    ];
+    
+    for (const pattern of spamPatterns) {
+        if (pattern.test(content)) {
+            return { valid: false, error: 'El mensaje parece spam' };
+        }
+    }
+    
+    return { valid: true };
+}
+
+// ==========================================
+// INICIALIZACI├ôN PRINCIPAL
+// ==========================================
+const resourceManager = new ResourceManager();
+
+// Funci├│n de inicializaci├│n principal
+function initializeApp() {
+    if (window.__boardAppInitialized) {
+        return;
+    }
+    window.__boardAppInitialized = true;
+
+    console.log('Initializing Bingo App with Enhanced Chat...');
+    
+    // Ajustar configuraci├│n seg├║n el dispositivo
+    adjustConfigForDevice();
+    
+    // Inicializar gestor de recursos
+    resourceManager.initialize();
+    
+    // Configurar eventos
+    setupEvents();
+    
+    // Configurar scroll mask
+    setupScrollMask();
+    
+    // Configurar countdown del juego
+    setupGameCountdown();
+    
+    // Iniciar polling de mensajes
+    messagePoller.lastCallback = pollMessagesOptimized;
+    messagePoller.poll(pollMessagesOptimized);
+    
+    // Un solo poll: jugadores + acumulado
+    intervalManager.set('liveStatus', updateLiveStatus, CONFIG.LIVE_STATUS_INTERVAL || 10000);
+    updateLiveStatus();
+
+    if (window.totalNumbersGenerated !== undefined) {
+        updateBallsCounter(window.totalNumbersGenerated);
+    }
+
+    if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length) {
+        numbersgenerated = window.drawnNumbers.map(parseBallNumber).filter(Boolean);
+        reconcileBallDisplay(numbersgenerated);
+    } else if (Array.isArray(window.fiveNumbers) && window.fiveNumbers.length) {
+        numbersgenerated = window.fiveNumbers.map(parseBallNumber).filter(Boolean);
+        reconcileBallDisplay(numbersgenerated);
+    }
+    
+    // Iniciar ├║ltimo n├║mero si es necesario (respaldo si no hay Pusher / CRON)
+    if (typeof timeBallLast !== 'undefined') {
+        startAutomaticLast();
+    }
+
+    // Tiempo real: escuchar bolas por Pusher (misma fuente que el jugador)
+    initBoardPusherRealtime();
+    
+    // Limpiar mensajes antiguos peri├│dicamente
+    intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
+    
+    console.log('Bingo App with Enhanced Chat initialized successfully');
+}
+
+function initBoardPusherRealtime() {
+    try {
+        const key = window.PUSHER_KEY;
+        const cluster = window.PUSHER_CLUSTER || 'us2';
+        const gameId = window.GAME_ID;
+        if (!key || !gameId || typeof Pusher === 'undefined') {
+            console.warn('Board Pusher no disponible; se usa polling numberGet');
+            return;
+        }
+
+        // Evitar doble init
+        if (window.__boardPusherInitialized) {
+            return;
+        }
+        window.__boardPusherInitialized = true;
+
+        const authUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'pusher/auth';
+        const pusher = new Pusher(key, {
+            cluster: cluster,
+            forceTLS: true,
+            authEndpoint: authUrl,
+            auth: {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }
+        });
+
+        const channelName = 'private-game-' + gameId;
+        const channel = pusher.subscribe(channelName);
+
+        channel.bind('pusher:subscription_succeeded', function () {
+            console.log('Γ£à Admin board suscrito a', channelName);
+        });
+
+        channel.bind('pusher:subscription_error', function (err) {
+            console.warn('Γ¥î Error suscripci├│n Pusher admin board:', err);
+        });
+
+        channel.bind('game:number_drawn', function (data) {
+            const number = data.number || data.n;
+            const drawn = data.drawnNumbers || data.drawn || null;
+            const total = data.totalNumbersGenerated !== undefined
+                ? data.totalNumbersGenerated
+                : (Array.isArray(drawn) ? drawn.length : undefined);
+
+            // Si el auto AJAX ya pint├│ esta bola, no re-animar (evita doble flash)
+            const parsed = parseBallNumber(number);
+            const alreadyShown = parsed && Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed);
+
+            if (Array.isArray(drawn) && drawn.length) {
+                syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, {
+                    showCenterAnimation: !alreadyShown && !autoSubmitInFlight
+                });
+            } else if (number && !alreadyShown) {
+                handleNewNumber(number, total, drawn);
+            }
+
+            if (!gameStarted) {
+                gameStarted = true;
+                startTime = new Date();
+                updateGameTimer();
+                if (!gameTimerInterval) {
+                    gameTimerInterval = setInterval(updateGameTimer, 1000);
+                }
+            }
+
+            // Si llegan bolas por Pusher (p.ej. CRON), alinear botones con juego en curso
+            if ($('#start-button').is(':visible')) {
+                $('#start-button').hide();
+                $('#stop-button, #next-number-button').show();
+            }
+        });
+
+        channel.bind('game:game_finished', function () {
+            showGameFinalized();
+        });
+
+        window.__boardPusher = pusher;
+        window.__boardChannel = channel;
+    } catch (e) {
+        console.warn('No se pudo iniciar Pusher en el tablero admin:', e);
+    }
+}
+
+// ==========================================
+// EVENT LISTENERS PRINCIPALES
+// ==========================================
+
+// Inicializaci├│n cuando el DOM est├⌐ listo (o ya listo si el script carga tarde / AJAX)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
+
+// Manejo de errores globales
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    handleNetworkError(event.error, 'global');
+});
+
+// Manejo de promesas rechazadas
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    handleNetworkError(event.reason, 'promise');
+});
+
+// Optimizaci├│n para cambios de orientaci├│n en m├│viles
+window.addEventListener('orientationchange', debounce(() => {
+    // Recalcular elementos que dependen del viewport
+    confettiManager.resize();
+    
+    // Forzar rec├ílculo de m├íscaras de scroll
+    setTimeout(() => {
+        const container = document.querySelector(".board-section");
+        if (container) {
+            container.dispatchEvent(new Event('scroll'));
+        }
+    }, 100);
+}, 250));
+
+// Optimizaci├│n para cambios de tama├▒o de ventana
+window.addEventListener('resize', debounce(() => {
+    // Limpiar cache de elementos que pueden haber cambiado
+    domCache.clear();
+    
+    // Recalcular confetti canvas
+    confettiManager.resize();
+}, 250));
+
+// ==========================================
+// EXPORTAR FUNCIONES PARA USO GLOBAL
+// ==========================================
+
+// Hacer disponibles las funciones principales globalmente para compatibilidad
+window.BingoApp = {
+    // Funciones principales
+    sendMessage,
+    sendEmoji,
+    sendMessageText,
+    generateNumber,
+    startAutomaticGeneration,
+    stopAutomaticGeneration,
+    showGameFinalized,
+    RemoveVolume,
+    RemoveMicrophone,
+    
+    // Funciones del chat mejorado
+    displayMessage,
+    validateMessage,
+    formatMessageContent,
+    showTypingIndicator,
+    cleanupOldMessages,
+    
+    // Gestores
+    intervalManager,
+    audioManager,
+    resourceManager,
+    confettiManager,
+    messagePool,
+    
+    // Utilidades
+    handleNetworkError,
+    isLowEndDevice,
+    
+    // Estado
+    get winners() { return winners; },
+    get numbersGenerated() { return numbersgenerated; },
+    get isGameFinished() { return isGameFinishedShown; },
+    get messagesDisplayed() { return messagesDisplayed; }
+};
+
+// ==========================================
+// FUNCIONES DE DEBUGGING (solo en desarrollo)
+// ==========================================
+if (typeof DEBUG !== 'undefined' && DEBUG) {
+    window.BingoDebug = {
+        // Informaci├│n de estado
+        getState() {
+            return {
+                numbersGenerated: numbersgenerated.length,
+                messagesDisplayed: messagesDisplayed.length,
+                winners: winners.length,
+                intervals: intervalManager.intervals.size,
+                isPollingActive: messagePoller.isActive,
+                audioCache: audioManager.audioCache.size,
+                domCache: domCache.cache.size,
+                messagePool: messagePool.pool.length,
+                gameStarted,
+                isGameFinished: isGameFinishedShown
+            };
+        },
+        
+        // Forzar limpieza de recursos
+        forceCleanup() {
+            resourceManager.cleanup();
+        },
+        
+        // Simular error de red
+        simulateNetworkError() {
+            handleNetworkError(new Error('Simulated network error'), 'debug');
+        },
+        
+        // Simular mensaje
+        simulateMessage(content = 'Mensaje de prueba ≡ƒÄ«') {
+            displayMessage({ message: content, id: Date.now() }, imagePath);
+        },
+        
+        // Limpiar chat
+        clearChat() {
+            const display = $id("message-display");
+            if (display) {
+                Array.from(display.children).forEach(child => {
+                    if (child.classList.contains('message-bubble')) {
+                        child.remove();
+                    }
+                });
+            }
+            messagesDisplayed.length = 0;
+        },
+        
+        // Informaci├│n de rendimiento
+        getPerformanceInfo() {
+            return {
+                memory: performance.memory ? {
+                    used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+                    total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB',
+                    limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB'
+                } : 'Not available',
+                timing: performance.timing,
+                navigation: performance.navigation,
+                config: CONFIG
+            };
+        }
+    };
+    
+    console.log('Bingo Debug tools available in window.BingoDebug');
+}
+
+console.log('Bingo App with Enhanced Chat script loaded successfully');
