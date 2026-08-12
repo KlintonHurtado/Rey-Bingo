@@ -455,9 +455,9 @@ if (!function_exists('bingo_register_sing_if_missing')) {
             try {
                 $singId = $modelSings->insertID();
 
-                // Pagar el premio AUTOMÁTICAMENTE de inmediato al confirmar el bingo
+                // Pagar los premios AUTOMÁTICAMENTE para todos los ganadores pendientes del juego
                 if ($finalize) {
-                    bingo_pay_sing_award($singId, 1);
+                    bingo_pay_pending_awards_for_game($gameId);
                 }
 
                 $modelUsers = new \App\Models\UsersModel();
@@ -705,10 +705,21 @@ if (!function_exists('bingo_normalize_earnings_rate')) {
 if (!function_exists('bingo_calculate_award_per_sing')) {
     function bingo_calculate_award_per_sing(array $game, array $award, int $gameId, int $modalityId): float
     {
-        $modelSings = new SingsModel();
+        $db = \Config\Database::connect();
 
-        $singsCount = max(1, $modelSings->where('game', $gameId)->where('modality', $modalityId)->countAllResults());
-        $cartons = bingo_count_game_cartons($gameId);
+        // Contar únicamente cantes oficiales aceptados o pagados (status 1 o 2)
+        $singsCount = (int) $db->table('sings')
+            ->where('game', $gameId)
+            ->where('modality', $modalityId)
+            ->whereIn('status', [1, 2])
+            ->countAllResults();
+        $singsCount = max(1, $singsCount);
+
+        // Contar únicamente cartones comprados/asignados a jugadores (user != 0), excluyendo temp_cartons
+        $cartons = (int) $db->table('cartons')
+            ->where('game', $gameId)
+            ->where('user !=', 0)
+            ->countAllResults();
 
         if ((int) ($game['award'] ?? 0) === 2) {
             $fixedCents = bingo_money_to_cents((float) ($award['amount'] ?? 0));

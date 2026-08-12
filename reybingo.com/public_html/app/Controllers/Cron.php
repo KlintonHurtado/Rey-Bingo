@@ -1831,9 +1831,9 @@ class Cron extends Controller
                         $modelSings->insert($data);
                         $id = $modelSings->insertID();
 
-                        // Pagar el premio AUTOMÁTICAMENTE al instante
+                        // Pagar los premios AUTOMÁTICAMENTE para todos los ganadores pendientes
                         try {
-                            bingo_pay_sing_award($id, 1);
+                            bingo_pay_pending_awards_for_game((int) $game['id']);
                         } catch (\Throwable $pe) {
                             log_message('error', 'Error al pagar premio automático en Cron::singBingo: ' . $pe->getMessage());
                         }
