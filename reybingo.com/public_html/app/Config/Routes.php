@@ -86,6 +86,19 @@ $routes->get('store/affiliate', 'Store::affiliate');
 $routes->get('store/withdraw', 'Store::withdraw');
 $routes->get('store/register', 'Store::registerAffiliate');
 $routes->get('store/affiliateCode', 'Store::affiliateCode');
+$routes->get('store/movements', 'Store::movements');
+$routes->get('store/movementsListGet', 'Store::movementsListGet');
+$routes->get('store/exportMovements', 'Store::exportMovements');
+
+$routes->get('operator', 'Operator::index');
+$routes->get('operator/enterStore/(:num)', 'Operator::enterStore/$1');
+$routes->get('operator/leaveStore', 'Operator::leaveStore');
+$routes->post('operator/storeBalanceSubmit', 'Operator::storeBalanceSubmit');
+$routes->post('operator/saveStoreRates', 'Operator::saveStoreRates');
+$routes->post('operator/balanceRequestSubmit', 'Operator::balanceRequestSubmit');
+$routes->get('operator/balanceListGet', 'Operator::balanceListGet');
+$routes->get('operator/movementsListGet', 'Operator::movementsListGet');
+$routes->get('operator/exportMovements', 'Operator::exportMovements');
 
 $routes->get('games', 'Games::index');
 $routes->get('games/add', 'Games::add');

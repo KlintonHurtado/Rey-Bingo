@@ -5038,14 +5038,26 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
             $amt = round((float) ($pay['amount'] ?? 0), 2);
             $st = (int) ($pay['status'] ?? 2);
 
-            // Acreditaciones de saldo
-            if (in_array($ptype, ['operator_store_credit', 'admin_store_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit'], true)) {
+            // Acreditaciones de saldo y ajustes manuales (Admin / Operador / Bonos)
+            if (in_array($ptype, [
+                'admin_store_credit', 'operator_store_credit', 'store_credit', 'store_balance_add',
+                'admin_recharge_credit', 'admin_withdraw_credit', 'admin_bonus', 'manual_credit',
+                'balance_add', 'adjustment_credit'
+            ], true)) {
+                $creditLabel = match($ptype) {
+                    'admin_store_credit'    => 'Acreditación (Admin)',
+                    'operator_store_credit' => 'Acreditación (Operador)',
+                    'admin_recharge_credit' => 'Ajuste Recarga (Admin)',
+                    'admin_withdraw_credit' => 'Ajuste Retiro (Admin)',
+                    'admin_bonus'           => 'Bono (Admin)',
+                    default                 => 'Acreditación de Saldo'
+                };
                 $push([
                     'id' => 'PAY_CRED_' . $pay['id'],
                     'datetime' => (string) ($pay['created_at'] ?? ''),
                     'type' => 'credit',
                     'type_category' => 'credit',
-                    'type_label' => 'Acreditación de Saldo',
+                    'type_label' => $creditLabel,
                     'badge_class' => 'bg-success text-white',
                     'icon' => 'fa-duotone fa-solid fa-circle-plus',
                     'direction' => '+',
@@ -5057,21 +5069,33 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                     'beneficiary_username' => '',
                     'beneficiary_code' => '',
                     'ref_code' => 'PAY #' . $pay['id'],
-                    'detail' => ($ptype === 'admin_store_credit' ? 'Acreditación por Administración' : 'Acreditación por Operador / Sistema'),
+                    'detail' => (! empty($pay['description']) ? $pay['description'] : ($ptype === 'admin_store_credit' ? 'Acreditación manual realizada por Administración' : ($ptype === 'operator_store_credit' ? 'Acreditación de saldo por Operador' : 'Acreditación / Ajuste manual de saldo'))),
                     'ref_table' => 'payments',
                     'ref_id' => (int) ($pay['id'] ?? 0),
                 ]);
                 continue;
             }
 
-            // Débitos de saldo
-            if (in_array($ptype, ['admin_store_debit', 'operator_store_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit'], true)) {
+            // Débitos de saldo y ajustes manuales (Admin / Operador)
+            if (in_array($ptype, [
+                'admin_store_debit', 'operator_store_debit', 'store_debit', 'store_balance_remove',
+                'admin_recharge_debit', 'admin_withdraw_debit', 'admin_bonus_debit', 'manual_debit',
+                'balance_remove', 'adjustment_debit'
+            ], true)) {
+                $debitLabel = match($ptype) {
+                    'admin_store_debit'    => 'Débito / Ajuste (Admin)',
+                    'operator_store_debit' => 'Débito / Ajuste (Operador)',
+                    'admin_recharge_debit' => 'Ajuste Recarga (Admin)',
+                    'admin_withdraw_debit' => 'Ajuste Retiro (Admin)',
+                    'admin_bonus_debit'    => 'Ajuste Bono (Admin)',
+                    default                => 'Débito / Retiro de Saldo'
+                };
                 $push([
                     'id' => 'PAY_DEB_' . $pay['id'],
                     'datetime' => (string) ($pay['created_at'] ?? ''),
                     'type' => 'debit',
                     'type_category' => 'debit',
-                    'type_label' => 'Débito / Retiro de Saldo',
+                    'type_label' => $debitLabel,
                     'badge_class' => 'bg-danger text-white',
                     'icon' => 'fa-duotone fa-solid fa-circle-minus',
                     'direction' => '-',
@@ -5083,7 +5107,7 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                     'beneficiary_username' => '',
                     'beneficiary_code' => '',
                     'ref_code' => 'PAY #' . $pay['id'],
-                    'detail' => 'Débito / Retiro de saldo de la tienda',
+                    'detail' => (! empty($pay['description']) ? $pay['description'] : ($ptype === 'admin_store_debit' ? 'Débito manual realizado por Administración' : ($ptype === 'operator_store_debit' ? 'Débito / Ajuste por Operador' : 'Débito / Ajuste de saldo'))),
                     'ref_table' => 'payments',
                     'ref_id' => (int) ($pay['id'] ?? 0),
                 ]);
@@ -5510,14 +5534,28 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                     continue;
                 }
 
-                // Transferencias de saldo a Puntos de Venta
-                if (in_array($ptype, ['operator_store_credit', 'store_credit', 'admin_store_credit', 'store_balance_add'], true)) {
+                // Transferencias de saldo y Acreditaciones manuales (Admin / Operador)
+                if (in_array($ptype, [
+                    'admin_operator_pay', 'admin_operator_credit', 'operator_store_credit',
+                    'store_credit', 'admin_store_credit', 'store_balance_add',
+                    'admin_recharge_credit', 'admin_withdraw_credit', 'admin_bonus', 'manual_credit',
+                    'balance_add', 'adjustment_credit'
+                ], true)) {
+                    $creditLabel = match($ptype) {
+                        'admin_operator_pay', 'admin_operator_credit' => 'Acreditación (Admin)',
+                        'admin_store_credit'                          => 'Acreditación PV (Admin)',
+                        'operator_store_credit'                       => 'Transferencia a PV',
+                        'admin_recharge_credit'                       => 'Ajuste Recarga (Admin)',
+                        'admin_withdraw_credit'                       => 'Ajuste Retiro (Admin)',
+                        'admin_bonus'                                 => 'Bono (Admin)',
+                        default                                       => 'Acreditación de Saldo'
+                    };
                     $push([
                         'id' => 'PAY_CRED_' . $pay['id'],
                         'datetime' => (string) ($pay['created_at'] ?? ''),
                         'type' => 'credit',
                         'type_category' => 'credit',
-                        'type_label' => 'Transferencia a PV',
+                        'type_label' => $creditLabel,
                         'badge_class' => 'bg-success text-white',
                         'icon' => 'fa-duotone fa-solid fa-circle-plus',
                         'direction' => ($uId === $operatorId ? '+' : '-'),
@@ -5531,7 +5569,7 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                         'beneficiary_username' => '',
                         'beneficiary_code' => '',
                         'ref_code' => 'PAY #' . $pay['id'],
-                        'detail' => 'Transferencia / Acreditación de saldo a ' . $stName,
+                        'detail' => (! empty($pay['description']) ? $pay['description'] : ($ptype === 'admin_operator_pay' || $ptype === 'admin_operator_credit' ? 'Acreditación manual realizada por Administración al Operador' : ($ptype === 'admin_store_credit' ? 'Acreditación manual por Administración a ' . $stName : 'Transferencia / Acreditación de saldo a ' . $stName))),
                         'ref_table' => 'payments',
                         'ref_id' => (int) ($pay['id'] ?? 0),
                     ]);
@@ -5590,14 +5628,28 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                     continue;
                 }
 
-                // Débitos / Ajustes
-                if (in_array($ptype, ['admin_operator_debit', 'operator_debit', 'admin_store_debit', 'store_debit', 'store_balance_remove'], true)) {
+                // Débitos / Ajustes manuales (Admin / Operador)
+                if (in_array($ptype, [
+                    'admin_operator_debit', 'operator_debit', 'admin_store_debit',
+                    'operator_store_debit', 'store_debit', 'store_balance_remove',
+                    'admin_recharge_debit', 'admin_withdraw_debit', 'admin_bonus_debit', 'manual_debit',
+                    'balance_remove', 'adjustment_debit'
+                ], true)) {
+                    $debitLabel = match($ptype) {
+                        'admin_operator_debit' => 'Débito Operador (Admin)',
+                        'admin_store_debit'    => 'Débito PV (Admin)',
+                        'operator_store_debit' => 'Débito a PV',
+                        'admin_recharge_debit' => 'Ajuste Recarga (Admin)',
+                        'admin_withdraw_debit' => 'Ajuste Retiro (Admin)',
+                        'admin_bonus_debit'    => 'Ajuste Bono (Admin)',
+                        default                => 'Débito / Ajuste'
+                    };
                     $push([
                         'id' => 'PAY_DEB_' . $pay['id'],
                         'datetime' => (string) ($pay['created_at'] ?? ''),
                         'type' => 'debit',
                         'type_category' => 'debit',
-                        'type_label' => 'Débito / Ajuste',
+                        'type_label' => $debitLabel,
                         'badge_class' => 'bg-danger text-white',
                         'icon' => 'fa-duotone fa-solid fa-circle-minus',
                         'direction' => '-',
@@ -5611,7 +5663,7 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                         'beneficiary_username' => '',
                         'beneficiary_code' => '',
                         'ref_code' => 'PAY #' . $pay['id'],
-                        'detail' => 'Débito / Ajuste de saldo',
+                        'detail' => (! empty($pay['description']) ? $pay['description'] : ($ptype === 'admin_operator_debit' ? 'Débito / Ajuste manual por Administración al Operador' : ($ptype === 'admin_store_debit' ? 'Débito / Ajuste manual por Administración a ' . $stName : 'Débito / Ajuste de saldo'))),
                         'ref_table' => 'payments',
                         'ref_id' => (int) ($pay['id'] ?? 0),
                     ]);
