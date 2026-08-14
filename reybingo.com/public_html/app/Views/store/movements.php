@@ -10,8 +10,8 @@ $currency = systemGet('currency') ?? '$';
 $stats = $stats ?? [];
 ?>
 
-<div class="card store-panel-card h-100">
-    <div class="card-body p-3">
+<div class="card store-panel-card h-100" style="min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
         <!-- Encabezado de la Sección -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>
@@ -46,12 +46,26 @@ $stats = $stats ?? [];
                 </div>
             </div>
             <div class="col-6 col-md-3">
+                <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión GGR Afiliados</small>
+                            <h5 class="mb-0 fw-bold text-success"><?= esc($currency); ?> <?= number_format((float) ($stats['ggr_commissions_amount'] ?? 0), 2); ?></h5>
+                            <small class="text-muted">GGR de afiliados</small>
+                        </div>
+                        <div class="text-success fs-3">
+                            <i class="fa-duotone fa-solid fa-chart-pie"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,202,240,0.08) 0%, rgba(13,202,240,0.02) 100%); border-left: 4px solid #0dcaf0 !important;">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Recargas Jugadores</small>
-                            <h5 class="mb-0 fw-bold text-info"><?= esc($currency); ?> <?= number_format((float) ($stats['total_recharges_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted"><?= (int) ($stats['total_recharges_count'] ?? 0); ?> realizadas</small>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión por Recargas</small>
+                            <h5 class="mb-0 fw-bold text-info"><?= esc($currency); ?> <?= number_format((float) ($stats['recharge_commissions_amount'] ?? 0), 2); ?></h5>
+                            <small class="text-muted"><?= (int) ($stats['total_recharges_count'] ?? 0); ?> recargas</small>
                         </div>
                         <div class="text-info fs-3">
                             <i class="fa-duotone fa-solid fa-mobile-screen"></i>
@@ -60,29 +74,15 @@ $stats = $stats ?? [];
                 </div>
             </div>
             <div class="col-6 col-md-3">
-                <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(220,53,69,0.08) 0%, rgba(220,53,69,0.02) 100%); border-left: 4px solid #dc3545 !important;">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Retiros Pagados</small>
-                            <h5 class="mb-0 fw-bold text-danger"><?= esc($currency); ?> <?= number_format((float) ($stats['total_retires_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted"><?= (int) ($stats['total_retires_count'] ?? 0); ?> pagados</small>
-                        </div>
-                        <div class="text-danger fs-3">
-                            <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.03) 100%); border-left: 4px solid #ffc107 !important;">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisiones Ganadas</small>
-                            <h5 class="mb-0 fw-bold text-warning text-dark"><?= esc($currency); ?> <?= number_format((float) ($stats['total_commissions_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted"><?= (int) ($stats['total_commissions_count'] ?? 0); ?> registros</small>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión Pago Retiros</small>
+                            <h5 class="mb-0 fw-bold text-warning text-dark"><?= esc($currency); ?> <?= number_format((float) ($stats['prize_commissions_amount'] ?? 0), 2); ?></h5>
+                            <small class="text-muted"><?= (int) ($stats['total_retires_count'] ?? 0); ?> retiros pagados</small>
                         </div>
                         <div class="text-warning fs-3">
-                            <i class="fa-duotone fa-solid fa-sack-dollar"></i>
+                            <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
                         </div>
                     </div>
                 </div>
@@ -108,7 +108,10 @@ $stats = $stats ?? [];
                             <option value="recharge" <?= ($filters['type'] ?? '') === 'recharge' ? 'selected' : ''; ?>>Recargas a Jugadores</option>
                             <option value="retire" <?= ($filters['type'] ?? '') === 'retire' ? 'selected' : ''; ?>>Pagos de Retiros</option>
                             <option value="credit" <?= ($filters['type'] ?? '') === 'credit' ? 'selected' : ''; ?>>Acreditaciones de Saldo</option>
-                            <option value="commission" <?= ($filters['type'] ?? '') === 'commission' ? 'selected' : ''; ?>>Comisiones Ganadas</option>
+                            <option value="commission_ggr" <?= ($filters['type'] ?? '') === 'commission_ggr' ? 'selected' : ''; ?>>Comisión GGR Afiliados</option>
+                            <option value="commission_recharge" <?= ($filters['type'] ?? '') === 'commission_recharge' ? 'selected' : ''; ?>>Comisión por Recargas</option>
+                            <option value="commission_prize" <?= ($filters['type'] ?? '') === 'commission_prize' ? 'selected' : ''; ?>>Comisión Pago de Retiros</option>
+                            <option value="commission" <?= ($filters['type'] ?? '') === 'commission' ? 'selected' : ''; ?>>Todas las Comisiones</option>
                             <option value="debit" <?= ($filters['type'] ?? '') === 'debit' ? 'selected' : ''; ?>>Débitos / Ajustes</option>
                         </select>
                     </div>
@@ -146,6 +149,8 @@ $stats = $stats ?? [];
         </div>
     </div>
 </div>
+
+<?= view('store/partials/close') ?>
 
 <script type="text/javascript">
     function getFilterParams() {

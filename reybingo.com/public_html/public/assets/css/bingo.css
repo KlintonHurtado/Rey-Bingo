@@ -504,6 +504,16 @@ html:has(#content-page > .operator-panel-fit) {
     padding: 1.35rem 1.5rem;
 }
 
+.store-movements-scroll-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    -webkit-overflow-scrolling: touch;
+}
+
 .store-tab-form {
     justify-content: flex-start;
     align-content: flex-start;

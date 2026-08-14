@@ -5092,11 +5092,17 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
 
             // Comisiones ganadas
             if (in_array($ptype, ['store_recharge_commission', 'store_ggr_commission', 'store_prize_commission', 'store_retire_commission', 'store_commission', 'referred', 'referral'], true)) {
+                $typeKey = match($ptype) {
+                    'store_ggr_commission' => 'commission_ggr',
+                    'store_recharge_commission' => 'commission_recharge',
+                    'store_prize_commission', 'store_retire_commission' => 'commission_prize',
+                    default => 'commission'
+                };
                 $commissionLabels = [
-                    'store_ggr_commission'      => 'Comisión GGR',
-                    'store_recharge_commission' => 'Comisión por Recarga',
-                    'store_prize_commission'    => 'Comisión por Pago Retiro',
-                    'store_retire_commission'   => 'Comisión por Pago Retiro',
+                    'store_ggr_commission'      => 'Comisión GGR Afiliados',
+                    'store_recharge_commission' => 'Comisión por Recargas',
+                    'store_prize_commission'    => 'Comisión Pago de Retiros',
+                    'store_retire_commission'   => 'Comisión Pago de Retiros',
                     'store_commission'          => 'Comisión Punto de Venta',
                 ];
                 $comLabel = $commissionLabels[$ptype] ?? 'Comisión';
@@ -5104,7 +5110,7 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 $push([
                     'id' => 'PAY_COM_' . $pay['id'],
                     'datetime' => (string) ($pay['created_at'] ?? ''),
-                    'type' => 'commission',
+                    'type' => $typeKey,
                     'type_category' => 'commission',
                     'type_label' => $comLabel,
                     'badge_class' => 'bg-warning text-dark',
@@ -5137,14 +5143,17 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
 
         // Totales estadísticos
         $stats = [
-            'total_recharges_amount'   => 0.0,
-            'total_recharges_count'    => 0,
-            'total_retires_amount'     => 0.0,
-            'total_retires_count'      => 0,
-            'total_commissions_amount' => 0.0,
-            'total_commissions_count'  => 0,
-            'total_credits_amount'     => 0.0,
-            'total_credits_count'      => 0,
+            'total_recharges_amount'      => 0.0,
+            'total_recharges_count'       => 0,
+            'total_retires_amount'        => 0.0,
+            'total_retires_count'         => 0,
+            'total_commissions_amount'    => 0.0,
+            'total_commissions_count'     => 0,
+            'ggr_commissions_amount'      => 0.0,
+            'recharge_commissions_amount' => 0.0,
+            'prize_commissions_amount'    => 0.0,
+            'total_credits_amount'        => 0.0,
+            'total_credits_count'         => 0,
         ];
 
         $runningBalance = 0.0;
@@ -5164,6 +5173,14 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 } elseif ($cat === 'commission' && $st === 2) {
                     $stats['total_commissions_amount'] += $amt;
                     $stats['total_commissions_count']++;
+                    $t = (string) ($row['type'] ?? '');
+                    if ($t === 'commission_ggr') {
+                        $stats['ggr_commissions_amount'] += $amt;
+                    } elseif ($t === 'commission_recharge') {
+                        $stats['recharge_commissions_amount'] += $amt;
+                    } elseif ($t === 'commission_prize') {
+                        $stats['prize_commissions_amount'] += $amt;
+                    }
                 } elseif ($cat === 'credit' && $st === 2) {
                     $stats['total_credits_amount'] += $amt;
                     $stats['total_credits_count']++;

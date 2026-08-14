@@ -1615,14 +1615,32 @@ class Payments extends Controller {
 
     public function retireGet() {
         $modelUsers = new UsersModel();
+        $modelRetires = new RetiresModel();
 
-        $data['user'] = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')));
+        $userId = (int) session()->get('id');
+        $data['user'] = wallet_service()->normalizeUser($modelUsers->find($userId));
+        $data['pendingRetire'] = $modelRetires->where('user', $userId)->where('status', 1)->first();
 
         return view('users/retire', $data);
     }
 
     public function retireSubmit() {
         $modelRetires = new RetiresModel();
+        $userId = (int) session()->get('id');
+
+        $pendingRetire = $modelRetires->where('user', $userId)->where('status', 1)->first();
+        if ($pendingRetire) {
+            $currency = systemGet('currency') ?? '$';
+            $amountFormatted = $currency . ' ' . number_format((float) ($pendingRetire['amount'] ?? 0), 2);
+            return $this->response->setJSON([
+                'success' => false,
+                'has_pending' => true,
+                'errors' => [
+                    'retire-amount' => 'Ya tienes una solicitud de retiro en proceso por ' . $amountFormatted . '. Debes esperar a que sea procesada antes de enviar una nueva.',
+                ],
+                'message' => 'Ya tienes una solicitud de retiro pendiente de procesar.',
+            ]);
+        }
 
         $receiver = $this->request->getPost('retire-receiver');
 

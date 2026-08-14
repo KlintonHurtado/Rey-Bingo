@@ -10,6 +10,40 @@
                 $kycMessage = wallet_kyc_withdraw_message($user);
                 $kycActionLabel = wallet_kyc_action_label($user);
             ?>
+            <?php if (! empty($pendingRetire)): ?>
+                <div class="alert alert-info border-0 mb-3 p-3" role="alert" style="border-radius: 14px; background: #eef2ff; color: #1e1b4b;">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="fa-duotone fa-solid fa-clock-rotate-left fs-3 mt-1 text-primary"></i>
+                        <div class="flex-grow-1">
+                            <h6 class="fw-bold mb-1 text-primary">Tienes una solicitud de retiro en proceso</h6>
+                            <p class="small mb-2 text-muted">
+                                Tu solicitud está siendo procesada. No es posible enviar una nueva solicitud hasta que esta sea completada.
+                            </p>
+                            <div class="p-2 rounded bg-white border mb-1" style="font-size: 0.88rem;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Monto:</span>
+                                    <strong class="text-success"><?= systemGet('currency') ?? '$'; ?> <?= number_format((float) ($pendingRetire['amount'] ?? 0), 2); ?></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Método:</span>
+                                    <strong class="text-dark"><?= esc($pendingRetire['bank'] ?? '-'); ?></strong>
+                                </div>
+                                <?php if (($pendingRetire['bank'] ?? '') === 'Punto de Venta' && ! empty($pendingRetire['account'])): ?>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">Código de Retiro:</span>
+                                        <strong class="font-monospace text-primary"><?= esc($pendingRetire['account']); ?></strong>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Estado:</span>
+                                    <span class="badge bg-warning text-dark">En Revisión</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <?php if (! $kycVerified): ?>
                 <div id="retire-kyc-alert" class="alert alert-warning border-0 mb-3 py-3" role="alert" style="border-radius: 12px;">
                     <div class="d-flex align-items-start gap-2">
@@ -32,7 +66,7 @@
                 <div class="row">
                     <div class="col-md-12 mb-1">
                         <label for="retire-receiver" class="form-label"><?= translate('receiver bank'); ?></label>
-                        <select class='form-control form-control-lg form-bingo' name="retire-receiver" id="retire-receiver" onchange="retirebankGet();">
+                        <select class='form-control form-control-lg form-bingo' name="retire-receiver" id="retire-receiver" onchange="retirebankGet();"<?= ! empty($pendingRetire) ? ' disabled' : ''; ?>>
                             <option value=""><?= translate('receiver bank'); ?></option>
                             <option value="store">Punto de Venta (Cobro en Efectivo)</option>
                             <option value="0"><?= translate('new bank'); ?></option>
@@ -49,7 +83,7 @@
                 <div class="row" id="new-bank" style="display: none;">
                     <div class="col-md-12 mb-1">
                         <label for="retire-bank" class="form-label"><?= translate('home bank'); ?></label>
-                        <select class='form-control form-control-lg form-bingo' name="retire-bank" id="retire-bank">
+                        <select class='form-control form-control-lg form-bingo' name="retire-bank" id="retire-bank"<?= ! empty($pendingRetire) ? ' disabled' : ''; ?>>
                                 <option value=""><?= translate('select a'); ?> <?= strtolower(translate('bank')); ?></option>
                                 <!-- BANCOS -->
                                 <option value="BANCO PICHINCHA">BANCO PICHINCHA</option>
@@ -58,20 +92,40 @@
                                 <option value="BANCO DEL AUSTRO">BANCO DEL AUSTRO</option>
 
                                 <!-- COOPERATIVAS -->
-                                <option value="COOP. JEP">COOPERATIVA JEP</option>
-                                <option value="COOP. JARDIN AZUAYO">COOPERATIVA JARDÍN AZUAYO</option>
-                                <option value="COOP. POLICIA NACIONAL">COOPERATIVA DE LA POLICÍA NACIONAL</option>
-                                <option value="COOP. ALIANZA DEL VALLE">COOPERATIVA ALIANZA DEL VALLE</option>
-                                <option value="COOP. COOPERCO">COOPERATIVA COOPERCO</option>
-                                <option value="COOP. MUSHUC RUNA">COOPERATIVA MUSHUC RUNA</option>
-                            </select>
+                                <option value="COOP. JEP">COOP. JEP</option>
+                                <option value="COOP. POLICIA NACIONAL">COOP. POLICÍA NACIONAL</option>
+                                <option value="COOP. ALIANZA DEL VALLE">COOP. ALIANZA DEL VALLE</option>
+                                <option value="COOP. 29 DE OCTUBRE">COOP. 29 DE OCTUBRE</option>
+                                <option value="COOP. 15 DE ABRIL">COOP. 15 DE ABRIL</option>
+                                <option value="COOP. OSCUS">COOP. OSCUS</option>
+                                <option value="COOP. ANDALUCIA">COOP. ANDALUCÍA</option>
+                                <option value="COOP. COOPROGRESO">COOP. COOPROGRESO</option>
+                                <option value="COOP. TULCAN">COOP. TULCÁN</option>
+                                <option value="COOP. RIOBAMBA">COOP. RIOBAMBA</option>
+                                <option value="COOP. SAN FRANCISCO">COOP. SAN FRANCISCO</option>
+                                <option value="COOP. CACPECO">COOP. CACPECO</option>
+                                <option value="COOP. MUSHUC RUNA">COOP. MUSHUC RUNA</option>
+                                <option value="COOP. ATUNTAQUI">COOP. ATUNTAQUI</option>
+                                <option value="COOP. 23 DE JULIO">COOP. 23 DE JULIO</option>
+                                <option value="COOP. COMERCIO">COOP. COMERCIO</option>
+                                <option value="COOP. AMBATO">COOP. AMBATO</option>
+                                <option value="COOP. SANTA ROSA">COOP. SANTA ROSA</option>
+                                <option value="COOP. MANANTIAL">COOP. MANANTIAL</option>
+                                <option value="COOP. COTOPAXI">COOP. COTOPAXI</option>
+                                <option value="COOP. PADRE JULIAN LORENTE">COOP. PADRE JULIÁN LORENTE</option>
+                                <option value="COOP. ARTESANOS">COOP. ARTESANOS</option>
+                                <option value="COOP. LA DOLOROSA">COOP. LA DOLOROSA</option>
+                                <option value="COOP. 9 DE OCTUBRE">COOP. 9 DE OCTUBRE</option>
+                                <option value="COOP. SAN ANTONIO">COOP. SAN ANTONIO</option>
+                                <option value="COOP. CHIBULEO">COOP. CHIBULEO</option>
+                                <option value="COOP. SANTA ANA">COOP. SANTA ANA</option>
+                                <option value="COOP. SAN JOSE">COOP. SAN JOSÉ</option>
+                                <option value="COOP. VILCABAMBA">COOP. VILCABAMBA</option>
+                                <option value="COOP. GUARANDA">COOP. GUARANDA</option>
+                                <option value="COOP. EL SAGRARIO">COOP. EL SAGRARIO</option>
+                                <option value="COOP. CAMARA DE COMERCIO DE QUITO">COOP. CÁMARA DE COMERCIO DE QUITO</option>
+                        </select>
                         <small id="retire-bank-error" class="text-danger d-none"></small>
-                    </div>
-
-                    <div class="col-md-12 mb-1">
-                        <label for="retire-account" class="form-label"><?= translate('account'); ?></label>
-                        <input type="number" class="form-control form-control-lg form-bingo" name="retire-account" id="retire-account" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('naccount')); ?>" autocomplete="off">
-                        <small id="retire-account-error" class="text-danger d-none"></small>
                     </div>
 
                     <div class="col-md-12 mb-1">
@@ -114,7 +168,13 @@
                 </div>
 
                 <div class="col-md-12">
-                    <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="retire-button"<?= (! $kycVerified || wallet_withdrawable($user) <= 0) ? ' disabled' : ''; ?>><?= translate('send'); ?></button>
+                    <?php if (! empty($pendingRetire)): ?>
+                        <button type="button" class="btn btn-secondary d-block w-50 mt-2" disabled>
+                            <i class="fa-duotone fa-solid fa-clock-rotate-left me-1"></i> Solicitud en Proceso
+                        </button>
+                    <?php else: ?>
+                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" id="retire-button"<?= (! $kycVerified || wallet_withdrawable($user) <= 0) ? ' disabled' : ''; ?>><?= translate('send'); ?></button>
+                    <?php endif; ?>
                 </div>
             <?= form_close(); ?>
 

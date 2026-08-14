@@ -31,26 +31,40 @@ $storeUser = $storeUser ?? [];
                     <?php else : ?>
                         <div class="mb-3"></div>
                     <?php endif; ?>
+<?php
+$storeIdVal = (int) ($storeUser['id'] ?? 0);
+$currency = systemGet('currency') ?? '$';
+
+$rechargeCommissionEarned = $storeIdVal > 0 ? bingo_sum_store_recharge_commissions($storeIdVal) : 0.0;
+$prizeCommissionEarned = $storeIdVal > 0 ? bingo_sum_store_prize_commissions($storeIdVal) : 0.0;
+$ggrEarned = 0.0;
+if ($storeIdVal > 0 && function_exists('bingo_sum_affiliate_ggr_commissions')) {
+    $ggrData = bingo_sum_affiliate_ggr_commissions($storeIdVal, 'store');
+    $ggrEarned = (float) ($ggrData['total_commission'] ?? 0) + (float) ($ggrData['pending_commission'] ?? 0);
+}
+$totalCommissionsEarned = round($rechargeCommissionEarned + $prizeCommissionEarned + $ggrEarned, 2);
+?>
                     <div class="store-sidebar-stats">
                         <div class="store-balance-sidebar">
                             <span class="store-balance-label"><?= translate('available store balance'); ?></span>
-                            <strong class="store-balance-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($walletSummary['recharge'] ?? 0), 2) ?></strong>
+                            <strong class="store-balance-amount"><?= $currency; ?> <?= number_format((float) ($walletSummary['recharge'] ?? 0), 2) ?></strong>
                         </div>
                         <div class="store-earnings-sidebar">
-                            <span class="store-balance-label">Comisiones Acumuladas (Fin de Mes)</span>
-                            <strong class="store-earnings-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($walletSummary['earnings_display'] ?? $walletSummary['withdraw'] ?? 0), 2) ?></strong>
+                            <span class="store-balance-label">Total Comisiones (Fin de Mes)</span>
+                            <strong class="store-earnings-amount"><?= $currency; ?> <?= number_format($totalCommissionsEarned, 2) ?></strong>
+                            <small class="text-muted" style="font-size: 0.73rem;">Por liquidar al cierre del mes</small>
                         </div>
                         <div class="store-commission-sidebar">
-                            <span class="store-balance-label"><?= translate('store ggr commission rate'); ?></span>
-                            <strong class="store-commission-rate"><?= number_format(bingo_store_ggr_commission_rate($storeUser) * 100, 2) ?>%</strong>
+                            <span class="store-balance-label">Comisión GGR (<?= number_format(bingo_store_ggr_commission_rate($storeUser) * 100, 2) ?>%)</span>
+                            <strong class="store-commission-rate"><?= $currency; ?> <?= number_format($ggrEarned, 2) ?></strong>
                         </div>
                         <div class="store-commission-sidebar">
-                            <span class="store-balance-label"><?= translate('store recharge commission rate'); ?></span>
-                            <strong class="store-commission-rate"><?= number_format(bingo_store_commission_rate($storeUser) * 100, 2) ?>%</strong>
+                            <span class="store-balance-label">Comisión Recargas (<?= number_format(bingo_store_commission_rate($storeUser) * 100, 2) ?>%)</span>
+                            <strong class="store-commission-rate"><?= $currency; ?> <?= number_format($rechargeCommissionEarned, 2) ?></strong>
                         </div>
                         <div class="store-commission-sidebar">
-                            <span class="store-balance-label"><?= translate('store prize commission rate'); ?></span>
-                            <strong class="store-commission-rate"><?= number_format(bingo_store_prize_commission_rate($storeUser) * 100, 2) ?>%</strong>
+                            <span class="store-balance-label">Comisión Retiros (<?= number_format(bingo_store_prize_commission_rate($storeUser) * 100, 2) ?>%)</span>
+                            <strong class="store-commission-rate"><?= $currency; ?> <?= number_format($prizeCommissionEarned, 2) ?></strong>
                         </div>
                     </div>
 
