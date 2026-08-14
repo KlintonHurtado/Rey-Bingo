@@ -138,6 +138,12 @@
                         <small id="retire-account-type-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-12 mb-1">
+                        <label for="retire-account" class="form-label"><?= translate('account number'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="retire-account" id="retire-account" placeholder="<?= translate('enter an account number'); ?>" autocomplete="off">
+                        <small id="retire-account-error" class="text-danger d-none"></small>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-1">
                             <label for="retire-document" class="form-label"><?= translate('document'); ?></label>
@@ -270,13 +276,30 @@
                             style: { background: "#fd7e14" },
                             stopOnFocus: true
                         }).showToast();
-                    } else {
-                        if (response.errors) {
-                            $.each(response.errors, function(field, message) {
-                                $('#' + field + '-error').text(message).removeClass('d-none');
-                                $('#' + field).addClass('is-invalid');
-                            });
-                        }
+                    } else if (response.errors) {
+                        let firstError = '';
+                        $.each(response.errors, function(field, message) {
+                            $('#' + field + '-error').text(message).removeClass('d-none');
+                            $('#' + field).addClass('is-invalid');
+                            if (!firstError) firstError = message;
+                        });
+                        Toastify({
+                            text: firstError || "Por favor verifica los campos obligatorios.",
+                            duration: 4000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#dc3545" },
+                            stopOnFocus: true
+                        }).showToast();
+                    } else if (response.message) {
+                        Toastify({
+                            text: response.message,
+                            duration: 4000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#dc3545" },
+                            stopOnFocus: true
+                        }).showToast();
                     }
                 },
                 error: function() {

@@ -82,12 +82,13 @@ $totalCommissionsEarned = round($rechargeCommissionEarned + $prizeCommissionEarn
                     <div class="store-panel-sidebar-divider"></div>
 
                     <ul class="nav store-panel-tabs store-panel-nav">
-                        <li class="nav-item">
+                        <!-- Botón Solicitar Saldo comentado temporalmente por solicitud -->
+                        <!-- <li class="nav-item">
                             <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'funding' ? 'active' : '' ?>" href="<?= site_url('store/funding'); ?>">
                                 <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
                                 <span><?= translate('request store balance'); ?></span>
                             </a>
-                        </li>
+                        </li> -->
                         <li class="nav-item">
                             <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'recharge' ? 'active' : '' ?>" href="<?= site_url('store/recharge'); ?>">
                                 <i class="fa-duotone fa-solid fa-mobile-screen"></i>
