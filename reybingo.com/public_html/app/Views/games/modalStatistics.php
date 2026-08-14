@@ -724,4 +724,79 @@ function savePlayerWallets(userId) {
         }
     });
 }
+
+function adminAdjustNonPlayer(userId, action) {
+    const amountVal = parseFloat($('#admin-adjust-amount').val());
+    if (isNaN(amountVal) || amountVal <= 0) {
+        Toastify({
+            text: "Ingrese un monto válido mayor a 0",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            style: { background: "#dc3545" },
+            stopOnFocus: true
+        }).showToast();
+        return;
+    }
+
+    const actionText = action === 'credit' ? 'sumar (recargar)' : 'retirar (quitar)';
+    const actionColor = action === 'credit' ? '#198754' : '#dc3545';
+
+    Swal.fire({
+        title: '¿Confirmar operación?',
+        text: `¿Estás seguro de que deseas ${actionText} <?= systemGet('currency'); ?> ${amountVal.toFixed(2)} al saldo de recarga?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: actionColor,
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: action === 'credit' ? '<i class="fa-solid fa-plus me-1"></i> Sí, sumar saldo' : '<i class="fa-solid fa-minus me-1"></i> Sí, quitar saldo',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '<?= site_url('users/adjustNonPlayerBalance'); ?>',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    user_id: userId,
+                    action: action,
+                    amount: amountVal,
+                    '<?= csrf_token(); ?>': '<?= csrf_hash(); ?>'
+                },
+                success: function(response) {
+                    if (response && response.success) {
+                        Toastify({
+                            text: response.message || 'Operación realizada exitosamente',
+                            duration: 3000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#198754" },
+                            stopOnFocus: true
+                        }).showToast();
+                        viewUser(userId);
+                    } else {
+                        Toastify({
+                            text: response.error || 'Error al procesar la operación',
+                            duration: 3500,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#dc3545" },
+                            stopOnFocus: true
+                        }).showToast();
+                    }
+                },
+                error: function() {
+                    Toastify({
+                        text: 'Error en la solicitud al servidor',
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            });
+        }
+    });
+}
 </script>

@@ -34,7 +34,7 @@
                         <label for="retire-receiver" class="form-label"><?= translate('receiver bank'); ?></label>
                         <select class='form-control form-control-lg form-bingo' name="retire-receiver" id="retire-receiver" onchange="retirebankGet();">
                             <option value=""><?= translate('receiver bank'); ?></option>
-                            <option value="store">🏪 Punto de Venta (Cobro en Efectivo)</option>
+                            <option value="store">Punto de Venta (Cobro en Efectivo)</option>
                             <option value="0"><?= translate('new bank'); ?></option>
                             <?php if (isset($user['bank']) && !empty($user['bank'])): ?>
                                 <option value="<?= $user['bank'] ?>"><?= $user['bank'] ?></option>
@@ -152,21 +152,41 @@
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        
                         $('#modalRetire').modal('hide');
 
                         if (response.newRetire) {
                             updateTableRetire(response.newRetire);
                         }
 
-                        Toastify({
-                            text: "<?= translate('retire request sent successfully'); ?>",
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            style: { background: "#198754" },
-                            stopOnFocus: true
-                        }).showToast();
+                        if (response.is_store && response.retire_code) {
+                            Swal.fire({
+                                title: '¡Código de Retiro Generado!',
+                                html: `
+                                    <div class="my-2">
+                                        <p class="mb-2">Tu código de retiro es:</p>
+                                        <div class="py-2 px-3 mb-3" style="background:#f7f5ff; border:2px dashed #6236ff; border-radius:10px;">
+                                            <span style="font-size: 1.8rem; font-weight: 800; color: #6236ff; font-family: monospace; letter-spacing: 3px;">
+                                                ${response.retire_code}
+                                            </span>
+                                        </div>
+                                        <p class="small text-muted mb-0">
+                                            Hemos enviado el código y las instrucciones a tu correo electrónico. Puedes cobrar en cualquier Punto de Venta presentando tu cédula y este código.
+                                        </p>
+                                    </div>`,
+                                icon: 'success',
+                                confirmButtonText: 'Entendido',
+                                confirmButtonColor: '#6236ff'
+                            });
+                        } else {
+                            Toastify({
+                                text: response.message || "<?= translate('retire request sent successfully'); ?>",
+                                duration: 4000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#198754" },
+                                stopOnFocus: true
+                            }).showToast();
+                        }
                     } else if (response.minMax) {
                         Toastify({
                             text: response.message,
@@ -352,16 +372,16 @@
             currentBankDiv.style.display = 'block';
             saveaccountBankDiv.style.display = 'none';
             infoBankDiv.innerHTML = `
-                <div class="card shadow-sm p-3 mb-2 border-0" style="border-radius: 12px; width: 100%; background: linear-gradient(135deg, rgba(75,114,250,0.08) 0%, rgba(75,114,250,0.02) 100%); border: 1px solid rgba(75,114,250,0.25) !important;">
+                <div class="card shadow p-3 mb-3 border-0" style="border-radius: 12px; width: 100%; background: #ffffff; color: #212529;">
                     <div class="d-flex align-items-start gap-3">
-                        <div class="text-primary text-center pt-1" style="font-size: 1.8rem; min-width: 40px;">
+                        <div class="text-center pt-1" style="font-size: 1.8rem; min-width: 40px; color: #0d6efd;">
                             <i class="fa-duotone fa-solid fa-store"></i>
                         </div>
                         <div>
-                            <strong class="d-block text-primary fs-6">Retiro en Efectivo - Punto de Venta</strong>
-                            <small class="text-muted d-block mt-1">
-                                Ingresa el monto a retirar. Al enviar tu solicitud, te enviaremos un <strong>código de retiro alfanumérico a tu correo</strong>. Podrás cobrar tu dinero en efectivo en cualquier Punto de Venta presentando tu número de cédula y el código.
-                            </small>
+                            <strong class="d-block fs-6" style="color: #0b5ed7; font-weight: 700; font-size: 1.05rem;">Retiro en Efectivo - Punto de Venta</strong>
+                            <div class="mt-1" style="color: #495057; font-size: 0.88rem; line-height: 1.45;">
+                                Ingresa el monto a retirar. Al enviar tu solicitud, te enviaremos un <strong style="color: #111827;">código de retiro alfanumérico a tu correo</strong>. Podrás cobrar tu dinero en efectivo en cualquier Punto de Venta presentando tu número de cédula y el código.
+                            </div>
                         </div>
                     </div>
                 </div>`;

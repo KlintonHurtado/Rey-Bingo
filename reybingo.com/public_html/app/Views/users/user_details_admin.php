@@ -1,5 +1,7 @@
 <?php
 $isOperator = (int) ($user['group'] ?? 0) === bingo_group_operator();
+$isStore = (int) ($user['group'] ?? 0) === bingo_group_store();
+$isNonPlayer = $isOperator || $isStore;
 $isOperatorRole = $isOperator || (function_exists('bingo_is_operator') && bingo_is_operator());
 ?>
 <?php
@@ -92,76 +94,122 @@ $sourceLabel = static function ($source) {
         </div>
         <div class="col-md-9">
             <div class="row g-2 mb-2">
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('wallet'); ?></small>
-                        <strong id="admin-wallet-total"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_total'] ?? 0), 2); ?></strong>
+                <?php if (! $isNonPlayer) : ?>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('wallet'); ?></small>
+                            <strong id="admin-wallet-total"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_total'] ?? 0), 2); ?></strong>
+                        </div>
                     </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip" style="background:rgba(25,135,84,.12);">
+                            <small><?= translate('bonus balance'); ?></small>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
+                                       value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('recharge balance'); ?></small>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
+                                       value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('withdraw balance'); ?></small>
+                            <div class="input-group input-group-sm mt-1">
+                                <span class="input-group-text"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
+                                       value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
+                            </div>
+                        </div>
+                    </div>
+                <?php else : ?>
+                    <div class="col-12 col-md-4">
+                        <div class="stat-chip">
+                            <small><?= translate('wallet'); ?></small>
+                            <strong id="admin-wallet-total" class="fs-5"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_total'] ?? 0), 2); ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="stat-chip" style="background:rgba(25,135,84,.12);">
+                            <small><?= translate('recharge balance'); ?></small>
+                            <strong class="text-success fs-5"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2); ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="stat-chip" style="background:rgba(13,110,253,.12);">
+                            <small><?= translate('withdraw balance'); ?></small>
+                            <strong class="text-primary fs-5"><?= esc($currency); ?> <?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2); ?></strong>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php if (! $isNonPlayer) : ?>
+                <div class="mb-2">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
+                        <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
+                    </button>
+                    <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip" style="background:rgba(25,135,84,.12);">
-                        <small><?= translate('bonus balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
-                                   value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
+            <?php else : ?>
+                <!-- Panel de Recargar (Sumar) / Retirar (Quitar) saldo para Operadores y Puntos de Venta -->
+                <div class="card p-2 mb-2 border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(25,135,84,0.06) 0%, rgba(13,110,253,0.04) 100%); border: 1px solid rgba(25,135,84,0.25) !important; border-radius: 10px;">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 220px;">
+                            <label for="admin-adjust-amount" class="small fw-bold text-dark mb-0 text-nowrap">Monto a operar:</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><?= esc($currency); ?></span>
+                                <input type="number" step="0.01" min="0.01" class="form-control" id="admin-adjust-amount" placeholder="0.00" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="adminAdjustNonPlayer(<?= (int) $user['id']; ?>, 'credit')">
+                                <i class="fa-solid fa-circle-plus me-1"></i> Sumar Recarga (+)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger text-nowrap" onclick="adminAdjustNonPlayer(<?= (int) $user['id']; ?>, 'debit')">
+                                <i class="fa-solid fa-circle-minus me-1"></i> Quitar / Retirar Saldo (-)
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('recharge balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
-                                   value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
+            <?php endif; ?>
+            <?php if (! $isNonPlayer) : ?>
+                <div class="row g-2 mb-2">
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('bonus released'); ?></small>
+                            <strong><?= esc($currency); ?> <?= number_format((float) ($stats['bonus_released'] ?? 0), 2); ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('roulette cartons released'); ?></small>
+                            <strong><?= esc($currency); ?> <?= number_format((float) ($stats['roulette_released'] ?? 0), 2); ?></strong>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('roulette gifted cartons'); ?></small>
+                            <strong><?= (int) ($stats['granted_cartons'] ?? 0); ?></strong>
+                            <small class="text-muted"><?= translate('pending'); ?>: <?= (int) ($stats['pending_cartons'] ?? 0); ?></small>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-chip">
+                            <small><?= translate('total prizes'); ?></small>
+                            <strong><?= esc($currency); ?> <?= number_format((float) ($stats['total_prizes'] ?? 0), 2); ?></strong>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('withdraw balance'); ?></small>
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text"><?= esc($currency); ?></span>
-                            <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
-                                   value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="mb-2">
-                <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
-                    <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
-                </button>
-                <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
-            </div>
-            <div class="row g-2 mb-2">
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('bonus released'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['bonus_released'] ?? 0), 2); ?></strong>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('roulette cartons released'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['roulette_released'] ?? 0), 2); ?></strong>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('roulette gifted cartons'); ?></small>
-                        <strong><?= (int) ($stats['granted_cartons'] ?? 0); ?></strong>
-                        <small class="text-muted"><?= translate('pending'); ?>: <?= (int) ($stats['pending_cartons'] ?? 0); ?></small>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-chip">
-                        <small><?= translate('total prizes'); ?></small>
-                        <strong><?= esc($currency); ?> <?= number_format((float) ($stats['total_prizes'] ?? 0), 2); ?></strong>
-                    </div>
-                </div>
-            </div>
+            <?php endif; ?>
 
             <table class="table table-sm mb-2">
                 <tr><td><strong><?= translate('code'); ?></strong></td><td><?= esc($user['code'] ?? ''); ?></td></tr>
@@ -189,9 +237,11 @@ $sourceLabel = static function ($source) {
             </table>
 
             <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
-                    <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
-                </button>
+                <?php if (! $isNonPlayer) : ?>
+                    <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
+                        <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
+                    </button>
+                <?php endif; ?>
                 <a class="btn btn-sm btn-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-file-excel"></i> Descargar movimientos
                 </a>
@@ -212,7 +262,7 @@ $sourceLabel = static function ($source) {
 
     <ul class="nav nav-tabs card-header-tabs mb-3" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ud-movements" type="button">Movimientos</button></li>
-        <?php if (! $isOperator) : ?>
+        <?php if (! $isNonPlayer) : ?>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-deposits" type="button"><?= translate('deposits'); ?></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-retires" type="button"><?= translate('retires'); ?></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-prizes" type="button"><?= translate('prizes'); ?></button></li>

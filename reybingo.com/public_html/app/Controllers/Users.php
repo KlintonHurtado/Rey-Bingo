@@ -1229,6 +1229,130 @@ class Users extends Controller {
         ]);
     }
 
+    public function adjustNonPlayerBalance()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized'),
+            ]);
+        }
+
+        helper('wallet');
+
+        $userId = (int) $this->request->getPost('user_id');
+        $action = trim((string) $this->request->getPost('action'));
+        $amount = (float) $this->request->getPost('amount');
+
+        if ($userId <= 0 || $amount <= 0 || ! in_array($action, ['credit', 'debit'], true)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'Ingrese un monto válido mayor a 0.',
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $targetUser = $modelUsers->where('id', $userId)->where('deleted', 0)->first();
+
+        if (! $targetUser) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'Usuario no encontrado.',
+            ]);
+        }
+
+        $group = (int) ($targetUser['group'] ?? 0);
+        $isOperator = $group === bingo_group_operator();
+        $isStore = $group === bingo_group_store();
+
+        if (! $isOperator && ! $isStore) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'Esta acción solo aplica a Operadores y Puntos de Venta.',
+            ]);
+        }
+
+        $adminId = (int) session()->get('id');
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelNotifications = new \App\Models\NotificationsModel();
+        $currency = systemGet('currency') ?? '$';
+
+        if ($action === 'credit') {
+            wallet_credit_recharge($userId, $amount);
+
+            $paymentType = $isOperator ? 'admin_operator_pay' : 'admin_store_credit';
+            $modelPayments->insert([
+                'user'    => $userId,
+                'type'    => $paymentType,
+                'type_id' => $adminId,
+                'amount'  => $amount,
+                'status'  => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId,
+                'type'    => 'deposit',
+                'type_id' => $userId,
+                'title'   => '💰 RECARGA DE SALDO ACREDITADA',
+                'message' => 'Se ha acreditado ' . $currency . ' ' . number_format($amount, 2) . ' a tu saldo por administración.',
+            ]);
+
+            $updated = wallet_service()->normalizeUser($modelUsers->find($userId));
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Se sumaron ' . $currency . ' ' . number_format($amount, 2) . ' exitosamente.',
+                'new_balance' => wallet_recharge_balance($updated),
+                'wallet_total' => wallet_total($updated),
+            ]);
+        }
+
+        if ($action === 'debit') {
+            $currentRecharge = wallet_recharge_balance($targetUser);
+            if ($currentRecharge < $amount) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error'   => 'El saldo disponible (' . $currency . ' ' . number_format($currentRecharge, 2) . ') es inferior al monto a retirar.',
+                ]);
+            }
+
+            if (! wallet_deduct_recharge($userId, $amount)) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error' => 'No se pudo debitar el saldo.',
+                ]);
+            }
+
+            $paymentType = $isOperator ? 'admin_operator_debit' : 'admin_store_debit';
+            $modelPayments->insert([
+                'user'    => $userId,
+                'type'    => $paymentType,
+                'type_id' => $adminId,
+                'amount'  => $amount,
+                'status'  => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId,
+                'type'    => 'retire',
+                'type_id' => $userId,
+                'title'   => 'ℹ️ DÉBITO / RETIRO DE SALDO',
+                'message' => 'Se ha retirado ' . $currency . ' ' . number_format($amount, 2) . ' de tu saldo por administración.',
+            ]);
+
+            $updated = wallet_service()->normalizeUser($modelUsers->find($userId));
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Se debitaron ' . $currency . ' ' . number_format($amount, 2) . ' exitosamente.',
+                'new_balance' => wallet_recharge_balance($updated),
+                'wallet_total' => wallet_total($updated),
+            ]);
+        }
+
+        return $this->response->setJSON(['success' => false, 'error' => 'Acción no reconocida.']);
+    }
+
     public function lowBalancePendingCountGet()
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {

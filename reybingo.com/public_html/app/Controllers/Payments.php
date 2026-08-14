@@ -2407,7 +2407,7 @@ class Payments extends Controller {
         return $this->response->setJSON(['success' => false, 'error' => translate('invalid action')]);
     }
 
-    private function sendRetireStoreEmail(array $user, string $code, float $amount): bool
+    public function sendRetireStoreEmail(array $user, string $code, float $amount): bool
     {
         if (empty($user['email'])) {
             return false;
@@ -2425,12 +2425,18 @@ class Payments extends Controller {
                 'currency' => systemGet('currency') ?? '$',
             ]);
 
+            $emailConfig->clear(true);
             $emailConfig->setFrom($config->fromEmail, $config->fromName);
             $emailConfig->setTo($user['email']);
             $emailConfig->setSubject($subject);
             $emailConfig->setMessage($message);
+            $emailConfig->setMailType('html');
 
-            return (bool) $emailConfig->send();
+            $sent = $emailConfig->send();
+            if (! $sent) {
+                log_message('error', 'Error sending retire store email: ' . $emailConfig->printDebugger(['headers']));
+            }
+            return (bool) $sent;
         } catch (\Throwable $e) {
             log_message('error', 'Error sending retire store email: ' . $e->getMessage());
             return false;
