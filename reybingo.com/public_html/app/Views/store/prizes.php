@@ -1,7 +1,7 @@
 <?= view('store/partials/open', [
     'imagePath' => $imagePath,
     'walletSummary' => $walletSummary,
-    'pendingPrizes' => $pendingPrizes ?? ($pendingCount ?? 0),
+    'pendingPrizes' => $pendingCount ?? 0,
     'activeNav' => 'prizes',
 ]) ?>
 
@@ -9,68 +9,89 @@
     <div class="card-body store-tab-body">
         <div class="store-tab-form">
             <h6 class="store-tab-form-title">
-                <i class="fa-duotone fa-solid fa-trophy-star"></i> <?= translate('pay prizes from store'); ?>
+                <i class="fa-duotone fa-solid fa-money-bill-transfer"></i> Pagar Notas de Retiro en Efectivo
             </h6>
 
             <div class="store-tab-form-fields">
-            <?php if ((float) ($walletSummary['recharge'] ?? 0) <= 0) : ?>
-                <div class="alert alert-warning store-alert-compact small">
-                    <?= translate('no store balance yet request admin approval'); ?>
-                    <a href="<?= site_url('store/funding'); ?>" class="alert-link"><?= translate('request store balance'); ?></a>
-                </div>
-            <?php endif; ?>
+                <p class="small text-muted mb-3">
+                    Ingresa el número de cédula del jugador y el código de retiro alfanumérico que recibió por correo para validar y entregar el dinero en efectivo.
+                </p>
 
-            <input type="hidden" id="store-prize-player-id" value="">
+                <input type="hidden" id="store-retire-id" value="">
 
-            <label for="store-prize-lookup" class="form-label"><?= translate('player document number'); ?></label>
-            <div class="store-search-row mb-2">
-                <div class="store-form-field">
-                    <input type="text" class="form-control form-bingo" id="store-prize-lookup" placeholder="<?= translate('enter player document number'); ?>" autocomplete="off">
-                    <small id="store-prize-lookup-hint" class="text-muted d-none"><?= translate('searching player'); ?>...</small>
-                    <small id="store-prize-lookup-error" class="text-danger d-none"></small>
+                <div class="mb-2">
+                    <label for="store-retire-document" class="form-label">Número de Cédula / Documento <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-bingo" id="store-retire-document" placeholder="Ingrese número de cédula del jugador..." autocomplete="off">
                 </div>
-                <button type="button" class="btn btn-primary btn-bingo store-search-btn" id="store-prize-lookup-btn">
-                    <i class="fa-duotone fa-solid fa-magnifying-glass"></i> <?= translate('search'); ?>
+
+                <div class="mb-3">
+                    <label for="store-retire-code" class="form-label">Código de Retiro (Recibido al Correo) <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-primary"><i class="fa-duotone fa-solid fa-key"></i></span>
+                        <input type="text" class="form-control form-bingo text-uppercase" id="store-retire-code" placeholder="Ej: RET-AB12CD" autocomplete="off" style="letter-spacing: 1.5px; font-weight: 600;">
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary btn-bingo w-100 mb-3" id="store-retire-lookup-btn">
+                    <i class="fa-duotone fa-solid fa-magnifying-glass"></i> Buscar y Validar Nota de Retiro
                 </button>
-            </div>
 
-            <div id="store-prize-player-preview" class="store-player-preview d-none mb-2">
-                <div class="store-player-preview-inner">
-                    <div>
-                        <strong id="store-prize-player-name"></strong>
-                        <div class="small text-muted">
-                            <span id="store-prize-player-code"></span> ·
-                            <span id="store-prize-player-document"></span>
+                <div id="store-retire-lookup-hint" class="small text-muted text-center d-none mb-2">
+                    <i class="fa-duotone fa-solid fa-spinner fa-spin me-1"></i> Validando nota de retiro...
+                </div>
+                <div id="store-retire-lookup-error" class="alert alert-danger py-2 px-3 small d-none mb-2"></div>
+
+                <!-- Tarjeta de vista previa de la nota de retiro -->
+                <div id="store-retire-preview" class="d-none mt-2">
+                    <div class="card border-0 shadow-sm mb-3" style="border-radius: 12px; background: linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(37,99,235,0.02) 100%); border: 1px solid rgba(37,99,235,0.25) !important;">
+                        <div class="card-body p-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <span class="badge bg-warning text-dark mb-1">
+                                        <i class="fa-solid fa-clock me-1"></i> Pendiente por Cobrar
+                                    </span>
+                                    <h6 class="mb-0 text-dark fw-bold" id="store-retire-player-name"></h6>
+                                    <small class="text-muted">
+                                        Cédula: <strong id="store-retire-preview-document"></strong> · 
+                                        Código: <strong id="store-retire-preview-code" class="text-primary font-monospace"></strong>
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-2" style="opacity: 0.15;">
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="text-muted small">Total a Entregar en Efectivo:</span>
+                                <div class="text-success fw-bold fs-4" id="store-retire-preview-amount"></div>
+                            </div>
+
+                            <button type="button" class="btn btn-success btn-bingo w-100 py-2" id="store-retire-pay-btn">
+                                <i class="fa-duotone fa-solid fa-hand-holding-dollar me-1"></i> Confirmar y Pagar Retiro en Efectivo
+                            </button>
                         </div>
                     </div>
-                    <div class="text-end">
-                        <small class="text-muted d-block"><?= translate('current balance'); ?></small>
-                        <strong><?= systemGet('currency'); ?> <span id="store-prize-player-wallet">0.00</span></strong>
-                    </div>
                 </div>
-            </div>
 
-            <div class="store-form-field store-form-field-full">
-                <label for="store-prize-payable-amount" class="form-label"><?= translate('prize amount to pay'); ?></label>
-                <input type="text" class="form-control form-bingo store-prize-payable-input" id="store-prize-payable-amount" value="0.00" placeholder="0.00" readonly disabled>
-                <small id="store-prize-payable-detail" class="text-muted d-block mt-1"><?= translate('search and select a player first'); ?></small>
-            </div>
             </div>
         </div>
 
         <div class="store-tab-history">
-            <h6 class="store-tab-history-title">
-                <i class="fa-duotone fa-solid fa-clock-rotate-left"></i> <?= translate('player prizes history'); ?>
-            </h6>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="store-tab-history-title mb-0">
+                    <i class="fa-duotone fa-solid fa-clock-rotate-left"></i> Historial de Retiros Pagados
+                </h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="storeRefreshRetires(1)">
+                    <i class="fa-duotone fa-solid fa-rotate"></i> Actualizar
+                </button>
+            </div>
             <div class="store-table-wrap" id="store-prizes-list">
                 <?= view('store/prizes_list', [
-                    'sings' => [],
+                    'retires' => [],
                     'currentPage' => 1,
                     'totalPages' => 1,
                     'totalRecords' => 0,
                     'per_page' => 10,
                     'showPagination' => false,
-                    'requiresPlayer' => true,
                 ]); ?>
             </div>
         </div>
@@ -82,239 +103,155 @@
 <?= view('store/partials/scripts_common') ?>
 
 <script type="text/javascript">
-    let storePrizesPage = 1;
-    let storePrizeSelectedPlayer = null;
-    let storePrizeLookupTimer = null;
-    let storePrizeLookupRequest = null;
-    const storePrizeMinDocumentDigits = 6;
-    const storePrizeCurrency = '<?= esc(systemGet('currency'), 'js'); ?>';
+    let storeRetiresPage = 1;
+    let storeRetireSelected = null;
+    const storeCurrency = '<?= esc(systemGet('currency'), 'js'); ?>';
 
-    function storeUpdatePrizeSummary(summary) {
-        summary = summary || { count: 0, total_formatted: '0.00', items: [] };
-        const count = parseInt(summary.count, 10) || 0;
-        const total = summary.total_formatted || '0.00';
-
-        $('#store-prize-payable-amount').val(total);
-
-        if (!$('#store-prize-player-id').val()) {
-            $('#store-prize-payable-detail').text('<?= esc(translate('search and select a player first'), 'js'); ?>');
-            return;
-        }
-
-        if (count === 0) {
-            $('#store-prize-payable-detail').text('<?= esc(translate('no pending prizes to pay'), 'js'); ?>');
-            return;
-        }
-
-        let detail = count === 1
-            ? '<?= esc(translate('one pending prize to pay'), 'js'); ?>'
-            : count + ' <?= esc(translate('pending prizes to pay'), 'js'); ?>';
-
-        if (Array.isArray(summary.items) && summary.items.length > 0) {
-            const lines = summary.items.slice(0, 3).map(function(item) {
-                return item.game + ' · ' + item.modality + ': ' + storePrizeCurrency + ' ' + item.amount_formatted;
-            });
-            if (summary.items.length > 3) {
-                lines.push('+' + (summary.items.length - 3) + ' <?= esc(translate('more'), 'js'); ?>');
-            }
-            detail += ' — ' + lines.join(' | ');
-        }
-
-        $('#store-prize-payable-detail').text(detail);
-    }
-
-    function storeLoadPrizeSummary() {
-        const playerId = $('#store-prize-player-id').val() || '';
-
-        if (!playerId) {
-            storeUpdatePrizeSummary();
-            return;
-        }
-
-        $.get('<?= site_url('store/playerPrizeSummaryGet'); ?>', {
-            player_id: playerId,
-            status: '1'
-        }, function(response) {
-            if (response.success) {
-                storeUpdatePrizeSummary(response.summary || {});
-            }
-        }, 'json');
-    }
-
-    function storeRefreshPrizes(page) {
-        storePrizesPage = page || 1;
-        const playerId = $('#store-prize-player-id').val() || '';
-
-        if (!playerId) {
-            $('#store-prizes-list').html('<div class="text-center py-4 text-muted"><?= esc(translate('search and select a player first'), 'js'); ?></div>');
-            storeUpdatePrizeSummary();
-            return;
-        }
-
-        storeLoadPrizeSummary();
-
+    function storeRefreshRetires(page) {
+        storeRetiresPage = page || 1;
         $.get('<?= site_url('store/prizesListGet'); ?>', {
-            page: storePrizesPage,
-            player_id: playerId,
-            status: '1'
+            page: storeRetiresPage
         }, function(html) {
             $('#store-prizes-list').html(html);
         });
     }
 
-    function storePayAwardSubmit(id, userName, amount) {
+    function storeClearRetireSelection() {
+        storeRetireSelected = null;
+        $('#store-retire-id').val('');
+        $('#store-retire-preview').addClass('d-none');
+        $('#store-retire-lookup-error').addClass('d-none').text('');
+    }
+
+    function storeShowRetirePreview(retire) {
+        storeRetireSelected = retire;
+        $('#store-retire-id').val(retire.id);
+        $('#store-retire-player-name').text(retire.player_name || 'Jugador');
+        $('#store-retire-preview-document').text(retire.document);
+        $('#store-retire-preview-code').text(retire.code);
+        $('#store-retire-preview-amount').text(storeCurrency + ' ' + parseFloat(retire.amount).toFixed(2));
+        $('#store-retire-preview').removeClass('d-none');
+        $('#store-retire-lookup-error').addClass('d-none').text('');
+    }
+
+    function storeLookupRetire() {
+        const documentVal = $('#store-retire-document').val().trim();
+        const codeVal = $('#store-retire-code').val().trim();
+
+        $('#store-retire-lookup-error').addClass('d-none').text('');
+
+        if (!documentVal && !codeVal) {
+            $('#store-retire-lookup-error').text('Ingrese la cédula y/o el código de retiro.').removeClass('d-none');
+            return;
+        }
+
+        $('#store-retire-lookup-hint').removeClass('d-none');
+        $('#store-retire-lookup-btn').prop('disabled', true);
+
+        $.post('<?= site_url('store/lookupRetireNote'); ?>', {
+            document: documentVal,
+            code: codeVal,
+            <?= csrf_token() ?>: '<?= csrf_hash(); ?>'
+        }, function(response) {
+            if (response && response.success && response.retire) {
+                storeShowRetirePreview(response.retire);
+            } else {
+                storeClearRetireSelection();
+                const msg = (response && response.message) ? response.message : 'No se encontró ninguna nota de retiro pendiente con los datos ingresados.';
+                $('#store-retire-lookup-error').text(msg).removeClass('d-none');
+            }
+        }, 'json').fail(function() {
+            storeClearRetireSelection();
+            $('#store-retire-lookup-error').text('Error de conexión con el servidor.').removeClass('d-none');
+        }).always(function() {
+            $('#store-retire-lookup-hint').addClass('d-none');
+            $('#store-retire-lookup-btn').prop('disabled', false);
+        });
+    }
+
+    $('#store-retire-lookup-btn').on('click', function() {
+        storeLookupRetire();
+    });
+
+    $('#store-retire-document, #store-retire-code').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            storeLookupRetire();
+        }
+    });
+
+    $('#store-retire-pay-btn').on('click', function() {
+        if (!storeRetireSelected || !storeRetireSelected.id) {
+            return;
+        }
+
+        const retire = storeRetireSelected;
+        const amountFormatted = storeCurrency + ' ' + parseFloat(retire.amount).toFixed(2);
+
         Swal.fire({
-            title: '<?= esc(translate('pay prize'), 'js'); ?>',
-            html: '<?= esc(translate('confirm pay prize to'), 'js'); ?> <strong>' + userName + '</strong><br><?= esc(systemGet('currency'), 'js'); ?> <strong>' + amount + '</strong>?',
+            title: '¿Confirmar Pago en Efectivo?',
+            html: '¿Confirmas que vas a entregar <strong>' + amountFormatted + '</strong> en efectivo al jugador <strong>' + (retire.player_name || '') + '</strong> (Cédula: ' + retire.document + ')?',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: '<?= esc(translate('yes'), 'js'); ?>',
-            cancelButtonText: '<?= esc(translate('cancel'), 'js'); ?>'
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="fa-solid fa-check me-1"></i> Sí, pagar retiro',
+            cancelButtonText: 'Cancelar'
         }).then(function(result) {
             if (!result.isConfirmed) {
                 return;
             }
 
-            fetch('<?= site_url('store/payAwardSubmit'); ?>', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ id: id, action: 'pay' })
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    storeShowToast(data.message || '<?= esc(translate('prize paid successfully from store'), 'js'); ?>', 'success');
-                    if (typeof data.store_balance !== 'undefined' && data.store_balance !== null) {
-                        storeUpdateBalance(data.store_balance);
+            const $btn = $('#store-retire-pay-btn');
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Procesando pago...');
+
+            $.post('<?= site_url('store/payRetireSubmit'); ?>', {
+                retire_id: retire.id,
+                code: retire.code,
+                document: retire.document,
+                <?= csrf_token() ?>: '<?= csrf_hash(); ?>'
+            }, function(res) {
+                if (res && res.success) {
+                    storeClearRetireSelection();
+                    $('#store-retire-document').val('');
+                    $('#store-retire-code').val('');
+
+                    Swal.fire({
+                        title: '¡Retiro Pagado!',
+                        text: res.message || 'El retiro fue pagado exitosamente en efectivo.',
+                        icon: 'success',
+                        confirmButtonText: 'Aceptar'
+                    });
+
+                    if (typeof res.store_balance !== 'undefined' && res.store_balance !== null) {
+                        storeUpdateBalance(res.store_balance);
                     }
-                    storeRefreshPrizes(storePrizesPage);
+
+                    storeRefreshRetires(1);
                 } else {
-                    storeShowToast(data.error || data.message || '<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>', 'error');
+                    Swal.fire({
+                        title: 'Error',
+                        text: (res && res.message) ? res.message : 'No se pudo procesar el pago del retiro.',
+                        icon: 'error'
+                    });
                 }
-            })
-            .catch(function() {
-                storeShowToast('<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>', 'error');
+            }, 'json').fail(function() {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un problema al procesar la solicitud en el servidor.',
+                    icon: 'error'
+                });
+            }).always(function() {
+                $btn.prop('disabled', false).html('<i class="fa-duotone fa-solid fa-hand-holding-dollar me-1"></i> Confirmar y Pagar Retiro en Efectivo');
             });
         });
-    }
+    });
 
     function storePrizesGetPage(page) {
-        storeRefreshPrizes(page);
+        storeRefreshRetires(page);
     }
 
     $(function() {
-        function storeNormalizeDocument(value) {
-            return String(value || '').replace(/\D/g, '');
-        }
-
-        function storeClearPrizePlayerSelection() {
-            storePrizeSelectedPlayer = null;
-            $('#store-prize-player-id').val('');
-            $('#store-prize-player-preview').addClass('d-none');
-            $('#store-prize-payable-amount').val('0.00').prop('disabled', true);
-            storeUpdatePrizeSummary();
-            storeRefreshPrizes(1);
-        }
-
-        function storeShowPrizePlayer(response) {
-            storePrizeSelectedPlayer = response.player;
-            $('#store-prize-player-id').val(response.player.id);
-            $('#store-prize-player-name').text(response.player.firstname + ' ' + response.player.lastname);
-            $('#store-prize-player-code').text(response.player.code);
-            $('#store-prize-player-document').text(response.player.document);
-            $('#store-prize-player-wallet').text(response.player.wallet);
-            $('#store-prize-player-preview').removeClass('d-none');
-            $('#store-prize-payable-amount').prop('disabled', false);
-            $('#store-prize-lookup-error').addClass('d-none').text('');
-            storeUpdatePrizeSummary(response.prizes_summary || {});
-            storeRefreshPrizes(1);
-        }
-
-        function storeLookupPrizePlayer() {
-            const query = $('#store-prize-lookup').val().trim();
-            const digits = storeNormalizeDocument(query);
-
-            $('#store-prize-lookup-error').addClass('d-none').text('');
-
-            if (!query) {
-                storeClearPrizePlayerSelection();
-                return;
-            }
-
-            if (digits.length < storePrizeMinDocumentDigits) {
-                storeClearPrizePlayerSelection();
-                return;
-            }
-
-            if (storePrizeLookupRequest) {
-                storePrizeLookupRequest.abort();
-            }
-
-            $('#store-prize-lookup-hint').removeClass('d-none');
-            $('#store-prize-lookup-btn').prop('disabled', true);
-
-            storePrizeLookupRequest = $.post('<?= site_url('store/lookupPlayer'); ?>', {
-                <?= csrf_token() ?>: '<?= csrf_hash(); ?>',
-                query: query
-            }, function(response) {
-                if (!response.success) {
-                    storeClearPrizePlayerSelection();
-                    $('#store-prize-lookup-error').text(response.message || '<?= esc(translate('player not found'), 'js'); ?>').removeClass('d-none');
-                    return;
-                }
-
-                storeShowPrizePlayer(response);
-            }, 'json').fail(function(xhr, status) {
-                if (status === 'abort') {
-                    return;
-                }
-                storeClearPrizePlayerSelection();
-                $('#store-prize-lookup-error').text('<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>').removeClass('d-none');
-            }).always(function() {
-                storePrizeLookupRequest = null;
-                $('#store-prize-lookup-hint').addClass('d-none');
-                $('#store-prize-lookup-btn').prop('disabled', false);
-            });
-        }
-
-        $('#store-prize-lookup-btn').on('click', function() {
-            const query = $('#store-prize-lookup').val().trim();
-
-            if (!query) {
-                $('#store-prize-lookup-error').text('<?= esc(translate('enter player document number'), 'js'); ?>').removeClass('d-none');
-                return;
-            }
-
-            storeLookupPrizePlayer();
-        });
-
-        $('#store-prize-lookup').on('input', function() {
-            clearTimeout(storePrizeLookupTimer);
-
-            const query = $(this).val().trim();
-            const digits = storeNormalizeDocument(query);
-
-            if (!query || digits.length < storePrizeMinDocumentDigits) {
-                storeClearPrizePlayerSelection();
-                $('#store-prize-lookup-error').addClass('d-none').text('');
-                $('#store-prize-lookup-hint').addClass('d-none');
-                return;
-            }
-
-            storePrizeLookupTimer = setTimeout(storeLookupPrizePlayer, 450);
-        });
-
-        $('#store-prize-lookup').on('keypress', function(e) {
-            if (e.which === 13) {
-                e.preventDefault();
-                clearTimeout(storePrizeLookupTimer);
-                $('#store-prize-lookup-btn').trigger('click');
-            }
-        });
-
-        storeUpdatePrizeSummary();
+        storeRefreshRetires(1);
     });
 </script>

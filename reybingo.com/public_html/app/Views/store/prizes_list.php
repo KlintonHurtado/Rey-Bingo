@@ -1,49 +1,48 @@
 <table class="table table-striped mb-0">
     <thead>
         <tr>
-            <th><?= translate('game'); ?></th>
-            <th class="text-center"><?= translate('carton'); ?></th>
-            <th class="text-center"><?= translate('modality'); ?></th>
-            <th class="text-center"><?= translate('award'); ?></th>
-            <th class="text-center"><?= translate('status'); ?></th>
-            <th class="text-center"><?= translate('option'); ?></th>
+            <th>Ref / ID</th>
+            <th>Fecha</th>
+            <th>Jugador</th>
+            <th class="text-center">Cédula</th>
+            <th class="text-center">Código</th>
+            <th class="text-end">Monto Pagado</th>
+            <th class="text-center">Estado</th>
         </tr>
     </thead>
     <tbody>
-        <?php if (! empty($sings)) : ?>
-            <?php foreach ($sings as $sing) : ?>
+        <?php if (! empty($retires)) : ?>
+            <?php foreach ($retires as $retire) : ?>
                 <tr>
                     <td>
-                        <strong><?= esc($sing['room_name']) ?></strong><br>
-                        <small class="text-muted"><?= esc($sing['game_description']) ?></small>
+                        <strong class="text-primary">#<?= esc(str_pad($retire['id'], 4, '0', STR_PAD_LEFT)); ?></strong>
                     </td>
-                    <td class="text-center">C<?= esc($sing['serial']) ?></td>
-                    <td class="text-center"><?= esc($sing['modality_name']) ?></td>
-                    <td class="text-center">
-                        <strong><?= systemGet('currency'); ?> <?= esc($sing['award_amount']) ?></strong>
+                    <td>
+                        <small class="text-muted"><?= esc(date('d/m/Y H:i', strtotime($retire['updated_at'] ?? $retire['created_at']))); ?></small>
                     </td>
-                    <td class="text-center"><?= $sing['status'] ?></td>
+                    <td>
+                        <strong><?= esc($retire['player_name']); ?></strong><br>
+                        <small class="text-muted"><?= esc($retire['player_code']); ?></small>
+                    </td>
+                    <td class="text-center font-monospace">
+                        <?= esc($retire['document'] ?: '-'); ?>
+                    </td>
                     <td class="text-center">
-                        <?php if (($sing['status_raw'] ?? 0) === 1) : ?>
-                            <button type="button" class="btn btn-primary btn-bingo btn-sm text-white" onclick="storePayAwardSubmit('<?= (int) $sing['id']; ?>', '<?= esc($sing['user_name'], 'attr'); ?>', '<?= esc($sing['award_amount'], 'attr'); ?>');">
-                                <i class="fa-duotone fa-hand-holding-dollar"></i>
-                            </button>
-                        <?php else : ?>
-                            <span class="text-muted">—</span>
-                        <?php endif; ?>
+                        <span class="badge bg-primary font-monospace"><?= esc($retire['code']); ?></span>
+                    </td>
+                    <td class="text-end">
+                        <strong class="text-success"><?= systemGet('currency'); ?> <?= number_format((float) $retire['amount'], 2); ?></strong>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i> Pagado</span>
                     </td>
                 </tr>
             <?php endforeach; ?>
         <?php else : ?>
             <tr>
-                <td colspan="6" class="text-center py-3">
-                    <?php if (! empty($requiresPlayer)) : ?>
-                        <?= translate('search and select a player first'); ?>
-                    <?php elseif (! empty($playerNotFound)) : ?>
-                        <?= translate('player not found'); ?>
-                    <?php else : ?>
-                        <?= translate('no winners found'); ?>
-                    <?php endif; ?>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    <i class="fa-duotone fa-solid fa-receipt fs-2 mb-2 d-block text-secondary"></i>
+                    No hay notas de retiro pagadas registradas en este Punto de Venta.
                 </td>
             </tr>
         <?php endif; ?>
@@ -53,39 +52,29 @@
 <?php if (! empty($showPagination) && $showPagination) : ?>
     <div class="store-prizes-pagination px-2 py-3 border-top">
         <div class="text-center text-muted small mb-2">
-            <?= translate('showing'); ?>
-            <?= ($currentPage - 1) * $per_page + 1; ?> -
-            <?= min($currentPage * $per_page, $totalRecords); ?>
-            <?= translate('of'); ?> <?= number_format($totalRecords); ?> <?= translate('winners'); ?>
+            Mostrando <?= ($currentPage - 1) * $per_page + 1; ?> - <?= min($currentPage * $per_page, $totalRecords); ?> de <?= number_format($totalRecords); ?> retiros
         </div>
-        <nav class="d-flex justify-content-center align-items-center">
-            <ul class="pagination mb-0 pagination-sm">
-                <?php if ($currentPage > 1) : ?>
-                    <li class="page-item">
-                        <a class="page-link" href="javascript:void(0)" onclick="storePrizesGetPage(<?= $currentPage - 1; ?>)">
-                            <i class="fa-duotone fa-solid fa-chevron-left"></i>
-                        </a>
-                    </li>
-                <?php endif; ?>
-
+        <nav aria-label="Navegación de retiros">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item <?= ($currentPage <= 1) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="javascript:void(0);" onclick="storePrizesGetPage(<?= $currentPage - 1; ?>)" aria-label="Anterior">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
                 <?php
                 $startPage = max(1, $currentPage - 2);
                 $endPage = min($totalPages, $currentPage + 2);
+                for ($p = $startPage; $p <= $endPage; $p++) :
                 ?>
-
-                <?php for ($i = $startPage; $i <= $endPage; $i++) : ?>
-                    <li class="page-item <?= $i === $currentPage ? 'active' : ''; ?>">
-                        <a class="page-link" href="javascript:void(0)" onclick="storePrizesGetPage(<?= $i; ?>)"><?= $i; ?></a>
+                    <li class="page-item <?= ($p == $currentPage) ? 'active' : ''; ?>">
+                        <a class="page-link" href="javascript:void(0);" onclick="storePrizesGetPage(<?= $p; ?>)"><?= $p; ?></a>
                     </li>
                 <?php endfor; ?>
-
-                <?php if ($currentPage < $totalPages) : ?>
-                    <li class="page-item">
-                        <a class="page-link" href="javascript:void(0)" onclick="storePrizesGetPage(<?= $currentPage + 1; ?>)">
-                            <i class="fa-duotone fa-solid fa-chevron-right"></i>
-                        </a>
-                    </li>
-                <?php endif; ?>
+                <li class="page-item <?= ($currentPage >= $totalPages) ? 'disabled' : ''; ?>">
+                    <a class="page-link" href="javascript:void(0);" onclick="storePrizesGetPage(<?= $currentPage + 1; ?>)" aria-label="Siguiente">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>

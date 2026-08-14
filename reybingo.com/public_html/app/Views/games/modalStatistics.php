@@ -111,6 +111,9 @@
                         <button class="nav-link" id="players-tab" data-bs-toggle="tab" data-bs-target="#players" type="button" role="tab" aria-controls="players" aria-selected="false" data-module="players"><?= translate('users'); ?></button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="stores-tab" data-bs-toggle="tab" data-bs-target="#stores" type="button" role="tab" aria-controls="stores" aria-selected="false" data-module="stores">Puntos de Venta</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="operators-tab" data-bs-toggle="tab" data-bs-target="#operators" type="button" role="tab" aria-controls="operators" aria-selected="false" data-module="operators">Operadores</button>
                     </li>
                 </ul>
@@ -137,6 +140,9 @@
                 </div>
                 <div class="tab-pane fade" id="players" role="tabpanel" aria-labelledby="players-tab">
                     <div id="players-content" class="statistics-content"></div>
+                </div>
+                <div class="tab-pane fade" id="stores" role="tabpanel" aria-labelledby="stores-tab">
+                    <div id="stores-content" class="statistics-content"></div>
                 </div>
                 <div class="tab-pane fade" id="operators" role="tabpanel" aria-labelledby="operators-tab">
                     <div id="operators-content" class="statistics-content"></div>
@@ -211,6 +217,7 @@
             'games': 'games',        // games va SOLO a summary
             'users': 'users',
             'players': 'players',
+            'stores': 'stores',
             'operators': 'operators',
             'transactions': 'transactions',
             'deposits': 'transactions',
@@ -229,6 +236,7 @@
             'games': 'games',          // games tab usa módulo games
             'users': 'users',
             'players': 'players',
+            'stores': 'stores',
             'operators': 'operators',
             'transactions': 'transactions',
             'roulette': 'roulette',
@@ -276,6 +284,15 @@
             requestData.search = extraParams.search || $('#searchOperators').val() || '';
             requestData.status = extraParams.status || $('#statusFilterOperators').val() || 'all';
             requestData.page = extraParams.page || $('#currentPageOperators').val() || 1;
+            requestData.per_page = extraParams.per_page || 10;
+            break;
+
+        case 'stores':
+            // Parámetros específicos para puntos de venta
+            requestData.search = extraParams.search || $('#searchStores').val() || '';
+            requestData.status = extraParams.status || $('#statusFilterStores').val() || 'all';
+            requestData.operator_id = extraParams.operator_id || $('#operatorFilterStores').val() || 'all';
+            requestData.page = extraParams.page || $('#currentPageStores').val() || 1;
             requestData.per_page = extraParams.per_page || 10;
             break;
             

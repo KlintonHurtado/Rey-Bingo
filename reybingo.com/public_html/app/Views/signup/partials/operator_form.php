@@ -79,6 +79,19 @@ $submitLabel = $submitLabel ?? translate('operator enter');
                 <small id="<?= esc($fieldPrefix); ?>-email-error" class="text-danger d-none"></small>
             </div>
 
+            <div class="col-12 col-md-6 operator-signup-form-field">
+                <label for="<?= esc($fieldPrefix); ?>-phone" class="form-label"><?= translate('phone'); ?></label>
+                <input
+                    type="text"
+                    class="form-control form-control-lg form-bingo"
+                    name="phone"
+                    id="<?= esc($fieldPrefix); ?>-phone"
+                    placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('phone')); ?>"
+                    autocomplete="tel"
+                >
+                <small id="<?= esc($fieldPrefix); ?>-phone-error" class="text-danger d-none"></small>
+            </div>
+
             <div class="col-12 operator-signup-form-field">
                 <label for="<?= esc($fieldPrefix); ?>-address_line" class="form-label"><?= translate('address'); ?></label>
                 <input

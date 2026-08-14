@@ -200,6 +200,7 @@ class Games extends Controller {
             'retires' => translate('retires'),
             'roulette' => translate('roulette'),
             'referrals' => translate('referrals'),
+            'stores' => 'Puntos de Venta',
             'operators' => 'Operadores',
         ];
         
@@ -1003,8 +1004,10 @@ class Games extends Controller {
                         $builderUsers->where('created_at >=', $startDate . ' 00:00:00')->where('created_at <=', $endDate . ' 23:59:59');
                     }
                     
-                    // CAMBIO IMPORTANTE: Usar $builderUsers en lugar de $modelUsers
-                    $users = $builderUsers->where('status', 1)->findAll();
+                    // Excluir Puntos de Venta y Operadores del Top Jugadores
+                    $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+                    $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+                    $users = $builderUsers->where('status', 1)->whereNotIn('group', [$storeGroup, $operatorGroup])->where('deleted', 0)->findAll();
                     
                     // Calcular estadísticas de usuarios
                     $data['users'] = $users;
@@ -1080,8 +1083,13 @@ class Games extends Controller {
                         $builder->where('status', $status);
                     }
                     
+                    $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+                    $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+
                     if ($group !== 'all') {
                         $builder->where('group', $group);
+                    } else {
+                        $builder->whereNotIn('group', [$storeGroup, $operatorGroup]);
                     }
                     
                     // Excluir eliminados
@@ -1186,6 +1194,85 @@ class Games extends Controller {
                     $data['current_page'] = $page;
                     $data['per_page'] = $perPage;
                     $data['stats'] = $this->getOperatorsStats();
+                }
+                break;
+
+            case 'stores':
+                if ($activeTab == 'stores' || $activeTab == 'summary') {
+                    $page = (int) ($this->request->getGet('page') ?? 1);
+                    $perPage = 10;
+                    $search = $this->request->getGet('search') ?? '';
+                    $status = $this->request->getGet('status') ?? 'all';
+                    $operatorId = $this->request->getGet('operator_id') ?? 'all';
+                    
+                    $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+                    $builder = $modelUsers->builder();
+                    
+                    $builder->where('group', $storeGroup);
+                    $builder->where('deleted', 0);
+                    
+                    if (!empty($search)) {
+                        $builder->groupStart()
+                            ->like('firstname', $search)
+                            ->orLike('lastname', $search)
+                            ->orLike('business_name', $search)
+                            ->orLike('username', $search)
+                            ->orLike('email', $search)
+                            ->orLike('phone', $search)
+                            ->orLike('document', $search)
+                            ->orLike('code', $search)
+                            ->groupEnd();
+                    }
+        
+                    if ($status !== 'all') {
+                        $builder->where('status', $status);
+                    }
+
+                    if ($operatorId !== 'all') {
+                        $builder->where('operator_id', (int) $operatorId);
+                    }
+                    
+                    $totalRecords = $builder->countAllResults(false);
+                    $offset = ($page - 1) * $perPage;
+                    $stores = $builder->limit($perPage, $offset)->get()->getResultArray();
+                    
+                    $pager = \Config\Services::pager();
+                    $pager->store('default', $page, $perPage, $totalRecords);
+                    
+                    $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+                    $operatorsList = $modelUsers->where('group', $operatorGroup)->where('deleted', 0)->findAll();
+                    $operatorsMap = [];
+                    foreach ($operatorsList as $opItem) {
+                        $operatorsMap[$opItem['id']] = $opItem;
+                    }
+
+                    foreach ($stores as &$st) {
+                        $stId = (int) $st['id'];
+                        $depositsModel = new DepositsModel();
+                        $retiresModel = new RetiresModel();
+                        
+                        $st['total_deposits'] = (float) (($depositsModel->where('user', $stId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        $st['total_retires'] = (float) (($retiresModel->where('user', $stId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
+                        
+                        $st['players_count'] = $modelUsers->where('referred_by', $stId)->where('deleted', 0)->countAllResults();
+                        
+                        $opAssigned = !empty($st['operator_id']) && isset($operatorsMap[$st['operator_id']]) ? $operatorsMap[$st['operator_id']] : null;
+                        $st['operator_name'] = $opAssigned ? trim(($opAssigned['firstname'] ?? '') . ' ' . ($opAssigned['lastname'] ?? '')) : '-';
+                        $st['operator_code'] = $opAssigned['code'] ?? '';
+
+                        $st['last_activity'] = $this->getLastActivity($stId);
+                    }
+                    unset($st);
+                    
+                    $data['stores'] = $stores;
+                    $data['operators_list'] = $operatorsList;
+                    $data['pager'] = $pager;
+                    $data['search'] = $search;
+                    $data['status'] = $status;
+                    $data['operator_id'] = $operatorId;
+                    $data['current_page'] = $page;
+                    $data['per_page'] = $perPage;
+                    $data['stats'] = $this->getStoresStats();
                 }
                 break;
                 
@@ -1486,6 +1573,8 @@ class Games extends Controller {
                 return view('games/statistics/players', $data);
             case 'operators':
                 return view('games/statistics/operators', $data);
+            case 'stores':
+                return view('games/statistics/stores', $data);
             default:
                 return view('games/statistics/summary', $data);
         }
@@ -1727,36 +1816,38 @@ class Games extends Controller {
 
     private function getUsersStats() {
         $modelUsers = new UsersModel();
+        $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+        $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
 
         $stats = [];
         
-        // Total de usuarios
-        $stats['total_users'] = $modelUsers->where('deleted', 0)->countAllResults();
+        // Total de usuarios regulares (excluyendo Puntos de Venta y Operadores)
+        $stats['total_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('deleted', 0)->countAllResults();
         
         // Usuarios activos
-        $stats['active_users'] = $modelUsers->where('status', 1)->where('deleted', 0)->countAllResults();
+        $stats['active_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('status', 1)->where('deleted', 0)->countAllResults();
         
         // Usuarios baneados
-        $stats['banned_users'] = $modelUsers->where('status', 0)->where('deleted', 0)->countAllResults();
+        $stats['banned_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('status', 0)->where('deleted', 0)->countAllResults();
         
         // Usuarios por grupo
         $stats['admin_users'] = $modelUsers->where('group', 1)->where('deleted', 0)->countAllResults();
         $stats['player_users'] = $modelUsers->where('group', 0)->where('deleted', 0)->countAllResults();
         
         // Total en wallets
-        $stats['total_wallet'] = $modelUsers->where('deleted', 0)->selectSum('wallet')->get()->getRow()->wallet ?? 0;
+        $stats['total_wallet'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('deleted', 0)->selectSum('wallet')->get()->getRow()->wallet ?? 0;
         
         // Promedio por usuario
         $stats['avg_wallet'] = $stats['total_users'] > 0 ? $stats['total_wallet'] / $stats['total_users'] : 0;
         
         // Usuarios registrados hoy
-        $stats['today_users'] = $modelUsers->where('DATE(created_at)', date('Y-m-d'))->where('deleted', 0)->countAllResults();
+        $stats['today_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('DATE(created_at)', date('Y-m-d'))->where('deleted', 0)->countAllResults();
         
         // Usuarios registrados esta semana
-        $stats['week_users'] = $modelUsers->where('created_at >=', date('Y-m-d', strtotime('-7 days')))->where('deleted', 0)->countAllResults();
+        $stats['week_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('created_at >=', date('Y-m-d', strtotime('-7 days')))->where('deleted', 0)->countAllResults();
         
         // Usuarios registrados este mes
-        $stats['month_users'] = $modelUsers->where('created_at >=', date('Y-m-d', strtotime('-30 days')))->where('deleted', 0)->countAllResults();
+        $stats['month_users'] = $modelUsers->whereNotIn('group', [$storeGroup, $operatorGroup])->where('created_at >=', date('Y-m-d', strtotime('-30 days')))->where('deleted', 0)->countAllResults();
         
         return $stats;
     }
@@ -1772,6 +1863,21 @@ class Games extends Controller {
         $stats['total_wallet'] = (float) ($modelUsers->where('group', $operatorGroup)->where('deleted', 0)->selectSum('wallet')->get()->getRow()->wallet ?? 0);
         $stats['avg_wallet'] = $stats['total_operators'] > 0 ? $stats['total_wallet'] / $stats['total_operators'] : 0;
         $stats['today_operators'] = $modelUsers->where('group', $operatorGroup)->where('DATE(created_at)', date('Y-m-d'))->where('deleted', 0)->countAllResults();
+        
+        return $stats;
+    }
+
+    private function getStoresStats() {
+        $modelUsers = new UsersModel();
+        $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+
+        $stats = [];
+        $stats['total_stores'] = $modelUsers->where('group', $storeGroup)->where('deleted', 0)->countAllResults();
+        $stats['active_stores'] = $modelUsers->where('group', $storeGroup)->where('status', 1)->where('deleted', 0)->countAllResults();
+        $stats['banned_stores'] = $modelUsers->where('group', $storeGroup)->where('status', 0)->where('deleted', 0)->countAllResults();
+        $stats['total_wallet'] = (float) ($modelUsers->where('group', $storeGroup)->where('deleted', 0)->selectSum('wallet')->get()->getRow()->wallet ?? 0);
+        $stats['avg_wallet'] = $stats['total_stores'] > 0 ? $stats['total_wallet'] / $stats['total_stores'] : 0;
+        $stats['today_stores'] = $modelUsers->where('group', $storeGroup)->where('DATE(created_at)', date('Y-m-d'))->where('deleted', 0)->countAllResults();
         
         return $stats;
     }
@@ -2352,10 +2458,18 @@ class Games extends Controller {
             $pushService = new SimplePushService();
 
             $currentUserId = session()->get('id');
-            $users = $modelUsers->where('id !=', $currentUserId)->findAll();
+            $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+            $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+            $users = $modelUsers->where('id !=', $currentUserId)
+                                ->whereNotIn('group', [$operatorGroup, $storeGroup])
+                                ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
             foreach ($users as $user) {
+                $userGroup = (int) ($user['group'] ?? 0);
+                if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
+                    continue;
+                }
 
                 $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
 
@@ -2780,10 +2894,18 @@ class Games extends Controller {
             $pushService = new SimplePushService();
 
             $currentUserId = session()->get('id');
-            $users = $modelUsers->where('id !=', $currentUserId)->findAll();
+            $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+            $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+            $users = $modelUsers->where('id !=', $currentUserId)
+                                ->whereNotIn('group', [$operatorGroup, $storeGroup])
+                                ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
             foreach ($users as $user) {
+                $userGroup = (int) ($user['group'] ?? 0);
+                if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
+                    continue;
+                }
 
                 $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
 

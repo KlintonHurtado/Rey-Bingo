@@ -332,7 +332,7 @@
                                         <?php endif; ?>
                                         <td><?= $payment['bank']; ?></td>
                                         <td class="text-center">
-                                            <?php if ($payment['type'] == 'retire' || $payment['type'] == 'purchase'): ?>
+                                            <?php if ($payment['type'] == 'retire' || $payment['type'] == 'purchase' || in_array($payment['type'], ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit'], true)): ?>
                                                 <strong class="icon-danger">
                                                     -<?= systemGet('currency'); ?> <?= number_format($payment['amount'], 2); ?>
                                                 </strong>
@@ -784,7 +784,7 @@
 
                 let amountHtml = '';
 
-                if (payment.type === 'retire' || payment.type === 'purchase') {
+                if (payment.type === 'retire' || payment.type === 'purchase' || ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit'].includes(payment.type)) {
                     amountHtml = `
                         <strong class="icon-danger">
                             -<?= systemGet('currency'); ?> ${formatNumber(payment.amount)}

@@ -34,6 +34,7 @@
                         <label for="retire-receiver" class="form-label"><?= translate('receiver bank'); ?></label>
                         <select class='form-control form-control-lg form-bingo' name="retire-receiver" id="retire-receiver" onchange="retirebankGet();">
                             <option value=""><?= translate('receiver bank'); ?></option>
+                            <option value="store">🏪 Punto de Venta (Cobro en Efectivo)</option>
                             <option value="0"><?= translate('new bank'); ?></option>
                             <?php if (isset($user['bank']) && !empty($user['bank'])): ?>
                                 <option value="<?= $user['bank'] ?>"><?= $user['bank'] ?></option>
@@ -347,6 +348,24 @@
             newBankDiv.style.display = 'block';
             currentBankDiv.style.display = 'block';
             saveaccountBankDiv.style.display = 'block';
+        } else if (bankId === "store") {
+            currentBankDiv.style.display = 'block';
+            saveaccountBankDiv.style.display = 'none';
+            infoBankDiv.innerHTML = `
+                <div class="card shadow-sm p-3 mb-2 border-0" style="border-radius: 12px; width: 100%; background: linear-gradient(135deg, rgba(75,114,250,0.08) 0%, rgba(75,114,250,0.02) 100%); border: 1px solid rgba(75,114,250,0.25) !important;">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="text-primary text-center pt-1" style="font-size: 1.8rem; min-width: 40px;">
+                            <i class="fa-duotone fa-solid fa-store"></i>
+                        </div>
+                        <div>
+                            <strong class="d-block text-primary fs-6">Retiro en Efectivo - Punto de Venta</strong>
+                            <small class="text-muted d-block mt-1">
+                                Ingresa el monto a retirar. Al enviar tu solicitud, te enviaremos un <strong>código de retiro alfanumérico a tu correo</strong>. Podrás cobrar tu dinero en efectivo en cualquier Punto de Venta presentando tu número de cédula y el código.
+                            </small>
+                        </div>
+                    </div>
+                </div>`;
+            infoBankDiv.style.display = 'block';
         } else {
             currentBankDiv.style.display = 'block';
             saveaccountBankDiv.style.display = 'none';

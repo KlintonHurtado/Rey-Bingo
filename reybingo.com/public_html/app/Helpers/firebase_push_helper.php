@@ -3,8 +3,19 @@
 if (!function_exists('send_firebase_push_to_all')) {
     function send_firebase_push_to_all($title, $body, $url = '')
     {
-        $tokenModel = new \App\Models\FirebaseTokenModel();
-        $tokens = $tokenModel->findAll();
+        $db = \Config\Database::connect();
+        $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+        $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+
+        $tokens = $db->table('firebase_tokens ft')
+            ->select('ft.token')
+            ->join('users u', 'u.id = ft.user_id', 'left')
+            ->groupStart()
+                ->where('ft.user_id IS NULL')
+                ->orWhere('ft.user_id', 0)
+                ->orWhereNotIn('u.group', [$operatorGroup, $storeGroup])
+            ->groupEnd()
+            ->get()->getResultArray();
 
         if (empty($tokens)) {
             return false;

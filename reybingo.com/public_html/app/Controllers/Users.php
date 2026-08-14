@@ -227,7 +227,8 @@ class Users extends Controller {
             'roulette' => 1,
             'wallet' => 0,
             'document' => $document,
-            'phone' => '',
+            'phone' => trim((string) $this->request->getPost('phone')),
+            'address_line' => trim((string) $this->request->getPost('address_line')),
             'bank' => '',
             'account' => '',
             'image' => '',
@@ -257,6 +258,8 @@ class Users extends Controller {
                 'business_name' => $data['business_name'],
                 'email' => $email,
                 'document' => $document,
+                'phone' => $data['phone'],
+                'address_line' => $data['address_line'],
                 'store_commission_rate' => $storeCommissionRate,
                 'ggr_commission_rate' => $ggrCommissionRate,
                 'store_prize_commission_rate' => $prizeCommissionRate,
@@ -1136,8 +1139,82 @@ class Users extends Controller {
             ]);
         }
 
+        $normalizedOld = wallet_service()->normalizeUser($player);
+        $oldBonus = (float) ($normalizedOld['wallet_bonus'] ?? 0);
+        $oldRecharge = (float) ($normalizedOld['wallet_recharge'] ?? 0);
+        $oldWithdraw = (float) ($normalizedOld['wallet_withdraw'] ?? 0);
+
+        $diffBonus = round($bonus - $oldBonus, 2);
+        $diffRecharge = round($recharge - $oldRecharge, 2);
+        $diffWithdraw = round($withdraw - $oldWithdraw, 2);
+
         wallet_set_balances($userId, $bonus, $recharge, $withdraw);
         $updated = wallet_service()->normalizeUser($modelUsers->find($userId) ?: $player);
+
+        $adminId = (int) session()->get('id');
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelNotifications = new \App\Models\NotificationsModel();
+        $currency = systemGet('currency') ?? '$';
+
+        if (abs($diffBonus) > 0.009) {
+            $isCredit = $diffBonus > 0;
+            $modelPayments->insert([
+                'user'    => $userId,
+                'type'    => $isCredit ? 'admin_bonus' : 'admin_bonus_debit',
+                'type_id' => $adminId,
+                'amount'  => abs($diffBonus),
+                'status'  => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId,
+                'type'    => 'bonus',
+                'type_id' => $userId,
+                'title'   => $isCredit ? '🎁 BONO ACREDITADO (ADMIN)' : 'ℹ️ AJUSTE DE BONO (ADMIN)',
+                'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffBonus), 2) . ' en tu saldo de bono por administración.',
+            ]);
+        }
+
+        if (abs($diffRecharge) > 0.009) {
+            $isCredit = $diffRecharge > 0;
+            $modelPayments->insert([
+                'user'    => $userId,
+                'type'    => $isCredit ? 'admin_recharge_credit' : 'admin_recharge_debit',
+                'type_id' => $adminId,
+                'amount'  => abs($diffRecharge),
+                'status'  => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId,
+                'type'    => 'deposit',
+                'type_id' => $userId,
+                'title'   => $isCredit ? '💰 SALDO RECARGA ACREDITADO' : 'ℹ️ AJUSTE SALDO RECARGA',
+                'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffRecharge), 2) . ' en tu saldo de recarga por administración.',
+            ]);
+        }
+
+        if (abs($diffWithdraw) > 0.009) {
+            $isCredit = $diffWithdraw > 0;
+            $modelPayments->insert([
+                'user'    => $userId,
+                'type'    => $isCredit ? 'admin_withdraw_credit' : 'admin_withdraw_debit',
+                'type_id' => $adminId,
+                'amount'  => abs($diffWithdraw),
+                'status'  => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $userId,
+                'from'    => $adminId,
+                'type'    => 'payment',
+                'type_id' => $userId,
+                'title'   => $isCredit ? '💵 SALDO RETIRABLE ACREDITADO' : 'ℹ️ AJUSTE SALDO RETIRABLE',
+                'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffWithdraw), 2) . ' en tu saldo retirable por administración.',
+            ]);
+        }
 
         return $this->response->setJSON([
             'success' => true,

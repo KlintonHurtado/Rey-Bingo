@@ -241,6 +241,8 @@ class Signup extends Controller {
         $lastUser = $model->orderBy('id', 'DESC')->first();
         $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
 
+        $phoneInput = trim((string) $this->request->getPost('phone'));
+
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
@@ -255,7 +257,7 @@ class Signup extends Controller {
             'autodial' => 1,
             'roulette' => 1,
             'wallet' => 0,
-            'phone' => '8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT),
+            'phone' => $phoneInput !== '' ? $phoneInput : ('8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT)),
             'bank' => '',
             'account' => '',
             'image' => '',
@@ -372,6 +374,8 @@ class Signup extends Controller {
         $lastUser = $model->orderBy('id', 'DESC')->first();
         $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
 
+        $phoneInput = trim((string) $this->request->getPost('phone'));
+
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
@@ -387,7 +391,7 @@ class Signup extends Controller {
             'autodial' => 1,
             'roulette' => 1,
             'wallet' => 0,
-            'phone' => '8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT),
+            'phone' => $phoneInput !== '' ? $phoneInput : ('8' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT)),
             'bank' => '',
             'account' => '',
             'image' => '',
@@ -483,6 +487,10 @@ class Signup extends Controller {
             'phone' => [
                 'label' => translate('phone'),
                 'rules' => 'required|numeric|is_unique[users.phone]'
+            ],
+            'address_line' => [
+                'label' => translate('address'),
+                'rules' => 'permit_empty|min_length[3]'
             ]
         ];
 

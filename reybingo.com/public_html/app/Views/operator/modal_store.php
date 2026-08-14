@@ -19,6 +19,12 @@
                     </div>
 
                     <div class="col-md-12 mb-2">
+                        <label for="operator-store-phone" class="form-label"><?= translate('phone'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="phone" id="operator-store-phone" placeholder="<?= translate('phone'); ?>" autocomplete="off">
+                        <small id="phone-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-12 mb-2">
                         <label for="operator-store-address_line" class="form-label"><?= translate('address'); ?></label>
                         <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="operator-store-address_line" placeholder="<?= translate('address'); ?>" autocomplete="off">
                         <small id="address_line-error" class="text-danger d-none"></small>

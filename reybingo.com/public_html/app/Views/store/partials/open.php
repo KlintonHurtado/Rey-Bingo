@@ -87,15 +87,9 @@ $storeUser = $storeUser ?? [];
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'withdraw' ? 'active' : '' ?>" href="<?= site_url('store/withdraw'); ?>">
-                                <i class="fa-duotone fa-solid fa-arrow-up-from-bracket"></i>
-                                <span><?= translate('withdraw store earnings'); ?></span>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'prizes' ? 'active' : '' ?>" href="<?= site_url('store/prizes'); ?>">
-                                <i class="fa-duotone fa-solid fa-trophy-star"></i>
-                                <span><?= translate('pay prizes from store'); ?></span>
+                                <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
+                                <span>Pagar Notas de Retiro</span>
                                 <?php if (($pendingPrizes ?? 0) > 0) : ?>
                                     <span class="badge bg-warning text-dark ms-1"><?= (int) $pendingPrizes; ?></span>
                                 <?php endif; ?>

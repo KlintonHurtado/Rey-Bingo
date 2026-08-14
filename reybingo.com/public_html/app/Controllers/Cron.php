@@ -1407,13 +1407,21 @@ class Cron extends Controller
         $modelAwards = new AwardsModel();
         $modelNotifications = new NotificationsModel();
 
-        // Obtener todos los usuarios activos
-        $users = $modelUsers->where('status', 1)->findAll();
+        // Obtener usuarios activos excluyendo operador y punto de venta
+        $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+        $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+        $users = $modelUsers->where('status', 1)
+                            ->whereNotIn('group', [$operatorGroup, $storeGroup])
+                            ->findAll();
         
         // Calcular premio total
         $totalPrize = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
         foreach ($users as $user) {
+            $userGroup = (int) ($user['group'] ?? 0);
+            if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
+                continue;
+            }
             $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($totalPrize, 2) : translate('accumulated');
 
             $notificationData = [

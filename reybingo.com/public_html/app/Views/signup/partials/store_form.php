@@ -77,6 +77,12 @@ $roleLabel = translate('point of sale');
                 <small id="<?= esc($fieldPrefix); ?>-document-error" class="text-danger d-none"></small>
             </div>
 
+            <div class="col-12 col-md-6 store-signup-form-field">
+                <label for="<?= esc($fieldPrefix); ?>-phone" class="form-label"><?= translate('phone'); ?></label>
+                <input type="text" class="form-control form-control-lg form-bingo" name="phone" id="<?= esc($fieldPrefix); ?>-phone" autocomplete="tel" required>
+                <small id="<?= esc($fieldPrefix); ?>-phone-error" class="text-danger d-none"></small>
+            </div>
+
             <div class="col-12 store-signup-form-field">
                 <label for="<?= esc($fieldPrefix); ?>-address_line" class="form-label"><?= translate('address'); ?></label>
                 <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="<?= esc($fieldPrefix); ?>-address_line" autocomplete="street-address" required>

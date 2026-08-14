@@ -632,7 +632,176 @@ class Store extends Controller
 
         return $this->renderStorePage('store/prizes', [
             'pendingCount' => $this->countStorePendingPrizes(),
-        ], translate('pay prizes from store'));
+        ], 'Pagar Notas de Retiro');
+    }
+
+    public function lookupRetireNote()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $document = trim((string) $this->request->getPost('document'));
+        $code = strtoupper(trim((string) $this->request->getPost('code')));
+
+        if ($document === '' && $code === '') {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ingrese el número de cédula y/o el código de retiro.',
+            ]);
+        }
+
+        $modelRetires = new RetiresModel();
+        $modelUsers = new UsersModel();
+
+        $builder = $modelRetires->builder();
+        $builder->where('bank', 'Punto de Venta');
+        $builder->where('status', 1);
+
+        if ($code !== '') {
+            $builder->where('account', $code);
+        }
+        if ($document !== '') {
+            $builder->where('document', $document);
+        }
+
+        $retire = $builder->orderBy('id', 'DESC')->get()->getRowArray();
+
+        if (! $retire) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No se encontró ninguna nota de retiro pendiente con la cédula y código ingresados.',
+            ]);
+        }
+
+        $player = $modelUsers->find((int) $retire['user']);
+        $playerName = $player ? trim($player['firstname'] . ' ' . $player['lastname']) : 'Jugador';
+        $playerCode = $player['code'] ?? '';
+
+        return $this->response->setJSON([
+            'success' => true,
+            'retire' => [
+                'id'             => (int) $retire['id'],
+                'code'           => $retire['account'],
+                'amount'         => (float) $retire['amount'],
+                'document'       => $retire['document'] ?: ($player['document'] ?? ''),
+                'player_name'    => $playerName,
+                'player_code'    => $playerCode,
+                'player_id'      => (int) $retire['user'],
+                'date_formatted' => date('d/m/Y H:i', strtotime($retire['created_at'])),
+                'created_at'     => $retire['created_at'],
+            ],
+        ]);
+    }
+
+    public function payRetireSubmit()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $retireId = (int) $this->request->getPost('retire_id');
+        $code = strtoupper(trim((string) $this->request->getPost('code')));
+        $document = trim((string) $this->request->getPost('document'));
+
+        $modelRetires = new RetiresModel();
+        $modelUsers = new UsersModel();
+        $modelNotifications = new NotificationsModel();
+        $modelPayments = new PaymentsModel();
+
+        $retire = null;
+        if ($retireId > 0) {
+            $retire = $modelRetires->find($retireId);
+        }
+        if (! $retire && $code !== '') {
+            $retire = $modelRetires->where('bank', 'Punto de Venta')->where('account', $code)->first();
+        }
+
+        if (! $retire || (int) $retire['status'] !== 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'La nota de retiro no existe o ya fue procesada anteriormente.',
+            ]);
+        }
+
+        $playerId = (int) $retire['user'];
+        $player = wallet_service()->normalizeUser($modelUsers->find($playerId));
+
+        if (! $player) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Jugador no encontrado.',
+            ]);
+        }
+
+        $amount = (float) $retire['amount'];
+        if (wallet_withdrawable($player) < $amount) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'El saldo retirable disponible del jugador (' . systemGet('currency') . ' ' . number_format(wallet_withdrawable($player), 2) . ') es inferior al monto a retirar.',
+            ]);
+        }
+
+        if (! wallet_deduct_withdrawable($playerId, $amount)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No se pudo debitar el saldo del jugador.',
+            ]);
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $storeUser = $modelUsers->find($storeId);
+        $storeName = bingo_store_display_name($storeUser ?: []);
+
+        $observation = 'Pagado en efectivo por Punto de Venta: ' . $storeName . ' (ID #' . $storeId . ') el ' . date('d/m/Y H:i:s');
+        $modelRetires->update($retire['id'], [
+            'status'      => 2,
+            'observation' => $observation,
+        ]);
+
+        $modelPayments->insert([
+            'user'    => $playerId,
+            'type'    => 'retire',
+            'type_id' => $retire['id'],
+            'amount'  => $amount,
+            'status'  => 2,
+        ]);
+
+        $commission = 0.0;
+        if (function_exists('bingo_credit_store_operation_commission')) {
+            $commission = bingo_credit_store_operation_commission(
+                $storeId,
+                $amount,
+                'store_prize_commission',
+                (int) $retire['id'],
+                $storeUser,
+                (int) session()->get('id')
+            );
+        }
+
+        $modelNotifications->insert([
+            'user'    => $playerId,
+            'from'    => $storeId,
+            'type'    => 'retire',
+            'type_id' => $retire['id'],
+            'title'   => '💵 RETIRO ENTREGADO EN PUNTO DE VENTA',
+            'message' => 'Tu retiro por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' fue pagado en efectivo en el Punto de Venta ' . $storeName . '. Código: ' . $retire['account'],
+        ]);
+
+        $updatedStore = wallet_summary_payload($modelUsers->find($storeId));
+
+        $message = 'Retiro de ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' pagado exitosamente en efectivo.';
+        if ($commission > 0) {
+            $message .= ' Comisión acreditada al punto de venta: ' . systemGet('currency') . ' ' . number_format($commission, 2);
+        }
+
+        return $this->response->setJSON([
+            'success'       => true,
+            'message'       => $message,
+            'amount'        => $amount,
+            'commission'    => $commission,
+            'store_balance' => $updatedStore['recharge'] ?? null,
+        ]);
     }
 
     public function prizesListGet()
@@ -641,113 +810,37 @@ class Store extends Controller
             return $this->response->setStatusCode(403)->setBody(translate('unauthorized'));
         }
 
-        $modelSings = new SingsModel();
+        $modelRetires = new RetiresModel();
+        $modelUsers = new UsersModel();
         $perPage = 10;
         $page = max(1, (int) ($this->request->getGet('page') ?? 1));
         $offset = ($page - 1) * $perPage;
-        $playerId = (int) ($this->request->getGet('player_id') ?? 0);
-        $status = (string) ($this->request->getGet('status') ?? '1');
+        $storeId = $this->getEffectiveStoreId();
 
-        if ($playerId <= 0) {
-            return view('store/prizes_list', [
-                'sings' => [],
-                'currentPage' => 1,
-                'totalPages' => 1,
-                'totalRecords' => 0,
-                'per_page' => $perPage,
-                'showPagination' => false,
-                'requiresPlayer' => true,
-            ]);
-        }
+        $builder = $modelRetires->builder();
+        $builder->where('bank', 'Punto de Venta');
+        $builder->where('status', 2);
+        $builder->like('observation', 'ID #' . $storeId);
 
-        $modelUsers = new UsersModel();
-        $player = $modelUsers
-            ->where('id', $playerId)
-            ->where('group', bingo_group_player())
-            ->where('deleted', 0)
-            ->where('status', 1)
-            ->first();
-
-        if (! $player) {
-            return view('store/prizes_list', [
-                'sings' => [],
-                'currentPage' => 1,
-                'totalPages' => 1,
-                'totalRecords' => 0,
-                'per_page' => $perPage,
-                'showPagination' => false,
-                'playerNotFound' => true,
-            ]);
-        }
-
-        $builder = $modelSings->builder();
-        $builder->select('sings.*');
-        $builder->where('sings.user', $playerId);
-
-        if ($status !== 'all' && $status !== '') {
-            $builder->where('sings.status', (int) $status);
-        }
-
-        $builder->orderBy('sings.id', 'DESC');
         $totalRecords = $builder->countAllResults(false);
-        $sings = $builder->limit($perPage, $offset)->get()->getResultArray();
+        $retires = $builder->orderBy('id', 'DESC')->limit($perPage, $offset)->get()->getResultArray();
         $totalPages = max(1, (int) ceil($totalRecords / $perPage));
 
-        $data = [
-            'sings' => bingo_enrich_winner_sings($sings),
-            'currentPage' => $page,
-            'totalPages' => $totalPages,
-            'totalRecords' => $totalRecords,
-            'per_page' => $perPage,
+        foreach ($retires as &$r) {
+            $player = $modelUsers->find((int) $r['user']);
+            $r['player_name'] = $player ? trim($player['firstname'] . ' ' . $player['lastname']) : 'Jugador';
+            $r['player_code'] = $player['code'] ?? '';
+            $r['code'] = $r['account'] ?: ('#' . $r['id']);
+        }
+        unset($r);
+
+        return view('store/prizes_list', [
+            'retires'        => $retires,
+            'currentPage'    => $page,
+            'totalPages'     => $totalPages,
+            'totalRecords'   => $totalRecords,
+            'per_page'       => $perPage,
             'showPagination' => $totalPages > 1,
-        ];
-
-        return view('store/prizes_list', $data);
-    }
-
-    public function payAwardSubmit()
-    {
-        if (! session()->get('logged_in') || ! bingo_is_store()) {
-            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
-        }
-
-        if (! $this->request->isAJAX()) {
-            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
-        }
-
-        $requestData = $this->request->getJSON();
-        $singId = (int) ($requestData->id ?? 0);
-        $action = (string) ($requestData->action ?? '');
-
-        if ($singId <= 0 || $action !== 'pay') {
-            return $this->response->setJSON(['success' => false, 'error' => translate('incomplete data')]);
-        }
-
-        $storeId = $this->getEffectiveStoreId();
-        $result = bingo_pay_sing_award($singId, $storeId, [
-            'debit_store' => true,
-            'store_id'    => $storeId,
-        ]);
-
-        if (! ($result['success'] ?? false)) {
-            return $this->response->setJSON([
-                'success' => false,
-                'error'   => $result['error'] ?? translate('there was an error in the request to the server.'),
-            ]);
-        }
-
-        $message = translate('prize paid successfully from store');
-        if (! empty($result['commission']) && (float) $result['commission'] > 0) {
-            $message .= '. ' . translate('store commission credited') . ': '
-                . systemGet('currency') . ' ' . number_format((float) $result['commission'], 2);
-        }
-
-        return $this->response->setJSON([
-            'success'       => true,
-            'amount'        => $result['amount'] ?? '0.00',
-            'store_balance' => $result['store_balance'] ?? null,
-            'commission'    => $result['commission'] ?? null,
-            'message'       => $message,
         ]);
     }
 
@@ -757,30 +850,7 @@ class Store extends Controller
             return $redirect;
         }
 
-        $storeId = $this->getEffectiveStoreId();
-        $storeUser = $this->getFreshStoreUser() ?? [];
-        $modelRetires = new RetiresModel();
-
-        $retires = $modelRetires
-            ->where('user', $storeId)
-            ->orderBy('created_at', 'DESC')
-            ->findAll(30);
-
-        foreach ($retires as &$retire) {
-            $retire['status_label'] = $this->formatRetireStatus((int) ($retire['status'] ?? 0));
-        }
-        unset($retire);
-
-        $earningsSummary = bingo_fetch_store_withdraw_summary($storeId, $storeUser);
-
-        return $this->renderStorePage('store/withdraw', [
-            'withdrawable' => $earningsSummary['wallet_withdraw'],
-            'earningsSummary' => $earningsSummary,
-            'retires' => $retires,
-            'retireEnabled' => (string) (systemGet('activateRetire') ?? '1') === '1',
-            'minimumRetire' => (float) (systemGet('minimumRetire') ?? 0),
-            'maximumRetire' => (float) (systemGet('maximumRetire') ?? 0),
-        ], translate('withdraw store earnings'));
+        return redirect()->to(site_url('store/affiliate'));
     }
 
     public function affiliate()
@@ -887,9 +957,9 @@ class Store extends Controller
 
     private function countStorePendingPrizes(): int
     {
-        $modelSings = new SingsModel();
+        $modelRetires = new RetiresModel();
 
-        return (int) $modelSings->where('status', 1)->countAllResults();
+        return (int) $modelRetires->where('bank', 'Punto de Venta')->where('status', 1)->countAllResults();
     }
 
     private function formatRetireStatus(int $status): string

@@ -4596,9 +4596,27 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                 continue;
             }
 
+            if ($ptype === 'admin_bonus_debit') {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'bonus',
+                    'type_label' => 'Ajuste Bono (Admin)',
+                    'direction' => '-',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'bonus',
+                    'source_label' => 'Saldo Bono',
+                    'detail' => 'Ajuste de saldo de bono por administración',
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
             $bonusLabels = [
                 'registration_bonus' => 'Bono de registro',
-                'admin_bonus' => 'Bono admin',
+                'admin_bonus' => 'Acreditación Bono (Admin)',
                 'bonus' => 'Bono',
                 'referred' => 'Comisión referido',
                 'referral' => 'Comisión referido',
@@ -4615,6 +4633,78 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                     'source' => 'bonus',
                     'source_label' => 'Saldo Bono',
                     'detail' => 'Tipo: ' . $ptype,
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            if (in_array($ptype, ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit'], true)) {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'retire',
+                    'type_label' => $ptype === 'admin_recharge_debit' ? 'Ajuste Recarga (Admin)' : 'Retiro de saldo',
+                    'direction' => '-',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'recharge',
+                    'source_label' => 'Saldo Recarga',
+                    'detail' => 'Débito de saldo' . ($typeId > 0 ? (' (Ref #' . $typeId . ')') : ''),
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            if ($ptype === 'admin_withdraw_debit') {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'retire',
+                    'type_label' => 'Ajuste Retiro (Admin)',
+                    'direction' => '-',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'withdraw',
+                    'source_label' => 'Saldo Retiro',
+                    'detail' => 'Débito de saldo retirable por administración',
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            if (in_array($ptype, ['operator_store_credit', 'admin_operator_pay', 'admin_operator_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit'], true)) {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'deposit',
+                    'type_label' => $ptype === 'admin_recharge_credit' ? 'Acreditación Recarga (Admin)' : 'Acreditación de saldo',
+                    'direction' => '+',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'recharge',
+                    'source_label' => 'Saldo Recarga',
+                    'detail' => 'Acreditación de saldo' . ($typeId > 0 ? (' (Ref #' . $typeId . ')') : ''),
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            if ($ptype === 'admin_withdraw_credit') {
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'deposit',
+                    'type_label' => 'Acreditación Retiro (Admin)',
+                    'direction' => '+',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'withdraw',
+                    'source_label' => 'Saldo Retiro',
+                    'detail' => 'Acreditación de saldo retirable por administración',
                     'ref_table' => 'payments',
                     'ref_id' => (int) ($pay['id'] ?? 0),
                 ]);

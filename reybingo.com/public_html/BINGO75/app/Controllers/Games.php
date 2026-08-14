@@ -1965,10 +1965,18 @@ class Games extends Controller {
             $pushService = new SimplePushService();
 
             $currentUserId = session()->get('id');
-            $users = $modelUsers->where('id !=', $currentUserId)->findAll();
+            $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+            $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+            $users = $modelUsers->where('id !=', $currentUserId)
+                                ->whereNotIn('group', [$operatorGroup, $storeGroup])
+                                ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
             foreach ($users as $user) {
+                $userGroup = (int) ($user['group'] ?? 0);
+                if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
+                    continue;
+                }
 
                 $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
 
@@ -2328,10 +2336,18 @@ class Games extends Controller {
             $pushService = new SimplePushService();
 
             $currentUserId = session()->get('id');
-            $users = $modelUsers->where('id !=', $currentUserId)->findAll();
+            $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
+            $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
+            $users = $modelUsers->where('id !=', $currentUserId)
+                                ->whereNotIn('group', [$operatorGroup, $storeGroup])
+                                ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
             foreach ($users as $user) {
+                $userGroup = (int) ($user['group'] ?? 0);
+                if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
+                    continue;
+                }
 
                 $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
 

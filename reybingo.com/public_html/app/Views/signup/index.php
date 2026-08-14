@@ -41,6 +41,12 @@
                                 <small id="phone-error" class="text-danger d-none"></small>
                             </div>
 
+                            <div class="col-md-12 mb-1">
+                                <label for="address_line" class="form-label"><?= translate('address'); ?></label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="address_line" placeholder="<?= translate('address'); ?>" autocomplete="off">
+                                <small id="address_line-error" class="text-danger d-none"></small>
+                            </div>
+
                             <div class="col-md-12">
                                 <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-3" id="signup-step-button"><?= translate('continue'); ?></button>
                             </div>
@@ -129,7 +135,8 @@
                 firstname: $('#firstname').val(),
                 lastname: $('#lastname').val(),
                 document: $('#document').val(),
-                phone: $('#phone').val()
+                phone: $('#phone').val(),
+                address_line: $('#address_line').val()
             };
 
             $.ajax({

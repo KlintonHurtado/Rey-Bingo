@@ -65,16 +65,6 @@
                             <button
                                 type="button"
                                 class="nav-link operator-panel-tab operator-tool-tab"
-                                data-operator-tab="withdraw-operator"
-                            >
-                                <i class="fa-duotone fa-solid fa-arrow-up-from-bracket"></i>
-                                <span><?= translate('withdraw operator earnings'); ?></span>
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button
-                                type="button"
-                                class="nav-link operator-panel-tab operator-tool-tab"
                                 data-operator-tab="commissions-stores"
                             >
                                 <i class="fa-duotone fa-solid fa-coins"></i>
@@ -264,20 +254,7 @@
                 </div>
             </div>
 
-            <div
-                class="card store-panel-card operator-panel-pane"
-                id="operator-pane-withdraw-operator"
-            >
-                <div class="card-body operator-panel-pane-body">
-                    <?= view('operator/partials/withdraw_operator', [
-                        'retires' => $retires ?? [],
-                        'earningsSummary' => $earningsSummary ?? [],
-                        'retireEnabled' => $retireEnabled ?? false,
-                        'minimumRetire' => $minimumRetire ?? 0,
-                        'maximumRetire' => $maximumRetire ?? 0,
-                    ]); ?>
-                </div>
-            </div>
+
 
             <div
                 class="card store-panel-card operator-panel-pane"

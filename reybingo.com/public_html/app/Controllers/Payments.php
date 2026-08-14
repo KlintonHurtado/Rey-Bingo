@@ -322,17 +322,18 @@ class Payments extends Controller {
             foreach ($payments as $payment) {
                 $user = $modelUsers->find($payment['user']);
 
-                if ($payment['type'] === 'registration_bonus' || $payment['type'] === 'admin_bonus') {
-                    $isAdminBonus = $payment['type'] === 'admin_bonus';
+                if ($payment['type'] === 'registration_bonus' || $payment['type'] === 'admin_bonus' || $payment['type'] === 'admin_bonus_debit') {
+                    $isAdminBonus = $payment['type'] === 'admin_bonus' || $payment['type'] === 'admin_bonus_debit';
+                    $isDebit = $payment['type'] === 'admin_bonus_debit';
                     $allTransactions[] = [
                         'id' => $payment['id'],
-                        'type' => 'bonus',
-                        'type_Tra' => $isAdminBonus ? translate('admin bonus') : translate('registration bonus'),
+                        'type' => $isDebit ? 'retire' : 'bonus',
+                        'type_Tra' => $isDebit ? 'Ajuste Bono (Admin)' : ($isAdminBonus ? 'Bono Admin' : translate('registration bonus')),
                         'user_id' => $payment['user'],
                         'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
                         'user_code' => $user ? $user['code'] : 'N/A',
                         'bank' => $isAdminBonus
-                            ? translate('admin bonus info')
+                            ? ($isDebit ? 'Ajuste de saldo de bono' : translate('admin bonus info'))
                             : translate('registration bonus info'),
                         'reference' => ($isAdminBonus ? 'ABO-' : 'ABN-') . str_pad($payment['id'], 4, '0', STR_PAD_LEFT),
                         'amount' => $payment['amount'],
@@ -358,6 +359,14 @@ class Payments extends Controller {
                     $typePayment = translate('per referred player');
                     $typeTra = translate('referred');
                     $ledgerType = 'referred';
+                } else if (in_array($payment['type'], ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit', 'admin_withdraw_debit'], true)) {
+                    $typePayment = $payment['type'] === 'admin_withdraw_debit' ? 'Ajuste Retiro (Admin)' : ($payment['type'] === 'admin_recharge_debit' ? 'Ajuste Recarga (Admin)' : 'Retiro de saldo');
+                    $typeTra = 'Retiro';
+                    $ledgerType = 'retire';
+                } else if (in_array($payment['type'], ['operator_store_credit', 'admin_operator_pay', 'admin_operator_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit', 'admin_withdraw_credit'], true)) {
+                    $typePayment = $payment['type'] === 'admin_withdraw_credit' ? 'Acreditación Retiro (Admin)' : ($payment['type'] === 'admin_recharge_credit' ? 'Acreditación Recarga (Admin)' : 'Acreditación de saldo');
+                    $typeTra = 'Recarga';
+                    $ledgerType = 'deposit';
                 }
 
                 $transaction = [
@@ -1729,6 +1738,19 @@ class Payments extends Controller {
 
                 $modelUsers->update(session()->get('id'), $dataBank);
             }
+        } else if ($receiver === "store") {
+            $retireCode = 'RET-' . strtoupper(substr(str_shuffle('23456789ABCDEFGHJKLMNPQRSTUVWXYZ'), 0, 6));
+            $data = [
+                'user'         => session()->get('id'),
+                'bank'         => 'Punto de Venta',
+                'account'      => $retireCode,
+                'account_type' => 'store_pickup',
+                'document'     => $user['document'] ?? '',
+                'phone'        => $user['phone'] ?? '',
+                'amount'       => $this->request->getPost('retire-amount'),
+                'observation'  => 'Código de retiro: ' . $retireCode,
+                'status'       => 1
+            ];
         } else {
             $accountType = bingo_normalize_account_type($user['account_type'] ?? '');
             if ($accountType === '') {
@@ -1780,6 +1802,10 @@ class Payments extends Controller {
 
         $currentUserId = session()->get('id');
 
+        if ($receiver === "store") {
+            $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
+        }
+
         $admins = $modelUsers->select('id')->where('group', 1)->findAll();
 
         foreach ($admins as $admin) {
@@ -1788,20 +1814,27 @@ class Payments extends Controller {
                 'from' => $currentUserId,
                 'type' => 'retire',
                 'type_id' => $retireId,
-                'title' => '📥 NUEVA SOLICITUD DE RETIRO',
-                'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha solicitado un retiro por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $reference . ' | Fecha: ' . date('d/m/Y'),
+                'title' => $receiver === 'store' ? '🏪 NUEVO RETIRO EN PUNTO DE VENTA' : '📥 NUEVA SOLICITUD DE RETIRO',
+                'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha solicitado un retiro por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ($receiver === 'store' ? (' (Código: ' . $data['account'] . ')') : (' | Ref: #' . $reference)) . ' | Fecha: ' . date('d/m/Y'),
             ];
 
             $modelNotifications->insert($notificationData);
         }
 
         if ($retireId) {
+            $responseMessage = $receiver === 'store'
+                ? 'Solicitud de retiro registrada. Tu código de retiro es ' . $data['account'] . ' y ha sido enviado a tu correo electrónico (' . ($user['email'] ?? '') . ').'
+                : translate('retire request sent successfully');
+
             $response = [
                 'success' => true,
+                'message' => $responseMessage,
+                'is_store' => ($receiver === 'store'),
+                'retire_code' => $receiver === 'store' ? $data['account'] : null,
                 'newRetire' => [
                     'id' => $retireId,
                     'type' => 'retire',
-                    'type_Tra' => translate('retire'),
+                    'type_Tra' => $receiver === 'store' ? 'Retiro Punto de Venta' : translate('retire'),
                     'user_id' => $data['user'],
                     'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
                     'user_code' => $user ? $user['code'] : 'N/A',
@@ -2372,6 +2405,36 @@ class Payments extends Controller {
         }
 
         return $this->response->setJSON(['success' => false, 'error' => translate('invalid action')]);
+    }
+
+    private function sendRetireStoreEmail(array $user, string $code, float $amount): bool
+    {
+        if (empty($user['email'])) {
+            return false;
+        }
+
+        try {
+            $emailConfig = \Config\Services::email();
+            $config = new \Config\Email();
+
+            $subject = '🏪 Código de Retiro en Punto de Venta - ' . (systemGet('name') ?: APP_NAME);
+            $message = view('emails/retire_store_code', [
+                'code'     => $code,
+                'user'     => $user,
+                'amount'   => $amount,
+                'currency' => systemGet('currency') ?? '$',
+            ]);
+
+            $emailConfig->setFrom($config->fromEmail, $config->fromName);
+            $emailConfig->setTo($user['email']);
+            $emailConfig->setSubject($subject);
+            $emailConfig->setMessage($message);
+
+            return (bool) $emailConfig->send();
+        } catch (\Throwable $e) {
+            log_message('error', 'Error sending retire store email: ' . $e->getMessage());
+            return false;
+        }
     }
 
 }

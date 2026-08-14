@@ -266,6 +266,7 @@ class Operator extends Controller
 
         $businessName = trim((string) $this->request->getPost('business_name'));
         $addressLine = trim((string) $this->request->getPost('address_line'));
+        $phoneInput = trim((string) $this->request->getPost('phone'));
         $lastUser = $model->orderBy('id', 'DESC')->first();
         $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
 
@@ -289,7 +290,7 @@ class Operator extends Controller
             'roulette' => 1,
             'wallet' => 0,
             'document' => 'ST-' . str_pad((string) $nextId, 8, '0', STR_PAD_LEFT),
-            'phone' => '9' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT),
+            'phone' => $phoneInput !== '' ? $phoneInput : ('9' . str_pad((string) $nextId, 10, '0', STR_PAD_LEFT)),
             'bank' => '',
             'account' => '',
             'image' => '',

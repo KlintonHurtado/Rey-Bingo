@@ -44,6 +44,18 @@
                         <small id="email-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-6 mb-2">
+                        <label for="phone" class="form-label"><?= translate('phone'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="phone" id="phone" value="<?= $isUpdate ? esc($storeData['phone'] ?? '') : '' ?>" autocomplete="off">
+                        <small id="phone-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label for="address_line" class="form-label"><?= translate('address'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="address_line" value="<?= $isUpdate ? esc($storeData['address_line'] ?? '') : '' ?>" autocomplete="off">
+                        <small id="address_line-error" class="text-danger d-none"></small>
+                    </div>
+
                     <div class="col-md-12 mb-2">
                         <label for="operator_id" class="form-label"><?= translate('operator'); ?></label>
                         <select class="form-control form-control-lg form-bingo" name="operator_id" id="operator_id">
