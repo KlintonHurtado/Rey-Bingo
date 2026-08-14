@@ -90,44 +90,41 @@ $stats = $stats ?? [];
         </div>
 
         <!-- Barra de Filtros -->
-        <div class="card border-0 bg-light p-3 mb-3" style="border-radius: 12px;">
+        <div class="store-movements-filters-bar mb-3 p-3" style="background: rgba(98, 54, 255, 0.04); border: 1px solid rgba(98, 54, 255, 0.12); border-radius: 14px;">
             <form id="form-filter-movements" onsubmit="return false;">
                 <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-3">
-                        <label for="filter-date-from" class="form-label small fw-bold mb-1">Fecha Desde</label>
-                        <input type="date" class="form-control form-control-sm form-bingo" id="filter-date-from" value="<?= esc($filters['date_from'] ?? ''); ?>">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label for="filter-date-from" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Fecha Desde</label>
+                        <input type="date" class="form-control store-filter-input" id="filter-date-from" value="<?= esc($filters['date_from'] ?? ''); ?>">
                     </div>
-                    <div class="col-12 col-md-3">
-                        <label for="filter-date-to" class="form-label small fw-bold mb-1">Fecha Hasta</label>
-                        <input type="date" class="form-control form-control-sm form-bingo" id="filter-date-to" value="<?= esc($filters['date_to'] ?? ''); ?>">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label for="filter-date-to" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Fecha Hasta</label>
+                        <input type="date" class="form-control store-filter-input" id="filter-date-to" value="<?= esc($filters['date_to'] ?? ''); ?>">
                     </div>
-                    <div class="col-12 col-md-2">
-                        <label for="filter-type" class="form-label small fw-bold mb-1">Tipo de Movimiento</label>
-                        <select class="form-control form-control-sm form-bingo" id="filter-type">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label for="filter-type" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Tipo de Movimiento</label>
+                        <select class="form-select form-control store-filter-input" id="filter-type">
                             <option value="all" <?= ($filters['type'] ?? '') === 'all' ? 'selected' : ''; ?>>Todos los tipos</option>
                             <option value="recharge" <?= ($filters['type'] ?? '') === 'recharge' ? 'selected' : ''; ?>>Recargas a Jugadores</option>
                             <option value="retire" <?= ($filters['type'] ?? '') === 'retire' ? 'selected' : ''; ?>>Pagos de Retiros</option>
                             <option value="credit" <?= ($filters['type'] ?? '') === 'credit' ? 'selected' : ''; ?>>Acreditaciones de Saldo</option>
-                            <option value="commission_ggr" <?= ($filters['type'] ?? '') === 'commission_ggr' ? 'selected' : ''; ?>>Comisión GGR Afiliados</option>
-                            <option value="commission_recharge" <?= ($filters['type'] ?? '') === 'commission_recharge' ? 'selected' : ''; ?>>Comisión por Recargas</option>
-                            <option value="commission_prize" <?= ($filters['type'] ?? '') === 'commission_prize' ? 'selected' : ''; ?>>Comisión Pago de Retiros</option>
-                            <option value="commission" <?= ($filters['type'] ?? '') === 'commission' ? 'selected' : ''; ?>>Todas las Comisiones</option>
+                            <option value="commission_ggr" <?= ($filters['type'] ?? '') === 'commission_ggr' ? 'selected' : ''; ?>>Comisión GGR</option>
+                            <option value="commission_recharge" <?= ($filters['type'] ?? '') === 'commission_recharge' ? 'selected' : ''; ?>>Comisión Recargas</option>
+                            <option value="commission_prize" <?= ($filters['type'] ?? '') === 'commission_prize' ? 'selected' : ''; ?>>Comisión Retiros</option>
                             <option value="debit" <?= ($filters['type'] ?? '') === 'debit' ? 'selected' : ''; ?>>Débitos / Ajustes</option>
                         </select>
                     </div>
-                    <div class="col-12 col-md-3">
-                        <label for="filter-search" class="form-label small fw-bold mb-1">Buscar (Cédula / Nombre / Código)</label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" class="form-control form-bingo" id="filter-search" placeholder="Cédula, nombre o código..." value="<?= esc($filters['search'] ?? ''); ?>">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label for="filter-search" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Buscar (Cédula / Nombre / Ref)</label>
+                        <div class="d-flex gap-1">
+                            <input type="text" class="form-control store-filter-input flex-grow-1" id="filter-search" placeholder="Cédula, nombre o código..." value="<?= esc($filters['search'] ?? ''); ?>">
+                            <button type="button" class="btn btn-primary" onclick="applyStoreMovementsFilter();" title="Buscar / Filtrar" style="background: #6236ff; border-color: #6236ff; border-radius: 10px; padding: 6px 14px; min-width: 42px;">
+                                <i class="fa-duotone fa-solid fa-magnifying-glass"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetStoreMovementsFilter();" title="Limpiar Filtros" style="border-radius: 10px; padding: 6px 12px; min-width: 38px;">
+                                <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                            </button>
                         </div>
-                    </div>
-                    <div class="col-12 col-md-1 d-flex gap-1">
-                        <button type="button" class="btn btn-sm btn-primary btn-bingo w-100 py-1" onclick="applyStoreMovementsFilter();" title="Filtrar">
-                            <i class="fa-duotone fa-solid fa-magnifying-glass"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary w-100 py-1" onclick="resetStoreMovementsFilter();" title="Limpiar">
-                            <i class="fa-duotone fa-solid fa-rotate-left"></i>
-                        </button>
                     </div>
                 </div>
             </form>

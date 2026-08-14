@@ -514,6 +514,25 @@ html:has(#content-page > .operator-panel-fit) {
     -webkit-overflow-scrolling: touch;
 }
 
+.store-filter-input {
+    width: 100% !important;
+    margin: 0 !important;
+    height: 42px !important;
+    border: 1.5px solid #d1d5db !important;
+    border-radius: 10px !important;
+    padding: 6px 12px !important;
+    font-size: 0.9rem !important;
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    box-shadow: none !important;
+}
+
+.store-filter-input:focus {
+    border-color: #6236ff !important;
+    box-shadow: 0 0 0 3px rgba(98, 54, 255, 0.15) !important;
+    outline: none !important;
+}
+
 .store-tab-form {
     justify-content: flex-start;
     align-content: flex-start;

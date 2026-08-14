@@ -28,10 +28,10 @@
                                     <span class="text-muted">Método:</span>
                                     <strong class="text-dark"><?= esc($pendingRetire['bank'] ?? '-'); ?></strong>
                                 </div>
-                                <?php if (($pendingRetire['bank'] ?? '') === 'Punto de Venta' && ! empty($pendingRetire['account'])): ?>
+                                <?php if (($pendingRetire['bank'] ?? '') === 'Punto de Venta'): ?>
                                     <div class="d-flex justify-content-between mb-1">
                                         <span class="text-muted">Código de Retiro:</span>
-                                        <strong class="font-monospace text-primary"><?= esc($pendingRetire['account']); ?></strong>
+                                        <strong class="text-primary small">Enviado a tu correo</strong>
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
@@ -218,19 +218,19 @@
                             updateTableRetire(response.newRetire);
                         }
 
-                        if (response.is_store && response.retire_code) {
+                        if (response.is_store) {
                             Swal.fire({
-                                title: '¡Código de Retiro Generado!',
+                                title: '¡Solicitud de Retiro Enviada!',
                                 html: `
                                     <div class="my-2">
-                                        <p class="mb-2">Tu código de retiro es:</p>
-                                        <div class="py-2 px-3 mb-3" style="background:#f7f5ff; border:2px dashed #6236ff; border-radius:10px;">
-                                            <span style="font-size: 1.8rem; font-weight: 800; color: #6236ff; font-family: monospace; letter-spacing: 3px;">
-                                                ${response.retire_code}
-                                            </span>
+                                        <div class="mb-3">
+                                            <i class="fa-duotone fa-solid fa-envelope-circle-check text-primary" style="font-size: 3rem;"></i>
                                         </div>
+                                        <p class="mb-2 fw-semibold text-dark" style="font-size: 1rem;">
+                                            Tu código de retiro ha sido enviado a tu correo electrónico registrado.
+                                        </p>
                                         <p class="small text-muted mb-0">
-                                            Hemos enviado el código y las instrucciones a tu correo electrónico. Puedes cobrar en cualquier Punto de Venta presentando tu cédula y este código.
+                                            Por favor, revisa tu bandeja de entrada para ver tu código y cobrar en cualquier Punto de Venta presentando tu número de cédula.
                                         </p>
                                     </div>`,
                                 icon: 'success',

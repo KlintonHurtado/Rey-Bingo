@@ -1810,14 +1810,9 @@ class Payments extends Controller {
         $retire = $modelRetires->where('id', $retireId)->first();
 
         $reference = str_pad($retireId, 4, '0', STR_PAD_LEFT);
-
-        $modelNotifications = new NotificationsModel();
-
         $currentUserId = session()->get('id');
 
-        if ($receiver === "store") {
-            $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
-        }
+        $modelNotifications = new NotificationsModel();
 
         $admins = $modelUsers->select('id')->where('group', 1)->findAll();
 
@@ -1836,23 +1831,17 @@ class Payments extends Controller {
 
         if ($retireId) {
             $responseMessage = $receiver === 'store'
-                ? 'Solicitud de retiro registrada. Tu código de retiro es ' . $data['account'] . ' y ha sido enviado a tu correo electrónico (' . ($user['email'] ?? '') . ').'
+                ? 'Solicitud de retiro registrada exitosamente. Tu código de retiro e instrucciones han sido enviados a tu correo electrónico (' . ($user['email'] ?? '') . ').'
                 : translate('retire request sent successfully');
 
             $response = [
                 'success' => true,
                 'message' => $responseMessage,
                 'is_store' => ($receiver === 'store'),
-                'retire_code' => $receiver === 'store' ? $data['account'] : null,
                 'newRetire' => [
                     'id' => $retireId,
                     'type' => 'retire',
                     'type_Tra' => $receiver === 'store' ? 'Retiro Punto de Venta' : translate('retire'),
-                    'user_id' => $data['user'],
-                    'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
-                    'user_code' => $user ? $user['code'] : 'N/A',
-                    'bank' => $this->formatBankInfo('deposit', $user, $data['bank']),
-                    'reference' => str_pad($retireId, 4, '0', STR_PAD_LEFT),
                     'amount' => $data['amount'],
                     'date' => date('d/m/Y'),
                     'date_formatted' => date('d/m/Y'),
@@ -1862,6 +1851,20 @@ class Payments extends Controller {
                     'created_at' => date('d/m/Y')
                 ]
             ];
+
+            if ($receiver === "store") {
+                if (function_exists('fastcgi_finish_request')) {
+                    header('Content-Type: application/json');
+                    echo json_encode($response);
+                    session_write_close();
+                    fastcgi_finish_request();
+                    $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
+                    exit();
+                } else {
+                    session_write_close();
+                    $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
+                }
+            }
         } else {
             $response = [
                 'success' => false,
