@@ -139,8 +139,8 @@
                     </div>
 
                     <div class="col-md-12 mb-1">
-                        <label for="retire-account" class="form-label"><?= translate('account number'); ?></label>
-                        <input type="text" class="form-control form-control-lg form-bingo" name="retire-account" id="retire-account" placeholder="<?= translate('enter an account number'); ?>" autocomplete="off">
+                        <label for="retire-account" class="form-label">Número de cuenta</label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="retire-account" id="retire-account" placeholder="Ingrese número de cuenta" autocomplete="off">
                         <small id="retire-account-error" class="text-danger d-none"></small>
                     </div>
 

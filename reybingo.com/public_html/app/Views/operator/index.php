@@ -401,38 +401,143 @@
                 class="card store-panel-card operator-panel-pane"
                 id="operator-pane-account-details"
             >
-                <div class="card-body operator-panel-pane-body">
-                    <div class="operator-pane-inner operator-pane-inner-full">
-                        <div class="operator-panel-pane-head mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
-                            <div class="d-flex align-items-center gap-3">
-                                <div class="operator-panel-pane-icon">
-                                    <i class="fa-duotone fa-solid fa-list-check"></i>
-                                </div>
-                                <div>
-                                    <h5 class="mb-1">Detalles y Movimientos</h5>
-                                    <p class="small text-muted mb-0">Consulte el historial completo de movimientos, recargas, retiros y transacciones de su cuenta o Puntos de Venta.</p>
-                                </div>
+                <div class="card-body p-3 store-movements-scroll-body" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
+                    <!-- Encabezado de la Sección -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="operator-panel-pane-icon">
+                                <i class="fa-duotone fa-solid fa-clock-rotate-left"></i>
                             </div>
-                            <div class="d-flex align-items-center gap-2">
-                                <label for="op-details-user-select" class="form-label small fw-bold mb-0 text-nowrap"><i class="fa-duotone fa-solid fa-filter me-1"></i> Ver movimientos de:</label>
-                                <select id="op-details-user-select" class="form-select form-select-sm form-bingo" style="min-width: 240px;" onchange="opLoadAccountDetails(this.value)">
-                                    <option value="<?= (int) session()->get('id') ?>">👔 Mi Cuenta (Operador)</option>
-                                    <?php foreach ($stores ?? [] as $st) : ?>
-                                        <option value="<?= (int) $st['id'] ?>">🏪 PV: <?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])) ?> (<?= esc($st['username']) ?>)</option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <div>
+                                <h5 class="mb-0 fw-bold text-dark">Historial Completo de Movimientos</h5>
+                                <small class="text-muted">Consulta todas las recargas, retiros, comisiones y transferencias de tu cuenta y tus Puntos de Venta.</small>
                             </div>
                         </div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-success" id="btn-export-op-movements" onclick="exportOperatorMovements();">
+                                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
+                            </button>
+                        </div>
+                    </div>
 
-                        <div id="op-account-details-container" class="position-relative min-vh-50">
-                            <div class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Cargando...</span>
+                    <!-- Tarjetas de Resumen Estadístico del Operador -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,110,253,0.08) 0%, rgba(13,110,253,0.02) 100%); border-left: 4px solid #0d6efd !important;">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Saldo Disponible</small>
+                                        <h5 class="mb-0 fw-bold text-primary"><?= systemGet('currency'); ?> <?= number_format((float) ($opBalanceVal ?? 0), 2); ?></h5>
+                                    </div>
+                                    <div class="text-primary fs-3">
+                                        <i class="fa-duotone fa-solid fa-wallet"></i>
+                                    </div>
                                 </div>
-                                <p class="mt-2 text-muted small">Cargando detalles de movimientos...</p>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión GGR Afiliados</small>
+                                        <h5 class="mb-0 fw-bold text-success"><?= systemGet('currency'); ?> <?= number_format((float) ($operatorCommissions['ggr_commissions'] ?? 0), 2); ?></h5>
+                                        <small class="text-muted">Tasa: <?= number_format(bingo_ggr_commission_rate_for($user ?? [], 'operator') * 100, 2); ?>%</small>
+                                    </div>
+                                    <div class="text-success fs-3">
+                                        <i class="fa-duotone fa-solid fa-chart-pie"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,202,240,0.08) 0%, rgba(13,202,240,0.02) 100%); border-left: 4px solid #0dcaf0 !important;">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión por Recargas</small>
+                                        <h5 class="mb-0 fw-bold text-info"><?= systemGet('currency'); ?> <span id="op-stat-recharge">0.00</span></h5>
+                                        <small class="text-muted">Tasa: <?= number_format(bingo_operator_recharge_rate($user ?? []) * 100, 2); ?>%</small>
+                                    </div>
+                                    <div class="text-info fs-3">
+                                        <i class="fa-duotone fa-solid fa-mobile-screen"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.03) 100%); border-left: 4px solid #ffc107 !important;">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión Pago Retiros</small>
+                                        <h5 class="mb-0 fw-bold text-warning text-dark"><?= systemGet('currency'); ?> <span id="op-stat-prize">0.00</span></h5>
+                                        <small class="text-muted">Tasa: <?= number_format(bingo_operator_withdraw_rate($user ?? []) * 100, 2); ?>%</small>
+                                    </div>
+                                    <div class="text-warning fs-3">
+                                        <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Barra de Filtros con selector de Puntos de Venta -->
+                    <div class="store-movements-filters-bar mb-3 p-3" style="background: rgba(98, 54, 255, 0.04); border: 1px solid rgba(98, 54, 255, 0.12); border-radius: 14px;">
+                        <form id="form-filter-op-movements" onsubmit="return false;">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-6 col-md-2">
+                                    <label for="op-filter-date-from" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Fecha Desde</label>
+                                    <input type="date" class="form-control store-filter-input" id="op-filter-date-from">
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-2">
+                                    <label for="op-filter-date-to" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Fecha Hasta</label>
+                                    <input type="date" class="form-control store-filter-input" id="op-filter-date-to">
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-3">
+                                    <label for="op-filter-store" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Punto de Venta</label>
+                                    <select class="form-select form-control store-filter-input" id="op-filter-store">
+                                        <option value="all">🏪 Todos los Puntos de Venta</option>
+                                        <option value="operator">👔 Directo Operador</option>
+                                        <?php foreach ($stores ?? [] as $st) : ?>
+                                            <option value="<?= (int) $st['id'] ?>">🏪 <?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])) ?> (<?= esc($st['code'] ?: $st['username']) ?>)</option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-2">
+                                    <label for="op-filter-type" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Tipo Movimiento</label>
+                                    <select class="form-select form-control store-filter-input" id="op-filter-type">
+                                        <option value="all">Todos los tipos</option>
+                                        <option value="recharge">Recargas a Jugadores</option>
+                                        <option value="retire">Pagos de Retiros</option>
+                                        <option value="credit">Transferencias a PV</option>
+                                        <option value="commission_ggr">Comisión GGR</option>
+                                        <option value="commission_recharge">Comisión Recargas</option>
+                                        <option value="commission_prize">Comisión Retiros</option>
+                                        <option value="debit">Débitos / Ajustes</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-3">
+                                    <label for="op-filter-search" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Buscar (Cédula / Ref / Nombre)</label>
+                                    <div class="d-flex gap-1">
+                                        <input type="text" class="form-control store-filter-input flex-grow-1" id="op-filter-search" placeholder="Cédula, nombre o código..." autocomplete="off">
+                                        <button type="button" class="btn btn-primary" onclick="applyOperatorMovementsFilter();" title="Buscar / Filtrar" style="background: #6236ff; border-color: #6236ff; border-radius: 10px; padding: 6px 14px; min-width: 42px;">
+                                            <i class="fa-duotone fa-solid fa-magnifying-glass"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="resetOperatorMovementsFilter();" title="Limpiar Filtros" style="border-radius: 10px; padding: 6px 12px; min-width: 38px;">
+                                            <i class="fa-duotone fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Indicador de Carga -->
+                    <div id="operator-movements-loading" class="text-center py-4 d-none">
+                        <i class="fa-duotone fa-solid fa-spinner fa-spin fs-2 text-primary"></i>
+                        <p class="small text-muted mt-2">Cargando movimientos...</p>
+                    </div>
+
+                    <!-- Contenedor de la Tabla -->
+                    <div id="operator-movements-container"></div>
                 </div>
             </div>
         </main>
@@ -575,52 +680,78 @@
         });
     };
 
-    window.opLoadAccountDetails = function(userId) {
-        userId = userId || <?= (int) session()->get('id') ?>;
-        const $container = $('#op-account-details-container');
-        $container.html(`
-            <div class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-                <p class="mt-2 text-muted small">Cargando detalles...</p>
-            </div>
-        `);
+    function getOperatorFilterParams() {
+        return {
+            date_from: $('#op-filter-date-from').val(),
+            date_to: $('#op-filter-date-to').val(),
+            store_id: $('#op-filter-store').val(),
+            type: $('#op-filter-type').val(),
+            search: $('#op-filter-search').val()
+        };
+    }
+
+    window.applyOperatorMovementsFilter = function() {
+        const params = getOperatorFilterParams();
+        $('#operator-movements-loading').removeClass('d-none');
+        $('#operator-movements-container').addClass('opacity-50');
 
         $.ajax({
-            url: '<?= site_url('users/getUserDetails/'); ?>' + userId,
+            url: '<?= site_url('operator/movementsListGet'); ?>',
             method: 'GET',
-            dataType: 'json',
-            success: function(response) {
-                if (response.success && response.html) {
-                    $container.html(response.html);
-                } else {
-                    $container.html(`
-                        <div class="alert alert-danger my-3">
-                            <i class="fa-solid fa-triangle-exclamation me-2"></i> ${response.error || 'No se pudieron cargar los detalles'}
-                        </div>
-                    `);
-                }
+            data: params,
+            success: function(html) {
+                $('#operator-movements-container').html(html).removeClass('opacity-50');
             },
             error: function() {
-                $container.html(`
-                    <div class="alert alert-danger my-3">
-                        <i class="fa-solid fa-triangle-exclamation me-2"></i> Error al conectar con el servidor
-                    </div>
-                `);
+                Toastify({
+                    text: 'Error al consultar movimientos del operador.',
+                    duration: 3000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: { background: '#dc3545' }
+                }).showToast();
+                $('#operator-movements-container').removeClass('opacity-50');
+            },
+            complete: function() {
+                $('#operator-movements-loading').addClass('d-none');
             }
         });
     };
 
+    window.resetOperatorMovementsFilter = function() {
+        $('#op-filter-date-from').val('');
+        $('#op-filter-date-to').val('');
+        $('#op-filter-store').val('all');
+        $('#op-filter-type').val('all');
+        $('#op-filter-search').val('');
+        applyOperatorMovementsFilter();
+    };
+
+    window.exportOperatorMovements = function() {
+        const params = getOperatorFilterParams();
+        const queryString = $.param(params);
+        window.location.href = '<?= site_url('operator/exportMovements'); ?>?' + queryString;
+    };
+
     window.opGoToStoreDetails = function(storeId) {
         $('[data-operator-tab="account-details"]').trigger('click');
-        $('#op-details-user-select').val(storeId);
-        opLoadAccountDetails(storeId);
+        $('#op-filter-store').val(storeId);
+        applyOperatorMovementsFilter();
     };
 
     $(document).on('click', '[data-operator-tab="account-details"]', function() {
-        const selectedUser = $('#op-details-user-select').val() || <?= (int) session()->get('id') ?>;
-        opLoadAccountDetails(selectedUser);
+        applyOperatorMovementsFilter();
+    });
+
+    $(function() {
+        $('#op-filter-search').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                applyOperatorMovementsFilter();
+            }
+        });
+        $('#op-filter-store, #op-filter-type, #op-filter-date-from, #op-filter-date-to').on('change', function() {
+            applyOperatorMovementsFilter();
+        });
     });
 
     $(document).on('submit', '#operator-balance-request-form', function(e) {

@@ -726,4 +726,54 @@ class Operator extends Controller
             'operatorDeposits' => $operatorDeposits,
         ]);
     }
+
+    public function movementsListGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $operatorId = (int) session()->get('id');
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'store_id'  => (string) ($this->request->getGet('store_id') ?? 'all'),
+            'type'      => (string) ($this->request->getGet('type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $ledger = bingo_build_operator_movements_ledger($operatorId, $filters);
+
+        return view('operator/movements_list', [
+            'movements' => $ledger['movements'],
+            'stats'     => $ledger['stats'],
+            'currency'  => systemGet('currency') ?? '$',
+        ]);
+    }
+
+    public function exportMovements()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return redirect()->to('/signin');
+        }
+
+        $operatorId = (int) session()->get('id');
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'store_id'  => (string) ($this->request->getGet('store_id') ?? 'all'),
+            'type'      => (string) ($this->request->getGet('type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $ledger = bingo_build_operator_movements_ledger($operatorId, $filters);
+        $export = bingo_operator_movements_export_rows($ledger['movements']);
+
+        $filename = 'movimientos_operador_' . date('Y-m-d_His') . '.csv';
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setBody(bingo_export_csv_payload($export['headers'], $export['rows']));
+    }
 }
