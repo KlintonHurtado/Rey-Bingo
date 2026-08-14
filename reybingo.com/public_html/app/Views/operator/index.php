@@ -494,10 +494,10 @@
                                 <div class="col-12 col-sm-6 col-md-3">
                                     <label for="op-filter-store" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Punto de Venta</label>
                                     <select class="form-select form-control store-filter-input" id="op-filter-store">
-                                        <option value="all">🏪 Todos los Puntos de Venta</option>
-                                        <option value="operator">👔 Directo Operador</option>
+                                        <option value="all">Todos los Puntos de Venta</option>
+                                        <option value="operator">Directo Operador</option>
                                         <?php foreach ($stores ?? [] as $st) : ?>
-                                            <option value="<?= (int) $st['id'] ?>">🏪 <?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])) ?> (<?= esc($st['code'] ?: $st['username']) ?>)</option>
+                                            <option value="<?= (int) $st['id'] ?>"><?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])) ?> (<?= esc($st['code'] ?: $st['username']) ?>)</option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>

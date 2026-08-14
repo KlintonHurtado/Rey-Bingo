@@ -31,6 +31,8 @@
     </div>
 </div>
 
+<?= view('partials/modal_commission_liquidation'); ?>
+
 <div class="modal fade" id="modalOperatorPay" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">

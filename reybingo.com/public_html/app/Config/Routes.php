@@ -192,6 +192,8 @@ $routes->post('users/operatorSubmit', 'Users::operatorSubmit');
 $routes->post('users/operatorDeactivate', 'Users::operatorDeactivate');
 $routes->post('users/operatorDelete', 'Users::operatorDelete');
 $routes->post('users/operatorPaySubmit', 'Users::operatorPaySubmit');
+$routes->get('users/getCommissionLiquidationInfo/(:num)', 'Users::getCommissionLiquidationInfo/$1');
+$routes->post('users/settleUserCommissionSubmit', 'Users::settleUserCommissionSubmit');
 $routes->get('users/operatorsListGet', 'Users::operatorsListGet');
 $routes->get('operator', 'Operator::index');
 $routes->get('operator/register', 'Operator::registerAffiliate');

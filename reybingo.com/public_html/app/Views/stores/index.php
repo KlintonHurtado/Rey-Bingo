@@ -31,6 +31,8 @@
     </div>
 </div>
 
+<?= view('partials/modal_commission_liquidation'); ?>
+
 <script type="text/javascript">
     function storeRefreshList() {
         $.get('<?= site_url('users/storesListGet') ?>', function(html) {

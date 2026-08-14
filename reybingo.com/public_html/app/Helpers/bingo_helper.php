@@ -5813,6 +5813,126 @@ if (! function_exists('bingo_operator_movements_export_rows')) {
     }
 }
 
+if (! function_exists('bingo_fetch_user_commissions_breakdown')) {
+    /**
+     * Obtiene el desglose completo de comisiones acumuladas (GGR, Recargas, Retiros) y datos bancarios para liquidación.
+     *
+     * @param int $userId
+     * @return array<string,mixed>
+     */
+    function bingo_fetch_user_commissions_breakdown(int $userId): array
+    {
+        $empty = [
+            'success'                   => false,
+            'user_id'                   => $userId,
+            'name'                      => '',
+            'role_label'                => '',
+            'is_operator'               => false,
+            'is_store'                  => false,
+            'document'                  => '',
+            'phone'                     => '',
+            'email'                     => '',
+            'code'                      => '',
+            'username'                  => '',
+            'bank_name'                 => '',
+            'account_number'            => '',
+            'account_type'              => '',
+            'recharge_balance'          => 0.0,
+            'ggr_commission'            => 0.0,
+            'recharge_commission'       => 0.0,
+            'withdraw_commission'       => 0.0,
+            'total_pending_commissions' => 0.0,
+            'period_label'              => 'Período acumulado',
+        ];
+
+        if ($userId <= 0) {
+            return $empty;
+        }
+
+        $modelUsers = new \App\Models\UsersModel();
+        $user = $modelUsers->find($userId);
+        if (! $user) {
+            return $empty;
+        }
+
+        $group = (int) ($user['group'] ?? 0);
+        $isOperator = $group === bingo_group_operator();
+        $isStore = $group === bingo_group_store();
+
+        if (! $isOperator && ! $isStore) {
+            return $empty;
+        }
+
+        $name = trim((string) ($user['business_name'] ?: ($user['firstname'] . ' ' . $user['lastname'])));
+        $roleLabel = $isOperator ? 'Operador' : 'Punto de Venta';
+        $accountTypeFormatted = match((string) ($user['account_type'] ?? '')) {
+            'savings'  => 'Cuenta de Ahorros',
+            'checking' => 'Cuenta Corriente',
+            default    => ($user['account_type'] ?: 'No especificado')
+        };
+
+        // Saldo recargable actual
+        $rechargeBalance = function_exists('wallet_recharge_balance') ? wallet_recharge_balance($user) : (float) ($user['wallet'] ?? 0);
+
+        // 1. Comisión GGR
+        $ggrCommission = 0.0;
+        if (function_exists('bingo_ggr_affiliate_active') && bingo_ggr_affiliate_active()) {
+            $modelGgr = new \App\Models\AffiliateGgrCommissionsModel();
+            $affiliateType = $isOperator ? 'operator' : 'store';
+            $pendingGgrRows = $modelGgr
+                ->where('affiliate_id', $userId)
+                ->where('affiliate_type', $affiliateType)
+                ->whereIn('status', [0, 1])
+                ->findAll();
+            foreach ($pendingGgrRows as $grow) {
+                $ggrCommission += (float) ($grow['commission_amount'] ?? 0);
+            }
+        }
+
+        // 2. Comisión por Recargas y Retiros
+        $rechargeCommission = 0.0;
+        $withdrawCommission = 0.0;
+
+        if ($isStore) {
+            $ledger = bingo_build_store_movements_ledger($userId);
+            $rechargeCommission = (float) ($ledger['stats']['recharge_commissions_amount'] ?? 0);
+            $withdrawCommission = (float) ($ledger['stats']['prize_commissions_amount'] ?? 0);
+        } elseif ($isOperator) {
+            $ledger = bingo_build_operator_movements_ledger($userId);
+            $rechargeCommission = (float) ($ledger['stats']['recharge_commissions_amount'] ?? 0);
+            $withdrawCommission = (float) ($ledger['stats']['prize_commissions_amount'] ?? 0);
+        }
+
+        $totalPending = round($ggrCommission + $rechargeCommission + $withdrawCommission, 2);
+        $months = [1=>'Enero', 2=>'Febrero', 3=>'Marzo', 4=>'Abril', 5=>'Mayo', 6=>'Junio', 7=>'Julio', 8=>'Agosto', 9=>'Septiembre', 10=>'Octubre', 11=>'Noviembre', 12=>'Diciembre'];
+        $currentMonthName = $months[(int) date('n')] ?? date('F');
+        $periodLabel = 'Mes actual: ' . $currentMonthName . ' ' . date('Y');
+
+        return [
+            'success'                   => true,
+            'user_id'                   => $userId,
+            'name'                      => $name,
+            'role_label'                => $roleLabel,
+            'is_operator'               => $isOperator,
+            'is_store'                  => $isStore,
+            'document'                  => (string) ($user['document'] ?? ''),
+            'phone'                     => (string) ($user['phone'] ?? ''),
+            'email'                     => (string) ($user['email'] ?? ''),
+            'code'                      => (string) ($user['code'] ?? ''),
+            'username'                  => (string) ($user['username'] ?? ''),
+            'bank_name'                 => (string) ($user['bank'] ?: 'No registrado'),
+            'account_number'            => (string) ($user['account'] ?: 'No registrado'),
+            'account_type'              => $accountTypeFormatted,
+            'recharge_balance'          => round($rechargeBalance, 2),
+            'ggr_commission'            => round($ggrCommission, 2),
+            'recharge_commission'       => round($rechargeCommission, 2),
+            'withdraw_commission'       => round($withdrawCommission, 2),
+            'total_pending_commissions' => $totalPending,
+            'period_label'              => $periodLabel,
+        ];
+    }
+}
+
 if (!function_exists('bingo_document_expiry_status')) {
     /**
      * @return array{status:string,label:string,days:?int,expires_at:?string}

@@ -170,12 +170,15 @@ $sourceLabel = static function ($source) {
                                 <input type="number" step="0.01" min="0.01" class="form-control" id="admin-adjust-amount" placeholder="0.00" autocomplete="off">
                             </div>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex flex-wrap gap-2">
                             <button type="button" class="btn btn-sm btn-success text-nowrap" onclick="adminAdjustNonPlayer(<?= (int) $user['id']; ?>, 'credit')">
                                 <i class="fa-solid fa-circle-plus me-1"></i> Sumar Recarga (+)
                             </button>
                             <button type="button" class="btn btn-sm btn-danger text-nowrap" onclick="adminAdjustNonPlayer(<?= (int) $user['id']; ?>, 'debit')">
                                 <i class="fa-solid fa-circle-minus me-1"></i> Quitar / Retirar Saldo (-)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="openCommissionLiquidationModal(<?= (int) $user['id']; ?>, function(){ location.reload(); })" title="Liquidar y Pagar Comisiones Mensuales">
+                                <i class="fa-duotone fa-solid fa-money-bill-transfer me-1"></i> Liquidar Comisiones
                             </button>
                         </div>
                     </div>
@@ -645,3 +648,5 @@ $sourceLabel = static function ($source) {
         </div>
     </div>
 </div>
+
+<?= view('partials/modal_commission_liquidation'); ?>

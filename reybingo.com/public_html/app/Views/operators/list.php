@@ -38,7 +38,7 @@
                     </td>
                     <td class="text-center">
                         <div class="stores-actions d-flex justify-content-center gap-1" role="group">
-                            <button type="button" class="btn btn-sm btn-success text-white d-flex align-items-center gap-1" onclick="operatorPay(<?= (int) $operator['id'] ?>, '<?= esc($operator['firstname'] . ' ' . $operator['lastname'], 'js') ?>', '<?= esc($operator['code'] ?? '', 'js') ?>', '<?= esc($operator['document'] ?? '', 'js') ?>', <?= (float) ($operator['wallet_balance'] ?? 0) ?>, <?= (float) ($operator['total_earnings'] ?? 0) ?>)" title="Pagar / Cargar Saldo">
+                            <button type="button" class="btn btn-sm btn-success text-white d-flex align-items-center gap-1" onclick="openCommissionLiquidationModal(<?= (int) $operator['id'] ?>, function(){ operatorRefreshList(); })" title="Pagar / Liquidar Comisiones">
                                 <i class="fa-duotone fa-solid fa-money-bill-wave"></i> Pagar
                             </button>
                             <button type="button" class="btn btn-sm btn-primary" onclick="operatorEdit(<?= (int) $operator['id'] ?>)" title="<?= translate('edit'); ?>">

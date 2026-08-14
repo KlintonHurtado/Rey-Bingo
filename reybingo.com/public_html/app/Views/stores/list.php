@@ -51,7 +51,10 @@
                         <?php endif; ?>
                     </td>
                     <td class="text-center">
-                        <div class="stores-actions" role="group">
+                        <div class="stores-actions d-flex justify-content-center gap-1" role="group">
+                            <button type="button" class="btn btn-sm btn-success text-white d-flex align-items-center gap-1" onclick="openCommissionLiquidationModal(<?= (int) $store['id'] ?>, function(){ storeRefreshList(); })" title="Pagar / Liquidar Comisiones">
+                                <i class="fa-duotone fa-solid fa-money-bill-wave"></i> Pagar
+                            </button>
                             <button type="button" class="btn btn-sm btn-primary" onclick="storeEdit(<?= (int) $store['id'] ?>)" title="<?= translate('edit'); ?>">
                                 <i class="fa-duotone fa-solid fa-pen"></i>
                             </button>

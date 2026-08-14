@@ -826,6 +826,146 @@ class Users extends Controller {
         ]);
     }
 
+    public function getCommissionLiquidationInfo($userId = null)
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+        $userId = (int) $userId;
+        $info = bingo_fetch_user_commissions_breakdown($userId);
+
+        return $this->response->setJSON($info);
+    }
+
+    public function settleUserCommissionSubmit()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized'),
+            ]);
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+
+        $userId = (int) $this->request->getPost('user_id');
+        $amount = round((float) $this->request->getPost('amount'), 2);
+        $settlementType = trim((string) $this->request->getPost('settlement_type'));
+        $reference = trim((string) $this->request->getPost('reference'));
+        $notes = trim((string) $this->request->getPost('notes'));
+
+        if ($userId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Usuario no válido.',
+            ]);
+        }
+
+        $modelUsers = new UsersModel();
+        $targetUser = $modelUsers->find($userId);
+        if (! $targetUser) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Usuario no encontrado.',
+            ]);
+        }
+
+        $group = (int) ($targetUser['group'] ?? 0);
+        $isOperator = $group === bingo_group_operator();
+        $isStore = $group === bingo_group_store();
+
+        if (! $isOperator && ! $isStore) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Solo se pueden liquidar comisiones a Operadores o Puntos de Venta.',
+            ]);
+        }
+
+        if ($amount <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'El monto a liquidar debe ser mayor a 0.',
+            ]);
+        }
+
+        if (! in_array($settlementType, ['bank_transfer', 'credit_balance'], true)) {
+            $settlementType = 'bank_transfer';
+        }
+
+        $adminId = (int) session()->get('id');
+        $modelPayments = new \App\Models\PaymentsModel();
+
+        // 1. Si es acreditación a saldo recargable, sumamos a la wallet
+        if ($settlementType === 'credit_balance') {
+            wallet_credit_recharge($userId, $amount);
+        }
+
+        // 2. Registramos el movimiento de pago
+        $description = ($settlementType === 'credit_balance'
+            ? 'Liquidación de comisiones acreditada a Saldo de Recargas'
+            : 'Liquidación de comisiones pagada por Transferencia Bancaria' . ($reference !== '' ? ' (Ref: #' . $reference . ')' : '')
+        ) . ($notes !== '' ? ' | ' . $notes : '');
+
+        $paymentType = $isOperator ? 'admin_operator_pay' : 'admin_store_credit';
+
+        $modelPayments->insert([
+            'user'        => $userId,
+            'type'        => $paymentType,
+            'type_id'     => $adminId,
+            'amount'      => $amount,
+            'status'      => 2,
+            'description' => $description,
+        ]);
+
+        // 3. Marcamos las comisiones GGR pendientes de ese usuario como liquidadas/pagadas
+        if (function_exists('bingo_ggr_affiliate_active') && bingo_ggr_affiliate_active()) {
+            $modelGgr = new \App\Models\AffiliateGgrCommissionsModel();
+            $affiliateType = $isOperator ? 'operator' : 'store';
+            $modelGgr
+                ->where('affiliate_id', $userId)
+                ->where('affiliate_type', $affiliateType)
+                ->whereIn('status', [0, 1])
+                ->set(['status' => 2, 'paid_at' => date('Y-m-d H:i:s')])
+                ->update();
+
+            $modelSettlements = new \App\Models\AffiliateGgrMonthlySettlementsModel();
+            $modelSettlements->insert([
+                'affiliate_id'     => $userId,
+                'affiliate_type'   => $affiliateType,
+                'period_start'     => date('Y-m-01'),
+                'period_end'       => date('Y-m-t'),
+                'total_commission' => $amount,
+                'status'           => 'settled',
+                'settled_at'       => date('Y-m-d H:i:s'),
+                'created_at'       => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        // 4. Notificación al usuario
+        $modelNotifications = new \App\Models\NotificationsModel();
+        $modelNotifications->insert([
+            'user'       => $userId,
+            'title'      => '¡Liquidación de Comisiones Realizada!',
+            'message'    => 'La administración ha procesado la liquidación de tus comisiones por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' (' . ($settlementType === 'credit_balance' ? 'Acreditado a saldo recargable' : 'Transferencia bancaria') . ').',
+            'created_at' => date('Y-m-d H:i:s'),
+            'status'     => 1,
+        ]);
+
+        $updatedUser = $modelUsers->find($userId) ?? $targetUser;
+        $newBalance = wallet_recharge_balance($updatedUser);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => '¡Liquidación y pago de comisiones procesado exitosamente!',
+            'balance' => round($newBalance, 2),
+        ]);
+    }
+
     public function lowBalancePlayers()
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {
