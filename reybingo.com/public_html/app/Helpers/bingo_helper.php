@@ -4873,6 +4873,409 @@ if (!function_exists('bingo_user_movements_export_rows')) {
     }
 }
 
+if (! function_exists('bingo_build_store_movements_ledger')) {
+    /**
+     * Construye el historial y ledger completo de movimientos de un Punto de Venta (Store).
+     *
+     * @param int $storeId
+     * @param array<string,mixed> $filters
+     * @return array{movements:list<array<string,mixed>>,stats:array<string,mixed>}
+     */
+    function bingo_build_store_movements_ledger(int $storeId, array $filters = []): array
+    {
+        if ($storeId <= 0) {
+            return ['movements' => [], 'stats' => []];
+        }
+
+        $modelDeposits = new \App\Models\DepositsModel();
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelRetires = new \App\Models\RetiresModel();
+        $modelUsers = new \App\Models\UsersModel();
+
+        $rows = [];
+        $push = static function (array $row) use (&$rows) {
+            $rows[] = $row;
+        };
+
+        // Cache simple de usuarios
+        $userCache = [];
+        $getUser = static function (int $uid) use (&$userCache, $modelUsers): ?array {
+            if ($uid <= 0) {
+                return null;
+            }
+            if (! isset($userCache[$uid])) {
+                $userCache[$uid] = $modelUsers->find($uid);
+            }
+            return $userCache[$uid];
+        };
+
+        // 1. Recargas a jugadores realizadas por la tienda
+        $storeRecharges = $modelDeposits
+            ->where('store', $storeId)
+            ->where('method', 'store player recharge')
+            ->orderBy('created_at', 'DESC')
+            ->findAll(1000);
+
+        foreach ($storeRecharges as $dep) {
+            $pId = (int) ($dep['user'] ?? 0);
+            $pUser = $getUser($pId);
+            $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugador';
+            $pDoc = (string) ($pUser['document'] ?? $dep['document'] ?? '');
+            $pUsername = (string) ($pUser['username'] ?? '');
+            $pCode = (string) ($pUser['code'] ?? '');
+            $st = (int) ($dep['status'] ?? 0);
+            $amt = round((float) ($dep['amount'] ?? 0), 2);
+
+            $push([
+                'id' => 'DEP_' . $dep['id'],
+                'datetime' => (string) ($dep['created_at'] ?? ''),
+                'type' => 'recharge_player',
+                'type_category' => 'recharge',
+                'type_label' => 'Recarga a Jugador',
+                'badge_class' => 'bg-info text-white',
+                'icon' => 'fa-duotone fa-solid fa-mobile-screen',
+                'direction' => '-',
+                'amount' => $amt,
+                'status' => $st,
+                'status_label' => bingo_status_label_short($st),
+                'beneficiary_name' => $pName,
+                'beneficiary_document' => $pDoc,
+                'beneficiary_username' => $pUsername,
+                'beneficiary_code' => $pCode,
+                'ref_code' => 'DEP #' . $dep['id'],
+                'detail' => 'Recarga a ' . $pName . ($pDoc !== '' ? ' (Cédula: ' . $pDoc . ')' : '') . ($pUsername !== '' ? ' @' . $pUsername : ''),
+                'ref_table' => 'deposits',
+                'ref_id' => (int) ($dep['id'] ?? 0),
+            ]);
+        }
+
+        // 2. Pagos de notas de retiro en efectivo
+        $retirePayments = $modelPayments
+            ->where('user', $storeId)
+            ->whereIn('type', ['store_retire_pay', 'store_prize_pay'])
+            ->orderBy('created_at', 'DESC')
+            ->findAll(1000);
+
+        foreach ($retirePayments as $pay) {
+            $retireId = (int) ($pay['type_id'] ?? 0);
+            $retireRecord = $retireId > 0 ? $modelRetires->find($retireId) : null;
+            $pId = $retireRecord ? (int) ($retireRecord['user'] ?? 0) : 0;
+            $pUser = $getUser($pId);
+            $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugador';
+            $pDoc = (string) ($retireRecord['document'] ?? $pUser['document'] ?? '');
+            $retCode = (string) ($retireRecord['account'] ?? '');
+            $amt = round((float) ($pay['amount'] ?? 0), 2);
+            $st = (int) ($pay['status'] ?? 2);
+
+            $push([
+                'id' => 'PAY_RET_' . $pay['id'],
+                'datetime' => (string) ($pay['created_at'] ?? ''),
+                'type' => 'pay_retire',
+                'type_category' => 'retire',
+                'type_label' => 'Pago de Retiro (Efectivo)',
+                'badge_class' => 'bg-danger text-white',
+                'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
+                'direction' => '-',
+                'amount' => $amt,
+                'status' => $st,
+                'status_label' => 'Pagado',
+                'beneficiary_name' => $pName,
+                'beneficiary_document' => $pDoc,
+                'beneficiary_username' => (string) ($pUser['username'] ?? ''),
+                'beneficiary_code' => $retCode,
+                'ref_code' => $retCode !== '' ? $retCode : ('RET #' . $retireId),
+                'detail' => 'Pago en efectivo' . ($retCode !== '' ? ' (Código: ' . $retCode . ')' : '') . ' a ' . $pName . ($pDoc !== '' ? ' | Cédula: ' . $pDoc : ''),
+                'ref_table' => 'payments',
+                'ref_id' => (int) ($pay['id'] ?? 0),
+            ]);
+        }
+
+        // 3. Acreditaciones de saldo (Funding / Operador / Admin)
+        $storeFunding = $modelDeposits
+            ->where('user', $storeId)
+            ->groupStart()
+                ->where('method', 'store funding request')
+                ->orWhere('account', 'store_funding')
+            ->groupEnd()
+            ->orderBy('created_at', 'DESC')
+            ->findAll(500);
+
+        foreach ($storeFunding as $dep) {
+            $st = (int) ($dep['status'] ?? 0);
+            $amt = round((float) ($dep['amount'] ?? 0), 2);
+            $push([
+                'id' => 'FUND_' . $dep['id'],
+                'datetime' => (string) ($dep['created_at'] ?? ''),
+                'type' => 'funding_credit',
+                'type_category' => 'credit',
+                'type_label' => 'Solicitud de Saldo',
+                'badge_class' => 'bg-success text-white',
+                'icon' => 'fa-duotone fa-solid fa-hand-holding-dollar',
+                'direction' => '+',
+                'amount' => $amt,
+                'status' => $st,
+                'status_label' => bingo_status_label_short($st),
+                'beneficiary_name' => 'Mi Punto de Venta',
+                'beneficiary_document' => '',
+                'beneficiary_username' => '',
+                'beneficiary_code' => '',
+                'ref_code' => 'SOL #' . $dep['id'],
+                'detail' => 'Carga de saldo solicitada por transferencia' . (! empty($dep['bank']) ? ' (' . $dep['bank'] . ')' : ''),
+                'ref_table' => 'deposits',
+                'ref_id' => (int) ($dep['id'] ?? 0),
+            ]);
+        }
+
+        // 4. Pagos directos / Acreditaciones / Débitos / Comisiones en tabla `payments`
+        $storePayments = $modelPayments
+            ->where('user', $storeId)
+            ->whereNotIn('type', ['store_retire_pay', 'store_prize_pay'])
+            ->orderBy('created_at', 'DESC')
+            ->findAll(1000);
+
+        foreach ($storePayments as $pay) {
+            $ptype = (string) ($pay['type'] ?? '');
+            $amt = round((float) ($pay['amount'] ?? 0), 2);
+            $st = (int) ($pay['status'] ?? 2);
+
+            // Acreditaciones de saldo
+            if (in_array($ptype, ['operator_store_credit', 'admin_store_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit'], true)) {
+                $push([
+                    'id' => 'PAY_CRED_' . $pay['id'],
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'credit',
+                    'type_category' => 'credit',
+                    'type_label' => 'Acreditación de Saldo',
+                    'badge_class' => 'bg-success text-white',
+                    'icon' => 'fa-duotone fa-solid fa-circle-plus',
+                    'direction' => '+',
+                    'amount' => $amt,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'beneficiary_name' => 'Mi Punto de Venta',
+                    'beneficiary_document' => '',
+                    'beneficiary_username' => '',
+                    'beneficiary_code' => '',
+                    'ref_code' => 'PAY #' . $pay['id'],
+                    'detail' => ($ptype === 'admin_store_credit' ? 'Acreditación por Administración' : 'Acreditación por Operador / Sistema'),
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            // Débitos de saldo
+            if (in_array($ptype, ['admin_store_debit', 'operator_store_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit'], true)) {
+                $push([
+                    'id' => 'PAY_DEB_' . $pay['id'],
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'debit',
+                    'type_category' => 'debit',
+                    'type_label' => 'Débito / Retiro de Saldo',
+                    'badge_class' => 'bg-danger text-white',
+                    'icon' => 'fa-duotone fa-solid fa-circle-minus',
+                    'direction' => '-',
+                    'amount' => $amt,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'beneficiary_name' => 'Mi Punto de Venta',
+                    'beneficiary_document' => '',
+                    'beneficiary_username' => '',
+                    'beneficiary_code' => '',
+                    'ref_code' => 'PAY #' . $pay['id'],
+                    'detail' => 'Débito / Retiro de saldo de la tienda',
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            // Comisiones ganadas
+            if (in_array($ptype, ['store_recharge_commission', 'store_ggr_commission', 'store_prize_commission', 'store_retire_commission', 'store_commission', 'referred', 'referral'], true)) {
+                $commissionLabels = [
+                    'store_ggr_commission'      => 'Comisión GGR',
+                    'store_recharge_commission' => 'Comisión por Recarga',
+                    'store_prize_commission'    => 'Comisión por Pago Retiro',
+                    'store_retire_commission'   => 'Comisión por Pago Retiro',
+                    'store_commission'          => 'Comisión Punto de Venta',
+                ];
+                $comLabel = $commissionLabels[$ptype] ?? 'Comisión';
+
+                $push([
+                    'id' => 'PAY_COM_' . $pay['id'],
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'commission',
+                    'type_category' => 'commission',
+                    'type_label' => $comLabel,
+                    'badge_class' => 'bg-warning text-dark',
+                    'icon' => 'fa-duotone fa-solid fa-percent',
+                    'direction' => '+',
+                    'amount' => $amt,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'beneficiary_name' => 'Mi Punto de Venta',
+                    'beneficiary_document' => '',
+                    'beneficiary_username' => '',
+                    'beneficiary_code' => '',
+                    'ref_code' => 'COM #' . $pay['id'],
+                    'detail' => 'Ganancia por ' . strtolower($comLabel),
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+        }
+
+        // Orden cronológico ASC para calcular saldo acumulado y métricas
+        usort($rows, static function ($a, $b) {
+            $cmp = strcmp((string) ($a['datetime'] ?? ''), (string) ($b['datetime'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
+        });
+
+        // Totales estadísticos
+        $stats = [
+            'total_recharges_amount'   => 0.0,
+            'total_recharges_count'    => 0,
+            'total_retires_amount'     => 0.0,
+            'total_retires_count'      => 0,
+            'total_commissions_amount' => 0.0,
+            'total_commissions_count'  => 0,
+            'total_credits_amount'     => 0.0,
+            'total_credits_count'      => 0,
+        ];
+
+        $runningBalance = 0.0;
+        foreach ($rows as &$row) {
+            $dir = (string) ($row['direction'] ?? '');
+            $amt = round((float) ($row['amount'] ?? 0), 2);
+            $cat = (string) ($row['type_category'] ?? '');
+            $st = (int) ($row['status'] ?? 0);
+
+            if ($st === 2 || $st === 1) {
+                if ($cat === 'recharge' && $st === 2) {
+                    $stats['total_recharges_amount'] += $amt;
+                    $stats['total_recharges_count']++;
+                } elseif ($cat === 'retire' && $st === 2) {
+                    $stats['total_retires_amount'] += $amt;
+                    $stats['total_retires_count']++;
+                } elseif ($cat === 'commission' && $st === 2) {
+                    $stats['total_commissions_amount'] += $amt;
+                    $stats['total_commissions_count']++;
+                } elseif ($cat === 'credit' && $st === 2) {
+                    $stats['total_credits_amount'] += $amt;
+                    $stats['total_credits_count']++;
+                }
+            }
+
+            if ($st === 2) {
+                if ($dir === '+') {
+                    $runningBalance = round($runningBalance + $amt, 2);
+                } elseif ($dir === '-') {
+                    $runningBalance = round($runningBalance - $amt, 2);
+                }
+            }
+            $row['balance_after'] = $runningBalance;
+        }
+        unset($row);
+
+        // Filtrado por fecha, tipo y búsqueda
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $typeFilter = trim((string) ($filters['type'] ?? 'all'));
+        $search = strtolower(trim((string) ($filters['search'] ?? '')));
+
+        $filteredRows = [];
+        foreach ($rows as $row) {
+            $rowDate = substr((string) ($row['datetime'] ?? ''), 0, 10);
+
+            if ($dateFrom !== '' && $rowDate < $dateFrom) {
+                continue;
+            }
+            if ($dateTo !== '' && $rowDate > $dateTo) {
+                continue;
+            }
+            if ($typeFilter !== '' && $typeFilter !== 'all') {
+                if (($row['type_category'] ?? '') !== $typeFilter && ($row['type'] ?? '') !== $typeFilter) {
+                    continue;
+                }
+            }
+            if ($search !== '') {
+                $searchContent = strtolower(
+                    ($row['beneficiary_name'] ?? '') . ' ' .
+                    ($row['beneficiary_document'] ?? '') . ' ' .
+                    ($row['beneficiary_username'] ?? '') . ' ' .
+                    ($row['ref_code'] ?? '') . ' ' .
+                    ($row['detail'] ?? '') . ' ' .
+                    ($row['type_label'] ?? '')
+                );
+                if (strpos($searchContent, $search) === false) {
+                    continue;
+                }
+            }
+            $filteredRows[] = $row;
+        }
+
+        // Orden DESC (más reciente primero)
+        usort($filteredRows, static function ($a, $b) {
+            $cmp = strcmp((string) ($b['datetime'] ?? ''), (string) ($a['datetime'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcmp((string) ($b['id'] ?? ''), (string) ($a['id'] ?? ''));
+        });
+
+        return [
+            'movements' => $filteredRows,
+            'stats'     => $stats,
+        ];
+    }
+}
+
+if (! function_exists('bingo_store_movements_export_rows')) {
+    /**
+     * Filas planas para Excel/CSV de los movimientos del Punto de Venta.
+     *
+     * @param list<array<string,mixed>> $movements
+     * @return array{headers:list<string>,rows:list<list<mixed>>}
+     */
+    function bingo_store_movements_export_rows(array $movements): array
+    {
+        $headers = [
+            'Fecha y Hora',
+            'Tipo de Movimiento',
+            'Direccion (+/-)',
+            'Monto',
+            'Saldo Resultante',
+            'Estado',
+            'Beneficiario / Jugador',
+            'Documento / Cedula',
+            'Referencia / Codigo',
+            'Detalle',
+        ];
+
+        $rows = [];
+        foreach ($movements as $m) {
+            $rows[] = [
+                (string) ($m['datetime'] ?? ''),
+                (string) ($m['type_label'] ?? $m['type'] ?? ''),
+                (string) ($m['direction'] ?? ''),
+                (float) ($m['amount'] ?? 0),
+                isset($m['balance_after']) ? (float) $m['balance_after'] : '',
+                (string) ($m['status_label'] ?? ''),
+                (string) ($m['beneficiary_name'] ?? ''),
+                (string) ($m['beneficiary_document'] ?? ''),
+                (string) ($m['ref_code'] ?? ''),
+                (string) ($m['detail'] ?? ''),
+            ];
+        }
+
+        return ['headers' => $headers, 'rows' => $rows];
+    }
+}
+
 if (!function_exists('bingo_document_expiry_status')) {
     /**
      * @return array{status:string,label:string,days:?int,expires_at:?string}

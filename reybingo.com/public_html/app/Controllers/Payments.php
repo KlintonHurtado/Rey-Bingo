@@ -1686,18 +1686,13 @@ class Payments extends Controller {
             ]);
         }
 
-        if (bingo_is_store((int) ($user['group'] ?? -1))) {
-            $earningsSummary = bingo_fetch_store_withdraw_summary((int) ($user['id'] ?? 0), $user);
-            if (empty($earningsSummary['can_withdraw'])) {
-                $reasonKey = (string) ($earningsSummary['withdraw_blocked_reason'] ?? 'store earnings withdraw monthly notice');
-
-                return $this->response->setJSON([
-                    'success' => false,
-                    'errors' => [
-                        'retire-amount' => translate($reasonKey !== '' ? $reasonKey : 'store earnings withdraw monthly notice'),
-                    ],
-                ]);
-            }
+        if (bingo_is_store((int) ($user['group'] ?? -1)) || bingo_is_operator((int) ($user['group'] ?? -1))) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'retire-amount' => 'Las comisiones de operadores y puntos de venta son liquidadas y acreditadas por la administración al cierre de cada mes.',
+                ],
+            ]);
         }
 
         $withdrawable = wallet_withdrawable($user);
@@ -1814,7 +1809,7 @@ class Payments extends Controller {
                 'from' => $currentUserId,
                 'type' => 'retire',
                 'type_id' => $retireId,
-                'title' => $receiver === 'store' ? '🏪 NUEVO RETIRO EN PUNTO DE VENTA' : '📥 NUEVA SOLICITUD DE RETIRO',
+                'title' => $receiver === 'store' ? 'NUEVO RETIRO EN PUNTO DE VENTA' : 'NUEVA SOLICITUD DE RETIRO',
                 'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha solicitado un retiro por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ($receiver === 'store' ? (' (Código: ' . $data['account'] . ')') : (' | Ref: #' . $reference)) . ' | Fecha: ' . date('d/m/Y'),
             ];
 
@@ -2417,7 +2412,7 @@ class Payments extends Controller {
             $emailConfig = \Config\Services::email();
             $config = new \Config\Email();
 
-            $subject = '🏪 Código de Retiro en Punto de Venta - ' . (systemGet('name') ?: APP_NAME);
+            $subject = 'Código de Retiro en Punto de Venta - ' . (systemGet('name') ?: APP_NAME);
             $message = view('emails/retire_store_code', [
                 'code'     => $code,
                 'user'     => $user,

@@ -250,6 +250,10 @@ $routes->get('operator', 'Operator::index');
 $routes->post('operator/balanceRequestSubmit', 'Operator::balanceRequestSubmit');
 $routes->get('operator/balanceListGet', 'Operator::balanceListGet');
 
+$routes->get('store/movements', 'Store::movements');
+$routes->get('store/movementsListGet', 'Store::movementsListGet');
+$routes->get('store/exportMovements', 'Store::exportMovements');
+
 $routes->get('payments', 'Payments::index');
 $routes->get('payments/depositGet', 'Payments::depositGet');
 $routes->post('payments/depositStepSubmit', 'Payments::depositStepSubmit');

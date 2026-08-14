@@ -37,7 +37,7 @@ $storeUser = $storeUser ?? [];
                             <strong class="store-balance-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($walletSummary['recharge'] ?? 0), 2) ?></strong>
                         </div>
                         <div class="store-earnings-sidebar">
-                            <span class="store-balance-label"><?= translate('withdrawable earnings'); ?></span>
+                            <span class="store-balance-label">Comisiones Acumuladas (Fin de Mes)</span>
                             <strong class="store-earnings-amount"><?= systemGet('currency'); ?> <?= number_format((float) ($walletSummary['earnings_display'] ?? $walletSummary['withdraw'] ?? 0), 2) ?></strong>
                         </div>
                         <div class="store-commission-sidebar">
@@ -89,10 +89,13 @@ $storeUser = $storeUser ?? [];
                         <li class="nav-item">
                             <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'prizes' ? 'active' : '' ?>" href="<?= site_url('store/prizes'); ?>">
                                 <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
-                                <span>Pagar Notas de Retiro</span>
-                                <?php if (($pendingPrizes ?? 0) > 0) : ?>
-                                    <span class="badge bg-warning text-dark ms-1"><?= (int) $pendingPrizes; ?></span>
-                                <?php endif; ?>
+                                <span>Pagar Retiros</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link store-nav-link <?= ($activeNav ?? '') === 'movements' ? 'active' : '' ?>" href="<?= site_url('store/movements'); ?>">
+                                <i class="fa-duotone fa-solid fa-clock-rotate-left"></i>
+                                <span>Movimientos</span>
                             </a>
                         </li>
                     </ul>

@@ -1184,21 +1184,10 @@ if (! function_exists('bingo_fetch_store_withdraw_summary')) {
 
         $walletWithdraw = wallet_withdrawable($storeUser);
         $displayTotal = round($paidGgr + $pendingGgr + $paymentCommissions, 2);
-        $monthlyMode = bingo_ggr_pays_monthly();
-        $canWithdraw = $walletWithdraw > 0;
+        $monthlyMode = true;
+        $canWithdraw = false; // Comisiones quedan acumuladas como deuda del mes y son liquidadas por la administración al fin de mes.
 
-        if ($monthlyMode && $pendingGgr > 0) {
-            $canWithdraw = false;
-        }
-
-        $withdrawBlockedReason = '';
-        if ($displayTotal <= 0) {
-            $withdrawBlockedReason = 'no withdrawable earnings yet';
-        } elseif ($monthlyMode && $pendingGgr > 0) {
-            $withdrawBlockedReason = 'store earnings withdraw monthly notice';
-        } elseif ($walletWithdraw <= 0) {
-            $withdrawBlockedReason = 'store earnings await monthly settlement';
-        }
+        $withdrawBlockedReason = 'Las comisiones se acumulan durante el mes y son liquidadas por administración al cierre de cada mes.';
 
         return [
             'display_total'           => $displayTotal,
@@ -1222,8 +1211,8 @@ if (! function_exists('bingo_fetch_operator_withdraw_summary')) {
             'pending_ggr'             => 0.0,
             'paid_ggr'                => 0.0,
             'can_withdraw'            => false,
-            'monthly_mode'            => bingo_ggr_pays_monthly(),
-            'withdraw_blocked_reason' => 'no withdrawable earnings yet',
+            'monthly_mode'            => true,
+            'withdraw_blocked_reason' => 'Las comisiones se acumulan durante el mes y son liquidadas por administración al cierre de cada mes.',
         ];
 
         if ($operatorId <= 0) {
@@ -1249,21 +1238,10 @@ if (! function_exists('bingo_fetch_operator_withdraw_summary')) {
 
         $walletWithdraw = wallet_withdrawable($operatorUser);
         $displayTotal = round($paidGgr + $pendingGgr, 2);
-        $monthlyMode = bingo_ggr_pays_monthly();
-        $canWithdraw = $walletWithdraw > 0;
+        $monthlyMode = true;
+        $canWithdraw = false; // Comisiones quedan acumuladas como deuda del mes y son liquidadas por la administración al fin de mes.
 
-        if ($monthlyMode && $pendingGgr > 0) {
-            $canWithdraw = false;
-        }
-
-        $withdrawBlockedReason = '';
-        if ($displayTotal <= 0) {
-            $withdrawBlockedReason = 'no withdrawable earnings yet';
-        } elseif ($monthlyMode && $pendingGgr > 0) {
-            $withdrawBlockedReason = 'store earnings withdraw monthly notice';
-        } elseif ($walletWithdraw <= 0) {
-            $withdrawBlockedReason = 'store earnings await monthly settlement';
-        }
+        $withdrawBlockedReason = 'Las comisiones se acumulan durante el mes y son liquidadas por administración al cierre de cada mes.';
 
         return [
             'display_total'           => $displayTotal,

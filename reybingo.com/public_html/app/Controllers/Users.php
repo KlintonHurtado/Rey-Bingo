@@ -524,6 +524,14 @@ class Users extends Controller {
                 'label' => translate('document'),
                 'rules' => 'permit_empty|max_length[50]',
             ],
+            'phone' => [
+                'label' => translate('phone'),
+                'rules' => 'permit_empty|max_length[50]',
+            ],
+            'address_line' => [
+                'label' => translate('address'),
+                'rules' => 'permit_empty|max_length[255]',
+            ],
         ];
 
         if ($action === 'add') {
@@ -547,6 +555,8 @@ class Users extends Controller {
 
         $email = strtolower(trim((string) $this->request->getPost('email')));
         $document = trim((string) $this->request->getPost('document'));
+        $phone = trim((string) $this->request->getPost('phone'));
+        $address = trim((string) $this->request->getPost('address_line'));
         $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
         $operatorRechargeRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_recharge_rate'));
         $operatorWithdrawRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_withdraw_rate'));
@@ -563,7 +573,8 @@ class Users extends Controller {
             'roulette' => 1,
             'wallet' => 0,
             'document' => $document,
-            'phone' => '',
+            'phone' => $phone,
+            'address_line' => $address,
             'bank' => '',
             'account' => '',
             'image' => '',
@@ -593,6 +604,8 @@ class Users extends Controller {
                 'lastname' => $data['lastname'],
                 'email' => $email,
                 'document' => $document,
+                'phone' => $phone,
+                'address_line' => $address,
                 'operator_commission_rate' => $operatorCommissionRate,
                 'store_commission_rate' => $operatorRechargeRate,
                 'store_prize_commission_rate' => $operatorWithdrawRate,
@@ -1171,7 +1184,7 @@ class Users extends Controller {
                 'from'    => $adminId,
                 'type'    => 'bonus',
                 'type_id' => $userId,
-                'title'   => $isCredit ? '🎁 BONO ACREDITADO (ADMIN)' : 'ℹ️ AJUSTE DE BONO (ADMIN)',
+                'title'   => $isCredit ? 'BONO ACREDITADO (ADMIN)' : 'AJUSTE DE BONO (ADMIN)',
                 'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffBonus), 2) . ' en tu saldo de bono por administración.',
             ]);
         }
@@ -1191,7 +1204,7 @@ class Users extends Controller {
                 'from'    => $adminId,
                 'type'    => 'deposit',
                 'type_id' => $userId,
-                'title'   => $isCredit ? '💰 SALDO RECARGA ACREDITADO' : 'ℹ️ AJUSTE SALDO RECARGA',
+                'title'   => $isCredit ? 'SALDO RECARGA ACREDITADO' : 'AJUSTE SALDO RECARGA',
                 'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffRecharge), 2) . ' en tu saldo de recarga por administración.',
             ]);
         }
@@ -1211,7 +1224,7 @@ class Users extends Controller {
                 'from'    => $adminId,
                 'type'    => 'payment',
                 'type_id' => $userId,
-                'title'   => $isCredit ? '💵 SALDO RETIRABLE ACREDITADO' : 'ℹ️ AJUSTE SALDO RETIRABLE',
+                'title'   => $isCredit ? 'SALDO RETIRABLE ACREDITADO' : 'AJUSTE SALDO RETIRABLE',
                 'message' => ($isCredit ? 'Se ha acreditado ' : 'Se ha ajustado ') . $currency . ' ' . number_format(abs($diffWithdraw), 2) . ' en tu saldo retirable por administración.',
             ]);
         }
@@ -1294,7 +1307,7 @@ class Users extends Controller {
                 'from'    => $adminId,
                 'type'    => 'deposit',
                 'type_id' => $userId,
-                'title'   => '💰 RECARGA DE SALDO ACREDITADA',
+                'title'   => 'RECARGA DE SALDO ACREDITADA',
                 'message' => 'Se ha acreditado ' . $currency . ' ' . number_format($amount, 2) . ' a tu saldo por administración.',
             ]);
 
@@ -1337,7 +1350,7 @@ class Users extends Controller {
                 'from'    => $adminId,
                 'type'    => 'retire',
                 'type_id' => $userId,
-                'title'   => 'ℹ️ DÉBITO / RETIRO DE SALDO',
+                'title'   => 'DÉBITO / RETIRO DE SALDO',
                 'message' => 'Se ha retirado ' . $currency . ' ' . number_format($amount, 2) . ' de tu saldo por administración.',
             ]);
 

@@ -73,7 +73,7 @@
                             <!-- Instrucciones para cobrar -->
                             <div style="background-color:#fffbeb;border-left:4px solid #f59e0b;padding:14px 16px;border-radius:6px;margin:20px 0;">
                                 <strong style="color:#92400e;font-size:14px;display:block;margin-bottom:6px;">
-                                    📌 ¿Cómo cobrar tu dinero?
+                                    ¿Cómo cobrar tu dinero?
                                 </strong>
                                 <ol style="color:#78350f;font-size:13px;line-height:1.6;margin:0;padding-left:18px;">
                                     <li>Acércate a cualquier Punto de Venta autorizado.</li>

@@ -962,6 +962,103 @@ class Store extends Controller
         return (int) $modelRetires->where('bank', 'Punto de Venta')->where('status', 1)->countAllResults();
     }
 
+    public function movements()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $dateFrom = trim((string) $this->request->getGet('date_from'));
+        $dateTo = trim((string) $this->request->getGet('date_to'));
+        $type = trim((string) $this->request->getGet('type'));
+        $search = trim((string) $this->request->getGet('search'));
+
+        $ledgerData = bingo_build_store_movements_ledger($storeId, [
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+            'type'      => $type,
+            'search'    => $search,
+        ]);
+
+        return $this->renderStorePage('store/movements', [
+            'movements' => $ledgerData['movements'],
+            'stats'     => $ledgerData['stats'],
+            'filters'   => [
+                'date_from' => $dateFrom,
+                'date_to'   => $dateTo,
+                'type'      => $type ?: 'all',
+                'search'    => $search,
+            ],
+            'activeNav' => 'movements',
+        ], 'Movimientos del Punto de Venta');
+    }
+
+    public function movementsListGet()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $dateFrom = trim((string) $this->request->getGet('date_from'));
+        $dateTo = trim((string) $this->request->getGet('date_to'));
+        $type = trim((string) $this->request->getGet('type'));
+        $search = trim((string) $this->request->getGet('search'));
+
+        $ledgerData = bingo_build_store_movements_ledger($storeId, [
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+            'type'      => $type,
+            'search'    => $search,
+        ]);
+
+        return view('store/movements_list', [
+            'movements' => $ledgerData['movements'],
+            'stats'     => $ledgerData['stats'],
+            'currency'  => systemGet('currency') ?? '$',
+        ]);
+    }
+
+    public function exportMovements()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $dateFrom = trim((string) $this->request->getGet('date_from'));
+        $dateTo = trim((string) $this->request->getGet('date_to'));
+        $type = trim((string) $this->request->getGet('type'));
+        $search = trim((string) $this->request->getGet('search'));
+
+        $ledgerData = bingo_build_store_movements_ledger($storeId, [
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+            'type'      => $type,
+            'search'    => $search,
+        ]);
+
+        $export = bingo_store_movements_export_rows($ledgerData['movements']);
+
+        $filename = 'movimientos_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.csv';
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $output = fopen('php://output', 'w');
+        fputs($output, "\xEF\xBB\xBF");
+
+        fputcsv($output, $export['headers'], ';');
+        foreach ($export['rows'] as $row) {
+            fputcsv($output, $row, ';');
+        }
+        fclose($output);
+        exit();
+    }
+
     private function formatRetireStatus(int $status): string
     {
         return match ($status) {
