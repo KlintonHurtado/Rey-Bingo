@@ -41,6 +41,7 @@
                                 <span>Detalles y Movimientos</span>
                             </button>
                         </li>
+                        <!--
                         <li class="nav-item">
                             <button
                                 type="button"
@@ -51,6 +52,7 @@
                                 <span>Pedir Saldo al Administrador</span>
                             </button>
                         </li>
+                        -->
                         <li class="nav-item">
                             <button
                                 type="button"

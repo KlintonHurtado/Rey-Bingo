@@ -2950,8 +2950,41 @@ class Users extends Controller {
         $modelSings = new SingsModel();
 
         $user = $model->find($userId);
+        $userGroup = (int) ($user['group'] ?? session()->get('group') ?? 0);
+        $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
-        $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->findAll();
+        if ($isOperatorOrStore) {
+            // Operadores y Puntos de venta no deben recibir notificaciones de nuevas partidas
+            $modelNotifications
+                ->where('user', $user['id'])
+                ->where('status', 0)
+                ->groupStart()
+                    ->where('type', 'game')
+                    ->orWhere('game >', 0)
+                    ->orLike('title', 'PARTIDA')
+                    ->orLike('message', 'PARTIDA')
+                ->groupEnd()
+                ->set(['status' => 1])
+                ->update();
+
+            $notifications = $modelNotifications
+                ->where('user', $user['id'])
+                ->where('status', 0)
+                ->groupStart()
+                    ->where('type !=', 'game')
+                    ->orWhere('type IS NULL', null, false)
+                ->groupEnd()
+                ->groupStart()
+                    ->where('game', 0)
+                    ->orWhere('game IS NULL', null, false)
+                ->groupEnd()
+                ->notLike('title', 'PARTIDA')
+                ->notLike('message', 'PARTIDA')
+                ->orderBy('created_at', 'DESC')
+                ->findAll();
+        } else {
+            $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->findAll();
+        }
 
         foreach ($notifications as &$notification) { 
             if (in_array($notification['type'], ['deposit', 'retire', 'transfer', 'payment', 'referred']) && $notification['type_id'] > 0) {

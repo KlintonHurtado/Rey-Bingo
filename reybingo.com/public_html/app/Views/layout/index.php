@@ -758,6 +758,14 @@
             }
 
             window.showNotification = function showNotification(notification) {
+                const isGameNotice = notification.type === 'game' || (notification.title && notification.title.indexOf('PARTIDA') !== -1) || (notification.message && notification.message.indexOf('PARTIDA') !== -1);
+                <?php if (session()->get('logged_in') && function_exists('bingo_is_operator') && function_exists('bingo_is_store') && (bingo_is_operator() || bingo_is_store() || (function_exists('bingo_is_admin') && bingo_is_admin()))) : ?>
+                    if (isGameNotice) return;
+                <?php endif; ?>
+                if (isGameNotice && (window.location.pathname.indexOf('/operator') !== -1 || window.location.pathname.indexOf('/store') !== -1)) {
+                    return;
+                }
+
                 const container = document.getElementById('notificationsContainer');
                 if (!container) {
                     return;
