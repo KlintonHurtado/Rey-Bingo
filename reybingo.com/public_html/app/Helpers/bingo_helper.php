@@ -4740,6 +4740,11 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                 continue;
             }
 
+            // Excluir tipos de pagos ya manejados específicamente en sus tablas correspondientes
+            if (in_array($ptype, ['award', 'retire', 'withdraw', 'payout', 'carton_purchase'], true)) {
+                continue;
+            }
+
             $push([
                 'datetime' => (string) ($pay['created_at'] ?? ''),
                 'type' => 'payment',
@@ -4802,31 +4807,7 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
             // tabla opcional
         }
 
-        // Orden cronológico ASC para calcular saldo corrido (después de cada movimiento)
-        usort($rows, static function ($a, $b) {
-            $cmp = strcmp((string) ($a['datetime'] ?? ''), (string) ($b['datetime'] ?? ''));
-            if ($cmp !== 0) {
-                return $cmp;
-            }
-
-            return ((int) ($a['ref_id'] ?? 0)) <=> ((int) ($b['ref_id'] ?? 0));
-        });
-
-        $runningBalance = 0.0;
-        foreach ($rows as &$row) {
-            $dir = (string) ($row['direction'] ?? '');
-            $amt = round((float) ($row['amount'] ?? 0), 2);
-            if ($dir === '+') {
-                $runningBalance = round($runningBalance + $amt, 2);
-            } elseif ($dir === '-') {
-                $runningBalance = round($runningBalance - $amt, 2);
-            }
-            // direction '=' (p. ej. cartón ruleta gratis): no altera el saldo
-            $row['balance_after'] = $runningBalance;
-        }
-        unset($row);
-
-        // Vista admin: más reciente primero
+        // Ordenar en orden cronológico inverso (DESC: el movimiento más reciente primero)
         usort($rows, static function ($a, $b) {
             $cmp = strcmp((string) ($b['datetime'] ?? ''), (string) ($a['datetime'] ?? ''));
             if ($cmp !== 0) {
@@ -4839,6 +4820,33 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
         if ($limit > 0 && count($rows) > $limit) {
             $rows = array_slice($rows, 0, $limit);
         }
+
+        // Obtener el saldo total REAL actual de la billetera del usuario
+        $currentWalletBalance = round((float) (wallet_total($targetUser)), 2);
+
+        // Calcular el saldo que quedó después de cada movimiento hacia atrás desde el saldo actual de la billetera
+        $cursorBalance = $currentWalletBalance;
+        foreach ($rows as &$row) {
+            $st = (int) ($row['status'] ?? 0);
+            $dir = (string) ($row['direction'] ?? '');
+            $amt = round((float) ($row['amount'] ?? 0), 2);
+
+            // El saldo después de este movimiento fue $cursorBalance
+            $row['balance_after'] = max(0.0, round($cursorBalance, 2));
+
+            // Solo movimientos aprobados (o retiros pendientes que ya descuentan saldo) alteran el saldo hacia atrás
+            $affectsBalance = ($st === 2 || ($row['type'] === 'retire' && $st === 1));
+            if ($affectsBalance && $dir !== '=') {
+                if ($dir === '+') {
+                    // Si este movimiento sumó dinero, antes de este movimiento había MENOS dinero
+                    $cursorBalance = round($cursorBalance - $amt, 2);
+                } elseif ($dir === '-') {
+                    // Si este movimiento restó dinero, antes de este movimiento había MÁS dinero
+                    $cursorBalance = round($cursorBalance + $amt, 2);
+                }
+            }
+        }
+        unset($row);
 
         return $rows;
     }
@@ -5170,9 +5178,7 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
             'total_debits_count'          => 0,
         ];
 
-        $runningBalance = 0.0;
-        foreach ($rows as &$row) {
-            $dir = (string) ($row['direction'] ?? '');
+        foreach ($rows as $row) {
             $amt = round((float) ($row['amount'] ?? 0), 2);
             $cat = (string) ($row['type_category'] ?? '');
             $st = (int) ($row['status'] ?? 0);
@@ -5192,17 +5198,7 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                     $stats['total_debits_count']++;
                 }
             }
-
-            if ($st === 2) {
-                if ($dir === '+') {
-                    $runningBalance = round($runningBalance + $amt, 2);
-                } elseif ($dir === '-') {
-                    $runningBalance = round($runningBalance - $amt, 2);
-                }
-            }
-            $row['balance_after'] = $runningBalance;
         }
-        unset($row);
 
         // Filtrado por fecha, tipo y búsqueda
         $dateFrom = trim((string) ($filters['date_from'] ?? ''));
@@ -5249,6 +5245,28 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
             }
             return strcmp((string) ($b['id'] ?? ''), (string) ($a['id'] ?? ''));
         });
+
+        // Obtener saldo total disponible real actual de la tienda
+        $storeUser = $modelUsers->find($storeId);
+        $currentStoreBalance = round((float) ($storeUser['wallet_recharge'] ?? 0), 2);
+
+        $cursorBalance = $currentStoreBalance;
+        foreach ($filteredRows as &$row) {
+            $st = (int) ($row['status'] ?? 0);
+            $dir = (string) ($row['direction'] ?? '');
+            $amt = round((float) ($row['amount'] ?? 0), 2);
+
+            $row['balance_after'] = max(0.0, round($cursorBalance, 2));
+
+            if ($st === 2 && $dir !== '=') {
+                if ($dir === '+') {
+                    $cursorBalance = round($cursorBalance - $amt, 2);
+                } elseif ($dir === '-') {
+                    $cursorBalance = round($cursorBalance + $amt, 2);
+                }
+            }
+        }
+        unset($row);
 
         return [
             'movements' => $filteredRows,
@@ -5749,6 +5767,28 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
             }
             return strcmp((string) ($b['id'] ?? ''), (string) ($a['id'] ?? ''));
         });
+
+        // Obtener saldo total disponible real actual del operador
+        $operatorUser = $modelUsers->find($operatorId);
+        $currentOpBalance = round((float) ($operatorUser['wallet_recharge'] ?? 0), 2);
+
+        $cursorBalance = $currentOpBalance;
+        foreach ($filteredRows as &$row) {
+            $st = (int) ($row['status'] ?? 0);
+            $dir = (string) ($row['direction'] ?? '');
+            $amt = round((float) ($row['amount'] ?? 0), 2);
+
+            $row['balance_after'] = max(0.0, round($cursorBalance, 2));
+
+            if ($st === 2 && $dir !== '=') {
+                if ($dir === '+') {
+                    $cursorBalance = round($cursorBalance - $amt, 2);
+                } elseif ($dir === '-') {
+                    $cursorBalance = round($cursorBalance + $amt, 2);
+                }
+            }
+        }
+        unset($row);
 
         return [
             'movements' => $filteredRows,
