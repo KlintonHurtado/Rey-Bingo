@@ -56,6 +56,47 @@
                         <small id="address_line-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-6 mb-2">
+                        <label for="city" class="form-label"><?= translate('city'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="city" id="city" placeholder="<?= translate('city'); ?>" value="<?= $isUpdate ? esc($storeData['city'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="state" class="form-label"><?= translate('state'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="state" id="state" placeholder="<?= translate('state'); ?>" value="<?= $isUpdate ? esc($storeData['state'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label for="last_mac" class="form-label"><i class="fa-solid fa-network-wired me-1"></i> Dirección MAC de Terminal / Dispositivo</label>
+                        <input type="text" class="form-control form-control-lg form-bingo font-monospace text-uppercase" name="last_mac" id="last_mac" placeholder="00:1A:2B:3C:4D:5E" value="<?= $isUpdate ? esc($storeData['last_mac'] ?? '') : ''; ?>" autocomplete="off">
+                        <small class="text-muted">Asigna la MAC de la máquina o terminal autorizada para este Punto de Venta.</small>
+                    </div>
+
+                    <!-- Datos Bancarios PV -->
+                    <div class="col-md-12 mb-2 mt-2">
+                        <h6 class="text-white border-bottom pb-1"><i class="fa-duotone fa-solid fa-building-columns me-1"></i> <?= translate('banking information'); ?></h6>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="bank" class="form-label"><?= translate('bank'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="bank" id="bank" placeholder="Nombre del Banco" value="<?= $isUpdate ? esc($storeData['bank'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="account" class="form-label"><?= translate('account'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="account" id="account" placeholder="<?= translate('enter account'); ?>" value="<?= $isUpdate ? esc($storeData['account'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label for="account_type" class="form-label"><?= translate('account type'); ?></label>
+                        <?php $storeAccType = bingo_normalize_account_type($isUpdate ? ($storeData['account_type'] ?? '') : ''); ?>
+                        <select class="form-control form-control-lg form-bingo" name="account_type" id="account_type">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('account type')); ?></option>
+                            <option value="savings" <?= $storeAccType === 'savings' ? 'selected' : ''; ?>><?= translate('savings account'); ?></option>
+                            <option value="checking" <?= $storeAccType === 'checking' ? 'selected' : ''; ?>><?= translate('checking account'); ?></option>
+                        </select>
+                    </div>
+
                     <div class="col-md-12 mb-2">
                         <label for="operator_id" class="form-label"><?= translate('operator'); ?></label>
                         <select class="form-control form-control-lg form-bingo" name="operator_id" id="operator_id">

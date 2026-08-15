@@ -187,7 +187,7 @@
             <hr />
 
             <div class="text-center mb-2">
-                Disponible para retirar (Ganancias): <?= systemGet('currency'); ?> <span class="available-wallet fw-bold"><?= number_format(wallet_withdrawable($user), 2); ?></span>
+                Disponible para retirar (Ganancias): <?= systemGet('currency'); ?> <span class="wallet-withdraw-value fw-bold"><?= number_format(wallet_withdrawable($user), 2); ?></span>
             </div>
             <?php if (wallet_withdrawable($user) <= 0): ?>
             <div class="alert alert-info border-0 py-2 px-3 mt-1" style="border-radius:10px; font-size:0.85rem;">

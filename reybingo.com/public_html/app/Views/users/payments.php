@@ -290,9 +290,7 @@
                                     <th class="text-center"><?= translate('amount'); ?></th>
                                     <th class="text-center"><?= translate('date'); ?></th>
                                     <th class="text-center"><?= translate('status'); ?></th>
-                                    <?php if (session()->get('group') == 1) : ?>
                                     <th class="text-center"><?= translate('options'); ?></th>
-                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody id="payments-tbody">
@@ -381,49 +379,18 @@
                                                 <?= $payment['status_formatted']; ?>
                                             </span>
                                         </td>
-                                        <?php if (session()->get('group') == 1) : ?>
                                         <td class="text-center">
                                             <?php if (in_array($payment['type'], ['deposit', 'retire', 'transfer', 'payment', 'award', 'bonus', 'referred'], true)) : ?>
-                                            <a class="btn btn-primary btn-modal text-white" onclick="requestGet('<?= $payment['type'] ?>', '<?= $payment['id'] ?>');"><i class="fa-duotone fa-solid fa-eye"></i></a>
+                                            <a class="btn btn-primary btn-modal text-white" onclick="requestGet('<?= $payment['type'] ?>', '<?= $payment['id'] ?>');" title="Ver detalles"><i class="fa-duotone fa-solid fa-eye"></i></a>
                                             <?php else : ?>
                                             <span class="text-muted">—</span>
                                             <?php endif; ?>
-                                            <!--  
-                                            <?php if ($payment['type'] !== 'transfer') : ?>
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <?php if ($payment['status_raw'] != 1) : ?>
-                                                <button type="button" class="btn btn-success btn-sm" 
-                                                        onclick="updateStatus('<?= $payment['type']; ?>', <?= $payment['id']; ?>, 1)"
-                                                        title="<?= translate('approve'); ?>">
-                                                    <i class="fa-duotone fa-solid fa-check-double"></i>
-                                                </button>
-                                                <?php endif; ?>
-                                                <?php if ($payment['status_raw'] != 2) : ?>
-                                                <button type="button" class="btn btn-danger btn-sm" 
-                                                        onclick="updateStatus('<?= $payment['type']; ?>', <?= $payment['id']; ?>, 2)"
-                                                        title="<?= translate('reject'); ?>">
-                                                    <i class="fa-duotone fa-solid fa-xmark"></i>
-                                                </button>
-                                                <?php endif; ?>
-                                                <?php if ($payment['type'] == 'deposit' && $payment['status_raw'] != 3) : ?>
-                                                <button type="button" class="btn btn-info btn-sm" 
-                                                        onclick="updateStatus('<?= $payment['type']; ?>', <?= $payment['id']; ?>, 3)"
-                                                        title="<?= translate('verify'); ?>">
-                                                    <i class="fa fa-shield-check"></i>
-                                                </button>
-                                                <?php endif; ?>
-                                            </div>
-                                            <?php else : ?>
-                                            <span class="text-muted small"><?= translate('approved'); ?></span>
-                                            <?php endif; ?>
-                                            -->
                                         </td>
-                                        <?php endif; ?>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php else : ?>
                                     <tr id="not-list">
-                                        <td colspan="<?= session()->get('group') == 1 ? '8' : '6'; ?>" class="text-center pt-2">
+                                        <td colspan="<?= session()->get('group') == 1 ? '8' : '7'; ?>" class="text-center pt-2">
                                             <div class="text-muted">
                                                 <?= translate('no transactions found'); ?>
                                             </div>
@@ -856,52 +823,18 @@
                     </td>
                 `;
 
-                <?php if (session()->get('group') == 1) : ?>
                 if (payment.type !== 'transfer' && ['deposit', 'retire', 'payment', 'award', 'bonus', 'referred'].includes(payment.type)) {
                     row += `<td class="text-center">`;
                     row += `<div class="btn-group btn-group-sm" role="group">`;
-                    
-                    /*if (payment.status_raw != 1) {
-                        row += `
-                            <button type="button" class="btn btn-success btn-sm" 
-                                    onclick="updateStatus('${payment.type}', ${payment.id}, 1)"
-                                    title="<?= translate('approve'); ?>">
-                                <i class="fa-duotone fa-solid fa-check-double"></i>
-                            </button>
-                        `;
-                    }*/
-
                     row += `
-                        <a class="btn btn-primary btn-modal text-white" onclick="requestGet('${payment.type}', ${payment.id}, 1)"><i class="fa-duotone fa-solid fa-eye"></i></a>
+                        <a class="btn btn-primary btn-modal text-white" onclick="requestGet('${payment.type}', ${payment.id})" title="Ver detalles"><i class="fa-duotone fa-solid fa-eye"></i></a>
                     `;
-                    
-                    /*if (payment.status_raw != 2) {
-                        row += `
-                            <button type="button" class="btn btn-danger btn-sm" 
-                                    onclick="updateStatus('${payment.type}', ${payment.id}, 2)"
-                                    title="<?= translate('reject'); ?>">
-                                <i class="fa-duotone fa-solid fa-xmark"></i>
-                            </button>
-                        `;
-                    }*/
-                    
-                    /*if (payment.type === 'deposit' && payment.status_raw != 3) {
-                        row += `
-                            <button type="button" class="btn btn-info btn-sm" 
-                                    onclick="updateStatus('${payment.type}', ${payment.id}, 3)"
-                                    title="<?= translate('verify'); ?>">
-                                <i class="fa fa-shield-check"></i>
-                            </button>
-                        `;
-                    }*/
-                    
                     row += `</div></td>`;
                 } else if (payment.type === 'transfer') {
-                    row += `<td class="text-center"><span class="text-muted small"><?= translate('approved'); ?></span></td>`;
+                    row += `<td class="text-center"><a class="btn btn-primary btn-modal text-white" onclick="requestGet('transfer', ${payment.id})" title="Ver detalles"><i class="fa-duotone fa-solid fa-eye"></i></a></td>`;
                 } else {
                     row += `<td class="text-center"><span class="text-muted">—</span></td>`;
                 }
-                <?php endif; ?>
 
                 row += `</tr>`;
                 tbody.append(row);

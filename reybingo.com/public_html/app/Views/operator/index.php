@@ -251,6 +251,8 @@
             >
                 <div class="card-body operator-panel-pane-body">
                     <?= view('operator/partials/commissions_operator', [
+                        'user' => $user ?? [],
+                        'stores' => $stores ?? [],
                         'operatorCommissions' => $operatorCommissions ?? [],
                     ]); ?>
                 </div>
@@ -412,7 +414,7 @@
                             </div>
                             <div>
                                 <h5 class="mb-0 fw-bold text-dark">Historial Completo de Movimientos</h5>
-                                <small class="text-muted">Consulta todas las recargas, retiros, comisiones y transferencias de tu cuenta y tus Puntos de Venta.</small>
+                                <small class="text-muted">Consulta todas las recargas, retiros, transferencias y movimientos de saldo de tu cuenta y tus Puntos de Venta (Las comisiones se gestionan en su respectiva sección).</small>
                             </div>
                         </div>
                         <div>
@@ -422,7 +424,7 @@
                         </div>
                     </div>
 
-                    <!-- Tarjetas de Resumen Estadístico del Operador -->
+                    <!-- Tarjetas de Resumen Estadístico Operativo del Operador -->
                     <div class="row g-2 mb-3">
                         <div class="col-6 col-md-3">
                             <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,110,253,0.08) 0%, rgba(13,110,253,0.02) 100%); border-left: 4px solid #0d6efd !important;">
@@ -430,6 +432,7 @@
                                     <div>
                                         <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Saldo Disponible</small>
                                         <h5 class="mb-0 fw-bold text-primary"><?= systemGet('currency'); ?> <?= number_format((float) ($opBalanceVal ?? 0), 2); ?></h5>
+                                        <small class="text-muted">Saldo Operativo</small>
                                     </div>
                                     <div class="text-primary fs-3">
                                         <i class="fa-duotone fa-solid fa-wallet"></i>
@@ -438,26 +441,12 @@
                             </div>
                         </div>
                         <div class="col-6 col-md-3">
-                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div>
-                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión GGR Afiliados</small>
-                                        <h5 class="mb-0 fw-bold text-success"><?= systemGet('currency'); ?> <?= number_format((float) ($operatorCommissions['ggr_commissions'] ?? 0), 2); ?></h5>
-                                        <small class="text-muted">Tasa: <?= number_format(bingo_ggr_commission_rate_for($user ?? [], 'operator') * 100, 2); ?>%</small>
-                                    </div>
-                                    <div class="text-success fs-3">
-                                        <i class="fa-duotone fa-solid fa-chart-pie"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6 col-md-3">
                             <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,202,240,0.08) 0%, rgba(13,202,240,0.02) 100%); border-left: 4px solid #0dcaf0 !important;">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión por Recargas</small>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Recargas Realizadas</small>
                                         <h5 class="mb-0 fw-bold text-info"><?= systemGet('currency'); ?> <span id="op-stat-recharge">0.00</span></h5>
-                                        <small class="text-muted">Tasa: <?= number_format(bingo_operator_recharge_rate($user ?? []) * 100, 2); ?>%</small>
+                                        <small class="text-muted">Jugadores y PVs</small>
                                     </div>
                                     <div class="text-info fs-3">
                                         <i class="fa-duotone fa-solid fa-mobile-screen"></i>
@@ -466,15 +455,29 @@
                             </div>
                         </div>
                         <div class="col-6 col-md-3">
-                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.03) 100%); border-left: 4px solid #ffc107 !important;">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(220,53,69,0.08) 0%, rgba(220,53,69,0.02) 100%); border-left: 4px solid #dc3545 !important;">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión Pago Retiros</small>
-                                        <h5 class="mb-0 fw-bold text-warning text-dark"><?= systemGet('currency'); ?> <span id="op-stat-prize">0.00</span></h5>
-                                        <small class="text-muted">Tasa: <?= number_format(bingo_operator_withdraw_rate($user ?? []) * 100, 2); ?>%</small>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Retiros Pagados</small>
+                                        <h5 class="mb-0 fw-bold text-danger"><?= systemGet('currency'); ?> <span id="op-stat-prize">0.00</span></h5>
+                                        <small class="text-muted">Premios y Retiros en Efectivo</small>
                                     </div>
-                                    <div class="text-warning fs-3">
+                                    <div class="text-danger fs-3">
                                         <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Acreditaciones / Ingresos</small>
+                                        <h5 class="mb-0 fw-bold text-success"><?= systemGet('currency'); ?> <span id="op-stat-credits">0.00</span></h5>
+                                        <small class="text-muted">Fondos Admin y Retiros PV</small>
+                                    </div>
+                                    <div class="text-success fs-3">
+                                        <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
                                     </div>
                                 </div>
                             </div>
@@ -506,13 +509,11 @@
                                 <div class="col-12 col-sm-6 col-md-2">
                                     <label for="op-filter-type" class="form-label text-dark fw-semibold mb-1" style="font-size: 0.82rem; width: 100%; padding-left: 0; margin: 0 0 4px 0;">Tipo Movimiento</label>
                                     <select class="form-select form-control store-filter-input" id="op-filter-type">
-                                        <option value="all">Todos los tipos</option>
+                                        <option value="all">Todos los movimientos</option>
                                         <option value="recharge">Recargas a Jugadores</option>
+                                        <option value="recharge_store">Recargas a Puntos de Venta</option>
                                         <option value="retire">Pagos de Retiros</option>
-                                        <option value="credit">Transferencias a PV</option>
-                                        <option value="commission_ggr">Comisión GGR</option>
-                                        <option value="commission_recharge">Comisión Recargas</option>
-                                        <option value="commission_prize">Comisión Retiros</option>
+                                        <option value="credit">Acreditaciones / Retiros de PV</option>
                                         <option value="debit">Débitos / Ajustes</option>
                                     </select>
                                 </div>
@@ -703,6 +704,15 @@
             data: params,
             success: function(html) {
                 $('#operator-movements-container').html(html).removeClass('opacity-50');
+                const $w = $('#operator-movements-table-wrapper');
+                if ($w.length) {
+                    const r = parseFloat($w.data('total-recharges') || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const p = parseFloat($w.data('total-retires') || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const c = parseFloat($w.data('total-credits') || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    $('#op-stat-recharge').text(r);
+                    $('#op-stat-prize').text(p);
+                    $('#op-stat-credits').text(c);
+                }
             },
             error: function() {
                 Toastify({

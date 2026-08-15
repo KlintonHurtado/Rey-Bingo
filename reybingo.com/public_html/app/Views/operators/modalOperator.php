@@ -38,6 +38,11 @@
                         <small id="email-error" class="text-danger d-none"></small>
                     </div>
 
+                    <div class="col-md-12 mb-2">
+                        <label for="operator-business-name" class="form-label">Nombre Comercial / Marca del Operador</label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="business_name" id="operator-business-name" value="<?= $isUpdate ? esc($operatorData['business_name'] ?? '') : '' ?>" autocomplete="off" placeholder="Nombre comercial o marca">
+                    </div>
+
                     <div class="col-md-6 mb-2">
                         <label for="operator-phone" class="form-label"><?= translate('phone'); ?></label>
                         <input type="text" class="form-control form-control-lg form-bingo" name="phone" id="operator-phone" value="<?= $isUpdate ? esc($operatorData['phone'] ?? '') : '' ?>" autocomplete="off" placeholder="<?= translate('phone'); ?>">
@@ -48,6 +53,47 @@
                         <label for="operator-address" class="form-label"><?= translate('address'); ?></label>
                         <input type="text" class="form-control form-control-lg form-bingo" name="address_line" id="operator-address" value="<?= $isUpdate ? esc($operatorData['address_line'] ?? '') : '' ?>" autocomplete="off" placeholder="<?= translate('address'); ?>">
                         <small id="address_line-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="operator-city" class="form-label"><?= translate('city'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="city" id="operator-city" placeholder="<?= translate('city'); ?>" value="<?= $isUpdate ? esc($operatorData['city'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="operator-state" class="form-label"><?= translate('state'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="state" id="operator-state" placeholder="<?= translate('state'); ?>" value="<?= $isUpdate ? esc($operatorData['state'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label for="operator-last-mac" class="form-label"><i class="fa-solid fa-network-wired me-1"></i> Dirección MAC de Dispositivo</label>
+                        <input type="text" class="form-control form-control-lg form-bingo font-monospace text-uppercase" name="last_mac" id="operator-last-mac" placeholder="00:1A:2B:3C:4D:5E" value="<?= $isUpdate ? esc($operatorData['last_mac'] ?? '') : ''; ?>" autocomplete="off">
+                        <small class="text-muted">Asigna o actualiza la dirección MAC autorizada para el operador.</small>
+                    </div>
+
+                    <!-- Datos Bancarios Operador -->
+                    <div class="col-md-12 mb-2 mt-2">
+                        <h6 class="text-white border-bottom pb-1"><i class="fa-duotone fa-solid fa-building-columns me-1"></i> <?= translate('banking information'); ?></h6>
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="operator-bank" class="form-label"><?= translate('bank'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="bank" id="operator-bank" placeholder="Nombre del Banco" value="<?= $isUpdate ? esc($operatorData['bank'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-6 mb-2">
+                        <label for="operator-account" class="form-label"><?= translate('account'); ?></label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="account" id="operator-account" placeholder="<?= translate('enter account'); ?>" value="<?= $isUpdate ? esc($operatorData['account'] ?? '') : ''; ?>" autocomplete="off">
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <label for="operator-account_type" class="form-label"><?= translate('account type'); ?></label>
+                        <?php $opAccType = bingo_normalize_account_type($isUpdate ? ($operatorData['account_type'] ?? '') : ''); ?>
+                        <select class="form-control form-control-lg form-bingo" name="account_type" id="operator-account_type">
+                            <option value=""><?= translate('select a'); ?> <?= strtolower(translate('account type')); ?></option>
+                            <option value="savings" <?= $opAccType === 'savings' ? 'selected' : ''; ?>><?= translate('savings account'); ?></option>
+                            <option value="checking" <?= $opAccType === 'checking' ? 'selected' : ''; ?>><?= translate('checking account'); ?></option>
+                        </select>
                     </div>
 
                     <div class="col-md-12 mb-2">

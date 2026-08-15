@@ -38,7 +38,7 @@
             <hr />
 
             <div class="text-center">
-                Disponible para transferir: <?= systemGet('currency'); ?> <span class="available-wallet"><?= number_format(wallet_withdrawable(wallet_service()->normalizeUser($user)), 2); ?></span>
+                Disponible para transferir: <?= systemGet('currency'); ?> <span class="wallet-withdraw-value"><?= number_format(wallet_withdrawable(wallet_service()->normalizeUser($user)), 2); ?></span>
             </div>
         </div>
     </div>

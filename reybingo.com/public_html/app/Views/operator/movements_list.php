@@ -1,7 +1,12 @@
 <?php
 $currency = $currency ?? systemGet('currency') ?? '$';
+$stats = $stats ?? [];
 ?>
-<div class="table-responsive">
+<div class="table-responsive" id="operator-movements-table-wrapper"
+     data-total-recharges="<?= esc(number_format((float)($stats['total_recharges_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-retires="<?= esc(number_format((float)($stats['total_retires_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-credits="<?= esc(number_format((float)($stats['total_credits_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-debits="<?= esc(number_format((float)($stats['total_debits_amount'] ?? 0), 2, '.', '')); ?>">
     <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
         <thead class="table-light">
             <tr>

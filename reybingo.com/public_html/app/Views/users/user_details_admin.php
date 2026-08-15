@@ -216,13 +216,126 @@ $sourceLabel = static function ($source) {
 
             <table class="table table-sm mb-2">
                 <tr><td><strong><?= translate('code'); ?></strong></td><td><?= esc($user['code'] ?? ''); ?></td></tr>
+                <?php if (! empty($user['business_name']) || $isNonPlayer) : ?>
+                    <tr>
+                        <td><strong><?= $isStore ? 'Punto de Venta / Razón Social' : ($isOperator ? 'Marca / Operador' : translate('business name')); ?></strong></td>
+                        <td><strong class="text-primary"><?= esc($user['business_name'] ?: translate('not provided')); ?></strong></td>
+                    </tr>
+                <?php endif; ?>
                 <tr><td><strong><?= translate('email'); ?></strong></td><td><?= esc($user['email'] ?? ''); ?></td></tr>
                 <tr><td><strong><?= translate('phone'); ?></strong></td><td><?= esc($user['phone'] ?: translate('not provided')); ?></td></tr>
                 <tr><td><strong><?= translate('document'); ?></strong></td><td><?= esc($user['document'] ?: translate('not provided')); ?></td></tr>
+
+                <?php if (! empty($user['address_line']) || ! empty($user['city']) || ! empty($user['state']) || $isNonPlayer) : ?>
+                    <tr>
+                        <td><strong><?= translate('address'); ?></strong></td>
+                        <td>
+                            <?= esc(trim(($user['address_line'] ?? '') . (!empty($user['city']) ? ' - ' . $user['city'] : '') . (!empty($user['state']) ? ', ' . $user['state'] : '')) ?: translate('not provided')); ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+
+                <?php if ($isStore) : ?>
+                    <!-- INFORMACIÓN ESPECÍFICA DE PUNTO DE VENTA -->
+                    <tr>
+                        <td><strong>Operador Asignado</strong></td>
+                        <td>
+                            <?php if (! empty($assignedOperator)) : ?>
+                                <span class="badge bg-primary text-white">
+                                    <i class="fa-duotone fa-solid fa-user-tie"></i> <?= esc(trim(($assignedOperator['firstname'] ?? '') . ' ' . ($assignedOperator['lastname'] ?? ''))); ?>
+                                    (<?= esc($assignedOperator['code'] ?? ''); ?>)
+                                </span>
+                            <?php else : ?>
+                                <span class="badge bg-secondary text-white"><?= translate('no operator assigned'); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Comisiones PV</strong></td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-success" title="Comisión por Recargas de Saldo">
+                                    Recargas: <?= isset($user['store_commission_rate']) && $user['store_commission_rate'] !== null && $user['store_commission_rate'] !== '' ? ((float) $user['store_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                                <span class="badge bg-info text-white" title="Comisión por Pago de Premios">
+                                    Premios: <?= isset($user['store_prize_commission_rate']) && $user['store_prize_commission_rate'] !== null && $user['store_prize_commission_rate'] !== '' ? ((float) $user['store_prize_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                                <span class="badge bg-warning text-dark" title="Comisión GGR">
+                                    GGR: <?= isset($user['ggr_commission_rate']) && $user['ggr_commission_rate'] !== null && $user['ggr_commission_rate'] !== '' ? ((float) $user['ggr_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                <?php elseif ($isOperator) : ?>
+                    <!-- INFORMACIÓN ESPECÍFICA DE OPERADOR -->
+                    <tr>
+                        <td><strong>Puntos de Venta a Cargo</strong></td>
+                        <td>
+                            <strong class="text-success"><?= count($assignedStores); ?> PV(s)</strong>
+                            <?php if (! empty($assignedStores)) : ?>
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    <?php foreach ($assignedStores as $st) : ?>
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="fa-duotone fa-solid fa-store text-primary me-1"></i><?= esc($st['business_name'] ?: ($st['firstname'] . ' ' . $st['lastname'])); ?>
+                                            <small class="text-muted">(<?= esc($st['code']); ?>)</small>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Comisiones Operador</strong></td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1">
+                                <span class="badge bg-success" title="Comisión Operador por Recargas">
+                                    Recargas: <?= isset($user['store_commission_rate']) && $user['store_commission_rate'] !== null && $user['store_commission_rate'] !== '' ? ((float) $user['store_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                                <span class="badge bg-info text-white" title="Comisión Operador por Pago de Premios">
+                                    Premios: <?= isset($user['store_prize_commission_rate']) && $user['store_prize_commission_rate'] !== null && $user['store_prize_commission_rate'] !== '' ? ((float) $user['store_prize_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                                <span class="badge bg-warning text-dark" title="Comisión Afiliados / GGR">
+                                    GGR / Afiliados: <?= isset($user['operator_commission_rate']) && $user['operator_commission_rate'] !== null && $user['operator_commission_rate'] !== '' ? ((float) $user['operator_commission_rate'] * 100) . '%' : 'Global'; ?>
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+
+                <?php if (! empty($user['bank']) || ! empty($user['account']) || $isNonPlayer) : ?>
+                    <tr>
+                        <td><strong><?= translate('banking information'); ?></strong></td>
+                        <td>
+                            <?php if (! empty($user['bank']) || ! empty($user['account'])) : ?>
+                                <div class="small">
+                                    <strong><?= esc($user['bank'] ?: 'Banco'); ?></strong>
+                                    <?= !empty($user['account_type']) ? ' (' . esc(translate($user['account_type'] . ' account') ?: $user['account_type']) . ')' : ''; ?>
+                                    <br><code><?= esc($user['account'] ?: translate('not provided')); ?></code>
+                                </div>
+                            <?php else : ?>
+                                <span class="text-muted small"><?= translate('not provided'); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+
                 <tr><td><strong>IP</strong></td><td><code><?= esc($ip !== '' ? $ip : translate('not provided')); ?></code></td></tr>
                 <tr>
                     <td><strong><?= translate('mac address'); ?></strong></td>
-                    <td><code><?= esc($mac !== '' ? $mac : translate('mac not available web')); ?></code></td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <input type="text" class="form-control form-control-sm font-monospace text-uppercase" id="admin-mac-address"
+                                   placeholder="00:1A:2B:3C:4D:5E" value="<?= esc($mac); ?>" style="max-width:180px;">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="saveUserMac(<?= (int) $user['id']; ?>)">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Guardar MAC
+                            </button>
+                            <?php if ($mac !== '') : ?>
+                                <span class="badge bg-success"><i class="fa-solid fa-shield-check"></i> Registrada</span>
+                            <?php else : ?>
+                                <span class="text-muted small">No detectada / Sin asignar</span>
+                            <?php endif; ?>
+                        </div>
+                    </td>
                 </tr>
                 <tr>
                     <td><strong><?= translate('document expiry'); ?></strong></td>
@@ -650,3 +763,44 @@ $sourceLabel = static function ($source) {
 </div>
 
 <?= view('partials/modal_commission_liquidation'); ?>
+
+<script type="text/javascript">
+    if (typeof saveUserMac !== 'function') {
+        window.saveUserMac = function(userId) {
+            var macVal = $('#admin-mac-address').val() || '';
+            $.ajax({
+                url: '<?= site_url('users/saveUserMac'); ?>',
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    user_id: userId,
+                    mac_address: macVal,
+                    <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
+                },
+                success: function(response) {
+                    Toastify({
+                        text: response.message || (response.success ? 'Dirección MAC actualizada' : 'Error'),
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: response.success ? "#198754" : "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                    if (response.success && typeof viewUser === 'function') {
+                        viewUser(userId);
+                    }
+                },
+                error: function() {
+                    Toastify({
+                        text: 'Error al conectar con el servidor para guardar la MAC.',
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            });
+        };
+    }
+</script>

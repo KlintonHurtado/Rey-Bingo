@@ -359,13 +359,13 @@ class Payments extends Controller {
                     $typePayment = translate('per referred player');
                     $typeTra = translate('referred');
                     $ledgerType = 'referred';
-                } else if (in_array($payment['type'], ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit', 'admin_withdraw_debit'], true)) {
-                    $typePayment = $payment['type'] === 'admin_withdraw_debit' ? 'Ajuste Retiro (Admin)' : ($payment['type'] === 'admin_recharge_debit' ? 'Ajuste Recarga (Admin)' : 'Retiro de saldo');
+                } else if (in_array($payment['type'], ['operator_store_debit', 'admin_store_debit', 'admin_operator_debit', 'store_debit', 'store_balance_remove', 'admin_recharge_debit', 'admin_withdraw_debit', 'store_retire_pay'], true)) {
+                    $typePayment = $payment['type'] === 'store_retire_pay' ? 'Pago de Retiro en Efectivo' : ($payment['type'] === 'admin_withdraw_debit' ? 'Ajuste Retiro (Admin)' : ($payment['type'] === 'admin_recharge_debit' ? 'Ajuste Recarga (Admin)' : 'Retiro de saldo'));
                     $typeTra = 'Retiro';
                     $ledgerType = 'retire';
-                } else if (in_array($payment['type'], ['operator_store_credit', 'admin_operator_pay', 'admin_operator_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit', 'admin_withdraw_credit'], true)) {
-                    $typePayment = $payment['type'] === 'admin_withdraw_credit' ? 'Acreditación Retiro (Admin)' : ($payment['type'] === 'admin_recharge_credit' ? 'Acreditación Recarga (Admin)' : 'Acreditación de saldo');
-                    $typeTra = 'Recarga';
+                } else if (in_array($payment['type'], ['operator_store_credit', 'admin_operator_pay', 'admin_operator_credit', 'store_credit', 'store_balance_add', 'admin_recharge_credit', 'admin_withdraw_credit', 'operator_prize_credit', 'operator_prize_payout_credit'], true)) {
+                    $typePayment = ($payment['type'] === 'operator_prize_credit' || $payment['type'] === 'operator_prize_payout_credit') ? 'Acreditación por Pago de Premio' : ($payment['type'] === 'admin_withdraw_credit' ? 'Acreditación Retiro (Admin)' : ($payment['type'] === 'admin_recharge_credit' ? 'Acreditación Recarga (Admin)' : 'Acreditación de saldo'));
+                    $typeTra = 'Acreditación';
                     $ledgerType = 'deposit';
                 }
 
@@ -1012,9 +1012,11 @@ class Payments extends Controller {
     }
 
     private function formatStatusRetire($status) {
-        switch ($status) {
+        switch ((int) $status) {
             case 1:
-                return '<span class="badge bg-warning"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span>';
+                return '<span class="badge bg-warning text-dark"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span>';
+            case 3:
+                return '<span class="badge bg-info text-white"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> En revisión</span>';
             case 2:
                 return '<span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('approved') . '</span>';
             case 0:
@@ -1752,7 +1754,11 @@ class Payments extends Controller {
                 $modelUsers->update(session()->get('id'), $dataBank);
             }
         } else if ($receiver === "store") {
-            $retireCode = 'RET-' . strtoupper(substr(str_shuffle('23456789ABCDEFGHJKLMNPQRSTUVWXYZ'), 0, 6));
+            // Generar código de retiro estrictamente numérico (ej. 8 dígitos)
+            do {
+                $retireCode = (string) mt_rand(10000000, 99999999);
+            } while ($modelRetires->where('bank', 'Punto de Venta')->where('account', $retireCode)->first());
+
             $data = [
                 'user'         => session()->get('id'),
                 'bank'         => 'Punto de Venta',
@@ -1804,6 +1810,16 @@ class Payments extends Controller {
             }
         }
 
+        // Deducir inmediatamente el saldo retirable para que no pueda usarse mientras esté pendiente o en revisión
+        if (! wallet_deduct_withdrawable((int) session()->get('id'), (float) $data['amount'])) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'retire-amount' => translate('the amount cannot exceed what is available') . ': ' . systemGet('currency') . ' ' . number_format($withdrawable, 2)
+                ]
+            ]);
+        }
+
         $modelRetires->insert($data);
         $retireId = $modelRetires->insertID();
 
@@ -1822,7 +1838,7 @@ class Payments extends Controller {
                 'from' => $currentUserId,
                 'type' => 'retire',
                 'type_id' => $retireId,
-                'title' => $receiver === 'store' ? 'NUEVO RETIRO EN PUNTO DE VENTA' : 'NUEVA SOLICITUD DE RETIRO',
+                'title' => $receiver === 'store' ? 'NUEVA NOTA DE RETIRO EN PUNTO DE VENTA' : 'NUEVA SOLICITUD DE RETIRO',
                 'message' => $user['firstname'] . ' ' . $user['lastname'] . ' ha solicitado un retiro por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ($receiver === 'store' ? (' (Código: ' . $data['account'] . ')') : (' | Ref: #' . $reference)) . ' | Fecha: ' . date('d/m/Y'),
             ];
 
@@ -1831,7 +1847,7 @@ class Payments extends Controller {
 
         if ($retireId) {
             $responseMessage = $receiver === 'store'
-                ? 'Solicitud de retiro registrada exitosamente. Tu código de retiro e instrucciones han sido enviados a tu correo electrónico (' . ($user['email'] ?? '') . ').'
+                ? 'Solicitud de nota de retiro generada exitosamente. Tu solicitud está en estado Pendiente; una vez que el administrador la apruebe, recibirás tu código de retiro por correo electrónico.'
                 : translate('retire request sent successfully');
 
             $response = [
@@ -2286,72 +2302,150 @@ class Payments extends Controller {
                 return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
             }
 
-            if ($action === 'approve') {
-                if ($retire['status'] === '1' || $retire['status'] === '0') {
-                    if (wallet_withdrawable($user) < $retire['amount']) {
-                        $modelNotifications = new NotificationsModel();
+            $retireStatus = (int) $retire['status'];
 
-                        $currentUserId = session()->get('id');
-
-                        $notificationData = [
-                            'user' => $retire['user'],
-                            'from' => $currentUserId,
-                            'type' => 'retire',
-                            'type_id' => $retire['id'],
-                            'title' => '❌ RETIRO RECHAZADO',
-                            'message' => 'Su solicitud de retiro por un monto de ' . systemGet('currency') . ' ' . number_format($retire['amount'], 2) . ' ha sido rechazada. Si desea más información, por favor comuníquese con soporte.',
-                        ];
-
-                        $modelNotifications->insert($notificationData);
-
-                        $modelRetires->update($id, ['status' => 0, 'observation' => translate('the amount available in the user wallet is less than the amount to be retire')]);
-
-                        return $this->response->setJSON(['refuse' => true, 'error' => translate('the amount available in the user wallet is less than the amount to be retire')]);
-                    }
-
-                    if (! wallet_deduct_withdrawable($retire['user'], (float) $retire['amount'])) {
-                        return $this->response->setJSON(['refuse' => true, 'error' => translate('the amount available in the user wallet is less than the amount to be retire')]);
-                    }
+            if ($action === 'review') {
+                if (! bingo_is_admin()) {
+                    return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'No autorizado']);
+                }
+                if ($retireStatus !== 1) {
+                    return $this->response->setJSON(['success' => false, 'error' => 'Solo se pueden poner en revisión solicitudes pendientes.']);
                 }
 
-                $modelRetires->update($id, ['status' => 2, 'observation' => $observation]);
+                $modelRetires->update($id, [
+                    'status' => 3,
+                    'observation' => $observation ?: $retire['observation'],
+                ]);
 
                 $modelNotifications = new NotificationsModel();
-
-                $currentUserId = session()->get('id');
-
-                $notificationData = [
-                    'user' => $retire['user'],
-                    'from' => $currentUserId,
-                    'type' => 'retire',
+                $modelNotifications->insert([
+                    'user'    => $retire['user'],
+                    'from'    => session()->get('id'),
+                    'type'    => 'retire',
                     'type_id' => $retire['id'],
-                    'title' => '📤 RETIRO APROBADO',
-                    'message' => 'Se ha debitado de su billetera ' . systemGet('currency') . ' ' . number_format($retire['amount'], 2) . ' correspondientes a su solicitud de retiro y transferido a su cuenta bancaria.',
-                ];
+                    'title'   => '🔍 SOLICITUD EN REVISIÓN',
+                    'message' => 'Tu solicitud de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' está siendo revisada por el equipo de administración.',
+                ]);
 
-                $modelNotifications->insert($notificationData);
+                return $this->response->setJSON([
+                    'success' => true,
+                    'action'  => 'review',
+                    'status'  => 3,
+                    'message' => 'Solicitud cambiada a En Revisión exitosamente.',
+                ]);
+            } elseif ($action === 'approve') {
+                if (! bingo_is_admin()) {
+                    return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'No autorizado']);
+                }
+                if ($retireStatus === 2) {
+                    return $this->response->setJSON(['success' => false, 'error' => 'Esta solicitud ya fue aprobada anteriormente.']);
+                }
+
+                $modelRetires->update($id, [
+                    'status' => 2,
+                    'observation' => $observation ?: $retire['observation'],
+                ]);
+
+                // Si es Punto de Venta, enviar el correo electrónico con el código numérico y mensaje de aprobación
+                $isStore = ($retire['bank'] === 'Punto de Venta' || ($retire['account_type'] ?? '') === 'store_pickup');
+                if ($isStore) {
+                    $this->sendRetireStoreEmail($user, (string) $retire['account'], (float) $retire['amount']);
+                }
+
+                $modelNotifications = new NotificationsModel();
+                $modelNotifications->insert([
+                    'user'    => $retire['user'],
+                    'from'    => session()->get('id'),
+                    'type'    => 'retire',
+                    'type_id' => $retire['id'],
+                    'title'   => '📤 NOTA DE RETIRO APROBADA',
+                    'message' => $isStore
+                        ? ('Tu nota de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido APROBADA. Código de retiro: ' . $retire['account'] . '. Presenta este código en cualquier Punto de Venta para cobrar tu dinero en efectivo.')
+                        : ('Tu solicitud de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido aprobada y procesada hacia tu cuenta bancaria.'),
+                ]);
+
+                return $this->response->setJSON([
+                    'success' => true,
+                    'action'  => 'approve',
+                    'status'  => 2,
+                    'message' => 'Solicitud aprobada y código enviado al jugador.',
+                ]);
             } elseif ($action === 'refuse') {
-                if ($retire['status'] === '2') {
-                    // Restaurar el saldo de retiro usando el servicio correcto (no el campo legacy)
-                    wallet_credit_withdrawable($retire['user'], (float) $retire['amount']);
+                if (! bingo_is_admin()) {
+                    return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'No autorizado']);
+                }
+                if ($retireStatus === 0) {
+                    return $this->response->setJSON(['success' => false, 'error' => 'Esta solicitud ya fue rechazada anteriormente.']);
                 }
 
-                $modelRetires->update($id, ['status' => 0, 'observation' => $observation]);
+                // Reintegrar saldo de retiro al usuario
+                wallet_credit_withdrawable($retire['user'], (float) $retire['amount']);
+
+                $modelRetires->update($id, [
+                    'status' => 0,
+                    'observation' => $observation ?: $retire['observation'],
+                ]);
 
                 $modelNotifications = new NotificationsModel();
-
-                $currentUserId = session()->get('id');
-
-                $notificationData = [
-                    'user' => $retire['user'],
-                    'from' => $currentUserId,
-                    'type' => 'retire',
+                $modelNotifications->insert([
+                    'user'    => $retire['user'],
+                    'from'    => session()->get('id'),
+                    'type'    => 'retire',
                     'type_id' => $retire['id'],
-                    'title' => '❌ RETIRO RECHAZADO',
-                    'message' => 'Su solicitud de retiro por un monto de ' . systemGet('currency') . ' ' . number_format($retire['amount'], 2) . ' ha sido rechazada. Si desea más información, por favor comuníquese con soporte.',
-                ];
+                    'title'   => '❌ SOLICITUD DE RETIRO RECHAZADA',
+                    'message' => 'Tu solicitud de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido rechazada.' . (!empty($observation) ? (' Motivo: ' . $observation) : '') . ' Tu saldo de retiro ha sido reintegrado a tu billetera para que puedas usarlo.',
+                ]);
 
-                $modelNotifications->insert($notificationData);
+                return $this->response->setJSON([
+                    'success' => true,
+                    'action'  => 'refuse',
+                    'status'  => 0,
+                    'message' => 'Solicitud rechazada y saldo reintegrado al jugador.',
+                ]);
+            } elseif ($action === 'cancel') {
+                // Cancelación ejecutada por el propio usuario jugador
+                $currentUserId = (int) session()->get('id');
+                if ($currentUserId !== (int) $retire['user'] && ! bingo_is_admin()) {
+                    return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => 'No autorizado']);
+                }
+
+                if ($retireStatus !== 1) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'error'   => $retireStatus === 3
+                            ? 'La solicitud se encuentra en revisión por administración y ya no puede ser cancelada.'
+                            : 'Esta solicitud ya no se encuentra pendiente y no puede ser cancelada.',
+                    ]);
+                }
+
+                // Reintegrar saldo de retiro al usuario
+                wallet_credit_withdrawable($retire['user'], (float) $retire['amount']);
+
+                $modelRetires->update($id, [
+                    'status' => 0,
+                    'observation' => 'Cancelado por el usuario el ' . date('d/m/Y H:i:s'),
+                ]);
+
+                $modelNotifications = new NotificationsModel();
+                $modelNotifications->insert([
+                    'user'    => $retire['user'],
+                    'from'    => $currentUserId,
+                    'type'    => 'retire',
+                    'type_id' => $retire['id'],
+                    'title'   => '🚫 SOLICITUD DE RETIRO CANCELADA',
+                    'message' => 'Has cancelado tu solicitud de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . '. Tu saldo de retiro ha sido reintegrado a tu billetera.',
+                ]);
+
+                $updatedUser = wallet_service()->normalizeUser($modelUsers->find($retire['user']));
+
+                return $this->response->setJSON([
+                    'success'         => true,
+                    'action'          => 'cancel',
+                    'status'          => 0,
+                    'message'         => 'Solicitud cancelada exitosamente. Tu saldo de retiro ha sido reintegrado.',
+                    'wallet_withdraw' => $updatedUser['wallet_withdraw'],
+                    'wallet_total'    => wallet_total($updatedUser),
+                ]);
             }
         }
 

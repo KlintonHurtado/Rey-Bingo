@@ -653,10 +653,11 @@ class Store extends Controller
 
         $modelRetires = new RetiresModel();
         $modelUsers = new UsersModel();
+        $modelPayments = new PaymentsModel();
 
         $builder = $modelRetires->builder();
         $builder->where('bank', 'Punto de Venta');
-        $builder->where('status', 1);
+        $builder->whereIn('status', [1, 2]);
 
         if ($code !== '') {
             $builder->where('account', $code);
@@ -670,7 +671,18 @@ class Store extends Controller
         if (! $retire) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'No se encontró ninguna nota de retiro pendiente con la cédula y código ingresados.',
+                'message' => 'No se encontró ninguna nota de retiro válida o aprobada con la cédula y código ingresados.',
+            ]);
+        }
+
+        // Verificar si ya fue pagada en efectivo
+        $isPaid = $modelPayments->where('type', 'store_retire_pay')->where('type_id', (int) $retire['id'])->first()
+            || (strpos((string) ($retire['observation'] ?? ''), 'Pagado en efectivo') !== false);
+
+        if ($isPaid) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Esta nota de retiro ya fue pagada en efectivo anteriormente.',
             ]);
         }
 
@@ -717,10 +729,21 @@ class Store extends Controller
             $retire = $modelRetires->where('bank', 'Punto de Venta')->where('account', $code)->first();
         }
 
-        if (! $retire || (int) $retire['status'] !== 1) {
+        if (! $retire || ! in_array((int) $retire['status'], [1, 2], true)) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'La nota de retiro no existe o ya fue procesada anteriormente.',
+                'message' => 'La nota de retiro no existe, fue rechazada o ya fue procesada anteriormente.',
+            ]);
+        }
+
+        // Verificar que no haya sido pagada previamente
+        $alreadyPaid = $modelPayments->where('type', 'store_retire_pay')->where('type_id', (int) $retire['id'])->first()
+            || (strpos((string) ($retire['observation'] ?? ''), 'Pagado en efectivo') !== false);
+
+        if ($alreadyPaid) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Esta nota de retiro ya fue pagada anteriormente.',
             ]);
         }
 
@@ -735,20 +758,6 @@ class Store extends Controller
         }
 
         $amount = (float) $retire['amount'];
-        if (wallet_withdrawable($player) < $amount) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'El saldo retirable disponible del jugador (' . systemGet('currency') . ' ' . number_format(wallet_withdrawable($player), 2) . ') es inferior al monto a retirar.',
-            ]);
-        }
-
-        if (! wallet_deduct_withdrawable($playerId, $amount)) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'No se pudo debitar el saldo del jugador.',
-            ]);
-        }
-
         $storeId = $this->getEffectiveStoreId();
         $storeUser = $modelUsers->find($storeId);
         $storeName = bingo_store_display_name($storeUser ?: []);
@@ -766,6 +775,45 @@ class Store extends Controller
             'amount'  => $amount,
             'status'  => 2,
         ]);
+
+        // Registrar pago de retiro en el punto de venta para su historial de movimientos
+        $modelPayments->insert([
+            'user'    => $storeId,
+            'type'    => 'store_retire_pay',
+            'type_id' => (int) $retire['id'],
+            'amount'  => $amount,
+            'status'  => 2,
+        ]);
+
+        // Acreditar al Operador del Punto de Venta y registrar como acreditación en movimientos
+        $operatorId = (int) ($storeUser['operator_id'] ?? 0);
+        if ($operatorId <= 0 && bingo_is_operator()) {
+            $operatorId = (int) session()->get('id');
+        }
+
+        if ($operatorId > 0) {
+            wallet_credit_recharge($operatorId, $amount);
+
+            $playerName = trim(($player['firstname'] ?? '') . ' ' . ($player['lastname'] ?? ''));
+            $modelPayments->insert([
+                'user'        => $operatorId,
+                'from'        => $storeId,
+                'type'        => 'operator_prize_credit',
+                'type_id'     => (int) $retire['id'],
+                'amount'      => $amount,
+                'description' => 'Acreditación por pago de premio en Punto de Venta: ' . $storeName . ' (Ref #' . $retire['id'] . ' | Código: ' . $retire['account'] . ($playerName !== '' ? ' | Jugador: ' . $playerName : '') . ')',
+                'status'      => 2,
+            ]);
+
+            $modelNotifications->insert([
+                'user'    => $operatorId,
+                'from'    => $storeId,
+                'type'    => 'payment',
+                'type_id' => (int) $retire['id'],
+                'title'   => '💵 SALDO ACREDITADO POR PAGO DE PREMIO',
+                'message' => 'Se ha acreditado ' . (systemGet('currency') ?? '$') . ' ' . number_format($amount, 2) . ' a tu saldo por pago de premio en el Punto de Venta ' . $storeName . ' (Código: ' . $retire['account'] . ').',
+            ]);
+        }
 
         $commission = 0.0;
         if (function_exists('bingo_credit_store_operation_commission')) {
@@ -793,6 +841,9 @@ class Store extends Controller
         $message = 'Retiro de ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' pagado exitosamente en efectivo.';
         if ($commission > 0) {
             $message .= ' Comisión acreditada al punto de venta: ' . systemGet('currency') . ' ' . number_format($commission, 2);
+        }
+        if ($operatorId > 0) {
+            $message .= '. Saldo acreditado al operador: ' . systemGet('currency') . ' ' . number_format($amount, 2);
         }
 
         return $this->response->setJSON([

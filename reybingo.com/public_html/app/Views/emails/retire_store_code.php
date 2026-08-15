@@ -28,13 +28,13 @@
                     <tr>
                         <td style="padding:32px 28px 12px 28px;">
                             <h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#3b1f9c;">
-                                Solicitud de Retiro en Punto de Venta
+                                Nota de Retiro Aprobada - Punto de Venta
                             </h1>
                             <p style="margin:0 0 12px 0;font-size:15px;line-height:1.6;color:#4a5568;">
                                 <?= translate('hello'); ?> <strong><?= esc($user['firstname'] ?? ''); ?></strong>,
                             </p>
                             <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#4a5568;">
-                                Has generado una solicitud de retiro para cobrar tu dinero en efectivo en cualquiera de nuestros <strong>Puntos de Venta</strong> autorizados.
+                                ¡Buenas noticias! Tu solicitud de retiro ha sido <strong>APROBADA</strong> por la administración. Ya puedes cobrar tu dinero en efectivo en cualquiera de nuestros <strong>Puntos de Venta</strong> autorizados presentando el siguiente código:
                             </p>
 
                             <!-- Recuadro del Código de Retiro -->

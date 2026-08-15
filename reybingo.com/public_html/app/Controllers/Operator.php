@@ -776,4 +776,92 @@ class Operator extends Controller
             ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
             ->setBody(bingo_export_csv_payload($export['headers'], $export['rows']));
     }
+
+    public function operatorCommissionsGet()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $operatorId = (int) session()->get('id');
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'store_id'  => (string) ($this->request->getGet('store_id') ?? 'all'),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $data = bingo_fetch_operator_detailed_commissions_breakdown($operatorId, $filters);
+
+        $html = view('operator/partials/commissions_operator_table', [
+            'items'    => $data['items'],
+            'stats'    => $data['stats'],
+            'currency' => systemGet('currency') ?? '$',
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'html'    => $html,
+            'stats'   => $data['stats'],
+        ]);
+    }
+
+    public function exportOperatorCommissions()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return redirect()->to('/signin');
+        }
+
+        $operatorId = (int) session()->get('id');
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'store_id'  => (string) ($this->request->getGet('store_id') ?? 'all'),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $data = bingo_fetch_operator_detailed_commissions_breakdown($operatorId, $filters);
+
+        $headers = [
+            'Fecha y Hora',
+            'Punto de Venta / Origen',
+            'Tipo de Tasa',
+            'Referencia',
+            'Monto Base',
+            'Tasa PV (%)',
+            'Comision PV',
+            'Tasa Operador (%)',
+            'Margen Operador (%)',
+            'Ganancia Operador',
+            'Estado',
+            'Detalle'
+        ];
+
+        $rows = [];
+        foreach ($data['items'] as $it) {
+            $rows[] = [
+                $it['datetime'] ?? '',
+                $it['store_name'] ?? '',
+                $it['rate_type_label'] ?? '',
+                $it['ref_code'] ?? '',
+                number_format((float) ($it['base_amount'] ?? 0), 2),
+                number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
+                number_format((float) ($it['store_commission'] ?? 0), 2),
+                number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2) . '%',
+                number_format(((float) ($it['operator_spread'] ?? 0)) * 100, 2) . '%',
+                number_format((float) ($it['operator_profit'] ?? 0), 2),
+                $it['status_label'] ?? '',
+                $it['detail'] ?? '',
+            ];
+        }
+
+        $filename = 'comisiones_operador_' . date('Y-m-d_His') . '.csv';
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setBody(bingo_export_csv_payload($headers, $rows));
+    }
 }

@@ -260,6 +260,12 @@ class Users extends Controller {
                 'document' => $document,
                 'phone' => $data['phone'],
                 'address_line' => $data['address_line'],
+                'city' => trim((string) $this->request->getPost('city')),
+                'state' => trim((string) $this->request->getPost('state')),
+                'bank' => trim((string) $this->request->getPost('bank')),
+                'account' => trim((string) $this->request->getPost('account')),
+                'account_type' => bingo_normalize_account_type(trim((string) $this->request->getPost('account_type'))),
+                'last_mac' => trim((string) $this->request->getPost('last_mac')) ?: null,
                 'store_commission_rate' => $storeCommissionRate,
                 'ggr_commission_rate' => $ggrCommissionRate,
                 'store_prize_commission_rate' => $prizeCommissionRate,
@@ -557,12 +563,20 @@ class Users extends Controller {
         $document = trim((string) $this->request->getPost('document'));
         $phone = trim((string) $this->request->getPost('phone'));
         $address = trim((string) $this->request->getPost('address_line'));
+        $businessName = trim((string) $this->request->getPost('business_name'));
+        $city = trim((string) $this->request->getPost('city'));
+        $state = trim((string) $this->request->getPost('state'));
+        $bank = trim((string) $this->request->getPost('bank'));
+        $account = trim((string) $this->request->getPost('account'));
+        $accountType = bingo_normalize_account_type(trim((string) $this->request->getPost('account_type')));
+        $lastMac = trim((string) $this->request->getPost('last_mac'));
         $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
         $operatorRechargeRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_recharge_rate'));
         $operatorWithdrawRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_withdraw_rate'));
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
+            'business_name' => $businessName,
             'email' => $email,
             'username' => bingo_generate_operator_username($email, $model, $operatorId ?: null),
             'group' => bingo_group_operator(),
@@ -575,8 +589,12 @@ class Users extends Controller {
             'document' => $document,
             'phone' => $phone,
             'address_line' => $address,
-            'bank' => '',
-            'account' => '',
+            'city' => $city,
+            'state' => $state,
+            'bank' => $bank,
+            'account' => $account,
+            'account_type' => $accountType,
+            'last_mac' => $lastMac !== '' ? str_replace('-', ':', strtoupper($lastMac)) : null,
             'image' => '',
             'verified_email' => 1,
             'verification_token' => '',
@@ -602,10 +620,17 @@ class Users extends Controller {
             $updateData = [
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
+                'business_name' => $businessName,
                 'email' => $email,
                 'document' => $document,
                 'phone' => $phone,
                 'address_line' => $address,
+                'city' => $city,
+                'state' => $state,
+                'bank' => $bank,
+                'account' => $account,
+                'account_type' => $accountType,
+                'last_mac' => $lastMac !== '' ? str_replace('-', ':', strtoupper($lastMac)) : null,
                 'operator_commission_rate' => $operatorCommissionRate,
                 'store_commission_rate' => $operatorRechargeRate,
                 'store_prize_commission_rate' => $operatorWithdrawRate,
@@ -1874,6 +1899,21 @@ class Users extends Controller {
         $docExpiry = bingo_document_expiry_status($user);
         $kycStatus = (string) ($user['kyc_status'] ?? 'pending');
 
+        $assignedOperator = null;
+        if (! empty($user['operator_id'])) {
+            $assignedOperator = $modelUsers->find((int) $user['operator_id']);
+        }
+
+        $assignedStores = [];
+        if ((int) ($user['group'] ?? 0) === bingo_group_operator()) {
+            $assignedStores = $modelUsers
+                ->where('operator_id', $userId)
+                ->where('group', bingo_group_store())
+                ->where('deleted', 0)
+                ->orderBy('business_name', 'ASC')
+                ->findAll();
+        }
+
         $html = view('users/user_details_admin', [
             'user' => $user,
             'stats' => $stats,
@@ -1889,6 +1929,8 @@ class Users extends Controller {
             'docExpiry' => $docExpiry,
             'kycStatus' => $kycStatus,
             'currency' => systemGet('currency'),
+            'assignedOperator' => $assignedOperator,
+            'assignedStores' => $assignedStores,
         ]);
 
         return $this->response->setJSON([
@@ -2148,6 +2190,46 @@ class Users extends Controller {
             'success' => true,
             'message' => translate('document expiry updated'),
             'document_expires_at' => $value,
+        ]);
+    }
+
+    public function saveUserMac()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access'),
+            ]);
+        }
+
+        $userId = (int) $this->request->getPost('user_id');
+        $mac = strtoupper(trim((string) $this->request->getPost('mac_address')));
+
+        if ($userId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('user not found'),
+            ]);
+        }
+
+        if ($mac !== '' && ! preg_match('/^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/', $mac)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Formato de dirección MAC inválido. Ejemplo: 00:1A:2B:3C:4D:5E',
+            ]);
+        }
+
+        $macFormatted = $mac !== '' ? str_replace('-', ':', $mac) : null;
+
+        bingo_ensure_users_schema();
+        (new UsersModel())->update($userId, [
+            'last_mac' => $macFormatted,
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Dirección MAC guardada exitosamente.',
+            'mac'     => $macFormatted ?? '',
         ]);
     }
 
@@ -3264,9 +3346,11 @@ class Users extends Controller {
     }
 
     private function formatStatusRetire($status) {
-        switch ($status) {
+        switch ((int) $status) {
             case 1:
-                return '<span class="badge bg-warning"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span>';
+                return '<span class="badge bg-warning text-dark"><i class="fa-duotone fa-solid fa-clock"></i> ' . translate('pending') . '</span>';
+            case 3:
+                return '<span class="badge bg-info text-white"><i class="fa-duotone fa-solid fa-magnifying-glass"></i> En revisión</span>';
             case 2:
                 return '<span class="badge bg-success"><i class="fa-duotone fa-solid fa-check-double"></i> ' . translate('approved') . '</span>';
             case 0:
