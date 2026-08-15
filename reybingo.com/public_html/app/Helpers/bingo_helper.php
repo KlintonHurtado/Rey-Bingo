@@ -4381,6 +4381,20 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
             bingo_ensure_users_schema();
         }
 
+        $modelUsers = new \App\Models\UsersModel();
+        $targetUser = $modelUsers->find($userId);
+        if ($targetUser) {
+            $userGroup = (int) ($targetUser['group'] ?? -1);
+            if ($userGroup === bingo_group_operator()) {
+                $opLedger = bingo_build_operator_movements_ledger($userId);
+                return $opLedger['movements'] ?? [];
+            }
+            if ($userGroup === bingo_group_store()) {
+                $stLedger = bingo_build_store_movements_ledger($userId);
+                return $stLedger['movements'] ?? [];
+            }
+        }
+
         $rows = [];
         $push = static function (array $row) use (&$rows): void {
             $rows[] = array_merge([
@@ -4988,9 +5002,9 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 'type' => 'pay_retire',
                 'type_category' => 'retire',
                 'type_label' => 'Pago de Retiro (Efectivo)',
-                'badge_class' => 'bg-danger text-white',
+                'badge_class' => 'bg-success text-white',
                 'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
-                'direction' => '-',
+                'direction' => '+',
                 'amount' => $amt,
                 'status' => $st,
                 'status_label' => 'Pagado',
@@ -5129,44 +5143,8 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 continue;
             }
 
-            // Comisiones ganadas
+            // Omitir comisiones ganadas del libro de movimientos operativos del Punto de Venta
             if (in_array($ptype, ['store_recharge_commission', 'store_ggr_commission', 'store_prize_commission', 'store_retire_commission', 'store_commission', 'referred', 'referral'], true)) {
-                $typeKey = match($ptype) {
-                    'store_ggr_commission' => 'commission_ggr',
-                    'store_recharge_commission' => 'commission_recharge',
-                    'store_prize_commission', 'store_retire_commission' => 'commission_prize',
-                    default => 'commission'
-                };
-                $commissionLabels = [
-                    'store_ggr_commission'      => 'Comisión GGR Afiliados',
-                    'store_recharge_commission' => 'Comisión por Recargas',
-                    'store_prize_commission'    => 'Comisión Pago de Retiros',
-                    'store_retire_commission'   => 'Comisión Pago de Retiros',
-                    'store_commission'          => 'Comisión Punto de Venta',
-                ];
-                $comLabel = $commissionLabels[$ptype] ?? 'Comisión';
-
-                $push([
-                    'id' => 'PAY_COM_' . $pay['id'],
-                    'datetime' => (string) ($pay['created_at'] ?? ''),
-                    'type' => $typeKey,
-                    'type_category' => 'commission',
-                    'type_label' => $comLabel,
-                    'badge_class' => 'bg-warning text-dark',
-                    'icon' => 'fa-duotone fa-solid fa-percent',
-                    'direction' => '+',
-                    'amount' => $amt,
-                    'status' => $st,
-                    'status_label' => bingo_status_label_short($st),
-                    'beneficiary_name' => 'Mi Punto de Venta',
-                    'beneficiary_document' => '',
-                    'beneficiary_username' => '',
-                    'beneficiary_code' => '',
-                    'ref_code' => 'COM #' . $pay['id'],
-                    'detail' => 'Ganancia por ' . strtolower($comLabel),
-                    'ref_table' => 'payments',
-                    'ref_id' => (int) ($pay['id'] ?? 0),
-                ]);
                 continue;
             }
         }
@@ -5180,19 +5158,16 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
             return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
         });
 
-        // Totales estadísticos
+        // Totales estadísticos exclusivamente operativos para el Punto de Venta
         $stats = [
             'total_recharges_amount'      => 0.0,
             'total_recharges_count'       => 0,
             'total_retires_amount'        => 0.0,
             'total_retires_count'         => 0,
-            'total_commissions_amount'    => 0.0,
-            'total_commissions_count'     => 0,
-            'ggr_commissions_amount'      => 0.0,
-            'recharge_commissions_amount' => 0.0,
-            'prize_commissions_amount'    => 0.0,
             'total_credits_amount'        => 0.0,
             'total_credits_count'         => 0,
+            'total_debits_amount'         => 0.0,
+            'total_debits_count'          => 0,
         ];
 
         $runningBalance = 0.0;
@@ -5209,20 +5184,12 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 } elseif ($cat === 'retire' && $st === 2) {
                     $stats['total_retires_amount'] += $amt;
                     $stats['total_retires_count']++;
-                } elseif ($cat === 'commission' && $st === 2) {
-                    $stats['total_commissions_amount'] += $amt;
-                    $stats['total_commissions_count']++;
-                    $t = (string) ($row['type'] ?? '');
-                    if ($t === 'commission_ggr') {
-                        $stats['ggr_commissions_amount'] += $amt;
-                    } elseif ($t === 'commission_recharge') {
-                        $stats['recharge_commissions_amount'] += $amt;
-                    } elseif ($t === 'commission_prize') {
-                        $stats['prize_commissions_amount'] += $amt;
-                    }
                 } elseif ($cat === 'credit' && $st === 2) {
                     $stats['total_credits_amount'] += $amt;
                     $stats['total_credits_count']++;
+                } elseif ($cat === 'debit' && $st === 2) {
+                    $stats['total_debits_amount'] += $amt;
+                    $stats['total_debits_count']++;
                 }
             }
 
@@ -5469,9 +5436,9 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                     'type' => 'pay_retire',
                     'type_category' => 'retire',
                     'type_label' => 'Pago de Retiro',
-                    'badge_class' => 'bg-danger text-white',
+                    'badge_class' => 'bg-success text-white',
                     'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
-                    'direction' => '-',
+                    'direction' => '+',
                     'amount' => $amt,
                     'status' => $st,
                     'status_label' => 'Pagado',
@@ -6491,19 +6458,230 @@ if (!function_exists('bingo_store_prize_commission_rate')) {
     }
 }
 
-if (!function_exists('bingo_calculate_store_prize_commission')) {
-    function bingo_calculate_store_prize_commission(float $amount, array $store): float
+if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
+    /**
+     * Obtiene el desglose completo de comisiones para el Punto de Venta (Store)
+     * en sus 3 tasas: GGR Afiliados, Recargas a Jugadores y Retiros / Pago de Premios.
+     *
+     * @param int $storeId
+     * @param array<string,mixed> $filters
+     * @return array{stats:array<string,mixed>,items:list<array<string,mixed>>}
+     */
+    function bingo_fetch_store_detailed_commissions_breakdown(int $storeId, array $filters = []): array
     {
-        if ($amount <= 0) {
-            return 0.0;
+        if ($storeId <= 0) {
+            return ['stats' => [], 'items' => []];
         }
 
-        $rate = bingo_store_prize_commission_rate($store);
-        if ($rate <= 0) {
-            return 0.0;
+        $modelUsers = new \App\Models\UsersModel();
+        $modelDeposits = new \App\Models\DepositsModel();
+        $modelPayments = new \App\Models\PaymentsModel();
+        $modelRetires = new \App\Models\RetiresModel();
+        $modelGgr = new \App\Models\AffiliateGgrCommissionsModel();
+
+        $store = $modelUsers->find($storeId);
+        if (! $store) {
+            return ['stats' => [], 'items' => []];
         }
 
-        return round($amount * $rate, 2);
+        $rechargeRate = bingo_store_commission_rate($store);
+        $prizeRate = bingo_store_prize_commission_rate($store);
+        $ggrRate = function_exists('bingo_store_ggr_commission_rate') ? bingo_store_ggr_commission_rate($store) : 0.0;
+
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $rateFilter = trim((string) ($filters['rate_type'] ?? 'all'));
+        $search = strtolower(trim((string) ($filters['search'] ?? '')));
+
+        $items = [];
+
+        // 1. Recargas a jugadores realizadas por este Punto de Venta
+        $recharges = $modelDeposits
+            ->where('store', $storeId)
+            ->where('method', 'store player recharge')
+            ->orderBy('created_at', 'DESC')
+            ->findAll(2500);
+
+        foreach ($recharges as $dep) {
+            $amt = round((float) ($dep['amount'] ?? 0), 2);
+            $commission = round($amt * $rechargeRate, 2);
+            $status = (int) ($dep['status'] ?? 0);
+            $pId = (int) ($dep['user'] ?? 0);
+            $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
+            $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugador';
+            $pDoc = (string) ($dep['document'] ?? $pUser['document'] ?? '');
+            $pUsername = (string) ($pUser['username'] ?? '');
+
+            $items[] = [
+                'id' => 'REC_' . $dep['id'],
+                'datetime' => (string) ($dep['created_at'] ?? $dep['date'] ?? ''),
+                'rate_type' => 'recharge',
+                'rate_type_label' => 'Recarga',
+                'badge_class' => 'bg-info text-white',
+                'icon' => 'fa-duotone fa-solid fa-mobile-screen',
+                'base_amount' => $amt,
+                'store_rate' => $rechargeRate,
+                'commission_amount' => $commission,
+                'status' => $status,
+                'status_label' => bingo_status_label_short($status),
+                'player_name' => $pName,
+                'player_doc' => $pDoc,
+                'player_username' => $pUsername,
+                'ref_code' => 'DEP #' . $dep['id'],
+                'detail' => 'Comisión por recarga a ' . $pName . ($pDoc !== '' ? ' (Cédula: ' . $pDoc . ')' : ''),
+            ];
+        }
+
+        // 2. Retiros / Pago de premios en efectivo pagados por este Punto de Venta
+        $retires = $modelPayments
+            ->where('user', $storeId)
+            ->whereIn('type', ['store_retire_pay', 'store_prize_pay'])
+            ->orderBy('created_at', 'DESC')
+            ->findAll(2500);
+
+        foreach ($retires as $pay) {
+            $retireId = (int) ($pay['type_id'] ?? 0);
+            $retireRecord = $retireId > 0 ? $modelRetires->find($retireId) : null;
+            $pId = $retireRecord ? (int) ($retireRecord['user'] ?? 0) : 0;
+            $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
+            $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugador';
+            $pDoc = (string) ($retireRecord['document'] ?? $pUser['document'] ?? '');
+            $retCode = (string) ($retireRecord['account'] ?? '');
+            $amt = round((float) ($pay['amount'] ?? 0), 2);
+            $commission = round($amt * $prizeRate, 2);
+            $status = (int) ($pay['status'] ?? 2);
+
+            $items[] = [
+                'id' => 'RET_' . $pay['id'],
+                'datetime' => (string) ($pay['created_at'] ?? ''),
+                'rate_type' => 'withdraw',
+                'rate_type_label' => 'Pago Retiro',
+                'badge_class' => 'bg-danger text-white',
+                'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
+                'base_amount' => $amt,
+                'store_rate' => $prizeRate,
+                'commission_amount' => $commission,
+                'status' => $status,
+                'status_label' => 'Pagado',
+                'player_name' => $pName,
+                'player_doc' => $pDoc,
+                'player_username' => (string) ($pUser['username'] ?? ''),
+                'ref_code' => $retCode !== '' ? $retCode : ('RET #' . $retireId),
+                'detail' => 'Comisión por pago de retiro a ' . $pName . ($retCode !== '' ? ' (Código: ' . $retCode . ')' : ''),
+            ];
+        }
+
+        // 3. GGR Afiliados / Jugadores vinculados
+        if (function_exists('bingo_ggr_affiliate_active') && bingo_ggr_affiliate_active()) {
+            $ggrRows = $modelGgr
+                ->where('affiliate_id', $storeId)
+                ->where('affiliate_type', 'store')
+                ->orderBy('created_at', 'DESC')
+                ->findAll(2000);
+
+            foreach ($ggrRows as $grow) {
+                $ggrAmt = round((float) ($grow['ggr_amount'] ?? 0), 2);
+                $commission = round((float) ($grow['commission_amount'] ?? ($ggrAmt * $ggrRate)), 2);
+                $status = (int) ($grow['status'] ?? 0);
+                $pId = (int) ($grow['player_id'] ?? 0);
+                $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
+                $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugadores vinculados';
+
+                $items[] = [
+                    'id' => 'GGR_' . $grow['id'],
+                    'datetime' => (string) ($grow['created_at'] ?? $grow['period_date'] ?? ''),
+                    'rate_type' => 'ggr',
+                    'rate_type_label' => 'GGR Afiliados',
+                    'badge_class' => 'bg-warning text-dark',
+                    'icon' => 'fa-duotone fa-solid fa-chart-pie',
+                    'base_amount' => $ggrAmt,
+                    'store_rate' => $ggrRate,
+                    'commission_amount' => $commission,
+                    'status' => $status,
+                    'status_label' => $status === 1 ? 'Liquidada' : 'Pendiente',
+                    'player_name' => $pName,
+                    'player_doc' => (string) ($pUser['document'] ?? ''),
+                    'player_username' => (string) ($pUser['username'] ?? ''),
+                    'ref_code' => 'GGR #' . $grow['id'],
+                    'detail' => 'Comisión GGR por actividad de juego en el período',
+                ];
+            }
+        }
+
+        // Totales globales para las 3 Tarjetas del Punto de Venta
+        $stats = [
+            'ggr' => [
+                'rate' => $ggrRate,
+                'total_base' => 0.0,
+                'total_earned' => 0.0,
+                'count' => 0,
+            ],
+            'recharge' => [
+                'rate' => $rechargeRate,
+                'total_base' => 0.0,
+                'total_earned' => 0.0,
+                'count' => 0,
+            ],
+            'withdraw' => [
+                'rate' => $prizeRate,
+                'total_base' => 0.0,
+                'total_earned' => 0.0,
+                'count' => 0,
+            ],
+            'total_commissions_earned' => 0.0,
+        ];
+
+        foreach ($items as $item) {
+            $t = (string) ($item['rate_type'] ?? '');
+            $base = (float) ($item['base_amount'] ?? 0);
+            $earn = (float) ($item['commission_amount'] ?? 0);
+
+            if (isset($stats[$t])) {
+                $stats[$t]['total_base'] += $base;
+                $stats[$t]['total_earned'] += $earn;
+                $stats[$t]['count']++;
+            }
+            $stats['total_commissions_earned'] += $earn;
+        }
+
+        // Filtrado de items
+        $filteredItems = [];
+        foreach ($items as $item) {
+            $itemDate = substr((string) ($item['datetime'] ?? ''), 0, 10);
+            if ($dateFrom !== '' && $itemDate < $dateFrom) {
+                continue;
+            }
+            if ($dateTo !== '' && $itemDate > $dateTo) {
+                continue;
+            }
+            if ($rateFilter !== '' && $rateFilter !== 'all') {
+                if (($item['rate_type'] ?? '') !== $rateFilter) {
+                    continue;
+                }
+            }
+            if ($search !== '') {
+                $str = strtolower(
+                    ($item['player_name'] ?? '') . ' ' .
+                    ($item['player_doc'] ?? '') . ' ' .
+                    ($item['ref_code'] ?? '') . ' ' .
+                    ($item['detail'] ?? '') . ' ' .
+                    ($item['rate_type_label'] ?? '')
+                );
+                if (strpos($str, $search) === false) {
+                    continue;
+                }
+            }
+            $filteredItems[] = $item;
+        }
+
+        usort($filteredItems, static function ($a, $b) {
+            return strcmp((string) ($b['datetime'] ?? ''), (string) ($a['datetime'] ?? ''));
+        });
+
+        return [
+            'stats' => $stats,
+            'items' => $filteredItems,
+        ];
     }
 }
 

@@ -776,6 +776,9 @@ class Store extends Controller
             'status'  => 2,
         ]);
 
+        // Acreditar saldo al Punto de Venta porque entregó dinero en efectivo de su caja
+        wallet_credit_recharge($storeId, $amount);
+
         // Registrar pago de retiro en el punto de venta para su historial de movimientos
         $modelPayments->insert([
             'user'    => $storeId,
@@ -1129,5 +1132,87 @@ class Store extends Controller
             default:
                 return '<span class="badge bg-warning text-dark">' . translate('pending') . '</span>';
         }
+    }
+
+    public function storeCommissionsGet()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $this->response->setStatusCode(403);
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $data = bingo_fetch_store_detailed_commissions_breakdown($storeId, $filters);
+
+        $html = view('store/partials/commissions_store_table', [
+            'items'    => $data['items'],
+            'stats'    => $data['stats'],
+            'currency' => systemGet('currency') ?? '$',
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'html'    => $html,
+            'stats'   => $data['stats'],
+        ]);
+    }
+
+    public function exportStoreCommissions()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $data = bingo_fetch_store_detailed_commissions_breakdown($storeId, $filters);
+
+        $headers = [
+            'Fecha y Hora',
+            'Tipo de Tasa',
+            'Referencia',
+            'Jugador / Beneficiario',
+            'Cédula / Documento',
+            'Monto Base',
+            'Tasa Comisión (%)',
+            'Comisión Ganada',
+            'Estado',
+            'Detalle'
+        ];
+
+        $rows = [];
+        foreach ($data['items'] as $it) {
+            $rows[] = [
+                $it['datetime'] ?? '',
+                $it['rate_type_label'] ?? '',
+                $it['ref_code'] ?? '',
+                $it['player_name'] ?? '',
+                $it['player_doc'] ?? '',
+                number_format((float) ($it['base_amount'] ?? 0), 2),
+                number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
+                number_format((float) ($it['commission_amount'] ?? 0), 2),
+                $it['status_label'] ?? '',
+                $it['detail'] ?? '',
+            ];
+        }
+
+        $filename = 'comisiones_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.csv';
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->setBody(bingo_export_csv_payload($headers, $rows));
     }
 }

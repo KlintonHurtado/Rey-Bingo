@@ -89,6 +89,8 @@ $routes->get('store/affiliateCode', 'Store::affiliateCode');
 $routes->get('store/movements', 'Store::movements');
 $routes->get('store/movementsListGet', 'Store::movementsListGet');
 $routes->get('store/exportMovements', 'Store::exportMovements');
+$routes->get('store/storeCommissionsGet', 'Store::storeCommissionsGet');
+$routes->get('store/exportStoreCommissions', 'Store::exportStoreCommissions');
 
 $routes->get('operator', 'Operator::index');
 $routes->get('operator/enterStore/(:num)', 'Operator::enterStore/$1');

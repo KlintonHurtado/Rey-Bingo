@@ -378,6 +378,13 @@ $sourceLabel = static function ($source) {
 
     <ul class="nav nav-tabs card-header-tabs mb-3" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ud-movements" type="button">Movimientos</button></li>
+        <?php if ($isNonPlayer) : ?>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-commissions" type="button">
+                    <i class="fa-duotone fa-solid fa-percent me-1 text-primary"></i> Comisiones
+                </button>
+            </li>
+        <?php endif; ?>
         <?php if (! $isNonPlayer) : ?>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-deposits" type="button"><?= translate('deposits'); ?></button></li>
             <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#ud-retires" type="button"><?= translate('retires'); ?></button></li>
@@ -393,8 +400,8 @@ $sourceLabel = static function ($source) {
         <div class="tab-pane fade show active" id="ud-movements">
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <p class="small text-muted mb-0">
-                    Historial unificado: recargas, retiros, compras, resultados, premios, bonos y ruleta.
-                    La columna <strong>Saldo Total</strong> muestra cómo queda el saldo después de cada movimiento.
+                    Historial de movimientos operativos (recargas, pagos de retiros, acreditaciones de saldo y ajustes).
+                    La columna <strong>Saldo Total</strong> muestra cómo queda el saldo disponible después de cada movimiento.
                 </p>
                 <a class="btn btn-sm btn-outline-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-download"></i> Descargar Excel
@@ -405,91 +412,122 @@ $sourceLabel = static function ($source) {
                     <thead><tr>
                         <th><?= translate('date'); ?></th>
                         <th>Tipo</th>
-                        <th>Monto</th>
-                        <th>Saldo Total</th>
-                        <th><?= translate('status'); ?></th>
-                        <th><?= translate('game'); ?></th>
-                        <th>Serie</th>
-                        <th>Resultado</th>
-                        <th>Origen</th>
+                        <th class="text-end">Monto</th>
+                        <th class="text-end">Saldo Total</th>
+                        <?php if ($isNonPlayer) : ?>
+                            <th>Beneficiario / Jugador</th>
+                            <th>Cédula / Doc.</th>
+                            <th>Código / Ref.</th>
+                        <?php else : ?>
+                            <th><?= translate('game'); ?></th>
+                            <th>Serie</th>
+                            <th>Resultado</th>
+                            <th>Origen</th>
+                        <?php endif; ?>
+                        <th class="text-center"><?= translate('status'); ?></th>
                         <th>Detalle</th>
                     </tr></thead>
                     <tbody>
                     <?php if (empty($movements)) : ?>
-                        <tr><td colspan="10" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
+                        <tr><td colspan="<?= $isNonPlayer ? 9 : 10; ?>" class="text-center text-muted"><?= translate('no records found'); ?></td></tr>
                     <?php else : foreach ($movements as $m) :
                         $dir = (string) ($m['direction'] ?? '');
                         $amt = (float) ($m['amount'] ?? 0);
-                        $amtClass = $dir === '+' ? 'text-success' : ($dir === '-' ? 'text-danger' : 'text-muted');
+                        $amtClass = $dir === '+' ? 'text-success fw-bold' : ($dir === '-' ? 'text-danger fw-bold' : 'text-muted');
                         $balanceAfter = array_key_exists('balance_after', $m) ? (float) $m['balance_after'] : null;
                         $balanceClass = $balanceAfter === null
                             ? 'text-muted'
-                            : ($balanceAfter < 0 ? 'text-danger' : 'text-dark fw-semibold');
+                            : ($balanceAfter < 0 ? 'text-danger fw-bold' : 'text-dark fw-semibold');
+                        $badgeClass = $m['badge_class'] ?? 'bg-secondary text-white';
+                        $icon = $m['icon'] ?? '';
                         $type = (string) ($m['type'] ?? '');
                         $typeBadge = match ($type) {
-                            'deposit' => 'bg-success',
-                            'retire' => 'bg-danger',
+                            'deposit', 'funding_credit', 'admin_credit' => 'bg-success',
+                            'retire', 'player_recharge', 'store_funding', 'admin_debit' => 'bg-danger',
+                            'pay_retire' => 'bg-success text-white',
                             'purchase' => 'bg-primary',
                             'prize' => 'bg-warning text-dark',
                             'bonus' => 'bg-info text-dark',
                             'roulette' => 'bg-secondary',
-                            default => 'bg-dark',
-                        };
-                        $resultKey = (string) ($m['result'] ?? '');
-                        $resultBadge = match ($resultKey) {
-                            'won' => 'ud-result-won',
-                            'lost' => 'ud-result-lost',
-                            'pending' => 'ud-result-pending',
-                            default => '',
+                            default => $badgeClass,
                         };
                         ?>
                         <tr>
                             <td class="text-nowrap"><?= esc($m['datetime'] ?? ''); ?></td>
-                            <td><span class="badge <?= esc($typeBadge); ?>"><?= esc($m['type_label'] ?? $type); ?></span></td>
-                            <td class="<?= esc($amtClass); ?> text-nowrap">
+                            <td>
+                                <span class="badge <?= esc($typeBadge); ?>">
+                                    <?php if ($icon !== '') : ?><i class="<?= esc($icon); ?> me-1"></i><?php endif; ?>
+                                    <?= esc($m['type_label'] ?? $type); ?>
+                                </span>
+                            </td>
+                            <td class="<?= esc($amtClass); ?> text-nowrap text-end">
                                 <?= esc($dir); ?> <?= esc($currency); ?> <?= number_format($amt, 2); ?>
                             </td>
-                            <td class="<?= esc($balanceClass); ?> text-nowrap">
+                            <td class="<?= esc($balanceClass); ?> text-nowrap text-end">
                                 <?php if ($balanceAfter === null) : ?>
                                     —
                                 <?php else : ?>
                                     <?= esc($currency); ?> <?= number_format($balanceAfter, 2); ?>
                                 <?php endif; ?>
                             </td>
-                            <td><?= esc($m['status_label'] ?? ''); ?></td>
-                            <td><?= esc($m['game'] ?? '—'); ?></td>
-                            <td>
-                                <?php if (! empty($m['carton_serial'])) : ?>
-                                    <code><?= esc($m['carton_serial']); ?></code>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($resultKey !== '') : ?>
-                                    <span class="badge <?= esc($resultBadge !== '' ? $resultBadge : 'bg-secondary'); ?>">
-                                        <?= esc($m['result_label'] ?? $resultKey); ?>
-                                    </span>
-                                    <?php if ((float) ($m['prize_amount'] ?? 0) > 0) : ?>
-                                        <div class="small text-muted"><?= esc($currency); ?> <?= number_format((float) $m['prize_amount'], 2); ?></div>
+                            <?php if ($isNonPlayer) : ?>
+                                <td>
+                                    <?php if (! empty($m['beneficiary_name']) && $m['beneficiary_name'] !== 'Mi Punto de Venta') : ?>
+                                        <div class="fw-bold"><?= esc($m['beneficiary_name']); ?></div>
+                                        <?php if (! empty($m['beneficiary_username'])) : ?>
+                                            <small class="text-muted">@<?= esc($m['beneficiary_username']); ?></small>
+                                        <?php endif; ?>
+                                    <?php else : ?>
+                                        <span class="text-muted">—</span>
                                     <?php endif; ?>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if (! empty($m['source_label'])) : ?>
-                                    <span class="small"><?= esc($m['source_label']); ?></span>
-                                    <?php if ((float) ($m['from_bonus'] ?? 0) > 0 || (float) ($m['from_recharge'] ?? 0) > 0 || (float) ($m['from_withdraw'] ?? 0) > 0) : ?>
-                                        <div class="small text-muted">
-                                            A <?= number_format((float) ($m['from_bonus'] ?? 0), 2); ?>
-                                            / R <?= number_format((float) ($m['from_recharge'] ?? 0), 2); ?>
-                                            / Ret <?= number_format((float) ($m['from_withdraw'] ?? 0), 2); ?>
-                                        </div>
+                                </td>
+                                <td>
+                                    <?php if (! empty($m['beneficiary_document'])) : ?>
+                                        <span class="badge bg-light text-dark border"><?= esc($m['beneficiary_document']); ?></span>
+                                    <?php else : ?>
+                                        <span class="text-muted">—</span>
                                     <?php endif; ?>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (! empty($m['ref_code'])) : ?>
+                                        <span class="font-monospace text-primary fw-bold"><?= esc($m['ref_code']); ?></span>
+                                    <?php else : ?>
+                                        <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                </td>
+                            <?php else : ?>
+                                <td><?= esc($m['game'] ?? '—'); ?></td>
+                                <td>
+                                    <?php if (! empty($m['carton_serial'])) : ?>
+                                        <code><?= esc($m['carton_serial']); ?></code>
+                                    <?php else : ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (! empty($m['result'])) : ?>
+                                        <span class="badge <?= esc($m['result'] === 'won' ? 'bg-success' : ($m['result'] === 'lost' ? 'bg-secondary' : 'bg-warning text-dark')); ?>">
+                                            <?= esc($m['result_label'] ?? $m['result']); ?>
+                                        </span>
+                                        <?php if ((float) ($m['prize_amount'] ?? 0) > 0) : ?>
+                                            <div class="small text-muted"><?= esc($currency); ?> <?= number_format((float) $m['prize_amount'], 2); ?></div>
+                                        <?php endif; ?>
+                                    <?php else : ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (! empty($m['source_label'])) : ?>
+                                        <span class="small"><?= esc($m['source_label']); ?></span>
+                                    <?php else : ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                            <?php endif; ?>
+                            <td class="text-center">
+                                <span class="badge bg-<?= ((int)($m['status'] ?? 0) === 2 || (string)($m['status_label'] ?? '') === 'Aprobado' || (string)($m['status_label'] ?? '') === 'Pagado') ? 'success' : (((int)($m['status'] ?? 0) === 1 || (string)($m['status_label'] ?? '') === 'Pendiente') ? 'warning text-dark' : 'danger'); ?>">
+                                    <?= esc($m['status_label'] ?? 'Completado'); ?>
+                                </span>
                             </td>
                             <td class="small"><?= esc($m['detail'] ?? ''); ?></td>
                         </tr>
@@ -501,6 +539,301 @@ $sourceLabel = static function ($source) {
                 <?= count($movements ?? []); ?> registros. Usa <strong>Descargar Excel</strong> para el historial completo.
             </p>
         </div>
+
+        <?php if ($isNonPlayer) : ?>
+            <!-- TAB EXCLUSIVO DE COMISIONES PARA OPERADORES Y PUNTOS DE VENTA (STORES) -->
+            <div class="tab-pane fade" id="ud-commissions">
+                <?php
+                $cBreakdown = $commissionsBreakdown ?? ['stats' => [], 'items' => []];
+                $cStats = $cBreakdown['stats'] ?? [];
+                $cItems = $cBreakdown['items'] ?? [];
+                ?>
+                <?php if ($isOperator) : ?>
+                    <!-- RESUMEN DE 3 TARJETAS COMPACTAS PARA OPERADOR -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 3.5px solid #ffc107 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa GGR Afiliados</span>
+                                    <i class="fa-duotone fa-solid fa-chart-pie text-warning" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['ggr']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-warning-subtle text-dark border border-warning fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        Dif: <?= number_format(((float)($cStats['ggr']['base_differential'] ?? 0)) * 100, 2); ?>%
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base GGR:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-success fw-semibold">Ganancia Op:</span>
+                                        <strong class="text-success">+<?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_op_net_profit'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 3.5px solid #0dcaf0 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Recargas</span>
+                                    <i class="fa-duotone fa-solid fa-mobile-screen text-info" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['recharge']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-info-subtle text-info-emphasis border border-info fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        Dif: <?= number_format(((float)($cStats['recharge']['base_differential'] ?? 0)) * 100, 2); ?>%
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base Recargas:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-info fw-semibold">Ganancia Op:</span>
+                                        <strong class="text-info">+<?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_op_net_profit'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 3.5px solid #dc3545 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Retiros</span>
+                                    <i class="fa-duotone fa-solid fa-money-bill-transfer text-danger" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['withdraw']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        Dif: <?= number_format(((float)($cStats['withdraw']['base_differential'] ?? 0)) * 100, 2); ?>%
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base Retiros:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-danger fw-semibold">Ganancia Op:</span>
+                                        <strong class="text-danger">+<?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_op_net_profit'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TABLA DE COMISIONES DETALLADAS OPERADOR -->
+                    <div class="scroll-pane" style="max-height: 400px;">
+                        <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha y Hora</th>
+                                    <th>Punto de Venta</th>
+                                    <th>Tipo de Tasa</th>
+                                    <th class="text-end">Monto Base</th>
+                                    <th class="text-center">Tasa PV</th>
+                                    <th class="text-end">Comisión PV</th>
+                                    <th class="text-center">Tasa Op</th>
+                                    <th class="text-center">Margen (Dif)</th>
+                                    <th class="text-end text-success fw-bold">Ganancia Op</th>
+                                    <th class="text-center">Estado</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (! empty($cItems)) : ?>
+                                    <?php foreach ($cItems as $it) : ?>
+                                        <?php
+                                        $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
+                                        $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
+                                        $spreadPct = ((float) ($it['spread_rate'] ?? 0)) * 100;
+                                        ?>
+                                        <tr>
+                                            <td class="text-nowrap"><?= esc($it['datetime'] ?? '-'); ?></td>
+                                            <td>
+                                                <strong><?= esc($it['store_name'] ?? 'PV'); ?></strong>
+                                                <?php if (! empty($it['store_code'])) : ?>
+                                                    <small class="text-muted d-block"><?= esc($it['store_code']); ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge <?= esc($badgeClass); ?>">
+                                                    <i class="<?= esc($icon); ?> me-1"></i> <?= esc($it['rate_type_label'] ?? $it['rate_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
+                                            <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2); ?>%</span></td>
+                                            <td class="text-end"><?= esc($currency); ?> <?= number_format((float) ($it['store_commission'] ?? 0), 2); ?></td>
+                                            <td class="text-center"><span class="badge bg-primary-subtle text-primary border border-primary"><?= number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2); ?>%</span></td>
+                                            <td class="text-center"><span class="badge bg-success-subtle text-success border border-success fw-bold">+<?= number_format($spreadPct, 2); ?>%</span></td>
+                                            <td class="text-end text-success fw-bold" style="font-size: 0.90rem;">
+                                                +<?= esc($currency); ?> <?= number_format((float) ($it['op_net_profit'] ?? 0), 2); ?>
+                                            </td>
+                                            <td class="text-center"><span class="badge bg-success"><?= esc($it['status_label'] ?? 'Completado'); ?></span></td>
+                                            <td><small class="text-muted"><?= esc($it['detail'] ?? '-'); ?></small></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <tr><td colspan="11" class="text-center text-muted py-4">No se registran transacciones de comisiones para este operador.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                <?php else : ?>
+                    <!-- RESUMEN DE 3 TARJETAS COMPACTAS PARA PUNTO DE VENTA (STORE) -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 3.5px solid #ffc107 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa GGR Afiliados</span>
+                                    <i class="fa-duotone fa-solid fa-chart-pie text-warning" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['ggr']['rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-warning-subtle text-dark border border-warning fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        <?= (int) ($cStats['ggr']['count'] ?? 0); ?> períodos
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base GGR:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-success fw-semibold">Ganado PV:</span>
+                                        <strong class="text-success">+<?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_earned'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 3.5px solid #0dcaf0 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Recargas</span>
+                                    <i class="fa-duotone fa-solid fa-mobile-screen text-info" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['recharge']['rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-info-subtle text-info-emphasis border border-info fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        <?= (int) ($cStats['recharge']['count'] ?? 0); ?> recargas
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base Recargas:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-info fw-semibold">Ganado PV:</span>
+                                        <strong class="text-info">+<?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_earned'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 3.5px solid #dc3545 !important;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Retiros</span>
+                                    <i class="fa-duotone fa-solid fa-money-bill-transfer text-danger" style="font-size: 1rem;"></i>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-2 mb-1">
+                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['withdraw']['rate'] ?? 0)) * 100, 2); ?>%</span>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger fw-semibold py-0 px-1" style="font-size: 0.68rem;">
+                                        <?= (int) ($cStats['withdraw']['count'] ?? 0); ?> retiros pagados
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
+                                    <div>
+                                        <span class="text-muted">Base Retiros:</span>
+                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_base'] ?? 0), 2); ?></strong>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="text-danger fw-semibold">Ganado PV:</span>
+                                        <strong class="text-danger">+<?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_earned'] ?? 0), 2); ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TABLA DE COMISIONES DETALLADAS PUNTO DE VENTA -->
+                    <div class="scroll-pane" style="max-height: 400px;">
+                        <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha y Hora</th>
+                                    <th>Tipo de Tasa</th>
+                                    <th class="text-end">Monto Base</th>
+                                    <th class="text-center">Tasa (%)</th>
+                                    <th class="text-end text-success fw-bold">Comisión Ganada</th>
+                                    <th>Jugador / Beneficiario</th>
+                                    <th>Cédula / Doc.</th>
+                                    <th>Código / Ref.</th>
+                                    <th class="text-center">Estado</th>
+                                    <th>Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (! empty($cItems)) : ?>
+                                    <?php foreach ($cItems as $it) : ?>
+                                        <?php
+                                        $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
+                                        $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
+                                        $ratePct = ((float) ($it['store_rate'] ?? 0)) * 100;
+                                        ?>
+                                        <tr>
+                                            <td class="text-nowrap"><?= esc($it['datetime'] ?? '-'); ?></td>
+                                            <td>
+                                                <span class="badge <?= esc($badgeClass); ?>">
+                                                    <i class="<?= esc($icon); ?> me-1"></i> <?= esc($it['rate_type_label'] ?? $it['rate_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
+                                            <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($ratePct, 2); ?>%</span></td>
+                                            <td class="text-end text-success fw-bold" style="font-size: 0.90rem;">
+                                                +<?= esc($currency); ?> <?= number_format((float) ($it['commission_amount'] ?? 0), 2); ?>
+                                            </td>
+                                            <td>
+                                                <strong><?= esc($it['player_name'] ?? 'Jugador'); ?></strong>
+                                                <?php if (! empty($it['player_username'])) : ?>
+                                                    <small class="text-muted d-block">@<?= esc($it['player_username']); ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (! empty($it['player_doc'])) : ?>
+                                                    <span class="badge bg-light text-dark border"><?= esc($it['player_doc']); ?></span>
+                                                <?php else : ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (! empty($it['ref_code'])) : ?>
+                                                    <span class="font-monospace fw-bold text-primary"><?= esc($it['ref_code']); ?></span>
+                                                <?php else : ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center"><span class="badge bg-success"><?= esc($it['status_label'] ?? 'Completado'); ?></span></td>
+                                            <td><small class="text-muted"><?= esc($it['detail'] ?? '-'); ?></small></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <tr><td colspan="10" class="text-center text-muted py-4">No se registran transacciones de comisiones para este punto de venta.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
 
         <?php if (! $isOperator) : ?>
 <div class="tab-pane fade" id="ud-deposits">

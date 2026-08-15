@@ -1914,6 +1914,17 @@ class Users extends Controller {
                 ->findAll();
         }
 
+        $commissionsBreakdown = null;
+        if ((int) ($user['group'] ?? 0) === bingo_group_operator()) {
+            if (function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
+                $commissionsBreakdown = bingo_fetch_operator_detailed_commissions_breakdown((int) $userId);
+            }
+        } elseif ((int) ($user['group'] ?? 0) === bingo_group_store()) {
+            if (function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
+                $commissionsBreakdown = bingo_fetch_store_detailed_commissions_breakdown((int) $userId);
+            }
+        }
+
         $html = view('users/user_details_admin', [
             'user' => $user,
             'stats' => $stats,
@@ -1931,6 +1942,7 @@ class Users extends Controller {
             'currency' => systemGet('currency'),
             'assignedOperator' => $assignedOperator,
             'assignedStores' => $assignedStores,
+            'commissionsBreakdown' => $commissionsBreakdown,
         ]);
 
         return $this->response->setJSON([

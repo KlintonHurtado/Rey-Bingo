@@ -17,10 +17,10 @@ $stats = $stats ?? [];
             <div>
                 <h5 class="mb-0 fw-bold text-dark">
                     <i class="fa-duotone fa-solid fa-clock-rotate-left text-primary me-2"></i>
-                    Historial Completo de Movimientos
+                    Historial de Movimientos Operativos
                 </h5>
                 <small class="text-muted">
-                    Consulta todas las recargas, retiros pagados, comisiones y acreditaciones realizadas por tu Punto de Venta.
+                    Consulta todas las recargas a jugadores, pagos de retiros en efectivo y acreditaciones de saldo.
                 </small>
             </div>
             <div>
@@ -30,14 +30,16 @@ $stats = $stats ?? [];
             </div>
         </div>
 
-        <!-- Tarjetas de Resumen Estadístico -->
+        <!-- 4 Tarjetas de Resumen Estadístico Operativo -->
         <div class="row g-2 mb-3">
+            <!-- 1. Saldo Disponible para Venta -->
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,110,253,0.08) 0%, rgba(13,110,253,0.02) 100%); border-left: 4px solid #0d6efd !important;">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Saldo Recargable</small>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Saldo para Venta</small>
                             <h5 class="mb-0 fw-bold text-primary"><?= esc($currency); ?> <?= number_format((float) ($walletSummary['recharge'] ?? 0), 2); ?></h5>
+                            <small class="text-muted">Disponible</small>
                         </div>
                         <div class="text-primary fs-3">
                             <i class="fa-duotone fa-solid fa-wallet"></i>
@@ -45,27 +47,15 @@ $stats = $stats ?? [];
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión GGR Afiliados</small>
-                            <h5 class="mb-0 fw-bold text-success"><?= esc($currency); ?> <?= number_format((float) ($stats['ggr_commissions_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted">GGR de afiliados</small>
-                        </div>
-                        <div class="text-success fs-3">
-                            <i class="fa-duotone fa-solid fa-chart-pie"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
+            <!-- 2. Total Recargas Realizadas -->
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(13,202,240,0.08) 0%, rgba(13,202,240,0.02) 100%); border-left: 4px solid #0dcaf0 !important;">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión por Recargas</small>
-                            <h5 class="mb-0 fw-bold text-info"><?= esc($currency); ?> <?= number_format((float) ($stats['recharge_commissions_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted"><?= (int) ($stats['total_recharges_count'] ?? 0); ?> recargas</small>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Recargas</small>
+                            <h5 class="mb-0 fw-bold text-info"><?= esc($currency); ?> <span id="stat-total-recharges"><?= number_format((float) ($stats['total_recharges_amount'] ?? 0), 2); ?></span></h5>
+                            <small class="text-muted"><span id="stat-count-recharges"><?= (int) ($stats['total_recharges_count'] ?? 0); ?></span> recargas</small>
                         </div>
                         <div class="text-info fs-3">
                             <i class="fa-duotone fa-solid fa-mobile-screen"></i>
@@ -73,16 +63,34 @@ $stats = $stats ?? [];
                     </div>
                 </div>
             </div>
+
+            <!-- 3. Total Retiros Pagados -->
+            <div class="col-6 col-md-3">
+                <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(25,135,84,0.08) 0%, rgba(25,135,84,0.02) 100%); border-left: 4px solid #198754 !important;">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Retiros Pagados</small>
+                            <h5 class="mb-0 fw-bold text-success"><?= esc($currency); ?> <span id="stat-total-retires"><?= number_format((float) ($stats['total_retires_amount'] ?? 0), 2); ?></span></h5>
+                            <small class="text-muted"><span id="stat-count-retires"><?= (int) ($stats['total_retires_count'] ?? 0); ?></span> pagos</small>
+                        </div>
+                        <div class="text-success fs-3">
+                            <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Acreditaciones / Ingresos -->
             <div class="col-6 col-md-3">
                 <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.03) 100%); border-left: 4px solid #ffc107 !important;">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Comisión Pago Retiros</small>
-                            <h5 class="mb-0 fw-bold text-warning text-dark"><?= esc($currency); ?> <?= number_format((float) ($stats['prize_commissions_amount'] ?? 0), 2); ?></h5>
-                            <small class="text-muted"><?= (int) ($stats['total_retires_count'] ?? 0); ?> retiros pagados</small>
+                            <small class="text-muted d-block text-uppercase fw-semibold" style="font-size: 0.75rem;">Acreditaciones</small>
+                            <h5 class="mb-0 fw-bold text-warning text-dark"><?= esc($currency); ?> <span id="stat-total-credits"><?= number_format((float) ($stats['total_credits_amount'] ?? 0), 2); ?></span></h5>
+                            <small class="text-muted"><span id="stat-count-credits"><?= (int) ($stats['total_credits_count'] ?? 0); ?></span> ingresos</small>
                         </div>
                         <div class="text-warning fs-3">
-                            <i class="fa-duotone fa-solid fa-money-bill-transfer"></i>
+                            <i class="fa-duotone fa-solid fa-hand-holding-dollar"></i>
                         </div>
                     </div>
                 </div>
@@ -108,9 +116,6 @@ $stats = $stats ?? [];
                             <option value="recharge" <?= ($filters['type'] ?? '') === 'recharge' ? 'selected' : ''; ?>>Recargas a Jugadores</option>
                             <option value="retire" <?= ($filters['type'] ?? '') === 'retire' ? 'selected' : ''; ?>>Pagos de Retiros</option>
                             <option value="credit" <?= ($filters['type'] ?? '') === 'credit' ? 'selected' : ''; ?>>Acreditaciones de Saldo</option>
-                            <option value="commission_ggr" <?= ($filters['type'] ?? '') === 'commission_ggr' ? 'selected' : ''; ?>>Comisión GGR</option>
-                            <option value="commission_recharge" <?= ($filters['type'] ?? '') === 'commission_recharge' ? 'selected' : ''; ?>>Comisión Recargas</option>
-                            <option value="commission_prize" <?= ($filters['type'] ?? '') === 'commission_prize' ? 'selected' : ''; ?>>Comisión Retiros</option>
                             <option value="debit" <?= ($filters['type'] ?? '') === 'debit' ? 'selected' : ''; ?>>Débitos / Ajustes</option>
                         </select>
                     </div>
@@ -139,27 +144,25 @@ $stats = $stats ?? [];
         <!-- Contenedor de la Tabla -->
         <div id="store-movements-container">
             <?= view('store/movements_list', [
-                'movements' => $movements ?? [],
-                'stats' => $stats ?? [],
-                'currency' => $currency,
-            ]) ?>
+                'movements' => $movements,
+                'stats' => $stats,
+                'currency' => $currency
+            ]); ?>
         </div>
     </div>
 </div>
 
-<?= view('store/partials/close') ?>
-
 <script type="text/javascript">
     function getFilterParams() {
         return {
-            date_from: $('#filter-date-from').val(),
-            date_to: $('#filter-date-to').val(),
-            type: $('#filter-type').val(),
-            search: $('#filter-search').val()
+            date_from: $('#filter-date-from').val() || '',
+            date_to: $('#filter-date-to').val() || '',
+            type: $('#filter-type').val() || 'all',
+            search: $('#filter-search').val() || ''
         };
     }
 
-    function applyStoreMovementsFilter() {
+    window.applyStoreMovementsFilter = function() {
         const params = getFilterParams();
         $('#store-movements-loading').removeClass('d-none');
         $('#store-movements-container').addClass('opacity-50');
@@ -168,12 +171,34 @@ $stats = $stats ?? [];
             url: '<?= site_url('store/movementsListGet'); ?>',
             method: 'GET',
             data: params,
+            dataType: 'html',
             success: function(html) {
                 $('#store-movements-container').html(html).removeClass('opacity-50');
+
+                // Actualizar métricas dinámicas
+                const wrapper = $('#store-movements-table-wrapper');
+                if (wrapper.length) {
+                    const formatNum = function(num) {
+                        return parseFloat(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    };
+                    const recAmt = wrapper.data('total-recharges-amount');
+                    const recCount = wrapper.data('total-recharges-count');
+                    const retAmt = wrapper.data('total-retires-amount');
+                    const retCount = wrapper.data('total-retires-count');
+                    const credAmt = wrapper.data('total-credits-amount');
+                    const credCount = wrapper.data('total-credits-count');
+
+                    if (recAmt !== undefined) $('#stat-total-recharges').text(formatNum(recAmt));
+                    if (recCount !== undefined) $('#stat-count-recharges').text(recCount);
+                    if (retAmt !== undefined) $('#stat-total-retires').text(formatNum(retAmt));
+                    if (retCount !== undefined) $('#stat-count-retires').text(retCount);
+                    if (credAmt !== undefined) $('#stat-total-credits').text(formatNum(credAmt));
+                    if (credCount !== undefined) $('#stat-count-credits').text(credCount);
+                }
             },
             error: function() {
                 Toastify({
-                    text: 'Error al consultar movimientos.',
+                    text: 'Error al filtrar movimientos.',
                     duration: 3000,
                     gravity: 'top',
                     position: 'right',
@@ -185,30 +210,32 @@ $stats = $stats ?? [];
                 $('#store-movements-loading').addClass('d-none');
             }
         });
-    }
+    };
 
-    function resetStoreMovementsFilter() {
+    window.resetStoreMovementsFilter = function() {
         $('#filter-date-from').val('');
         $('#filter-date-to').val('');
         $('#filter-type').val('all');
         $('#filter-search').val('');
         applyStoreMovementsFilter();
-    }
+    };
 
-    function exportStoreMovements() {
+    window.exportStoreMovements = function() {
         const params = getFilterParams();
         const queryString = $.param(params);
         window.location.href = '<?= site_url('store/exportMovements'); ?>?' + queryString;
-    }
+    };
 
-    $(function() {
+    $(document).ready(function() {
+        $('#filter-type, #filter-date-from, #filter-date-to').on('change', function() {
+            applyStoreMovementsFilter();
+        });
         $('#filter-search').on('keyup', function(e) {
             if (e.key === 'Enter') {
                 applyStoreMovementsFilter();
             }
         });
-        $('#filter-type, #filter-date-from, #filter-date-to').on('change', function() {
-            applyStoreMovementsFilter();
-        });
     });
 </script>
+
+<?= view('store/partials/close') ?>

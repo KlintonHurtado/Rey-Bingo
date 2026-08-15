@@ -1,7 +1,16 @@
 <?php
 $currency = $currency ?? systemGet('currency') ?? '$';
+$stats = $stats ?? [];
+$movements = $movements ?? [];
 ?>
-<div class="table-responsive">
+<div class="table-responsive" id="store-movements-table-wrapper"
+     data-total-recharges-amount="<?= esc(number_format((float)($stats['total_recharges_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-recharges-count="<?= esc((int)($stats['total_recharges_count'] ?? 0)); ?>"
+     data-total-retires-amount="<?= esc(number_format((float)($stats['total_retires_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-retires-count="<?= esc((int)($stats['total_retires_count'] ?? 0)); ?>"
+     data-total-credits-amount="<?= esc(number_format((float)($stats['total_credits_amount'] ?? 0), 2, '.', '')); ?>"
+     data-total-credits-count="<?= esc((int)($stats['total_credits_count'] ?? 0)); ?>">
+
     <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
         <thead class="table-light">
             <tr>
@@ -98,7 +107,7 @@ $currency = $currency ?? systemGet('currency') ?? '$';
                 <tr>
                     <td colspan="9" class="text-center py-5 text-muted">
                         <i class="fa-duotone fa-solid fa-receipt fs-1 d-block mb-2 text-secondary"></i>
-                        No se encontraron movimientos registrados con los filtros aplicados.
+                        No se encontraron movimientos registrados con estos criterios.
                     </td>
                 </tr>
             <?php endif; ?>
