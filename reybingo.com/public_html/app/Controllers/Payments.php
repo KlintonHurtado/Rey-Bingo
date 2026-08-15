@@ -1868,19 +1868,6 @@ class Payments extends Controller {
                 ]
             ];
 
-            if ($receiver === "store") {
-                if (function_exists('fastcgi_finish_request')) {
-                    header('Content-Type: application/json');
-                    echo json_encode($response);
-                    session_write_close();
-                    fastcgi_finish_request();
-                    $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
-                    exit();
-                } else {
-                    session_write_close();
-                    $this->sendRetireStoreEmail($user, $data['account'], (float) $data['amount']);
-                }
-            }
         } else {
             $response = [
                 'success' => false,

@@ -226,20 +226,21 @@
 
                         if (response.is_store) {
                             Swal.fire({
-                                title: '¡Solicitud de Retiro Enviada!',
+                                title: '¡Solicitud de Nota de Retiro Enviada!',
                                 html: `
                                     <div class="my-2">
                                         <div class="mb-3">
-                                            <i class="fa-duotone fa-solid fa-envelope-circle-check text-primary" style="font-size: 3rem;"></i>
+                                            <i class="fa-duotone fa-solid fa-clock-rotate-left text-warning" style="font-size: 3rem;"></i>
                                         </div>
                                         <p class="mb-2 fw-semibold text-dark" style="font-size: 1rem;">
-                                            Tu código de retiro ha sido enviado a tu correo electrónico registrado.
+                                            Tu solicitud se encuentra en estado <strong>Pendiente</strong>.
                                         </p>
-                                        <p class="small text-muted mb-0">
-                                            Por favor, revisa tu bandeja de entrada para ver tu código y cobrar en cualquier Punto de Venta presentando tu número de cédula.
+                                        <p class="small text-muted mb-2 text-start">
+                                            • Mientras esté pendiente, puedes <strong>cancelar la solicitud</strong> desde tu historial de movimientos si deseas recuperar y usar tu saldo de retiro.<br>
+                                            • Una vez que la administración <strong>apruebe</strong> la nota, te llegará una notificación y el <strong>código de retiro a tu correo electrónico</strong> para cobrar en efectivo en el Punto de Venta.
                                         </p>
                                     </div>`,
-                                icon: 'success',
+                                icon: 'info',
                                 confirmButtonText: 'Entendido',
                                 confirmButtonColor: '#6236ff'
                             });

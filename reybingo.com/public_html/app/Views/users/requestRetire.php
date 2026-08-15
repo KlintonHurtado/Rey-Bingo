@@ -13,10 +13,18 @@
                         <h6 class="mb-1"><strong><?= translate('bank'); ?>:</strong> <?= esc($retire['bank']) ?></h6>
                     </div>
 
+                    <?php
+                    $isStoreRetire = ($retire['bank'] === 'Punto de Venta' || ($retire['account_type'] ?? '') === 'store_pickup');
+                    $isAdmin = (session()->get('group') == 1);
+                    ?>
                     <div class="col-md-12">
                         <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                            <small class="mb-0"><strong><?= translate('account'); ?>:</strong> <?= esc($retire['account']) ?></small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('account'); ?>', '<?= esc($retire['account']) ?>')"></i>
+                            <?php if ($isStoreRetire && ! $isAdmin && (int)$retire['status'] !== 2): ?>
+                                <small class="mb-0"><strong>Código de Retiro:</strong> <span class="badge bg-warning-subtle text-dark border">Se revelará y enviará al ser Aprobada</span></small>
+                            <?php else: ?>
+                                <small class="mb-0"><strong><?= translate('account'); ?> / Código:</strong> <?= esc($retire['account']) ?></small>
+                                <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('account'); ?>', '<?= esc($retire['account']) ?>')"></i>
+                            <?php endif; ?>
                         </div>
                         <div class="d-flex justify-content-between align-items-center border-bottom py-1">
                             <small class="mb-0"><strong><?= translate('account type'); ?>:</strong> <?= esc(bingo_account_type_label($retire['account_type'] ?? '') ?: '—') ?></small>

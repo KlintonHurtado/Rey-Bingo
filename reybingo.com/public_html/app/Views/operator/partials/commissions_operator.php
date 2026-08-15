@@ -17,6 +17,15 @@ $ggrRate = (float) ($stats['ggr']['rate'] ?? 0) * 100;
 $recRate = (float) ($stats['recharge']['rate'] ?? 0) * 100;
 $withRate = (float) ($stats['withdraw']['rate'] ?? 0) * 100;
 
+// Tasas globales PV configuradas en Financiero
+$globalPvGgrRate = (float) (systemGet('rateStoreGgrAffiliate') ?? systemGet('rateStoreGgrCommission') ?? 0) * 100;
+$globalPvRecRate = (float) (systemGet('rateStoreCommission') ?? 0) * 100;
+$globalPvWithRate = (float) (systemGet('rateStorePrizeCommission') ?? 0) * 100;
+
+$ggrMarginPct = max(0, $ggrRate - $globalPvGgrRate);
+$recMarginPct = max(0, $recRate - $globalPvRecRate);
+$withMarginPct = max(0, $withRate - $globalPvWithRate);
+
 $ggrOpEarned = (float) ($stats['ggr']['operator_earned'] ?? 0);
 $recOpEarned = (float) ($stats['recharge']['operator_earned'] ?? 0);
 $withOpEarned = (float) ($stats['withdraw']['operator_earned'] ?? 0);
@@ -28,41 +37,46 @@ $withStoresEarned = (float) ($stats['withdraw']['stores_earned'] ?? 0);
 $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recOpEarned + $withOpEarned));
 ?>
 <div class="operator-pane-inner operator-pane-inner-commissions" id="operator-commissions-main-root">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions" style="width: 36px; height: 36px; font-size: 1.1rem;">
                 <i class="fa-duotone fa-solid fa-chart-line"></i>
             </div>
             <div>
-                <h5 class="mb-0 fw-bold text-dark"><?= translate('operator commissions panel'); ?></h5>
-                <p class="small text-muted mb-0">Ganancias del Operador calculadas sobre el margen diferencial de cada Punto de Venta.</p>
+                <h5 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;"><?= translate('operator commissions panel'); ?></h5>
+                <p class="small text-muted mb-0" style="font-size: 0.78rem;">Ganancias del Operador calculadas sobre el margen diferencial de cada Punto de Venta.</p>
             </div>
         </div>
         <div>
-            <button type="button" class="btn btn-sm btn-success" id="btn-export-op-commissions" onclick="exportOperatorCommissions();">
+            <button type="button" class="btn btn-sm btn-success" id="btn-export-op-commissions" onclick="exportOperatorCommissions();" style="padding: 4px 10px; font-size: 0.82rem;">
                 <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
             </button>
         </div>
     </div>
 
-    <!-- 3 Tarjetas de Resumen con Margen Diferencial -->
-    <div class="row g-2 mb-3">
+    <!-- 3 Tarjetas Compactas de Resumen con Margen Diferencial -->
+    <div class="row g-2 mb-2">
         <!-- 1. Tasa GGR Afiliados -->
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 14px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 4px solid #ffc107 !important;">
+            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 3.5px solid #ffc107 !important;">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="text-uppercase fw-semibold text-muted" style="font-size: 0.75rem;">Tasa GGR Afiliados</span>
-                    <i class="fa-duotone fa-solid fa-chart-pie fs-4 text-warning"></i>
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa GGR Afiliados</span>
+                    <i class="fa-duotone fa-solid fa-chart-pie text-warning" style="font-size: 1rem;"></i>
                 </div>
-                <h4 class="mb-2 fw-bold text-dark"><?= number_format($ggrRate, 2); ?>%</h4>
-                <div class="d-flex justify-content-between align-items-end pt-2 border-top border-warning-subtle">
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format($ggrRate, 2); ?>%</span>
+                    <span class="badge bg-warning-subtle text-dark border border-warning fw-semibold py-0 px-1" style="font-size: 0.68rem;" title="Margen diferencial base configurado en Financiero">
+                        Dif: +<?= number_format($ggrMarginPct, 2); ?>%
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
                     <div>
-                        <small class="text-muted d-block" style="font-size: 0.72rem;">Ganado por Tiendas</small>
-                        <span class="small fw-bold text-muted"><?= $currency; ?> <span id="op-comm-stat-ggr-stores"><?= number_format($ggrStoresEarned, 2); ?></span></span>
+                        <span class="text-muted">Tiendas:</span>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-ggr-stores"><?= number_format($ggrStoresEarned, 2); ?></span></strong>
                     </div>
                     <div class="text-end">
-                        <small class="text-success d-block fw-semibold" style="font-size: 0.72rem;">Ganancia Operador (Dif.)</small>
-                        <strong class="text-success fs-6">+<?= $currency; ?> <span id="op-comm-stat-ggr-profit"><?= number_format($ggrOpEarned, 2); ?></span></strong>
+                        <span class="text-success fw-semibold">Operador:</span>
+                        <strong class="text-success">+<?= $currency; ?> <span id="op-comm-stat-ggr-profit"><?= number_format($ggrOpEarned, 2); ?></span></strong>
                     </div>
                 </div>
             </div>
@@ -70,20 +84,25 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
 
         <!-- 2. Tasa Recargas -->
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 14px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 4px solid #0dcaf0 !important;">
+            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 3.5px solid #0dcaf0 !important;">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="text-uppercase fw-semibold text-muted" style="font-size: 0.75rem;">Tasa Recargas del Operador</span>
-                    <i class="fa-duotone fa-solid fa-mobile-screen fs-4 text-info"></i>
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Recargas</span>
+                    <i class="fa-duotone fa-solid fa-mobile-screen text-info" style="font-size: 1rem;"></i>
                 </div>
-                <h4 class="mb-2 fw-bold text-dark"><?= number_format($recRate, 2); ?>%</h4>
-                <div class="d-flex justify-content-between align-items-end pt-2 border-top border-info-subtle">
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format($recRate, 2); ?>%</span>
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info fw-semibold py-0 px-1" style="font-size: 0.68rem;" title="Margen diferencial base configurado en Financiero">
+                        Dif: +<?= number_format($recMarginPct, 2); ?>%
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
                     <div>
-                        <small class="text-muted d-block" style="font-size: 0.72rem;">Ganado por Tiendas</small>
-                        <span class="small fw-bold text-muted"><?= $currency; ?> <span id="op-comm-stat-rec-stores"><?= number_format($recStoresEarned, 2); ?></span></span>
+                        <span class="text-muted">Tiendas:</span>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-rec-stores"><?= number_format($recStoresEarned, 2); ?></span></strong>
                     </div>
                     <div class="text-end">
-                        <small class="text-info d-block fw-semibold" style="font-size: 0.72rem;">Ganancia Operador (Dif.)</small>
-                        <strong class="text-info fs-6">+<?= $currency; ?> <span id="op-comm-stat-rec-profit"><?= number_format($recOpEarned, 2); ?></span></strong>
+                        <span class="text-info fw-semibold">Operador:</span>
+                        <strong class="text-info">+<?= $currency; ?> <span id="op-comm-stat-rec-profit"><?= number_format($recOpEarned, 2); ?></span></strong>
                     </div>
                 </div>
             </div>
@@ -91,20 +110,25 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
 
         <!-- 3. Tasa Retiros -->
         <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 14px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 4px solid #dc3545 !important;">
+            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 3.5px solid #dc3545 !important;">
                 <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="text-uppercase fw-semibold text-muted" style="font-size: 0.75rem;">Tasa Retiros del Operador</span>
-                    <i class="fa-duotone fa-solid fa-money-bill-transfer fs-4 text-danger"></i>
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Retiros</span>
+                    <i class="fa-duotone fa-solid fa-money-bill-transfer text-danger" style="font-size: 1rem;"></i>
                 </div>
-                <h4 class="mb-2 fw-bold text-dark"><?= number_format($withRate, 2); ?>%</h4>
-                <div class="d-flex justify-content-between align-items-end pt-2 border-top border-danger-subtle">
+                <div class="d-flex align-items-baseline gap-2 mb-1">
+                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format($withRate, 2); ?>%</span>
+                    <span class="badge bg-danger-subtle text-danger border border-danger fw-semibold py-0 px-1" style="font-size: 0.68rem;" title="Margen diferencial base configurado en Financiero">
+                        Dif: +<?= number_format($withMarginPct, 2); ?>%
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
                     <div>
-                        <small class="text-muted d-block" style="font-size: 0.72rem;">Ganado por Tiendas</small>
-                        <span class="small fw-bold text-muted"><?= $currency; ?> <span id="op-comm-stat-with-stores"><?= number_format($withStoresEarned, 2); ?></span></span>
+                        <span class="text-muted">Tiendas:</span>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-with-stores"><?= number_format($withStoresEarned, 2); ?></span></strong>
                     </div>
                     <div class="text-end">
-                        <small class="text-danger d-block fw-semibold" style="font-size: 0.72rem;">Ganancia Operador (Dif.)</small>
-                        <strong class="text-danger fs-6">+<?= $currency; ?> <span id="op-comm-stat-with-profit"><?= number_format($withOpEarned, 2); ?></span></strong>
+                        <span class="text-danger fw-semibold">Operador:</span>
+                        <strong class="text-danger">+<?= $currency; ?> <span id="op-comm-stat-with-profit"><?= number_format($withOpEarned, 2); ?></span></strong>
                     </div>
                 </div>
             </div>
