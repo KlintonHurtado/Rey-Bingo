@@ -549,86 +549,8 @@ $sourceLabel = static function ($source) {
                 $cItems = $cBreakdown['items'] ?? [];
                 ?>
                 <?php if ($isOperator) : ?>
-                    <!-- RESUMEN DE 3 TARJETAS COMPACTAS PARA OPERADOR -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 3.5px solid #ffc107 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa GGR Afiliados</span>
-                                    <i class="fa-duotone fa-solid fa-chart-pie text-warning" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['ggr']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-warning-subtle text-dark border border-warning fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        Dif: <?= number_format(((float)($cStats['ggr']['base_differential'] ?? 0)) * 100, 2); ?>%
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base GGR:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-success fw-semibold">Ganancia Op:</span>
-                                        <strong class="text-success">+<?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_op_net_profit'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 3.5px solid #0dcaf0 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Recargas</span>
-                                    <i class="fa-duotone fa-solid fa-mobile-screen text-info" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['recharge']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-info-subtle text-info-emphasis border border-info fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        Dif: <?= number_format(((float)($cStats['recharge']['base_differential'] ?? 0)) * 100, 2); ?>%
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base Recargas:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-info fw-semibold">Ganancia Op:</span>
-                                        <strong class="text-info">+<?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_op_net_profit'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 3.5px solid #dc3545 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Retiros</span>
-                                    <i class="fa-duotone fa-solid fa-money-bill-transfer text-danger" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['withdraw']['op_rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-danger-subtle text-danger border border-danger fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        Dif: <?= number_format(((float)($cStats['withdraw']['base_differential'] ?? 0)) * 100, 2); ?>%
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base Retiros:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-danger fw-semibold">Ganancia Op:</span>
-                                        <strong class="text-danger">+<?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_op_net_profit'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- TABLA DE COMISIONES DETALLADAS OPERADOR -->
-                    <div class="scroll-pane" style="max-height: 400px;">
+                    <div class="scroll-pane" style="max-height: 420px;">
                         <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
                             <thead class="table-light">
                                 <tr>
@@ -651,7 +573,8 @@ $sourceLabel = static function ($source) {
                                         <?php
                                         $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
                                         $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
-                                        $spreadPct = ((float) ($it['spread_rate'] ?? 0)) * 100;
+                                        $spreadPct = ((float) ($it['operator_spread'] ?? $it['spread_rate'] ?? 0)) * 100;
+                                        $opProfit = (float) ($it['operator_profit'] ?? $it['op_net_profit'] ?? 0);
                                         ?>
                                         <tr>
                                             <td class="text-nowrap"><?= esc($it['datetime'] ?? '-'); ?></td>
@@ -672,7 +595,7 @@ $sourceLabel = static function ($source) {
                                             <td class="text-center"><span class="badge bg-primary-subtle text-primary border border-primary"><?= number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2); ?>%</span></td>
                                             <td class="text-center"><span class="badge bg-success-subtle text-success border border-success fw-bold">+<?= number_format($spreadPct, 2); ?>%</span></td>
                                             <td class="text-end text-success fw-bold" style="font-size: 0.90rem;">
-                                                +<?= esc($currency); ?> <?= number_format((float) ($it['op_net_profit'] ?? 0), 2); ?>
+                                                +<?= esc($currency); ?> <?= number_format($opProfit, 2); ?>
                                             </td>
                                             <td class="text-center"><span class="badge bg-success"><?= esc($it['status_label'] ?? 'Completado'); ?></span></td>
                                             <td><small class="text-muted"><?= esc($it['detail'] ?? '-'); ?></small></td>
@@ -686,86 +609,8 @@ $sourceLabel = static function ($source) {
                     </div>
 
                 <?php else : ?>
-                    <!-- RESUMEN DE 3 TARJETAS COMPACTAS PARA PUNTO DE VENTA (STORE) -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(255,193,7,0.02) 100%); border-left: 3.5px solid #ffc107 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa GGR Afiliados</span>
-                                    <i class="fa-duotone fa-solid fa-chart-pie text-warning" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['ggr']['rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-warning-subtle text-dark border border-warning fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        <?= (int) ($cStats['ggr']['count'] ?? 0); ?> períodos
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base GGR:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-success fw-semibold">Ganado PV:</span>
-                                        <strong class="text-success">+<?= esc($currency); ?> <?= number_format((float) ($cStats['ggr']['total_earned'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(13,202,240,0.12) 0%, rgba(13,202,240,0.02) 100%); border-left: 3.5px solid #0dcaf0 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Recargas</span>
-                                    <i class="fa-duotone fa-solid fa-mobile-screen text-info" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['recharge']['rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-info-subtle text-info-emphasis border border-info fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        <?= (int) ($cStats['recharge']['count'] ?? 0); ?> recargas
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base Recargas:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-info fw-semibold">Ganado PV:</span>
-                                        <strong class="text-info">+<?= esc($currency); ?> <?= number_format((float) ($cStats['recharge']['total_earned'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-4">
-                            <div class="card border-0 shadow-sm p-2.5 h-100" style="border-radius: 10px; background: linear-gradient(135deg, rgba(220,53,69,0.12) 0%, rgba(220,53,69,0.02) 100%); border-left: 3.5px solid #dc3545 !important;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.70rem; letter-spacing: 0.3px;">Tasa Retiros</span>
-                                    <i class="fa-duotone fa-solid fa-money-bill-transfer text-danger" style="font-size: 1rem;"></i>
-                                </div>
-                                <div class="d-flex align-items-baseline gap-2 mb-1">
-                                    <span class="fw-bold text-dark" style="font-size: 1.15rem; line-height: 1;"><?= number_format(((float)($cStats['withdraw']['rate'] ?? 0)) * 100, 2); ?>%</span>
-                                    <span class="badge bg-danger-subtle text-danger border border-danger fw-semibold py-0 px-1" style="font-size: 0.68rem;">
-                                        <?= (int) ($cStats['withdraw']['count'] ?? 0); ?> retiros pagados
-                                    </span>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
-                                    <div>
-                                        <span class="text-muted">Base Retiros:</span>
-                                        <strong class="text-secondary"><?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_base'] ?? 0), 2); ?></strong>
-                                    </div>
-                                    <div class="text-end">
-                                        <span class="text-danger fw-semibold">Ganado PV:</span>
-                                        <strong class="text-danger">+<?= esc($currency); ?> <?= number_format((float) ($cStats['withdraw']['total_earned'] ?? 0), 2); ?></strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- TABLA DE COMISIONES DETALLADAS PUNTO DE VENTA -->
-                    <div class="scroll-pane" style="max-height: 400px;">
+                    <div class="scroll-pane" style="max-height: 420px;">
                         <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
                             <thead class="table-light">
                                 <tr>

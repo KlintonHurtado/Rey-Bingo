@@ -1901,12 +1901,12 @@ class Users extends Controller {
 
         $assignedOperator = null;
         if (! empty($user['operator_id'])) {
-            $assignedOperator = $modelUsers->find((int) $user['operator_id']);
+            $assignedOperator = $model->find((int) $user['operator_id']);
         }
 
         $assignedStores = [];
         if ((int) ($user['group'] ?? 0) === bingo_group_operator()) {
-            $assignedStores = $modelUsers
+            $assignedStores = $model
                 ->where('operator_id', $userId)
                 ->where('group', bingo_group_store())
                 ->where('deleted', 0)

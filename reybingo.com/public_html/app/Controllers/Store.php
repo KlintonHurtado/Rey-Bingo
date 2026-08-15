@@ -941,10 +941,33 @@ class Store extends Controller
             'ggrRate' => bingo_ggr_commission_rate_for($store ?? [], 'store'),
             'ggrCommissionTotal' => $ggrCommissionTotal,
             'totalCommission' => round($paymentCommissionTotal + $ggrCommissionTotal, 2),
+            'activeNav' => 'commissions',
+        ], translate('store commissions'));
+    }
+
+    public function commissions()
+    {
+        return $this->affiliate();
+    }
+
+    public function affiliates()
+    {
+        if ($redirect = $this->requireStore()) {
+            return $redirect;
+        }
+
+        $storeId = $this->getEffectiveStoreId();
+        $modelUsers = new UsersModel();
+        $store = $modelUsers->find($storeId);
+
+        $affiliatedPlayers = bingo_fetch_store_referred_players($storeId, 150);
+
+        return $this->renderStorePage('store/affiliates', [
+            'store' => $store,
             'referredCount' => count($affiliatedPlayers),
             'referredPlayers' => $affiliatedPlayers,
-            'ggrDashboard' => $ggrDashboard,
-        ], translate('store commissions'));
+            'activeNav' => 'affiliates',
+        ], 'Afiliados del Punto de Venta');
     }
 
     public function registerAffiliate()

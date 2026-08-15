@@ -83,6 +83,8 @@ $routes->get('store/playerPrizeSummaryGet', 'Store::playerPrizeSummaryGet');
 $routes->post('store/payAwardSubmit', 'Store::payAwardSubmit');
 $routes->post('store/payRetireSubmit', 'Store::payRetireSubmit');
 $routes->get('store/affiliate', 'Store::affiliate');
+$routes->get('store/commissions', 'Store::commissions');
+$routes->get('store/affiliates', 'Store::affiliates');
 $routes->get('store/withdraw', 'Store::withdraw');
 $routes->get('store/register', 'Store::registerAffiliate');
 $routes->get('store/affiliateCode', 'Store::affiliateCode');

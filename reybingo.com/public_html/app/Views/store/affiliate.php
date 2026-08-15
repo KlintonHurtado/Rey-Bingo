@@ -2,7 +2,7 @@
     'imagePath' => $imagePath,
     'walletSummary' => $walletSummary,
     'pendingPrizes' => $pendingPrizes ?? ($pendingCount ?? 0),
-    'activeNav' => 'affiliate',
+    'activeNav' => 'commissions',
 ]) ?>
 
 <?php
@@ -39,15 +39,12 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
                     <i class="fa-duotone fa-solid fa-percent"></i>
                 </div>
                 <div>
-                    <h5 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;"><?= translate('store commissions'); ?></h5>
+                    <h5 class="mb-0 fw-bold text-dark" style="font-size: 1.05rem;">Comisiones del Punto de Venta</h5>
                     <p class="small text-muted mb-0" style="font-size: 0.78rem;">Comisiones generadas por GGR de afiliados, recargas realizadas y pagos de retiros en efectivo.</p>
                 </div>
             </div>
             <div class="d-flex gap-1">
-                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalStoreAffiliateLink" style="padding: 4px 10px; font-size: 0.82rem;">
-                    <i class="fa-duotone fa-solid fa-qrcode me-1"></i> Mi Enlace de Afiliado
-                </button>
-                <button type="button" class="btn btn-sm btn-success" id="btn-export-store-commissions" onclick="exportStoreCommissions();" style="padding: 4px 10px; font-size: 0.82rem;">
+                <button type="button" class="btn btn-sm btn-success" id="btn-export-store-commissions" onclick="exportStoreCommissions();" style="padding: 5px 12px; font-size: 0.84rem;">
                     <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
                 </button>
             </div>
@@ -178,55 +175,12 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
         </div>
 
         <!-- Contenedor de la Tabla de Comisiones -->
-        <div id="store-commissions-container" class="mb-4">
+        <div id="store-commissions-container" class="mb-2">
             <?= view('store/partials/commissions_store_table', [
                 'items' => $items,
                 'stats' => $stats,
                 'currency' => $currency
             ]); ?>
-        </div>
-
-        <!-- Sección de Jugadores Vinculados -->
-        <div class="card border-0 shadow-sm p-3 mt-3" style="border-radius: 12px; background: #faf9ff;">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <h6 class="mb-0 fw-bold text-dark">
-                    <i class="fa-duotone fa-solid fa-users text-primary me-1"></i> Jugadores Vinculados a tu Punto de Venta
-                </h6>
-                <span class="badge bg-primary"><?= (int) ($referredCount ?? count($referredPlayers ?? [])); ?> registrados</span>
-            </div>
-            <div class="store-table-wrap">
-                <?= view('store/affiliate_referrals_list', [
-                    'referredPlayers' => $referredPlayers ?? [],
-                ]); ?>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Enlace / QR de Afiliado -->
-<div class="modal fade" id="modalStoreAffiliateLink" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold text-dark"><i class="fa-duotone fa-solid fa-qrcode text-primary me-2"></i> Mi Enlace de Afiliado</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center p-4">
-                <p class="text-muted small mb-3">Comparte este código o código QR para que los jugadores se registren bajo tu red.</p>
-                <div class="mb-3">
-                    <img src="<?= site_url('store/affiliateCode'); ?>" alt="QR" class="img-fluid border p-2 rounded shadow-sm" style="max-width: 180px;">
-                </div>
-                <?php
-                $storeCode = $user['code'] ?? $user['username'] ?? '';
-                $affLink = site_url('signup/punto-venta/' . $storeCode);
-                ?>
-                <div class="input-group mb-2">
-                    <input type="text" class="form-control" id="store-affiliate-url-input" value="<?= esc($affLink); ?>" readonly>
-                    <button class="btn btn-primary" type="button" onclick="copyStoreAffiliateLink();">
-                        <i class="fa-duotone fa-solid fa-copy me-1"></i> Copiar
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -302,21 +256,6 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
         const params = getStoreCommissionsFilterParams();
         const queryString = $.param(params);
         window.location.href = '<?= site_url('store/exportStoreCommissions'); ?>?' + queryString;
-    };
-
-    window.copyStoreAffiliateLink = function() {
-        const el = document.getElementById('store-affiliate-url-input');
-        if (el) {
-            el.select();
-            document.execCommand('copy');
-            Toastify({
-                text: '¡Enlace copiado al portapapeles!',
-                duration: 2500,
-                gravity: 'top',
-                position: 'right',
-                style: { background: '#198754' }
-            }).showToast();
-        }
     };
 
     $(document).ready(function() {
