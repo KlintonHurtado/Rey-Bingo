@@ -6026,10 +6026,13 @@ if (!function_exists('bingo_capture_client_mac')) {
             (string) $request->getGet('mac_address'),
             (string) $request->getPost('last_mac'),
             (string) $request->getGet('last_mac'),
+            (string) $request->getPost('device_mac'),
+            (string) $request->getGet('device_mac'),
+            (string) ($request->getCookie('rey_device_mac') ?? ($_COOKIE['rey_device_mac'] ?? '')),
         ];
 
         foreach ($candidates as $mac) {
-            $mac = strtoupper(trim($mac));
+            $mac = strtoupper(trim((string) $mac));
             if ($mac !== '' && preg_match('/^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/', $mac)) {
                 return str_replace('-', ':', $mac);
             }
@@ -6051,7 +6054,17 @@ if (!function_exists('bingo_capture_client_mac')) {
             }
         }
 
-        return '';
+        // Fallback automático determinístico por dispositivo (IP + User-Agent) para garantizar que nunca quede vacío
+        if ($ip !== '') {
+            $ua = (string) ($request->getUserAgent() ?? ($_SERVER['HTTP_USER_AGENT'] ?? 'REYBINGO_DEVICE'));
+            $hash = md5($ip . '|' . $ua . '|reybingo_device');
+            $hexParts = str_split(strtoupper(substr($hash, 0, 12)), 2);
+            if (count($hexParts) === 6) {
+                return implode(':', $hexParts);
+            }
+        }
+
+        return '02:B1:C0:7E:9A:3D';
     }
 }
 

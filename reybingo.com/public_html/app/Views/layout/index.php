@@ -39,6 +39,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link href="<?= asset_url('bootstrap/css/bootstrap.min.css') ?>" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="<?= asset_url('js/rey_device.js'); ?>"></script>
     <link href="<?= asset_url('css/toastify.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('css/bingo.css') ?>" rel="stylesheet">
     <script>

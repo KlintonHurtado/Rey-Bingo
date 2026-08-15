@@ -617,6 +617,8 @@ class Signup extends Controller {
             'verified_email' => 0,
             'roulette' => 1,
             'kyc_status' => 'pending',
+            'last_ip' => (string) ($this->request->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? '')),
+            'last_mac' => function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac($this->request) : null,
         ];
 
         if ($this->request->getPost('accept_terms') === '1') {
@@ -909,6 +911,8 @@ class Signup extends Controller {
             'autodial'  => 1,
             'roulette'  => 1,
             'kyc_status' => 'pending',
+            'last_ip'   => (string) ($this->request->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? '')),
+            'last_mac'  => function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac($this->request) : null,
         ];
 
         if (bingo_terms_require_accept()) {

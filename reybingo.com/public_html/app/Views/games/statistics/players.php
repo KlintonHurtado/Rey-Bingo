@@ -561,43 +561,6 @@
 	    });
 	}
 
-	function saveUserMac(userId) {
-	    var macVal = $('#admin-mac-address').val() || '';
-	    $.ajax({
-	        url: '<?= site_url('users/saveUserMac'); ?>',
-	        method: 'POST',
-	        dataType: 'json',
-	        data: {
-	            user_id: userId,
-	            mac_address: macVal,
-	            <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
-	        },
-	        success: function(response) {
-	            Toastify({
-	                text: response.message || (response.success ? 'Dirección MAC actualizada' : 'Error'),
-	                duration: 3000,
-	                gravity: "top",
-	                position: "right",
-	                style: { background: response.success ? "#198754" : "#dc3545" },
-	                stopOnFocus: true
-	            }).showToast();
-	            if (response.success) {
-	                viewUser(userId);
-	            }
-	        },
-	        error: function() {
-	            Toastify({
-	                text: 'Error al conectar con el servidor para guardar la MAC.',
-	                duration: 3000,
-	                gravity: "top",
-	                position: "right",
-	                style: { background: "#dc3545" },
-	                stopOnFocus: true
-	            }).showToast();
-	        }
-	    });
-	}
-
 	function savePlayerWallets(userId) {
 	    $.ajax({
 	        url: '<?= site_url('users/updatePlayerWallets'); ?>',

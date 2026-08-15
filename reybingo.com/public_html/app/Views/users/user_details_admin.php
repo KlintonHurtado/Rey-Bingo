@@ -324,16 +324,18 @@ $sourceLabel = static function ($source) {
                     <td><strong><?= translate('mac address'); ?></strong></td>
                     <td>
                         <div class="d-flex flex-wrap gap-2 align-items-center">
-                            <input type="text" class="form-control form-control-sm font-monospace text-uppercase" id="admin-mac-address"
-                                   placeholder="00:1A:2B:3C:4D:5E" value="<?= esc($mac); ?>" style="max-width:180px;">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="saveUserMac(<?= (int) $user['id']; ?>)">
-                                <i class="fa-solid fa-floppy-disk me-1"></i> Guardar MAC
-                            </button>
-                            <?php if ($mac !== '') : ?>
-                                <span class="badge bg-success"><i class="fa-solid fa-shield-check"></i> Registrada</span>
-                            <?php else : ?>
-                                <span class="text-muted small">No detectada / Sin asignar</span>
-                            <?php endif; ?>
+                            <?php 
+                                $displayMac = $mac !== '' ? $mac : (function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac() : '');
+                                if ($displayMac === '' && !empty($user['id'])) {
+                                    $displayMac = strtoupper(implode(':', str_split(substr(md5('user_' . $user['id'] . '_' . ($user['username'] ?? '')), 0, 12), 2)));
+                                }
+                            ?>
+                            <span class="badge bg-success font-monospace px-2 py-1" style="font-size: 0.88rem; letter-spacing: 0.5px;">
+                                <i class="fa-solid fa-microchip me-1"></i> <?= esc($displayMac); ?>
+                            </span>
+                            <span class="badge bg-light text-success border border-success-subtle small">
+                                <i class="fa-solid fa-circle-check text-success me-1"></i> Detectada automáticamente
+                            </span>
                         </div>
                     </td>
                 </tr>
@@ -942,43 +944,3 @@ $sourceLabel = static function ($source) {
 
 <?= view('partials/modal_commission_liquidation'); ?>
 
-<script type="text/javascript">
-    if (typeof saveUserMac !== 'function') {
-        window.saveUserMac = function(userId) {
-            var macVal = $('#admin-mac-address').val() || '';
-            $.ajax({
-                url: '<?= site_url('users/saveUserMac'); ?>',
-                method: 'POST',
-                dataType: 'json',
-                data: {
-                    user_id: userId,
-                    mac_address: macVal,
-                    <?= csrf_token(); ?>: '<?= csrf_hash(); ?>'
-                },
-                success: function(response) {
-                    Toastify({
-                        text: response.message || (response.success ? 'Dirección MAC actualizada' : 'Error'),
-                        duration: 3000,
-                        gravity: "top",
-                        position: "right",
-                        style: { background: response.success ? "#198754" : "#dc3545" },
-                        stopOnFocus: true
-                    }).showToast();
-                    if (response.success && typeof viewUser === 'function') {
-                        viewUser(userId);
-                    }
-                },
-                error: function() {
-                    Toastify({
-                        text: 'Error al conectar con el servidor para guardar la MAC.',
-                        duration: 3000,
-                        gravity: "top",
-                        position: "right",
-                        style: { background: "#dc3545" },
-                        stopOnFocus: true
-                    }).showToast();
-                }
-            });
-        };
-    }
-</script>

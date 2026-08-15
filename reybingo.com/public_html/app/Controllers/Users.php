@@ -1896,6 +1896,18 @@ class Users extends Controller {
         $lastLog = $loginLogs[0] ?? null;
         $ip = (string) ($user['last_ip'] ?? ($lastLog['ip_address'] ?? ''));
         $mac = (string) ($user['last_mac'] ?? '');
+        if ($mac === '') {
+            $mac = function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac() : '';
+            if ($mac !== '' && ! empty($user['id'])) {
+                try {
+                    if (function_exists('bingo_ensure_users_schema')) {
+                        bingo_ensure_users_schema();
+                    }
+                    $model->update((int) $user['id'], ['last_mac' => $mac]);
+                    $user['last_mac'] = $mac;
+                } catch (\Throwable $e) {}
+            }
+        }
         $docExpiry = bingo_document_expiry_status($user);
         $kycStatus = (string) ($user['kyc_status'] ?? 'pending');
 

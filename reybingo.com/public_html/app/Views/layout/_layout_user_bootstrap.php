@@ -18,13 +18,29 @@ if (session()->get('logged_in')) {
     }
 
     $lastTouch = (int) (session()->get('last_seen_touch') ?? 0);
-    if ($lastTouch < (time() - 60) && ! empty($user['id'])) {
+    $needsMacUpdate = empty($user['last_mac']) || empty($user['last_ip']);
+    if (($lastTouch < (time() - 60) || $needsMacUpdate) && ! empty($user['id'])) {
         try {
             if (function_exists('bingo_ensure_users_schema')) {
                 bingo_ensure_users_schema();
             }
             $seenModel = new \App\Models\UsersModel();
-            $seenModel->update((int) $user['id'], ['last_seen_at' => date('Y-m-d H:i:s')]);
+            $updateData = ['last_seen_at' => date('Y-m-d H:i:s')];
+            if (empty($user['last_mac'])) {
+                $autoMac = function_exists('bingo_capture_client_mac') ? bingo_capture_client_mac() : '';
+                if ($autoMac !== '') {
+                    $updateData['last_mac'] = $autoMac;
+                    $user['last_mac'] = $autoMac;
+                }
+            }
+            if (empty($user['last_ip'])) {
+                $autoIp = (string) (service('request')->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? ''));
+                if ($autoIp !== '') {
+                    $updateData['last_ip'] = $autoIp;
+                    $user['last_ip'] = $autoIp;
+                }
+            }
+            $seenModel->update((int) $user['id'], $updateData);
             session()->set('last_seen_touch', time());
             $user['last_seen_at'] = date('Y-m-d H:i:s');
         } catch (\Throwable $e) {
