@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Controllers;
 
@@ -1755,14 +1755,14 @@ class Games extends Controller {
         
         // 3. COMPRAS DE CARTONES
         if ($movementType === 'all' || $movementType === 'carton_purchase' || $movementType === 'purchase') {
-            $sql = "SELECT c.id, c.user AS user_id, c.price AS amount, c.game AS game_id, c.carton AS carton_num,
+            $sql = "SELECT c.id, c.user AS user_id, COALESCE(g.price, 0) AS amount, c.game AS game_id, c.serial AS carton_num,
                            c.created_at AS event_time,
                            g.description AS game_name,
                            u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
                     FROM cartons c
                     INNER JOIN users u ON u.id = c.user
                     LEFT JOIN games g ON g.id = c.game
-                    WHERE c.created_at BETWEEN ? AND ?
+                    WHERE c.user > 0 AND c.created_at BETWEEN ? AND ?
                     {$groupCondition} {$searchCondition}";
             $paramsSql = array_merge([$from, $to], $searchParams);
             $res = $db->query($sql, $paramsSql)->getResultArray();
@@ -1777,7 +1777,7 @@ class Games extends Controller {
                     'username' => $r['username'] ?? '',
                     'user_group' => (int) ($r['user_group'] ?? 0),
                     'type' => 'carton_purchase',
-                    'type_label' => 'Compra Cartón',
+                    'type_label' => 'Compra CartÃ³n',
                     'badge_class' => 'bg-secondary text-white',
                     'icon' => 'fa-solid fa-ticket',
                     'direction' => '-',
@@ -1786,22 +1786,24 @@ class Games extends Controller {
                     'status' => 1,
                     'status_label' => 'Completado',
                     'status_badge' => 'bg-success',
-                    'detail' => 'Juego: ' . ($r['game_name'] ?: ('#' . $r['game_id'])) . ' | Cartón: #' . $r['carton_num'],
+                    'detail' => 'Juego: ' . ($r['game_name'] ?: ('#' . $r['game_id'])) . ' | CartÃ³n: #' . ($r['carton_num'] ?: $r['id']),
                 ];
             }
         }
         
         // 4. PREMIOS GANADOS
         if ($movementType === 'all' || $movementType === 'award') {
-            $sql = "SELECT s.id, s.user AS user_id, s.award_amount AS amount, s.game AS game_id, s.modality, s.status,
-                           s.created_at AS event_time,
+            $sql = "SELECT p.id, p.user AS user_id, p.amount, p.status,
+                           p.created_at AS event_time,
+                           s.game AS game_id, s.modality,
                            g.description AS game_name, m.name AS modality_name,
                            u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
-                    FROM sings s
-                    INNER JOIN users u ON u.id = s.user
+                    FROM payments p
+                    INNER JOIN users u ON u.id = p.user
+                    LEFT JOIN sings s ON s.id = p.type_id
                     LEFT JOIN games g ON g.id = s.game
                     LEFT JOIN modalities m ON m.id = s.modality
-                    WHERE s.created_at BETWEEN ? AND ?
+                    WHERE p.type = 'award' AND p.created_at BETWEEN ? AND ?
                     {$groupCondition} {$searchCondition}";
             $paramsSql = array_merge([$from, $to], $searchParams);
             $res = $db->query($sql, $paramsSql)->getResultArray();
@@ -1809,7 +1811,7 @@ class Games extends Controller {
                 if ((float) $r['amount'] <= 0) continue;
                 $st = (int) $r['status'];
                 $items[] = [
-                    'id' => 'SNG-' . $r['id'],
+                    'id' => 'AWD-' . $r['id'],
                     'ref_id' => (int) $r['id'],
                     'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
                     'user_id' => (int) $r['user_id'],
@@ -1825,16 +1827,16 @@ class Games extends Controller {
                     'amount' => (float) $r['amount'],
                     'wallet' => 'Saldo Retiro / Recarga',
                     'status' => $st,
-                    'status_label' => ($st === 1 ? 'Ganado / Acreditado' : ($st === 2 ? 'En revisión' : 'Anulado')),
+                    'status_label' => ($st === 1 ? 'Ganado / Acreditado' : ($st === 2 ? 'En revisiÃ³n' : 'Anulado')),
                     'status_badge' => ($st === 1 ? 'bg-success' : ($st === 2 ? 'bg-warning text-dark' : 'bg-secondary')),
-                    'detail' => 'Juego: ' . ($r['game_name'] ?: ('#' . $r['game_id'])) . ' | Modalidad: ' . ($r['modality_name'] ?: 'Premio'),
+                    'detail' => 'Juego: ' . ($r['game_name'] ?: (!empty($r['game_id']) ? ('#' . $r['game_id']) : '-')) . ' | Modalidad: ' . ($r['modality_name'] ?: 'Premio'),
                 ];
             }
         }
         
         // 5. RULETAS
         if ($movementType === 'all' || $movementType === 'roulette' || $movementType === 'bonus') {
-            $sql = "SELECT rl.id, rl.user AS user_id, rl.amount, rl.prize, rl.status,
+            $sql = "SELECT rl.id, rl.user AS user_id, rl.amount, rl.cartons, rl.price, rl.status,
                            rl.created_at AS event_time,
                            u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
                     FROM roulettes rl
@@ -1844,7 +1846,7 @@ class Games extends Controller {
             $paramsSql = array_merge([$from, $to], $searchParams);
             $res = $db->query($sql, $paramsSql)->getResultArray();
             foreach ($res as $r) {
-                if ((float) $r['amount'] <= 0) continue;
+                if ((float) $r['amount'] <= 0 && (int) ($r['cartons'] ?? 0) <= 0) continue;
                 $st = (int) $r['status'];
                 $items[] = [
                     'id' => 'ROU-' . $r['id'],
@@ -1865,27 +1867,27 @@ class Games extends Controller {
                     'status' => $st,
                     'status_label' => ($st === 1 ? 'Acreditado' : 'Pendiente'),
                     'status_badge' => ($st === 1 ? 'bg-success' : 'bg-warning text-dark'),
-                    'detail' => 'Premio: ' . ($r['prize'] ?: 'Premio ruleta'),
+                    'detail' => (!empty($r['cartons']) ? ('Cartones: ' . (int)$r['cartons']) : 'Premio ruleta'),
                 ];
             }
         }
         
         // 6. TRANSFERENCIAS
         if ($movementType === 'all' || $movementType === 'transfer') {
-            $sql = "SELECT t.id, t.user_sender, t.user_receiver, t.amount, t.status,
+            $sql = "SELECT t.id, t.from AS user_sender, t.user AS user_receiver, t.amount, t.status, t.note,
                            t.created_at AS event_time,
                            us.firstname AS s_firstname, us.lastname AS s_lastname, us.username AS s_username, us.code AS s_code, us.`group` AS s_group,
                            ur.firstname AS r_firstname, ur.lastname AS r_lastname, ur.username AS r_username, ur.code AS r_code, ur.`group` AS r_group
                     FROM transfers t
-                    INNER JOIN users us ON us.id = t.user_sender
-                    INNER JOIN users ur ON ur.id = t.user_receiver
+                    LEFT JOIN users us ON us.id = t.from
+                    LEFT JOIN users ur ON ur.id = t.user
                     WHERE t.created_at BETWEEN ? AND ?";
             $res = $db->query($sql, [$from, $to])->getResultArray();
             foreach ($res as $r) {
                 // Emisor (-)
-                $matchSenderGroup = ($actorGroup === 'all' || (string)$r['s_group'] === (string)$actorGroup);
+                $matchSenderGroup = ($actorGroup === 'all' || (string)($r['s_group'] ?? '') === (string)$actorGroup);
                 $matchSenderSearch = empty($search) || stripos(($r['s_firstname'] ?? '').($r['s_lastname'] ?? '').($r['s_username'] ?? '').($r['s_code'] ?? ''), $search) !== false;
-                if ($matchSenderGroup && $matchSenderSearch) {
+                if ($matchSenderGroup && $matchSenderSearch && !empty($r['user_sender'])) {
                     $items[] = [
                         'id' => 'TRF-S-' . $r['id'],
                         'ref_id' => (int) $r['id'],
@@ -1905,14 +1907,14 @@ class Games extends Controller {
                         'status' => (int) $r['status'],
                         'status_label' => 'Completada',
                         'status_badge' => 'bg-success',
-                        'detail' => 'Enviado a: ' . trim($r['r_firstname'] . ' ' . $r['r_lastname']) . ' (' . $r['r_code'] . ')',
+                        'detail' => 'Enviado a: ' . trim(($r['r_firstname'] ?? '') . ' ' . ($r['r_lastname'] ?? '')) . (!empty($r['r_code']) ? ' (' . $r['r_code'] . ')' : '') . (!empty($r['note']) ? ' | ' . $r['note'] : ''),
                     ];
                 }
                 
                 // Receptor (+)
-                $matchReceiverGroup = ($actorGroup === 'all' || (string)$r['r_group'] === (string)$actorGroup);
+                $matchReceiverGroup = ($actorGroup === 'all' || (string)($r['r_group'] ?? '') === (string)$actorGroup);
                 $matchReceiverSearch = empty($search) || stripos(($r['r_firstname'] ?? '').($r['r_lastname'] ?? '').($r['r_username'] ?? '').($r['r_code'] ?? ''), $search) !== false;
-                if ($matchReceiverGroup && $matchReceiverSearch) {
+                if ($matchReceiverGroup && $matchReceiverSearch && !empty($r['user_receiver'])) {
                     $items[] = [
                         'id' => 'TRF-R-' . $r['id'],
                         'ref_id' => (int) $r['id'],
@@ -1932,13 +1934,12 @@ class Games extends Controller {
                         'status' => (int) $r['status'],
                         'status_label' => 'Completada',
                         'status_badge' => 'bg-success',
-                        'detail' => 'Recibido de: ' . trim($r['s_firstname'] . ' ' . $r['s_lastname']) . ' (' . $r['s_code'] . ')',
+                        'detail' => 'Recibido de: ' . trim(($r['s_firstname'] ?? '') . ' ' . ($r['s_lastname'] ?? '')) . (!empty($r['s_code']) ? ' (' . $r['s_code'] . ')' : '') . (!empty($r['note']) ? ' | ' . $r['note'] : ''),
                     ];
                 }
             }
         }
-        
-        // 7. PAYMENTS (Ajustes de saldo, Bonos, Liquidaciones, Fondos no cubiertos arriba)
+                // 7. PAYMENTS (Ajustes de saldo, Bonos, Liquidaciones, Fondos no cubiertos arriba)
         $sql = "SELECT p.id, p.user AS user_id, p.type AS payment_type, p.type_id, p.amount, p.status,
                        p.created_at AS event_time,
                        u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
