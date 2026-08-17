@@ -14,7 +14,7 @@
 
             <div class="store-tab-form-fields">
                 <p class="small text-muted mb-3">
-                    Ingresa el número de cédula del jugador y el código de retiro alfanumérico que recibió por correo para validar y entregar el dinero en efectivo.
+                    Ingresa el número de cédula del jugador y el código de retiro alfanumérico generado en su nota para validar y entregar el dinero en efectivo.
                 </p>
 
                 <input type="hidden" id="store-retire-id" value="">
@@ -25,7 +25,7 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="store-retire-code" class="form-label">Código de Retiro (Recibido al Correo) <span class="text-danger">*</span></label>
+                    <label for="store-retire-code" class="form-label">Código de Retiro <span class="text-danger">*</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-light text-primary"><i class="fa-duotone fa-solid fa-key"></i></span>
                         <input type="text" class="form-control form-bingo text-uppercase" id="store-retire-code" placeholder="Ej: RET-AB12CD" autocomplete="off" style="letter-spacing: 1.5px; font-weight: 600;">

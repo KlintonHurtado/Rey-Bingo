@@ -2333,11 +2333,7 @@ class Payments extends Controller {
                     'observation' => $observation ?: $retire['observation'],
                 ]);
 
-                // Si es Punto de Venta, enviar el correo electrónico con el código numérico y mensaje de aprobación
                 $isStore = ($retire['bank'] === 'Punto de Venta' || ($retire['account_type'] ?? '') === 'store_pickup');
-                if ($isStore) {
-                    $this->sendRetireStoreEmail($user, (string) $retire['account'], (float) $retire['amount']);
-                }
 
                 $modelNotifications = new NotificationsModel();
                 $modelNotifications->insert([
@@ -2355,7 +2351,7 @@ class Payments extends Controller {
                     'success' => true,
                     'action'  => 'approve',
                     'status'  => 2,
-                    'message' => 'Solicitud aprobada y código enviado al jugador.',
+                    'message' => 'Solicitud de retiro aprobada exitosamente.',
                 ]);
             } elseif ($action === 'refuse') {
                 if (! bingo_is_admin()) {

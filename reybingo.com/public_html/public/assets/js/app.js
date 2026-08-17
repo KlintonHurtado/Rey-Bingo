@@ -553,6 +553,10 @@ function statisticsViewUsers() {
     statisticsView('players');
 }
 
+function statisticsViewAudit() {
+    statisticsView('audit');
+}
+
 function openUserExportModal() {
     $("#modalUserExport").load(site_url + 'users/exportUsersModal', function() {
         showBsModal('#modalUserExport');

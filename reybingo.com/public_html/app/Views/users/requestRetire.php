@@ -104,7 +104,7 @@
                     <div class="alert alert-success py-2 small mt-3 mb-0 text-center">
                         <i class="fa-duotone fa-solid fa-circle-check"></i> Solicitud <strong>Aprobada</strong>.
                         <?php if ($retire['bank'] === 'Punto de Venta' || ($retire['account_type'] ?? '') === 'store_pickup') : ?>
-                            <br>Código de retiro: <strong class="fs-6 text-primary"><?= esc($retire['account']) ?></strong> (también enviado a tu correo).
+                            <br>Código de retiro: <strong class="fs-6 text-primary"><?= esc($retire['account']) ?></strong>
                         <?php endif; ?>
                     </div>
                 <?php elseif ($retire['status'] == 0) : ?>

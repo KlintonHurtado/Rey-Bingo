@@ -31,7 +31,7 @@
                                 <?php if (($pendingRetire['bank'] ?? '') === 'Punto de Venta'): ?>
                                     <div class="d-flex justify-content-between mb-1">
                                         <span class="text-muted">Código de Retiro:</span>
-                                        <strong class="text-primary small">Enviado a tu correo</strong>
+                                        <strong class="text-primary small"><?= !empty($pendingRetire['account']) ? esc($pendingRetire['account']) : 'Disponible al Aprobar'; ?></strong>
                                     </div>
                                 <?php endif; ?>
                                 <div class="d-flex justify-content-between">
@@ -237,7 +237,7 @@
                                         </p>
                                         <p class="small text-muted mb-2 text-start">
                                             • Mientras esté pendiente, puedes <strong>cancelar la solicitud</strong> desde tu historial de movimientos si deseas recuperar y usar tu saldo de retiro.<br>
-                                            • Una vez que la administración <strong>apruebe</strong> la nota, te llegará una notificación y el <strong>código de retiro a tu correo electrónico</strong> para cobrar en efectivo en el Punto de Venta.
+                                            • Una vez que la administración <strong>apruebe</strong> la nota, se activará tu <strong>código de retiro</strong> en tus notificaciones y pantalla para cobrar en efectivo en el Punto de Venta.
                                         </p>
                                     </div>`,
                                 icon: 'info',
@@ -464,7 +464,7 @@
                         <div>
                             <strong class="d-block fs-6" style="color: #0b5ed7; font-weight: 700; font-size: 1.05rem;">Retiro en Efectivo - Punto de Venta</strong>
                             <div class="mt-1" style="color: #495057; font-size: 0.88rem; line-height: 1.45;">
-                                Ingresa el monto a retirar. Al enviar tu solicitud, te enviaremos un <strong style="color: #111827;">código de retiro alfanumérico a tu correo</strong>. Podrás cobrar tu dinero en efectivo en cualquier Punto de Venta presentando tu número de cédula y el código.
+                                Ingresa el monto a retirar. Al ser aprobada tu solicitud, verás tu <strong style="color: #111827;">código de retiro alfanumérico</strong> en tus notificaciones. Podrás cobrar tu dinero en efectivo en cualquier Punto de Venta presentando tu número de cédula y el código.
                             </div>
                         </div>
                     </div>

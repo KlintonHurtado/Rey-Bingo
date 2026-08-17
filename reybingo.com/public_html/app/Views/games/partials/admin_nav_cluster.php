@@ -48,6 +48,9 @@ $showGgr = $showGgr ?? ($showAffiliates ?? true);
         <?php endif; ?>
 
         <?php if (session()->get('group') == 1) : ?>
+            <button type="button" class="btn btn-small btn-audit admin-nav-cluster-item" onclick="statisticsViewAudit();" title="Auditoría Financiera" style="background: linear-gradient(145deg, #10b981, #059669); color:#fff;">
+                <i class="fa-duotone fa-solid fa-file-invoice-dollar"></i>
+            </button>
             <a class="btn btn-small btn-kyc-admin admin-nav-cluster-item<?= $activeNav === 'kyc' ? ' is-active' : '' ?>" href="<?= site_url('kycAdmin'); ?>" title="Revisión KYC">
                 <i class="fa-duotone fa-solid fa-user-check"></i>
             </a>

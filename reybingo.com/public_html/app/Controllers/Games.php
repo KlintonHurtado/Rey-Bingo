@@ -202,6 +202,7 @@ class Games extends Controller {
             'referrals' => translate('referrals'),
             'stores' => 'Puntos de Venta',
             'operators' => 'Operadores',
+            'audit' => 'Auditoría',
         ];
         
         // Definir tipos de juego
@@ -1555,6 +1556,11 @@ class Games extends Controller {
                 break;
         }
         
+        // Cargar datos específicos si la pestaña activa es auditoría
+        if ($activeTab == 'audit') {
+            $data['audit_stats'] = $this->buildFinancialAuditData($this->request->getGet());
+        }
+
         // Seleccionar la vista según la pestaña activa
         switch ($activeTab) {
             case 'summary':
@@ -1575,9 +1581,499 @@ class Games extends Controller {
                 return view('games/statistics/operators', $data);
             case 'stores':
                 return view('games/statistics/stores', $data);
+            case 'audit':
+                return view('games/statistics/audit', $data);
             default:
                 return view('games/statistics/summary', $data);
         }
+    }
+
+    public function exportFinancialAudit()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return redirect()->to('/signin');
+        }
+
+        bingo_ensure_users_schema();
+        $params = $this->request->getGet();
+        $params['page'] = 1;
+        $params['per_page'] = 10000;
+        $auditData = $this->buildFinancialAuditData($params);
+
+        $headers = [
+            'ID / Ref',
+            'Fecha y Hora',
+            'Actor / Usuario',
+            'Username',
+            'Codigo',
+            'Rol',
+            'Concepto / Tipo',
+            'Billetera Afectada',
+            'Direccion',
+            'Monto',
+            'Estado',
+            'Detalles / Observaciones',
+        ];
+
+        $groupLabels = [
+            0 => 'Jugador',
+            1 => 'Administrador',
+            2 => 'Punto de Venta',
+            3 => 'Operador',
+        ];
+
+        $rows = [];
+        foreach ($auditData['items'] as $it) {
+            $rows[] = [
+                $it['id'] ?? '',
+                $it['datetime'] ?? '',
+                $it['user_name'] ?? '',
+                $it['username'] ?? '',
+                $it['user_code'] ?? '',
+                $groupLabels[$it['user_group'] ?? 0] ?? 'Usuario',
+                $it['type_label'] ?? '',
+                $it['wallet'] ?? '',
+                $it['direction'] ?? '',
+                number_format((float) ($it['amount'] ?? 0), 2, '.', ''),
+                $it['status_label'] ?? '',
+                $it['detail'] ?? '',
+            ];
+        }
+
+        $filename = 'auditoria-financiera-' . date('Ymd_His') . '.xls';
+        return (new ExcelExport())->downloadResponse($headers, $rows, $filename, [
+            'sheet_name' => 'Auditoria Financiera',
+        ]);
+    }
+
+    private function buildFinancialAuditData(array $params): array
+    {
+        $db = \Config\Database::connect();
+        bingo_ensure_users_schema();
+        
+        $actorGroup = (string) ($params['actor_group'] ?? 'all');
+        $startDate = !empty($params['startdate']) ? $params['startdate'] : date('Y-m-01');
+        $endDate = !empty($params['enddate']) ? $params['enddate'] : date('Y-m-d');
+        $movementType = (string) ($params['movement_type'] ?? 'all');
+        $search = trim((string) ($params['search'] ?? ''));
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = max(10, min(200, (int) ($params['per_page'] ?? 30)));
+        
+        $from = $startDate . ' 00:00:00';
+        $to = $endDate . ' 23:59:59';
+        
+        // Condición para filtrar por grupo (0=Jugador, 1=Admin, 2=Punto de Venta, 3=Operador)
+        $groupCondition = '';
+        if ($actorGroup !== 'all' && $actorGroup !== '') {
+            $gNum = (int) $actorGroup;
+            $groupCondition = " AND u.`group` = " . $gNum;
+        }
+        
+        $searchCondition = '';
+        $searchParams = [];
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $searchCondition = " AND (u.username LIKE ? OR u.firstname LIKE ? OR u.lastname LIKE ? OR u.code LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR u.document LIKE ?)";
+            $searchParams = [$like, $like, $like, $like, $like, $like, $like];
+        }
+        
+        $items = [];
+        
+        // 1. DEPOSITOS (Recargas)
+        if ($movementType === 'all' || $movementType === 'deposit') {
+            $sql = "SELECT d.id, d.user AS user_id, d.amount, d.bank, d.reference, d.method, d.status,
+                           COALESCE(d.created_at, d.date) AS event_time,
+                           u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                    FROM deposits d
+                    INNER JOIN users u ON u.id = d.user
+                    WHERE (d.created_at BETWEEN ? AND ? OR d.date BETWEEN ? AND ?)
+                    {$groupCondition} {$searchCondition}";
+            $paramsSql = array_merge([$from, $to, $startDate, $endDate], $searchParams);
+            $res = $db->query($sql, $paramsSql)->getResultArray();
+            foreach ($res as $r) {
+                $st = (int) $r['status'];
+                $items[] = [
+                    'id' => 'DEP-' . $r['id'],
+                    'ref_id' => (int) $r['id'],
+                    'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                    'user_id' => (int) $r['user_id'],
+                    'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                    'user_code' => $r['code'] ?? '',
+                    'username' => $r['username'] ?? '',
+                    'user_group' => (int) ($r['user_group'] ?? 0),
+                    'type' => 'deposit',
+                    'type_label' => 'Recarga / Depósito',
+                    'badge_class' => 'bg-success',
+                    'icon' => 'fa-solid fa-circle-arrow-down',
+                    'direction' => '+',
+                    'amount' => (float) $r['amount'],
+                    'wallet' => 'Saldo Recarga',
+                    'status' => $st,
+                    'status_label' => ($st === 1 ? 'Aprobado' : ($st === 2 ? 'Pendiente' : 'Rechazado')),
+                    'status_badge' => ($st === 1 ? 'bg-success' : ($st === 2 ? 'bg-warning text-dark' : 'bg-danger')),
+                    'detail' => trim('Método: ' . ($r['method'] ?: $r['bank'] ?: '-') . ' | Ref: ' . ($r['reference'] ?: '-')),
+                ];
+            }
+        }
+        
+        // 2. RETIROS (Notas de retiro)
+        if ($movementType === 'all' || $movementType === 'retire') {
+            $sql = "SELECT r.id, r.user AS user_id, r.amount, r.bank, r.account, r.status, r.observation,
+                           r.created_at AS event_time,
+                           u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                    FROM retires r
+                    INNER JOIN users u ON u.id = r.user
+                    WHERE r.created_at BETWEEN ? AND ?
+                    {$groupCondition} {$searchCondition}";
+            $paramsSql = array_merge([$from, $to], $searchParams);
+            $res = $db->query($sql, $paramsSql)->getResultArray();
+            foreach ($res as $r) {
+                $st = (int) $r['status'];
+                $items[] = [
+                    'id' => 'RET-' . $r['id'],
+                    'ref_id' => (int) $r['id'],
+                    'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                    'user_id' => (int) $r['user_id'],
+                    'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                    'user_code' => $r['code'] ?? '',
+                    'username' => $r['username'] ?? '',
+                    'user_group' => (int) ($r['user_group'] ?? 0),
+                    'type' => 'retire',
+                    'type_label' => 'Retiro',
+                    'badge_class' => 'bg-danger',
+                    'icon' => 'fa-solid fa-circle-arrow-up',
+                    'direction' => '-',
+                    'amount' => (float) $r['amount'],
+                    'wallet' => 'Saldo Retiro',
+                    'status' => $st,
+                    'status_label' => ($st === 2 ? 'Pagado / Aprobado' : ($st === 1 ? 'Pendiente' : ($st === 3 ? 'En Revisión' : 'Rechazado'))),
+                    'status_badge' => ($st === 2 ? 'bg-success' : ($st === 1 ? 'bg-warning text-dark' : ($st === 3 ? 'bg-info' : 'bg-danger'))),
+                    'detail' => trim('Banco: ' . ($r['bank'] ?: '-') . ' | Cuenta/Código: ' . ($r['account'] ?: '-') . (!empty($r['observation']) ? ' | Obs: ' . $r['observation'] : '')),
+                ];
+            }
+        }
+        
+        // 3. COMPRAS DE CARTONES
+        if ($movementType === 'all' || $movementType === 'carton_purchase' || $movementType === 'purchase') {
+            $sql = "SELECT c.id, c.user AS user_id, c.price AS amount, c.game AS game_id, c.carton AS carton_num,
+                           c.created_at AS event_time,
+                           g.description AS game_name,
+                           u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                    FROM cartons c
+                    INNER JOIN users u ON u.id = c.user
+                    LEFT JOIN games g ON g.id = c.game
+                    WHERE c.created_at BETWEEN ? AND ?
+                    {$groupCondition} {$searchCondition}";
+            $paramsSql = array_merge([$from, $to], $searchParams);
+            $res = $db->query($sql, $paramsSql)->getResultArray();
+            foreach ($res as $r) {
+                $items[] = [
+                    'id' => 'CAR-' . $r['id'],
+                    'ref_id' => (int) $r['id'],
+                    'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                    'user_id' => (int) $r['user_id'],
+                    'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                    'user_code' => $r['code'] ?? '',
+                    'username' => $r['username'] ?? '',
+                    'user_group' => (int) ($r['user_group'] ?? 0),
+                    'type' => 'carton_purchase',
+                    'type_label' => 'Compra Cartón',
+                    'badge_class' => 'bg-secondary text-white',
+                    'icon' => 'fa-solid fa-ticket',
+                    'direction' => '-',
+                    'amount' => (float) $r['amount'],
+                    'wallet' => 'Saldo Real / Bono',
+                    'status' => 1,
+                    'status_label' => 'Completado',
+                    'status_badge' => 'bg-success',
+                    'detail' => 'Juego: ' . ($r['game_name'] ?: ('#' . $r['game_id'])) . ' | Cartón: #' . $r['carton_num'],
+                ];
+            }
+        }
+        
+        // 4. PREMIOS GANADOS
+        if ($movementType === 'all' || $movementType === 'award') {
+            $sql = "SELECT s.id, s.user AS user_id, s.award_amount AS amount, s.game AS game_id, s.modality, s.status,
+                           s.created_at AS event_time,
+                           g.description AS game_name, m.name AS modality_name,
+                           u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                    FROM sings s
+                    INNER JOIN users u ON u.id = s.user
+                    LEFT JOIN games g ON g.id = s.game
+                    LEFT JOIN modalities m ON m.id = s.modality
+                    WHERE s.created_at BETWEEN ? AND ?
+                    {$groupCondition} {$searchCondition}";
+            $paramsSql = array_merge([$from, $to], $searchParams);
+            $res = $db->query($sql, $paramsSql)->getResultArray();
+            foreach ($res as $r) {
+                if ((float) $r['amount'] <= 0) continue;
+                $st = (int) $r['status'];
+                $items[] = [
+                    'id' => 'SNG-' . $r['id'],
+                    'ref_id' => (int) $r['id'],
+                    'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                    'user_id' => (int) $r['user_id'],
+                    'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                    'user_code' => $r['code'] ?? '',
+                    'username' => $r['username'] ?? '',
+                    'user_group' => (int) ($r['user_group'] ?? 0),
+                    'type' => 'award',
+                    'type_label' => 'Premio Ganado',
+                    'badge_class' => 'bg-warning text-dark',
+                    'icon' => 'fa-solid fa-trophy',
+                    'direction' => '+',
+                    'amount' => (float) $r['amount'],
+                    'wallet' => 'Saldo Retiro / Recarga',
+                    'status' => $st,
+                    'status_label' => ($st === 1 ? 'Ganado / Acreditado' : ($st === 2 ? 'En revisión' : 'Anulado')),
+                    'status_badge' => ($st === 1 ? 'bg-success' : ($st === 2 ? 'bg-warning text-dark' : 'bg-secondary')),
+                    'detail' => 'Juego: ' . ($r['game_name'] ?: ('#' . $r['game_id'])) . ' | Modalidad: ' . ($r['modality_name'] ?: 'Premio'),
+                ];
+            }
+        }
+        
+        // 5. RULETAS
+        if ($movementType === 'all' || $movementType === 'roulette' || $movementType === 'bonus') {
+            $sql = "SELECT rl.id, rl.user AS user_id, rl.amount, rl.prize, rl.status,
+                           rl.created_at AS event_time,
+                           u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                    FROM roulettes rl
+                    INNER JOIN users u ON u.id = rl.user
+                    WHERE rl.created_at BETWEEN ? AND ?
+                    {$groupCondition} {$searchCondition}";
+            $paramsSql = array_merge([$from, $to], $searchParams);
+            $res = $db->query($sql, $paramsSql)->getResultArray();
+            foreach ($res as $r) {
+                if ((float) $r['amount'] <= 0) continue;
+                $st = (int) $r['status'];
+                $items[] = [
+                    'id' => 'ROU-' . $r['id'],
+                    'ref_id' => (int) $r['id'],
+                    'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                    'user_id' => (int) $r['user_id'],
+                    'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                    'user_code' => $r['code'] ?? '',
+                    'username' => $r['username'] ?? '',
+                    'user_group' => (int) ($r['user_group'] ?? 0),
+                    'type' => 'roulette',
+                    'type_label' => 'Premio Ruleta',
+                    'badge_class' => 'bg-info text-dark',
+                    'icon' => 'fa-solid fa-arrows-spin',
+                    'direction' => '+',
+                    'amount' => (float) $r['amount'],
+                    'wallet' => 'Saldo Bono',
+                    'status' => $st,
+                    'status_label' => ($st === 1 ? 'Acreditado' : 'Pendiente'),
+                    'status_badge' => ($st === 1 ? 'bg-success' : 'bg-warning text-dark'),
+                    'detail' => 'Premio: ' . ($r['prize'] ?: 'Premio ruleta'),
+                ];
+            }
+        }
+        
+        // 6. TRANSFERENCIAS
+        if ($movementType === 'all' || $movementType === 'transfer') {
+            $sql = "SELECT t.id, t.user_sender, t.user_receiver, t.amount, t.status,
+                           t.created_at AS event_time,
+                           us.firstname AS s_firstname, us.lastname AS s_lastname, us.username AS s_username, us.code AS s_code, us.`group` AS s_group,
+                           ur.firstname AS r_firstname, ur.lastname AS r_lastname, ur.username AS r_username, ur.code AS r_code, ur.`group` AS r_group
+                    FROM transfers t
+                    INNER JOIN users us ON us.id = t.user_sender
+                    INNER JOIN users ur ON ur.id = t.user_receiver
+                    WHERE t.created_at BETWEEN ? AND ?";
+            $res = $db->query($sql, [$from, $to])->getResultArray();
+            foreach ($res as $r) {
+                // Emisor (-)
+                $matchSenderGroup = ($actorGroup === 'all' || (string)$r['s_group'] === (string)$actorGroup);
+                $matchSenderSearch = empty($search) || stripos(($r['s_firstname'] ?? '').($r['s_lastname'] ?? '').($r['s_username'] ?? '').($r['s_code'] ?? ''), $search) !== false;
+                if ($matchSenderGroup && $matchSenderSearch) {
+                    $items[] = [
+                        'id' => 'TRF-S-' . $r['id'],
+                        'ref_id' => (int) $r['id'],
+                        'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                        'user_id' => (int) $r['user_sender'],
+                        'user_name' => trim(($r['s_firstname'] ?? '') . ' ' . ($r['s_lastname'] ?? '')) ?: ($r['s_username'] ?? 'N/A'),
+                        'user_code' => $r['s_code'] ?? '',
+                        'username' => $r['s_username'] ?? '',
+                        'user_group' => (int) ($r['s_group'] ?? 0),
+                        'type' => 'transfer',
+                        'type_label' => 'Transferencia Enviada',
+                        'badge_class' => 'bg-secondary',
+                        'icon' => 'fa-solid fa-paper-plane',
+                        'direction' => '-',
+                        'amount' => (float) $r['amount'],
+                        'wallet' => 'Saldo Retiro / Recarga',
+                        'status' => (int) $r['status'],
+                        'status_label' => 'Completada',
+                        'status_badge' => 'bg-success',
+                        'detail' => 'Enviado a: ' . trim($r['r_firstname'] . ' ' . $r['r_lastname']) . ' (' . $r['r_code'] . ')',
+                    ];
+                }
+                
+                // Receptor (+)
+                $matchReceiverGroup = ($actorGroup === 'all' || (string)$r['r_group'] === (string)$actorGroup);
+                $matchReceiverSearch = empty($search) || stripos(($r['r_firstname'] ?? '').($r['r_lastname'] ?? '').($r['r_username'] ?? '').($r['r_code'] ?? ''), $search) !== false;
+                if ($matchReceiverGroup && $matchReceiverSearch) {
+                    $items[] = [
+                        'id' => 'TRF-R-' . $r['id'],
+                        'ref_id' => (int) $r['id'],
+                        'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                        'user_id' => (int) $r['user_receiver'],
+                        'user_name' => trim(($r['r_firstname'] ?? '') . ' ' . ($r['r_lastname'] ?? '')) ?: ($r['r_username'] ?? 'N/A'),
+                        'user_code' => $r['r_code'] ?? '',
+                        'username' => $r['r_username'] ?? '',
+                        'user_group' => (int) ($r['r_group'] ?? 0),
+                        'type' => 'transfer',
+                        'type_label' => 'Transferencia Recibida',
+                        'badge_class' => 'bg-secondary',
+                        'icon' => 'fa-solid fa-inbox-in',
+                        'direction' => '+',
+                        'amount' => (float) $r['amount'],
+                        'wallet' => 'Saldo Recarga',
+                        'status' => (int) $r['status'],
+                        'status_label' => 'Completada',
+                        'status_badge' => 'bg-success',
+                        'detail' => 'Recibido de: ' . trim($r['s_firstname'] . ' ' . $r['s_lastname']) . ' (' . $r['s_code'] . ')',
+                    ];
+                }
+            }
+        }
+        
+        // 7. PAYMENTS (Ajustes de saldo, Bonos, Liquidaciones, Fondos no cubiertos arriba)
+        $sql = "SELECT p.id, p.user AS user_id, p.type AS payment_type, p.type_id, p.amount, p.status,
+                       p.created_at AS event_time,
+                       u.firstname, u.lastname, u.username, u.code, u.`group` AS user_group, u.email, u.phone
+                FROM payments p
+                INNER JOIN users u ON u.id = p.user
+                WHERE p.created_at BETWEEN ? AND ?
+                  AND p.type NOT IN ('deposit', 'retire', 'purchase', 'award', 'carton', 'transfer', 'roulette')
+                {$groupCondition} {$searchCondition}";
+        $paramsSql = array_merge([$from, $to], $searchParams);
+        $res = $db->query($sql, $paramsSql)->getResultArray();
+        foreach ($res as $r) {
+            $pType = (string) $r['payment_type'];
+            $isDebit = in_array($pType, ['admin_bonus_debit', 'admin_recharge_debit', 'admin_withdraw_debit', 'operator_store_debit', 'store_debit', 'store_balance_remove'], true);
+            $direction = $isDebit ? '-' : '+';
+            
+            $typeLabel = 'Ajuste / Pago';
+            $badgeClass = 'bg-primary';
+            $walletName = 'Saldo General';
+            
+            if ($pType === 'registration_bonus') {
+                $typeLabel = 'Bono de Registro';
+                $badgeClass = 'bg-info text-dark';
+                $walletName = 'Saldo Bono';
+            } elseif ($pType === 'admin_bonus') {
+                $typeLabel = 'Bono Administrativo';
+                $badgeClass = 'bg-info text-dark';
+                $walletName = 'Saldo Bono';
+            } elseif ($pType === 'admin_bonus_debit') {
+                $typeLabel = 'Ajuste Débito Bono';
+                $badgeClass = 'bg-secondary';
+                $walletName = 'Saldo Bono';
+            } elseif ($pType === 'admin_recharge_credit') {
+                $typeLabel = 'Acreditación Recarga (Admin)';
+                $badgeClass = 'bg-success';
+                $walletName = 'Saldo Recarga';
+            } elseif ($pType === 'admin_recharge_debit') {
+                $typeLabel = 'Ajuste Débito Recarga (Admin)';
+                $badgeClass = 'bg-danger';
+                $walletName = 'Saldo Recarga';
+            } elseif ($pType === 'admin_withdraw_credit') {
+                $typeLabel = 'Acreditación Retiro (Admin)';
+                $badgeClass = 'bg-success';
+                $walletName = 'Saldo Retiro';
+            } elseif ($pType === 'admin_withdraw_debit') {
+                $typeLabel = 'Ajuste Débito Retiro (Admin)';
+                $badgeClass = 'bg-danger';
+                $walletName = 'Saldo Retiro';
+            } elseif ($pType === 'store_funding' || $pType === 'store_credit') {
+                $typeLabel = 'Fondos a Punto de Venta';
+                $badgeClass = 'bg-primary';
+                $walletName = 'Billetera Tienda';
+            } elseif ($pType === 'player_recharge' || $pType === 'store_retire_pay') {
+                $typeLabel = $pType === 'store_retire_pay' ? 'Pago Retiro Efectivo' : 'Recarga a Jugador';
+                $badgeClass = $isDebit ? 'bg-danger' : 'bg-success';
+                $walletName = 'Caja Punto de Venta';
+            } elseif (strpos($pType, 'liquidation') !== false || strpos($pType, 'commission') !== false) {
+                $typeLabel = 'Liquidación / Comisión';
+                $badgeClass = 'bg-dark';
+                $walletName = 'Saldo Comisión';
+            }
+            
+            if ($movementType !== 'all' && $movementType !== $pType && !($movementType === 'bonus' && strpos($pType, 'bonus') !== false)) {
+                continue;
+            }
+            
+            $items[] = [
+                'id' => 'PAY-' . $r['id'],
+                'ref_id' => (int) $r['id'],
+                'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
+                'user_id' => (int) $r['user_id'],
+                'user_name' => trim(($r['firstname'] ?? '') . ' ' . ($r['lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
+                'user_code' => $r['code'] ?? '',
+                'username' => $r['username'] ?? '',
+                'user_group' => (int) ($r['user_group'] ?? 0),
+                'type' => $pType,
+                'type_label' => $typeLabel,
+                'badge_class' => $badgeClass,
+                'icon' => $isDebit ? 'fa-solid fa-minus-circle' : 'fa-solid fa-plus-circle',
+                'direction' => $direction,
+                'amount' => (float) $r['amount'],
+                'wallet' => $walletName,
+                'status' => (int) $r['status'],
+                'status_label' => 'Procesado',
+                'status_badge' => 'bg-success',
+                'detail' => 'Concepto: ' . $pType . ' #' . $r['id'],
+            ];
+        }
+        
+        // Orden cronológico descendente
+        usort($items, static function($a, $b) {
+            return strcmp($b['datetime'], $a['datetime']);
+        });
+        
+        // Calcular métricas y totales consolidados
+        $totalIncome = 0.0;
+        $totalExpense = 0.0;
+        $totalCartonsVolume = 0.0;
+        $totalPrizesVolume = 0.0;
+        
+        foreach ($items as $it) {
+            $amt = (float) $it['amount'];
+            if ($it['direction'] === '+') {
+                $totalIncome += $amt;
+            } else {
+                $totalExpense += $amt;
+            }
+            if ($it['type'] === 'carton_purchase') {
+                $totalCartonsVolume += $amt;
+            } elseif ($it['type'] === 'award') {
+                $totalPrizesVolume += $amt;
+            }
+        }
+        
+        $totalRecords = count($items);
+        $totalPages = max(1, (int) ceil($totalRecords / $perPage));
+        $offset = ($page - 1) * $perPage;
+        $pagedItems = array_slice($items, $offset, $perPage);
+        
+        return [
+            'items' => $pagedItems,
+            'total_records' => $totalRecords,
+            'total_pages' => $totalPages,
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total_income' => round($totalIncome, 2),
+            'total_expense' => round($totalExpense, 2),
+            'net_balance' => round($totalIncome - $totalExpense, 2),
+            'total_cartons_volume' => round($totalCartonsVolume, 2),
+            'total_prizes_volume' => round($totalPrizesVolume, 2),
+            'actor_group' => $actorGroup,
+            'movement_type' => $movementType,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'search' => $search,
+        ];
     }
 
     public function exportActiveUsers(string $period = 'day')
