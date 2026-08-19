@@ -2457,12 +2457,27 @@ class Users extends Controller {
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
+        $referredStore = null;
+        $referredStoreId = (int) ($user['referred_store_id'] ?? 0);
+        if ($referredStoreId > 0) {
+            $referredStore = $model
+                ->select('id, business_name, code, username')
+                ->where('id', $referredStoreId)
+                ->where('group', bingo_group_store())
+                ->first();
+        }
+
         $data = [
             'page' => [
                 'title' => translate('my profile')
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('users/profile', ['contacts' => $contacts, 'user' => $user, 'imagePath' => $imagePath])
+            'contentPage' => view('users/profile', [
+                'contacts' => $contacts,
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'referredStore' => $referredStore,
+            ])
         ];
 
         if ($this->request->isAJAX()) {
