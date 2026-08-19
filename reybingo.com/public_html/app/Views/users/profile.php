@@ -120,11 +120,7 @@
                         </div>
                     <?= form_close(); ?>
 
-                    <?php
-                        $storeAffiliate = $referredStore ?? null;
-                        $isPlayerAffiliatedToStore = (int) ($user['group'] ?? -1) === 0 && (int) ($user['referred_store_id'] ?? 0) > 0;
-                    ?>
-                    <?php if ($isPlayerAffiliatedToStore) : ?>
+                    <?php if (! empty($affiliatedStore)) : ?>
                         <hr />
                         <div class="player-legal-box text-center p-3 mb-3" style="background: rgba(98,54,255,0.12); border-radius: 14px;">
                             <h6 class="mb-2" style="color:#fff; font-weight:700;">
@@ -134,9 +130,9 @@
                                 <?= translate('you are affiliated to point of sale'); ?>
                             </p>
                             <p class="mb-0 text-white" style="font-weight:700;">
-                                <?= esc($storeAffiliate['business_name'] ?? $storeAffiliate['username'] ?? ('#' . (int) ($user['referred_store_id'] ?? 0))); ?>
-                                <?php if (!empty($storeAffiliate['code'])) : ?>
-                                    <span class="text-white-50" style="font-weight:600;">(<?= esc($storeAffiliate['code']); ?>)</span>
+                                <?= esc(function_exists('bingo_store_display_name') ? bingo_store_display_name($affiliatedStore) : ($affiliatedStore['business_name'] ?? $affiliatedStore['username'] ?? '')); ?>
+                                <?php if (! empty($affiliatedStore['code'])) : ?>
+                                    <span class="text-white-50" style="font-weight:600;">(<?= esc($affiliatedStore['code']); ?>)</span>
                                 <?php endif; ?>
                             </p>
                         </div>

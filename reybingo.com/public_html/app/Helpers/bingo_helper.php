@@ -7218,6 +7218,37 @@ if (!function_exists('bingo_sum_operator_store_affiliate_commissions')) {
     }
 }
 
+if (!function_exists('bingo_fetch_player_affiliated_store')) {
+    /**
+     * Obtiene el Punto de Venta al que está afiliado un jugador.
+     */
+    function bingo_fetch_player_affiliated_store(array $player): ?array
+    {
+        if ((int) ($player['group'] ?? -1) !== bingo_group_player()) {
+            return null;
+        }
+
+        $storeId = (int) ($player['referred_store_id'] ?? 0);
+        if ($storeId <= 0) {
+            $storeId = (int) ($player['affiliate_signup_store_id'] ?? 0);
+        }
+
+        if ($storeId <= 0) {
+            return null;
+        }
+
+        $modelUsers = new \App\Models\UsersModel();
+        $store = $modelUsers
+            ->select('id, business_name, code, username, firstname, lastname')
+            ->where('id', $storeId)
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->first();
+
+        return $store ?: null;
+    }
+}
+
 if (!function_exists('bingo_fetch_store_referred_players')) {
     function bingo_fetch_store_referred_players(int $storeId, int $limit = 50): array
     {

@@ -226,6 +226,21 @@ $sourceLabel = static function ($source) {
                 <tr><td><strong><?= translate('phone'); ?></strong></td><td><?= esc($user['phone'] ?: translate('not provided')); ?></td></tr>
                 <tr><td><strong><?= translate('document'); ?></strong></td><td><?= esc($user['document'] ?: translate('not provided')); ?></td></tr>
 
+                <?php if (! $isNonPlayer && ! empty($affiliatedStore)) : ?>
+                    <tr>
+                        <td><strong><?= translate('affiliated point of sale'); ?></strong></td>
+                        <td>
+                            <span class="badge bg-primary text-white">
+                                <i class="fa-duotone fa-solid fa-store me-1"></i>
+                                <?= esc(function_exists('bingo_store_display_name') ? bingo_store_display_name($affiliatedStore) : ($affiliatedStore['business_name'] ?? $affiliatedStore['username'] ?? '')); ?>
+                                <?php if (! empty($affiliatedStore['code'])) : ?>
+                                    <small class="ms-1">(<?= esc($affiliatedStore['code']); ?>)</small>
+                                <?php endif; ?>
+                            </span>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+
                 <?php if (! empty($user['address_line']) || ! empty($user['city']) || ! empty($user['state']) || $isNonPlayer) : ?>
                     <tr>
                         <td><strong><?= translate('address'); ?></strong></td>

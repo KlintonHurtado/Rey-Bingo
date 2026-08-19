@@ -1937,6 +1937,10 @@ class Users extends Controller {
             }
         }
 
+        $affiliatedStore = function_exists('bingo_fetch_player_affiliated_store')
+            ? bingo_fetch_player_affiliated_store($user)
+            : null;
+
         $html = view('users/user_details_admin', [
             'user' => $user,
             'stats' => $stats,
@@ -1955,6 +1959,7 @@ class Users extends Controller {
             'assignedOperator' => $assignedOperator,
             'assignedStores' => $assignedStores,
             'commissionsBreakdown' => $commissionsBreakdown,
+            'affiliatedStore' => $affiliatedStore,
         ]);
 
         return $this->response->setJSON([
@@ -2453,19 +2458,13 @@ class Users extends Controller {
 
         $contacts = $modelContacts->findAll();
 
+        bingo_ensure_users_schema();
         $user = $model->find(session()->get('id'));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-
-        $referredStore = null;
-        $referredStoreId = (int) ($user['referred_store_id'] ?? 0);
-        if ($referredStoreId > 0) {
-            $referredStore = $model
-                ->select('id, business_name, code, username')
-                ->where('id', $referredStoreId)
-                ->where('group', bingo_group_store())
-                ->first();
-        }
+        $affiliatedStore = function_exists('bingo_fetch_player_affiliated_store')
+            ? bingo_fetch_player_affiliated_store($user)
+            : null;
 
         $data = [
             'page' => [
@@ -2476,7 +2475,7 @@ class Users extends Controller {
                 'contacts' => $contacts,
                 'user' => $user,
                 'imagePath' => $imagePath,
-                'referredStore' => $referredStore,
+                'affiliatedStore' => $affiliatedStore,
             ])
         ];
 
