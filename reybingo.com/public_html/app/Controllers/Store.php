@@ -803,47 +803,63 @@ class Store extends Controller
         if ($operatorId > 0) {
             wallet_credit_recharge($operatorId, $amount);
 
-            $playerName = trim(($player['firstname'] ?? '') . ' ' . ($player['lastname'] ?? ''));
-            $modelPayments->insert([
-                'user'        => $operatorId,
-                'from'        => $storeId,
-                'type'        => 'operator_prize_credit',
-                'type_id'     => (int) $retire['id'],
-                'amount'      => $amount,
-                'description' => 'Acreditación por pago de premio en Punto de Venta: ' . $storeName . ' (Ref #' . $retire['id'] . ' | Código: ' . $retire['account'] . ($playerName !== '' ? ' | Jugador: ' . $playerName : '') . ')',
-                'status'      => 2,
-            ]);
+            try {
+                $playerName = trim(($player['firstname'] ?? '') . ' ' . ($player['lastname'] ?? ''));
+                $modelPayments->insert([
+                    'user'        => $operatorId,
+                    'from'        => $storeId,
+                    'type'        => 'operator_prize_credit',
+                    'type_id'     => (int) $retire['id'],
+                    'amount'      => $amount,
+                    'description' => 'Acreditacion por pago de premio en Punto de Venta: ' . $storeName . ' (Ref #' . $retire['id'] . ' | Codigo: ' . $retire['account'] . ($playerName !== '' ? ' | Jugador: ' . $playerName : '') . ')',
+                    'status'      => 2,
+                ]);
+            } catch (\Throwable $e) {
+                log_message('error', 'store.payRetireSubmit operator payment log failed: ' . $e->getMessage());
+            }
 
-            $modelNotifications->insert([
-                'user'    => $operatorId,
-                'from'    => $storeId,
-                'type'    => 'payment',
-                'type_id' => (int) $retire['id'],
-                'title'   => '💵 SALDO ACREDITADO POR PAGO DE PREMIO',
-                'message' => 'Se ha acreditado ' . (systemGet('currency') ?? '$') . ' ' . number_format($amount, 2) . ' a tu saldo por pago de premio en el Punto de Venta ' . $storeName . ' (Código: ' . $retire['account'] . ').',
-            ]);
+            try {
+                $modelNotifications->insert([
+                    'user'    => $operatorId,
+                    'from'    => $storeId,
+                    'type'    => 'payment',
+                    'type_id' => (int) $retire['id'],
+                    'title'   => 'SALDO ACREDITADO POR PAGO DE PREMIO',
+                    'message' => 'Se ha acreditado ' . (systemGet('currency') ?? '$') . ' ' . number_format($amount, 2) . ' a tu saldo por pago de premio en el Punto de Venta ' . $storeName . ' (Codigo: ' . $retire['account'] . ').',
+                ]);
+            } catch (\Throwable $e) {
+                log_message('error', 'store.payRetireSubmit operator notification failed: ' . $e->getMessage());
+            }
         }
 
         $commission = 0.0;
         if (function_exists('bingo_credit_store_operation_commission')) {
-            $commission = bingo_credit_store_operation_commission(
-                $storeId,
-                $amount,
-                'store_prize_commission',
-                (int) $retire['id'],
-                $storeUser,
-                (int) session()->get('id')
-            );
+            try {
+                $commission = bingo_credit_store_operation_commission(
+                    $storeId,
+                    $amount,
+                    'store_prize_commission',
+                    (int) $retire['id'],
+                    $storeUser,
+                    (int) session()->get('id')
+                );
+            } catch (\Throwable $e) {
+                log_message('error', 'store.payRetireSubmit commission failed: ' . $e->getMessage());
+            }
         }
 
-        $modelNotifications->insert([
-            'user'    => $playerId,
-            'from'    => $storeId,
-            'type'    => 'retire',
-            'type_id' => $retire['id'],
-            'title'   => '💵 RETIRO ENTREGADO EN PUNTO DE VENTA',
-            'message' => 'Tu retiro por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' fue pagado en efectivo en el Punto de Venta ' . $storeName . '. Código: ' . $retire['account'],
-        ]);
+        try {
+            $modelNotifications->insert([
+                'user'    => $playerId,
+                'from'    => $storeId,
+                'type'    => 'retire',
+                'type_id' => $retire['id'],
+                'title'   => 'RETIRO ENTREGADO EN PUNTO DE VENTA',
+                'message' => 'Tu retiro por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' fue pagado en efectivo en el Punto de Venta ' . $storeName . '. Codigo: ' . $retire['account'],
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'store.payRetireSubmit player notification failed: ' . $e->getMessage());
+        }
 
         $updatedStore = wallet_summary_payload($modelUsers->find($storeId));
 
