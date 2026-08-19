@@ -2334,6 +2334,14 @@ class Payments extends Controller {
                 ]);
 
                 $isStore = ($retire['bank'] === 'Punto de Venta' || ($retire['account_type'] ?? '') === 'store_pickup');
+                $storeCodeEmailSent = false;
+                if ($isStore) {
+                    $storeCodeEmailSent = $this->sendRetireStoreEmail(
+                        $user,
+                        (string) ($retire['account'] ?? ''),
+                        (float) ($retire['amount'] ?? 0)
+                    );
+                }
 
                 $modelNotifications = new NotificationsModel();
                 $modelNotifications->insert([
@@ -2343,7 +2351,10 @@ class Payments extends Controller {
                     'type_id' => $retire['id'],
                     'title'   => '📤 NOTA DE RETIRO APROBADA',
                     'message' => $isStore
-                        ? ('Tu nota de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido APROBADA. Código de retiro: ' . $retire['account'] . '. Presenta este código en cualquier Punto de Venta para cobrar tu dinero en efectivo.')
+                        ? ('Tu nota de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido APROBADA. '
+                            . ($storeCodeEmailSent
+                                ? 'Revisa tu correo electrónico para ver el código de retiro.'
+                                : 'No fue posible enviar el código por correo. Verifica tu email y solicita soporte.'))
                         : ('Tu solicitud de retiro por ' . (systemGet('currency') ?? '$') . ' ' . number_format($retire['amount'], 2) . ' ha sido aprobada y procesada hacia tu cuenta bancaria.'),
                 ]);
 
