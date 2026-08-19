@@ -106,6 +106,19 @@
     let storeRetiresPage = 1;
     let storeRetireSelected = null;
     const storeCurrency = '<?= esc(systemGet('currency'), 'js'); ?>';
+    const storeCsrfName = '<?= csrf_token(); ?>';
+    let storeCsrfHash = '<?= csrf_hash(); ?>';
+
+    function storeAttachCsrf(payload) {
+        payload[storeCsrfName] = storeCsrfHash;
+        return payload;
+    }
+
+    function storeUpdateCsrf(response) {
+        if (response && response.csrfHash) {
+            storeCsrfHash = response.csrfHash;
+        }
+    }
 
     function storeRefreshRetires(page) {
         storeRetiresPage = page || 1;
@@ -148,11 +161,11 @@
         $('#store-retire-lookup-hint').removeClass('d-none');
         $('#store-retire-lookup-btn').prop('disabled', true);
 
-        $.post('<?= site_url('store/lookupRetireNote'); ?>', {
+        $.post('<?= site_url('store/lookupRetireNote'); ?>', storeAttachCsrf({
             document: documentVal,
-            code: codeVal,
-            <?= csrf_token() ?>: '<?= csrf_hash(); ?>'
-        }, function(response) {
+            code: codeVal
+        }), function(response) {
+            storeUpdateCsrf(response);
             if (response && response.success && response.retire) {
                 storeShowRetirePreview(response.retire);
             } else {
@@ -205,12 +218,12 @@
             const $btn = $('#store-retire-pay-btn');
             $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i> Procesando pago...');
 
-            $.post('<?= site_url('store/payRetireSubmit'); ?>', {
+            $.post('<?= site_url('store/payRetireSubmit'); ?>', storeAttachCsrf({
                 retire_id: retire.id,
                 code: retire.code,
-                document: retire.document,
-                <?= csrf_token() ?>: '<?= csrf_hash(); ?>'
-            }, function(res) {
+                document: retire.document
+            }), function(res) {
+                storeUpdateCsrf(res);
                 if (res && res.success) {
                     storeClearRetireSelection();
                     $('#store-retire-document').val('');

@@ -640,12 +640,15 @@ class Store extends Controller
         if ($redirect = $this->requireStore()) {
             return $redirect;
         }
+        $respond = fn(array $payload) => $this->response->setJSON($payload + [
+            'csrfHash' => csrf_hash(),
+        ]);
 
         $document = trim((string) $this->request->getPost('document'));
         $code = strtoupper(trim((string) $this->request->getPost('code')));
 
         if ($document === '' && $code === '') {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'Ingrese el número de cédula y/o el código de retiro.',
             ]);
@@ -669,7 +672,7 @@ class Store extends Controller
         $retire = $builder->orderBy('id', 'DESC')->get()->getRowArray();
 
         if (! $retire) {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'No se encontró ninguna nota de retiro válida o aprobada con la cédula y código ingresados.',
             ]);
@@ -680,7 +683,7 @@ class Store extends Controller
             || (strpos((string) ($retire['observation'] ?? ''), 'Pagado en efectivo') !== false);
 
         if ($isPaid) {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'Esta nota de retiro ya fue pagada en efectivo anteriormente.',
             ]);
@@ -690,7 +693,7 @@ class Store extends Controller
         $playerName = $player ? trim($player['firstname'] . ' ' . $player['lastname']) : 'Jugador';
         $playerCode = $player['code'] ?? '';
 
-        return $this->response->setJSON([
+        return $respond([
             'success' => true,
             'retire' => [
                 'id'             => (int) $retire['id'],
@@ -711,6 +714,9 @@ class Store extends Controller
         if ($redirect = $this->requireStore()) {
             return $redirect;
         }
+        $respond = fn(array $payload) => $this->response->setJSON($payload + [
+            'csrfHash' => csrf_hash(),
+        ]);
 
         $retireId = (int) $this->request->getPost('retire_id');
         $code = strtoupper(trim((string) $this->request->getPost('code')));
@@ -730,7 +736,7 @@ class Store extends Controller
         }
 
         if (! $retire || ! in_array((int) $retire['status'], [1, 2], true)) {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'La nota de retiro no existe, fue rechazada o ya fue procesada anteriormente.',
             ]);
@@ -741,7 +747,7 @@ class Store extends Controller
             || (strpos((string) ($retire['observation'] ?? ''), 'Pagado en efectivo') !== false);
 
         if ($alreadyPaid) {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'Esta nota de retiro ya fue pagada anteriormente.',
             ]);
@@ -751,7 +757,7 @@ class Store extends Controller
         $player = wallet_service()->normalizeUser($modelUsers->find($playerId));
 
         if (! $player) {
-            return $this->response->setJSON([
+            return $respond([
                 'success' => false,
                 'message' => 'Jugador no encontrado.',
             ]);
@@ -849,7 +855,7 @@ class Store extends Controller
             $message .= '. Saldo acreditado al operador: ' . systemGet('currency') . ' ' . number_format($amount, 2);
         }
 
-        return $this->response->setJSON([
+        return $respond([
             'success'       => true,
             'message'       => $message,
             'amount'        => $amount,

@@ -70,6 +70,20 @@ $backUrl = $backUrl ?? site_url('store/affiliate');
                 <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="<?= esc($fieldPrefix); ?>-password_confirm" autocomplete="new-password" required>
                 <small id="<?= esc($fieldPrefix); ?>-password_confirm-error" class="text-danger d-none"></small>
             </div>
+            <?php if (bingo_terms_require_accept()) : ?>
+            <div class="col-12 player-signup-form-field">
+                <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" value="1" name="accept_terms" id="<?= esc($fieldPrefix); ?>-accept_terms">
+                    <label class="form-check-label text-white" for="<?= esc($fieldPrefix); ?>-accept_terms">
+                        <?= translate('i accept the'); ?>
+                        <a href="<?= site_url('terminos'); ?>" target="_blank" rel="noopener"><?= translate('terms and conditions'); ?></a>
+                        <?= translate('and'); ?>
+                        <a href="<?= site_url('promociones'); ?>" target="_blank" rel="noopener"><?= translate('promotions'); ?></a>
+                    </label>
+                </div>
+                <small id="<?= esc($fieldPrefix); ?>-accept_terms-error" class="text-danger d-none"></small>
+            </div>
+            <?php endif; ?>
             <div class="col-12 player-signup-form-actions">
                 <button type="submit" class="btn btn-primary btn-bingo mt-2" id="<?= esc($fieldPrefix); ?>-submit">
                     <?= esc($submitLabel); ?>
@@ -113,13 +127,26 @@ $(function() {
                     return;
                 }
                 if (response.errors) {
+                    const genericErrors = [];
                     $.each(response.errors, function(field, message) {
                         const $field = $('#' + fieldPrefix + '-' + field);
-                        $('#' + fieldPrefix + '-' + field + '-error').text(message).removeClass('d-none');
-                        $field.addClass('is-invalid');
+                        const $error = $('#' + fieldPrefix + '-' + field + '-error');
+                        if ($error.length) {
+                            $error.text(message).removeClass('d-none');
+                        } else {
+                            genericErrors.push(message);
+                        }
+                        if ($field.length) {
+                            $field.addClass('is-invalid');
+                        }
                     });
+                    if (genericErrors.length) {
+                        alert(genericErrors.join('\n'));
+                    }
                 } else if (response.error) {
                     alert(response.error);
+                } else {
+                    alert('<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>');
                 }
             },
             error: function() {
