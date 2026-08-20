@@ -7239,10 +7239,9 @@ if (!function_exists('bingo_fetch_player_affiliated_store')) {
 
         $modelUsers = new \App\Models\UsersModel();
         $store = $modelUsers
-            ->select('id, business_name, code, username, firstname, lastname')
+            ->select('id, business_name, code, username, firstname, lastname, status, deleted')
             ->where('id', $storeId)
             ->where('group', bingo_group_store())
-            ->where('deleted', 0)
             ->first();
 
         return $store ?: null;

@@ -4821,6 +4821,77 @@ small.text-danger {
     box-shadow:0 0 0 .2rem rgba(135, 103, 250,.5)
 }
 
+/* Evitar que botones fijos tapen la X de modales (billetera, depósito, etc.) */
+body.modal-open .btn-sliders,
+body.modal-open .btn-volume,
+body.modal-open .btn-microphone,
+body.modal-open .btn-binary,
+body.modal-open .btn-logout,
+body.modal-open .btn-lock,
+body.modal-open .btn-home,
+body.modal-open .btn-wallet,
+body.modal-open .btn-qrcode,
+body.modal-open .btn-statistics,
+body.modal-open .btn-users,
+body.modal-open .btn-gear,
+body.modal-open .player-nav-cluster {
+    visibility: hidden !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+}
+
+#modalPayments .modal-header,
+#modalDeposit .modal-header,
+#modalRetire .modal-header,
+#modalTransfer .modal-header,
+#modalSettings .modal-header,
+#modalRequest .modal-header {
+    position: relative;
+    align-items: center;
+    padding-right: 3.25rem;
+    padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+}
+
+#modalPayments .modal-header .modal-title,
+#modalDeposit .modal-header .modal-title,
+#modalRetire .modal-header .modal-title,
+#modalTransfer .modal-header .modal-title,
+#modalSettings .modal-header .modal-title,
+#modalRequest .modal-header .modal-title {
+    flex: 1;
+    min-width: 0;
+    padding-right: 0.35rem;
+    line-height: 1.25;
+}
+
+#modalPayments .modal-header .btn-close,
+#modalDeposit .modal-header .btn-close,
+#modalRetire .modal-header .btn-close,
+#modalTransfer .modal-header .btn-close,
+#modalSettings .modal-header .btn-close,
+#modalRequest .modal-header .btn-close {
+    position: absolute;
+    right: 0.65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#modalPayments .modal-header .btn-close:hover,
+#modalDeposit .modal-header .btn-close:hover,
+#modalRetire .modal-header .btn-close:hover,
+#modalTransfer .modal-header .btn-close:hover,
+#modalSettings .modal-header .btn-close:hover,
+#modalRequest .modal-header .btn-close:hover {
+    transform: translateY(-50%) scale(1.1);
+}
+
 .btn-modal {
     width: 45px;
     height: 45px;
