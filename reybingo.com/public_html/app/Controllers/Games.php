@@ -1200,6 +1200,10 @@ class Games extends Controller {
 
             case 'stores':
                 if ($activeTab == 'stores' || $activeTab == 'summary') {
+                    if (function_exists('bingo_ensure_users_schema')) {
+                        bingo_ensure_users_schema();
+                    }
+
                     $page = (int) ($this->request->getGet('page') ?? 1);
                     $perPage = 10;
                     $search = $this->request->getGet('search') ?? '';
@@ -1247,6 +1251,8 @@ class Games extends Controller {
                         $operatorsMap[$opItem['id']] = $opItem;
                     }
 
+                    $playerGroup = function_exists('bingo_group_player') ? bingo_group_player() : 0;
+
                     foreach ($stores as &$st) {
                         $stId = (int) $st['id'];
                         $depositsModel = new DepositsModel();
@@ -1255,7 +1261,15 @@ class Games extends Controller {
                         $st['total_deposits'] = (float) (($depositsModel->where('user', $stId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
                         $st['total_retires'] = (float) (($retiresModel->where('user', $stId)->where('status', 2)->selectSum('amount')->get()->getRow()->amount) ?? 0);
                         
-                        $st['players_count'] = $modelUsers->where('referred_by', $stId)->where('deleted', 0)->countAllResults();
+                        // Jugadores afiliados al PV
+                        $playersBuilder = $modelUsers->builder();
+                        $playersBuilder->where('group', $playerGroup)
+                            ->where('deleted', 0)
+                            ->groupStart()
+                                ->where('referred_store_id', $stId)
+                                ->orWhere('affiliate_signup_store_id', $stId)
+                            ->groupEnd();
+                        $st['players_count'] = (int) $playersBuilder->countAllResults();
                         
                         $opAssigned = !empty($st['operator_id']) && isset($operatorsMap[$st['operator_id']]) ? $operatorsMap[$st['operator_id']] : null;
                         $st['operator_name'] = $opAssigned ? trim(($opAssigned['firstname'] ?? '') . ' ' . ($opAssigned['lastname'] ?? '')) : '-';
