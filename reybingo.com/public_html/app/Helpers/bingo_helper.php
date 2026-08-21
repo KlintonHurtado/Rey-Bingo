@@ -5797,6 +5797,43 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
     }
 }
 
+if (! function_exists('bingo_export_csv_payload')) {
+    /**
+     * Genera el cuerpo CSV (UTF-8 con BOM) para descargas.
+     *
+     * @param list<string> $headers
+     * @param list<list<mixed>> $rows
+     */
+    function bingo_export_csv_payload(array $headers, array $rows): string
+    {
+        $handle = fopen('php://temp', 'r+');
+        if ($handle === false) {
+            return "\xEF\xBB\xBF";
+        }
+
+        fputcsv($handle, $headers);
+        foreach ($rows as $row) {
+            $normalized = [];
+            foreach ((array) $row as $cell) {
+                if (is_bool($cell)) {
+                    $normalized[] = $cell ? '1' : '0';
+                } elseif (is_scalar($cell) || $cell === null) {
+                    $normalized[] = (string) ($cell ?? '');
+                } else {
+                    $normalized[] = json_encode($cell, JSON_UNESCAPED_UNICODE) ?: '';
+                }
+            }
+            fputcsv($handle, $normalized);
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle) ?: '';
+        fclose($handle);
+
+        return "\xEF\xBB\xBF" . $csv;
+    }
+}
+
 if (! function_exists('bingo_operator_movements_export_rows')) {
     /**
      * Filas planas para Excel/CSV de los movimientos del Operador.
