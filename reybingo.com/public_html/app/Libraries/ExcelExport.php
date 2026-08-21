@@ -9,13 +9,16 @@ class ExcelExport
     /**
      * @param list<string> $headers
      * @param list<list<mixed>> $rows
-     * @param array{numeric_columns?: list<int>, integer_columns?: list<int>, sheet_name?: string} $options
+     * @param array{numeric_columns?: list<int>, integer_columns?: list<int>, sheet_name?: string, title?: string} $options
      */
     public function build(array $headers, array $rows, array $options = []): string
     {
         $sheetName = $this->sanitizeSheetName($options['sheet_name'] ?? 'Datos');
         $numericColumns = array_map('intval', $options['numeric_columns'] ?? []);
         $integerColumns = array_map('intval', $options['integer_columns'] ?? []);
+        $title = trim((string) ($options['title'] ?? ''));
+
+        $widths = $this->calculateColumnWidths($headers, $rows, $numericColumns, $integerColumns);
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<?mso-application progid="Excel.Sheet"?>' . "\n";
@@ -29,12 +32,27 @@ class ExcelExport
         $xml .= '<Worksheet ss:Name="' . $this->escape($sheetName) . '">' . "\n";
         $xml .= '<Table>' . "\n";
 
-        foreach ($headers as $header) {
-            $width = max(70, min(260, mb_strlen((string) $header) * 9 + 24));
-            $xml .= '<Column ss:AutoFitWidth="1" ss:Width="' . $width . '"/>' . "\n";
+        foreach ($widths as $width) {
+            $xml .= '<Column ss:AutoFitWidth="0" ss:Width="' . $width . '"/>' . "\n";
         }
 
-        $xml .= '<Row ss:StyleID="Header" ss:Height="22">' . "\n";
+        if ($title !== '') {
+            $xml .= '<Row ss:StyleID="Title" ss:Height="28">' . "\n";
+            $xml .= '<Cell ss:MergeAcross="' . max(0, count($headers) - 1) . '"><Data ss:Type="String">'
+                . $this->escape($title)
+                . '</Data></Cell>' . "\n";
+            $xml .= '</Row>' . "\n";
+
+            $xml .= '<Row ss:StyleID="Subtitle" ss:Height="18">' . "\n";
+            $xml .= '<Cell ss:MergeAcross="' . max(0, count($headers) - 1) . '"><Data ss:Type="String">'
+                . $this->escape('Generado: ' . date('d/m/Y H:i:s') . ' | Filas: ' . count($rows))
+                . '</Data></Cell>' . "\n";
+            $xml .= '</Row>' . "\n";
+
+            $xml .= '<Row ss:Height="8"><Cell><Data ss:Type="String"></Data></Cell></Row>' . "\n";
+        }
+
+        $xml .= '<Row ss:StyleID="Header" ss:Height="24">' . "\n";
         foreach ($headers as $header) {
             $xml .= '<Cell><Data ss:Type="String">' . $this->escape((string) $header) . '</Data></Cell>' . "\n";
         }
@@ -42,7 +60,7 @@ class ExcelExport
 
         foreach ($rows as $rowIndex => $row) {
             $styleId = ($rowIndex % 2) === 1 ? 'Zebra' : 'Default';
-            $xml .= '<Row ss:StyleID="' . $styleId . '">' . "\n";
+            $xml .= '<Row ss:StyleID="' . $styleId . '" ss:Height="20">' . "\n";
 
             foreach ($headers as $colIndex => $_header) {
                 $value = $row[$colIndex] ?? '';
@@ -53,6 +71,11 @@ class ExcelExport
         }
 
         $xml .= '</Table>' . "\n";
+        $xml .= '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">' . "\n";
+        $xml .= '<FreezePanes/><FrozenNoSplit/><SplitHorizontal>' . ($title !== '' ? 4 : 1) . '</SplitHorizontal>' . "\n";
+        $xml .= '<TopRowBottomPane>' . ($title !== '' ? 4 : 1) . '</TopRowBottomPane>' . "\n";
+        $xml .= '<ActivePane>2</ActivePane>' . "\n";
+        $xml .= '</WorksheetOptions>' . "\n";
         $xml .= '</Worksheet>' . "\n";
         $xml .= '</Workbook>';
 
@@ -79,48 +102,125 @@ class ExcelExport
             ->setBody($xml);
     }
 
+    /**
+     * @param list<string> $headers
+     * @param list<list<mixed>> $rows
+     * @param list<int> $numericColumns
+     * @param list<int> $integerColumns
+     * @return list<int>
+     */
+    private function calculateColumnWidths(array $headers, array $rows, array $numericColumns, array $integerColumns): array
+    {
+        $widths = [];
+
+        foreach ($headers as $colIndex => $header) {
+            $maxLen = mb_strlen((string) $header);
+
+            foreach ($rows as $row) {
+                $value = $row[$colIndex] ?? '';
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                if (in_array($colIndex, $numericColumns, true) || in_array($colIndex, $integerColumns, true)) {
+                    $text = is_numeric($value)
+                        ? number_format((float) $value, in_array($colIndex, $integerColumns, true) ? 0 : 2, '.', ',')
+                        : (string) $value;
+                } else {
+                    $text = (string) $value;
+                }
+
+                $maxLen = max($maxLen, mb_strlen($text));
+            }
+
+            // Anchos pensados para Excel: fechas, montos, detalle, etc.
+            if (in_array($colIndex, $numericColumns, true)) {
+                $width = max(90, min(130, $maxLen * 8 + 28));
+            } elseif (in_array($colIndex, $integerColumns, true)) {
+                $width = max(70, min(110, $maxLen * 8 + 24));
+            } elseif ($maxLen > 80) {
+                $width = 360; // Detalle / textos largos visibles
+            } elseif ($maxLen > 40) {
+                $width = max(180, min(280, $maxLen * 7 + 30));
+            } else {
+                $width = max(85, min(200, $maxLen * 8 + 28));
+            }
+
+            $widths[] = (int) round($width);
+        }
+
+        return $widths;
+    }
+
     private function buildStyles(): string
     {
         return <<<XML
 <Styles>
     <Style ss:ID="Default">
         <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-        <Font ss:FontName="Calibri" ss:Size="11"/>
+        <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1F2937"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
+    </Style>
+    <Style ss:ID="Title">
+        <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+        <Font ss:Bold="1" ss:FontName="Calibri" ss:Size="14" ss:Color="#4C1D95"/>
+    </Style>
+    <Style ss:ID="Subtitle">
+        <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+        <Font ss:FontName="Calibri" ss:Size="10" ss:Color="#6B7280"/>
     </Style>
     <Style ss:ID="Header">
         <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
         <Font ss:Bold="1" ss:Color="#FFFFFF" ss:FontName="Calibri" ss:Size="11"/>
-        <Interior ss:Color="#5B21B6" ss:Pattern="Solid"/>
+        <Interior ss:Color="#6236FF" ss:Pattern="Solid"/>
         <Borders>
             <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#4C1D95"/>
+            <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#4C1D95"/>
         </Borders>
     </Style>
     <Style ss:ID="Zebra">
         <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-        <Font ss:FontName="Calibri" ss:Size="11"/>
+        <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1F2937"/>
         <Interior ss:Color="#F5F3FF" ss:Pattern="Solid"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
     </Style>
     <Style ss:ID="Money">
         <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
-        <Font ss:FontName="Calibri" ss:Size="11"/>
+        <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#065F46"/>
         <NumberFormat ss:Format="#,##0.00"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
     </Style>
     <Style ss:ID="MoneyZebra">
         <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
-        <Font ss:FontName="Calibri" ss:Size="11"/>
+        <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#065F46"/>
         <Interior ss:Color="#F5F3FF" ss:Pattern="Solid"/>
         <NumberFormat ss:Format="#,##0.00"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
     </Style>
     <Style ss:ID="Integer">
         <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
         <Font ss:FontName="Calibri" ss:Size="11"/>
         <NumberFormat ss:Format="0"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
     </Style>
     <Style ss:ID="IntegerZebra">
         <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
         <Font ss:FontName="Calibri" ss:Size="11"/>
         <Interior ss:Color="#F5F3FF" ss:Pattern="Solid"/>
         <NumberFormat ss:Format="0"/>
+        <Borders>
+            <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/>
+        </Borders>
     </Style>
 </Styles>
 

@@ -10,6 +10,7 @@ use App\Models\BanksModel;
 use App\Models\PaymentsModel;
 use App\Models\SingsModel;
 use App\Models\RetiresModel;
+use App\Libraries\ExcelExport;
 use CodeIgniter\Controller;
 
 class Store extends Controller
@@ -1140,22 +1141,18 @@ class Store extends Controller
 
         $export = bingo_store_movements_export_rows($ledgerData['movements']);
 
-        $filename = 'movimientos_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.csv';
+        $filename = 'movimientos_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.xls';
 
-        header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-
-        $output = fopen('php://output', 'w');
-        fputs($output, "\xEF\xBB\xBF");
-
-        fputcsv($output, $export['headers'], ';');
-        foreach ($export['rows'] as $row) {
-            fputcsv($output, $row, ';');
-        }
-        fclose($output);
-        exit();
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => 'Movimientos',
+                'title' => 'Rey Bingo - Movimientos del Punto de Venta',
+                'numeric_columns' => [3, 4],
+            ]
+        );
     }
 
     private function formatRetireStatus(int $status): string
@@ -1239,25 +1236,36 @@ class Store extends Controller
 
         $rows = [];
         foreach ($data['items'] as $it) {
+            $datetime = (string) ($it['datetime'] ?? '');
+            if ($datetime !== '' && strtotime($datetime) !== false) {
+                $datetime = date('d/m/Y H:i:s', strtotime($datetime));
+            }
+
             $rows[] = [
-                $it['datetime'] ?? '',
-                $it['rate_type_label'] ?? '',
-                $it['ref_code'] ?? '',
-                $it['player_name'] ?? '',
-                $it['player_doc'] ?? '',
-                number_format((float) ($it['base_amount'] ?? 0), 2),
+                $datetime,
+                (string) ($it['rate_type_label'] ?? ''),
+                (string) ($it['ref_code'] ?? ''),
+                (string) ($it['player_name'] ?? ''),
+                (string) ($it['player_doc'] ?? ''),
+                round((float) ($it['base_amount'] ?? 0), 2),
                 number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                number_format((float) ($it['commission_amount'] ?? 0), 2),
-                $it['status_label'] ?? '',
-                $it['detail'] ?? '',
+                round((float) ($it['commission_amount'] ?? 0), 2),
+                (string) ($it['status_label'] ?? ''),
+                (string) ($it['detail'] ?? ''),
             ];
         }
 
-        $filename = 'comisiones_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.csv';
+        $filename = 'comisiones_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.xls';
 
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
-            ->setBody(bingo_export_csv_payload($headers, $rows));
+        return (new ExcelExport())->downloadResponse(
+            $headers,
+            $rows,
+            $filename,
+            [
+                'sheet_name' => 'Comisiones',
+                'title' => 'Rey Bingo - Comisiones del Punto de Venta',
+                'numeric_columns' => [5, 7],
+            ]
+        );
     }
 }

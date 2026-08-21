@@ -419,7 +419,7 @@
                         </div>
                         <div>
                             <button type="button" class="btn btn-sm btn-success" id="btn-export-op-movements" onclick="exportOperatorMovements();">
-                                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
+                                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
                             </button>
                         </div>
                     </div>

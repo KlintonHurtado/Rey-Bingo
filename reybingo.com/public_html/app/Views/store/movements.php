@@ -25,7 +25,7 @@ $stats = $stats ?? [];
             </div>
             <div>
                 <button type="button" class="btn btn-sm btn-success" id="btn-export-movements" onclick="exportStoreMovements();">
-                    <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
+                    <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
                 </button>
             </div>
         </div>

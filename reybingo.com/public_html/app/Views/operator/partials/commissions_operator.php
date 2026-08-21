@@ -49,7 +49,7 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
         </div>
         <div>
             <button type="button" class="btn btn-sm btn-success" id="btn-export-op-commissions" onclick="exportOperatorCommissions();" style="padding: 4px 10px; font-size: 0.82rem;">
-                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
+                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
             </button>
         </div>
     </div>

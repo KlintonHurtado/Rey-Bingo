@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\UsersModel;
 use App\Models\ContactsModel;
 use App\Models\RetiresModel;
+use App\Libraries\ExcelExport;
 use CodeIgniter\Controller;
 
 class Operator extends Controller
@@ -769,12 +770,18 @@ class Operator extends Controller
         $ledger = bingo_build_operator_movements_ledger($operatorId, $filters);
         $export = bingo_operator_movements_export_rows($ledger['movements']);
 
-        $filename = 'movimientos_operador_' . date('Y-m-d_His') . '.csv';
+        $filename = 'movimientos_operador_' . date('Y-m-d_His') . '.xls';
 
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
-            ->setBody(bingo_export_csv_payload($export['headers'], $export['rows']));
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => 'Movimientos',
+                'title' => 'Rey Bingo - Movimientos del Operador',
+                'numeric_columns' => [3],
+            ]
+        );
     }
 
     public function operatorCommissionsGet()
@@ -841,27 +848,38 @@ class Operator extends Controller
 
         $rows = [];
         foreach ($data['items'] as $it) {
+            $datetime = (string) ($it['datetime'] ?? '');
+            if ($datetime !== '' && strtotime($datetime) !== false) {
+                $datetime = date('d/m/Y H:i:s', strtotime($datetime));
+            }
+
             $rows[] = [
-                $it['datetime'] ?? '',
-                $it['store_name'] ?? '',
-                $it['rate_type_label'] ?? '',
-                $it['ref_code'] ?? '',
-                number_format((float) ($it['base_amount'] ?? 0), 2),
+                $datetime,
+                (string) ($it['store_name'] ?? ''),
+                (string) ($it['rate_type_label'] ?? ''),
+                (string) ($it['ref_code'] ?? ''),
+                round((float) ($it['base_amount'] ?? 0), 2),
                 number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                number_format((float) ($it['store_commission'] ?? 0), 2),
+                round((float) ($it['store_commission'] ?? 0), 2),
                 number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2) . '%',
                 number_format(((float) ($it['operator_spread'] ?? 0)) * 100, 2) . '%',
-                number_format((float) ($it['operator_profit'] ?? 0), 2),
-                $it['status_label'] ?? '',
-                $it['detail'] ?? '',
+                round((float) ($it['operator_profit'] ?? 0), 2),
+                (string) ($it['status_label'] ?? ''),
+                (string) ($it['detail'] ?? ''),
             ];
         }
 
-        $filename = 'comisiones_operador_' . date('Y-m-d_His') . '.csv';
+        $filename = 'comisiones_operador_' . date('Y-m-d_His') . '.xls';
 
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
-            ->setHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
-            ->setBody(bingo_export_csv_payload($headers, $rows));
+        return (new ExcelExport())->downloadResponse(
+            $headers,
+            $rows,
+            $filename,
+            [
+                'sheet_name' => 'Comisiones',
+                'title' => 'Rey Bingo - Comisiones del Operador',
+                'numeric_columns' => [4, 6, 9],
+            ]
+        );
     }
 }

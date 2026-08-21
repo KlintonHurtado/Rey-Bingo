@@ -45,7 +45,7 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
             </div>
             <div class="d-flex gap-1">
                 <button type="button" class="btn btn-sm btn-success" id="btn-export-store-commissions" onclick="exportStoreCommissions();" style="padding: 5px 12px; font-size: 0.84rem;">
-                    <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel / CSV
+                    <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
                 </button>
             </div>
         </div>

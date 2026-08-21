@@ -5299,12 +5299,19 @@ if (! function_exists('bingo_store_movements_export_rows')) {
 
         $rows = [];
         foreach ($movements as $m) {
+            $datetime = (string) ($m['datetime'] ?? '');
+            if ($datetime !== '' && strtotime($datetime) !== false) {
+                $datetime = date('d/m/Y H:i:s', strtotime($datetime));
+            }
+
             $rows[] = [
-                (string) ($m['datetime'] ?? ''),
+                $datetime,
                 (string) ($m['type_label'] ?? $m['type'] ?? ''),
                 (string) ($m['direction'] ?? ''),
                 (float) ($m['amount'] ?? 0),
-                isset($m['balance_after']) ? (float) $m['balance_after'] : '',
+                isset($m['balance_after']) && $m['balance_after'] !== '' && $m['balance_after'] !== null
+                    ? (float) $m['balance_after']
+                    : '',
                 (string) ($m['status_label'] ?? ''),
                 (string) ($m['beneficiary_name'] ?? ''),
                 (string) ($m['beneficiary_document'] ?? ''),
@@ -5858,8 +5865,13 @@ if (! function_exists('bingo_operator_movements_export_rows')) {
 
         $rows = [];
         foreach ($movements as $m) {
+            $datetime = (string) ($m['datetime'] ?? '');
+            if ($datetime !== '' && strtotime($datetime) !== false) {
+                $datetime = date('d/m/Y H:i:s', strtotime($datetime));
+            }
+
             $rows[] = [
-                (string) ($m['datetime'] ?? ''),
+                $datetime,
                 (string) ($m['type_label'] ?? $m['type'] ?? ''),
                 (string) ($m['direction'] ?? ''),
                 (float) ($m['amount'] ?? 0),
