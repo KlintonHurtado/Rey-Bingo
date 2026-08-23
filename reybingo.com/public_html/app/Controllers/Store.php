@@ -561,8 +561,9 @@ class Store extends Controller
         ];
 
         if ($commission > 0) {
-            $response['message'] .= '. ' . translate('store commission credited') . ': '
-                . systemGet('currency') . ' ' . number_format($commission, 2);
+            $response['message'] .= '. Comisión generada: '
+                . systemGet('currency') . ' ' . number_format($commission, 2)
+                . ' (pendiente de liquidación)';
         }
 
         if (! empty($affiliateLink['newly_linked'])) {

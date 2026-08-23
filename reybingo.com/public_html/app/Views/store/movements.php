@@ -116,6 +116,7 @@ $stats = $stats ?? [];
                             <option value="recharge" <?= ($filters['type'] ?? '') === 'recharge' ? 'selected' : ''; ?>>Recargas a Jugadores</option>
                             <option value="retire" <?= ($filters['type'] ?? '') === 'retire' ? 'selected' : ''; ?>>Pagos de Retiros</option>
                             <option value="credit" <?= ($filters['type'] ?? '') === 'credit' ? 'selected' : ''; ?>>Acreditaciones de Saldo</option>
+                            <option value="commission_liquidation" <?= ($filters['type'] ?? '') === 'commission_liquidation' ? 'selected' : ''; ?>>LIQUIDACION COMISIONES</option>
                             <option value="debit" <?= ($filters['type'] ?? '') === 'debit' ? 'selected' : ''; ?>>Débitos / Ajustes</option>
                         </select>
                     </div>

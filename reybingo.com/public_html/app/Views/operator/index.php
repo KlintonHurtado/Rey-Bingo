@@ -514,6 +514,7 @@
                                         <option value="recharge_store">Recargas a Puntos de Venta</option>
                                         <option value="retire">Pagos de Retiros</option>
                                         <option value="credit">Acreditaciones / Retiros de PV</option>
+                                        <option value="commission_liquidation">LIQUIDACION COMISIONES</option>
                                         <option value="debit">Débitos / Ajustes</option>
                                     </select>
                                 </div>

@@ -142,9 +142,9 @@ $currency = systemGet('currency') ?? '$';
                                     <label for="liq-input-amount" class="form-label fw-bold text-dark mb-1" style="font-size: 0.88rem;">Monto a Liquidar:</label>
                                     <div class="input-group">
                                         <span class="input-group-text bg-light fw-bold"><?= esc($currency); ?></span>
-                                        <input type="number" step="0.01" min="0.01" class="form-control form-control-lg fw-bold text-success" id="liq-input-amount" placeholder="0.00" autocomplete="off" required>
+                                        <input type="number" step="0.01" min="0" class="form-control form-control-lg fw-bold text-success" id="liq-input-amount" value="0" placeholder="0.00" autocomplete="off" required>
                                     </div>
-                                    <small class="text-muted">Puedes liquidar el monto total o parcial.</small>
+                                    <small class="text-danger fw-semibold">Inicia en 0. Ingresa manualmente el monto exacto a liquidar para evitar errores.</small>
                                 </div>
 
                                 <!-- Referencia de Transferencia -->
@@ -227,9 +227,8 @@ $currency = systemGet('currency') ?? '$';
                     $('#liq-bank-account').text(res.account_number || 'No registrado');
                     $('#liq-bank-holder').text((res.name || '-') + (res.phone ? ' &bull; Tel: ' + res.phone : ''));
 
-                    // Formulario
-                    const defaultAmount = parseFloat(res.total_pending_commissions || 0);
-                    $('#liq-input-amount').val(defaultAmount > 0 ? defaultAmount.toFixed(2) : '0.00');
+                    // Formulario: monto inicia en 0 para evitar liquidaciones accidentales
+                    $('#liq-input-amount').val('0');
                     $('#liq-input-reference').val('');
                     $('#liq-input-notes').val('');
                     $('#liq-type-transfer').prop('checked', true);
@@ -277,16 +276,18 @@ $currency = systemGet('currency') ?? '$';
         }
 
         const typeLabel = settlementType === 'credit_balance'
-            ? 'Acreditar como Saldo Recargable (+)'
-            : 'Transferencia Bancaria Directa';
+            ? 'LIQUIDACION COMISIONES (acreditar a saldo recargable)'
+            : 'LIQUIDACION COMISIONES (transferencia bancaria)';
 
         Swal.fire({
-            title: '¿Confirmar Liquidación?',
+            title: '¿Confirmar Liquidación de Comisiones?',
             html: `
                 <div class="text-start p-2">
+                    <p class="mb-2"><span class="badge bg-success">LIQUIDACION COMISIONES</span></p>
                     <p class="mb-1"><strong>Monto a Liquidar:</strong> <span class="text-success fs-5 fw-bold"><?= esc($currency); ?> ${amount.toFixed(2)}</span></p>
                     <p class="mb-1"><strong>Método:</strong> ${typeLabel}</p>
                     ${reference ? `<p class="mb-0"><strong>Referencia:</strong> ${reference}</p>` : ''}
+                    <p class="small text-muted mt-2 mb-0">Esto no es una acreditación normal de saldo: es un pago/liquidación de comisiones.</p>
                 </div>
             `,
             icon: 'question',

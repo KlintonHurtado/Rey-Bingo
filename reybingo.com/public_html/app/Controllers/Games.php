@@ -1960,12 +1960,22 @@ class Games extends Controller {
                 FROM payments p
                 INNER JOIN users u ON u.id = p.user
                 WHERE p.created_at BETWEEN ? AND ?
-                  AND p.type NOT IN ('deposit', 'retire', 'purchase', 'award', 'carton', 'transfer', 'roulette')
+                  AND p.type NOT IN (
+                    'deposit', 'retire', 'purchase', 'award', 'carton', 'transfer', 'roulette',
+                    'store_commission', 'store_recharge_commission', 'store_prize_commission', 'store_retire_commission',
+                    'store_ggr_commission', 'operator_commission', 'operator_recharge_commission', 'operator_prize_commission',
+                    'operator_ggr_commission', 'affiliate_cpa', 'store_player_affiliate_commission', 'store_affiliate_commission',
+                    'referred', 'referral'
+                  )
                 {$groupCondition} {$searchCondition}";
         $paramsSql = array_merge([$from, $to], $searchParams);
         $res = $db->query($sql, $paramsSql)->getResultArray();
         foreach ($res as $r) {
             $pType = (string) $r['payment_type'];
+            // Comisiones acumuladas individuales no deben figurar como pagadas en Admin
+            if (function_exists('bingo_is_accrued_commission_payment') && bingo_is_accrued_commission_payment(['type' => $pType])) {
+                continue;
+            }
             $isDebit = in_array($pType, ['admin_bonus_debit', 'admin_recharge_debit', 'admin_withdraw_debit', 'operator_store_debit', 'store_debit', 'store_balance_remove'], true);
             $direction = $isDebit ? '-' : '+';
             
@@ -2009,10 +2019,10 @@ class Games extends Controller {
                 $typeLabel = $pType === 'store_retire_pay' ? 'Pago Retiro Efectivo' : 'Recarga a Jugador';
                 $badgeClass = $isDebit ? 'bg-danger' : 'bg-success';
                 $walletName = 'Caja Punto de Venta';
-            } elseif (strpos($pType, 'liquidation') !== false || strpos($pType, 'commission') !== false) {
-                $typeLabel = 'Liquidación / Comisión';
+            } elseif ($pType === 'commission_liquidation' || $pType === 'commission_settlement') {
+                $typeLabel = 'LIQUIDACION COMISIONES';
                 $badgeClass = 'bg-dark';
-                $walletName = 'Saldo Comisión';
+                $walletName = 'Liquidación Comisiones';
             }
             
             if ($movementType !== 'all' && $movementType !== $pType && !($movementType === 'bonus' && strpos($pType, 'bonus') !== false)) {

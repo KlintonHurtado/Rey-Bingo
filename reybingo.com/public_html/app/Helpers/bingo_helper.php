@@ -3562,8 +3562,111 @@ if (!function_exists('bingo_ensure_retires_schema')) {
                 ]);
             }
         } catch (\Throwable $e) {
-            log_message('error', 'No se pudo actualizar el esquema de retires: ' . $e->getMessage());
+            log_message('error', 'bingo_ensure_retires_schema: ' . $e->getMessage());
         }
+    }
+}
+
+if (! function_exists('bingo_ensure_payments_schema')) {
+    function bingo_ensure_payments_schema(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $ensured = true;
+
+        try {
+            $db = \Config\Database::connect();
+            if (! $db->tableExists('payments')) {
+                return;
+            }
+
+            $forge = \Config\Database::forge();
+
+            if (! $db->fieldExists('description', 'payments')) {
+                $forge->addColumn('payments', [
+                    'description' => [
+                        'type' => 'TEXT',
+                        'null' => true,
+                        'after' => 'amount',
+                    ],
+                ]);
+            }
+
+            if (! $db->fieldExists('from', 'payments')) {
+                $forge->addColumn('payments', [
+                    'from' => [
+                        'type' => 'INT',
+                        'constraint' => 11,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'user',
+                    ],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_ensure_payments_schema: ' . $e->getMessage());
+        }
+    }
+}
+
+if (! function_exists('bingo_is_commission_liquidation_payment')) {
+    /**
+     * Detecta si un registro de payments corresponde a liquidación de comisiones.
+     */
+    function bingo_is_commission_liquidation_payment(array $pay): bool
+    {
+        $type = strtolower(trim((string) ($pay['type'] ?? '')));
+        if ($type === 'commission_liquidation' || $type === 'commission_settlement') {
+            return true;
+        }
+
+        $description = strtoupper((string) ($pay['description'] ?? ''));
+        return str_contains($description, 'LIQUIDACION COMISIONES')
+            || str_contains($description, 'LIQUIDACIÓN DE COMISIONES')
+            || str_contains($description, 'LIQUIDACION DE COMISIONES');
+    }
+}
+
+if (! function_exists('bingo_accrued_commission_payment_types')) {
+    /**
+     * Tipos de pago de comisiones acumuladas (NO son liquidación/pago mensual).
+     *
+     * @return list<string>
+     */
+    function bingo_accrued_commission_payment_types(): array
+    {
+        return [
+            'store_commission',
+            'store_recharge_commission',
+            'store_prize_commission',
+            'store_retire_commission',
+            'store_ggr_commission',
+            'operator_commission',
+            'operator_recharge_commission',
+            'operator_prize_commission',
+            'operator_ggr_commission',
+            'affiliate_cpa',
+            'store_player_affiliate_commission',
+            'store_affiliate_commission',
+            'referred',
+            'referral',
+        ];
+    }
+}
+
+if (! function_exists('bingo_is_accrued_commission_payment')) {
+    function bingo_is_accrued_commission_payment(array $pay): bool
+    {
+        if (bingo_is_commission_liquidation_payment($pay)) {
+            return false;
+        }
+
+        $type = strtolower(trim((string) ($pay['type'] ?? '')));
+
+        return in_array($type, bingo_accrued_commission_payment_types(), true)
+            || str_contains($type, '_commission');
     }
 }
 
@@ -4632,8 +4735,6 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                 'registration_bonus' => 'Bono de registro',
                 'admin_bonus' => 'Acreditación Bono (Admin)',
                 'bonus' => 'Bono',
-                'referred' => 'Comisión referido',
-                'referral' => 'Comisión referido',
             ];
             if (isset($bonusLabels[$ptype])) {
                 $push([
@@ -4653,13 +4754,13 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                 continue;
             }
 
+            // Comisiones acumuladas: no van a movimientos (solo liquidación mensual / panel de comisiones)
+            if (bingo_is_accrued_commission_payment($pay)) {
+                continue;
+            }
+
             // Las comisiones se gestionan exclusivamente en el módulo de comisiones / liquidaciones
-            if (in_array($ptype, [
-                'operator_ggr_commission', 'store_ggr_commission',
-                'operator_recharge_commission', 'store_recharge_commission',
-                'operator_prize_commission', 'store_prize_commission', 'store_retire_commission',
-                'operator_commission', 'store_commission', 'referred', 'referral'
-            ], true)) {
+            if (in_array($ptype, bingo_accrued_commission_payment_types(), true)) {
                 continue;
             }
 
@@ -4693,6 +4794,28 @@ if (!function_exists('bingo_build_user_movements_ledger')) {
                     'source' => 'withdraw',
                     'source_label' => 'Saldo Retiro',
                     'detail' => 'Débito de saldo retirable por administración',
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
+            if (bingo_is_commission_liquidation_payment($pay)) {
+                $detail = trim((string) ($pay['description'] ?? ''));
+                if ($detail === '') {
+                    $detail = 'LIQUIDACION COMISIONES | Pago/liquidación de comisiones por Administración';
+                }
+                $push([
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'commission_liquidation',
+                    'type_label' => 'LIQUIDACION COMISIONES',
+                    'direction' => '+',
+                    'amount' => $amount,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'source' => 'commission',
+                    'source_label' => 'Liquidación Comisiones',
+                    'detail' => $detail,
                     'ref_table' => 'payments',
                     'ref_id' => (int) ($pay['id'] ?? 0),
                 ]);
@@ -5075,6 +5198,36 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
             $amt = round((float) ($pay['amount'] ?? 0), 2);
             $st = (int) ($pay['status'] ?? 2);
 
+            // Liquidación de comisiones (no es acreditación normal de saldo)
+            if (bingo_is_commission_liquidation_payment($pay)) {
+                $detail = trim((string) ($pay['description'] ?? ''));
+                if ($detail === '') {
+                    $detail = 'LIQUIDACION COMISIONES | Pago/liquidación de comisiones por Administración';
+                }
+                $push([
+                    'id' => 'PAY_LIQ_' . $pay['id'],
+                    'datetime' => (string) ($pay['created_at'] ?? ''),
+                    'type' => 'commission_liquidation',
+                    'type_category' => 'commission_liquidation',
+                    'type_label' => 'LIQUIDACION COMISIONES',
+                    'badge_class' => 'bg-success text-white',
+                    'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
+                    'direction' => '+',
+                    'amount' => $amt,
+                    'status' => $st,
+                    'status_label' => bingo_status_label_short($st),
+                    'beneficiary_name' => 'Mi Punto de Venta',
+                    'beneficiary_document' => '',
+                    'beneficiary_username' => '',
+                    'beneficiary_code' => '',
+                    'ref_code' => 'LIQ #' . $pay['id'],
+                    'detail' => $detail,
+                    'ref_table' => 'payments',
+                    'ref_id' => (int) ($pay['id'] ?? 0),
+                ]);
+                continue;
+            }
+
             // Acreditaciones de saldo y ajustes manuales (Admin / Operador / Bonos)
             if (in_array($ptype, [
                 'admin_store_credit', 'operator_store_credit', 'store_credit', 'store_balance_add',
@@ -5151,8 +5304,9 @@ if (! function_exists('bingo_build_store_movements_ledger')) {
                 continue;
             }
 
-            // Omitir comisiones ganadas del libro de movimientos operativos del Punto de Venta
-            if (in_array($ptype, ['store_recharge_commission', 'store_ggr_commission', 'store_prize_commission', 'store_retire_commission', 'store_commission', 'referred', 'referral'], true)) {
+            // Omitir comisiones acumuladas del libro de movimientos operativos del Punto de Venta
+            // (solo figuran como pagadas tras LIQUIDACION COMISIONES)
+            if (bingo_is_accrued_commission_payment($pay) || in_array($ptype, bingo_accrued_commission_payment_types(), true)) {
                 continue;
             }
         }
@@ -5597,6 +5751,39 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                     continue;
                 }
 
+                // Liquidación de comisiones (no es acreditación normal)
+                if (bingo_is_commission_liquidation_payment($pay)) {
+                    $detail = trim((string) ($pay['description'] ?? ''));
+                    if ($detail === '') {
+                        $detail = 'LIQUIDACION COMISIONES | Pago/liquidación de comisiones por Administración'
+                            . ($uId !== $operatorId ? (' a ' . $stName) : '');
+                    }
+                    $push([
+                        'id' => 'PAY_LIQ_' . $pay['id'],
+                        'datetime' => (string) ($pay['created_at'] ?? ''),
+                        'type' => 'commission_liquidation',
+                        'type_category' => 'commission_liquidation',
+                        'type_label' => 'LIQUIDACION COMISIONES',
+                        'badge_class' => 'bg-success text-white',
+                        'icon' => 'fa-duotone fa-solid fa-money-bill-transfer',
+                        'direction' => '+',
+                        'amount' => $amt,
+                        'status' => $st,
+                        'status_label' => bingo_status_label_short($st),
+                        'store_id' => $uId,
+                        'store_name' => $stName,
+                        'beneficiary_name' => $stName,
+                        'beneficiary_document' => '',
+                        'beneficiary_username' => '',
+                        'beneficiary_code' => '',
+                        'ref_code' => 'LIQ #' . $pay['id'],
+                        'detail' => $detail,
+                        'ref_table' => 'payments',
+                        'ref_id' => (int) ($pay['id'] ?? 0),
+                    ]);
+                    continue;
+                }
+
                 // Transferencias de saldo y Acreditaciones manuales (Admin / Operador / Pago Premio)
                 if (in_array($ptype, [
                     'admin_operator_pay', 'admin_operator_credit',
@@ -5641,8 +5828,8 @@ if (! function_exists('bingo_build_operator_movements_ledger')) {
                     continue;
                 }
 
-                // Comisiones se gestionan exclusivamente en el módulo de comisiones del operador / liquidaciones
-                if (in_array($ptype, [
+                // Comisiones acumuladas: solo en módulo de comisiones / liquidación mensual
+                if (bingo_is_accrued_commission_payment($pay) || in_array($ptype, [
                     'operator_ggr_commission', 'store_ggr_commission',
                     'operator_recharge_commission', 'store_recharge_commission',
                     'operator_prize_commission', 'store_prize_commission', 'store_retire_commission',
@@ -6787,6 +6974,258 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
     }
 }
 
+if (! function_exists('bingo_format_commission_export_datetime')) {
+    function bingo_format_commission_export_datetime(string $datetime): string
+    {
+        $datetime = trim($datetime);
+        if ($datetime === '') {
+            return '';
+        }
+        $ts = strtotime($datetime);
+
+        return $ts !== false ? date('d/m/Y H:i:s', $ts) : $datetime;
+    }
+}
+
+if (! function_exists('bingo_build_admin_user_commissions_export')) {
+    /**
+     * Export Excel de comisiones de un Operador o Punto de Venta (Admin).
+     *
+     * @return array{headers:list<string>,rows:list<list<mixed>>,title:string,sheet_name:string,numeric_columns:list<int>,filename_prefix:string}|null
+     */
+    function bingo_build_admin_user_commissions_export(int $userId, array $filters = []): ?array
+    {
+        if ($userId <= 0) {
+            return null;
+        }
+
+        $modelUsers = new \App\Models\UsersModel();
+        $user = $modelUsers->find($userId);
+        if (! $user || (int) ($user['deleted'] ?? 0) !== 0) {
+            return null;
+        }
+
+        $group = (int) ($user['group'] ?? -1);
+        $isOperator = $group === bingo_group_operator();
+        $isStore = $group === bingo_group_store();
+        if (! $isOperator && ! $isStore) {
+            return null;
+        }
+
+        $displayName = $isStore
+            ? (function_exists('bingo_store_display_name') ? bingo_store_display_name($user) : trim((string) ($user['business_name'] ?? '')))
+            : trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+        $code = (string) ($user['code'] ?? '');
+
+        if ($isOperator) {
+            $data = bingo_fetch_operator_detailed_commissions_breakdown($userId, $filters);
+            $headers = [
+                'Fecha y Hora',
+                'Rol',
+                'Nombre',
+                'Codigo',
+                'Punto de Venta / Origen',
+                'Tipo de Comision',
+                'Referencia',
+                'Monto Base',
+                'Tasa (%)',
+                'Comision',
+                'Estado',
+                'Detalle',
+            ];
+            $rows = [];
+            foreach (($data['items'] ?? []) as $it) {
+                $rows[] = [
+                    bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
+                    'Operador',
+                    $displayName,
+                    $code,
+                    (string) ($it['store_name'] ?? ''),
+                    (string) ($it['rate_type_label'] ?? ''),
+                    (string) ($it['ref_code'] ?? ''),
+                    round((float) ($it['base_amount'] ?? 0), 2),
+                    number_format(((float) ($it['operator_spread'] ?? $it['operator_rate'] ?? 0)) * 100, 2) . '%',
+                    round((float) ($it['operator_profit'] ?? 0), 2),
+                    (string) ($it['status_label'] ?? ''),
+                    (string) ($it['detail'] ?? ''),
+                ];
+            }
+
+            return [
+                'headers' => $headers,
+                'rows' => $rows,
+                'title' => 'Rey Bingo - Comisiones Operador: ' . $displayName . ($code !== '' ? ' (' . $code . ')' : ''),
+                'sheet_name' => 'Comisiones Operador',
+                'numeric_columns' => [7, 9],
+                'filename_prefix' => 'comisiones_operador_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $code ?: (string) $userId),
+            ];
+        }
+
+        $data = bingo_fetch_store_detailed_commissions_breakdown($userId, $filters);
+        $headers = [
+            'Fecha y Hora',
+            'Rol',
+            'Nombre',
+            'Codigo',
+            'Tipo de Comision',
+            'Jugador / Beneficiario',
+            'Documento',
+            'Referencia',
+            'Monto Base',
+            'Tasa (%)',
+            'Comision',
+            'Estado',
+            'Detalle',
+        ];
+        $rows = [];
+        foreach (($data['items'] ?? []) as $it) {
+            $rows[] = [
+                bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
+                'Punto de Venta',
+                $displayName,
+                $code,
+                (string) ($it['rate_type_label'] ?? ''),
+                (string) ($it['player_name'] ?? ''),
+                (string) ($it['player_doc'] ?? ''),
+                (string) ($it['ref_code'] ?? ''),
+                round((float) ($it['base_amount'] ?? 0), 2),
+                number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
+                round((float) ($it['commission_amount'] ?? 0), 2),
+                (string) ($it['status_label'] ?? ''),
+                (string) ($it['detail'] ?? ''),
+            ];
+        }
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'title' => 'Rey Bingo - Comisiones Punto de Venta: ' . $displayName . ($code !== '' ? ' (' . $code . ')' : ''),
+            'sheet_name' => 'Comisiones PV',
+            'numeric_columns' => [8, 10],
+            'filename_prefix' => 'comisiones_pv_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $code ?: (string) $userId),
+        ];
+    }
+}
+
+if (! function_exists('bingo_build_admin_network_commissions_export')) {
+    /**
+     * Export Excel de todas las comisiones de la Red Tercerizada (Operadores + Puntos de Venta).
+     *
+     * @return array{headers:list<string>,rows:list<list<mixed>>,title:string,sheet_name:string,numeric_columns:list<int>}
+     */
+    function bingo_build_admin_network_commissions_export(array $filters = []): array
+    {
+        $modelUsers = new \App\Models\UsersModel();
+
+        $headers = [
+            'Fecha y Hora',
+            'Rol',
+            'Nombre',
+            'Codigo',
+            'Operador Asignado',
+            'Tipo de Comision',
+            'Origen / Beneficiario',
+            'Referencia',
+            'Monto Base',
+            'Tasa (%)',
+            'Comision',
+            'Estado',
+            'Detalle',
+        ];
+        $rows = [];
+
+        $operators = $modelUsers
+            ->where('group', bingo_group_operator())
+            ->where('deleted', 0)
+            ->orderBy('firstname', 'ASC')
+            ->findAll();
+
+        foreach ($operators as $operator) {
+            $opId = (int) ($operator['id'] ?? 0);
+            $opName = trim(($operator['firstname'] ?? '') . ' ' . ($operator['lastname'] ?? ''));
+            $opCode = (string) ($operator['code'] ?? '');
+            $data = bingo_fetch_operator_detailed_commissions_breakdown($opId, $filters);
+
+            foreach (($data['items'] ?? []) as $it) {
+                $rows[] = [
+                    bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
+                    'Operador',
+                    $opName,
+                    $opCode,
+                    $opName,
+                    (string) ($it['rate_type_label'] ?? ''),
+                    (string) ($it['store_name'] ?? ''),
+                    (string) ($it['ref_code'] ?? ''),
+                    round((float) ($it['base_amount'] ?? 0), 2),
+                    number_format(((float) ($it['operator_spread'] ?? $it['operator_rate'] ?? 0)) * 100, 2) . '%',
+                    round((float) ($it['operator_profit'] ?? 0), 2),
+                    (string) ($it['status_label'] ?? ''),
+                    (string) ($it['detail'] ?? ''),
+                ];
+            }
+        }
+
+        $stores = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->orderBy('business_name', 'ASC')
+            ->findAll();
+
+        $operatorNameCache = [];
+        foreach ($stores as $store) {
+            $storeId = (int) ($store['id'] ?? 0);
+            $storeName = function_exists('bingo_store_display_name')
+                ? bingo_store_display_name($store)
+                : trim((string) ($store['business_name'] ?? ''));
+            $storeCode = (string) ($store['code'] ?? '');
+            $opId = (int) ($store['operator_id'] ?? 0);
+            if ($opId > 0 && ! isset($operatorNameCache[$opId])) {
+                $op = $modelUsers->find($opId);
+                $operatorNameCache[$opId] = $op
+                    ? trim(($op['firstname'] ?? '') . ' ' . ($op['lastname'] ?? ''))
+                    : '';
+            }
+            $operatorName = $opId > 0 ? ($operatorNameCache[$opId] ?? '') : 'Sin operador';
+
+            $data = bingo_fetch_store_detailed_commissions_breakdown($storeId, $filters);
+            foreach (($data['items'] ?? []) as $it) {
+                $beneficiary = trim((string) ($it['player_name'] ?? ''));
+                if (! empty($it['player_doc'])) {
+                    $beneficiary .= ($beneficiary !== '' ? ' / ' : '') . $it['player_doc'];
+                }
+
+                $rows[] = [
+                    bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
+                    'Punto de Venta',
+                    $storeName,
+                    $storeCode,
+                    $operatorName !== '' ? $operatorName : 'Sin operador',
+                    (string) ($it['rate_type_label'] ?? ''),
+                    $beneficiary,
+                    (string) ($it['ref_code'] ?? ''),
+                    round((float) ($it['base_amount'] ?? 0), 2),
+                    number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
+                    round((float) ($it['commission_amount'] ?? 0), 2),
+                    (string) ($it['status_label'] ?? ''),
+                    (string) ($it['detail'] ?? ''),
+                ];
+            }
+        }
+
+        usort($rows, static function ($a, $b) {
+            return strcmp((string) ($b[0] ?? ''), (string) ($a[0] ?? ''));
+        });
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'title' => 'Rey Bingo - Comisiones Generales Red Tercerizada',
+            'sheet_name' => 'Red Tercerizada',
+            'numeric_columns' => [8, 10],
+        ];
+    }
+}
+
 if (!function_exists('bingo_calculate_store_commission')) {
     function bingo_calculate_store_commission(float $amount, array $store): float
     {
@@ -6840,14 +7279,15 @@ if (!function_exists('bingo_credit_store_operation_commission')) {
             return 0.0;
         }
 
-        wallet_credit_commission_earnings($storeId, $commission);
-
+        // Solo registrar comisión acumulada (pendiente). NO acreditar saldo ni marcarla como pagada.
+        // El pago real ocurre en el corte/liquidación mensual (commission_liquidation).
         $modelPayments->insert([
             'user' => $storeId,
             'type' => $paymentType,
             'type_id' => $typeId,
             'amount' => $commission,
-            'status' => 2,
+            'status' => 1,
+            'description' => 'Comision acumulada pendiente de liquidacion',
         ]);
         $paymentId = (int) $modelPayments->getInsertID();
 
@@ -6859,9 +7299,10 @@ if (!function_exists('bingo_credit_store_operation_commission')) {
                 'from' => $fromUserId > 0 ? $fromUserId : $storeId,
                 'type' => 'payment',
                 'type_id' => $paymentId,
-                'title' => '💰 ' . translate('store commission credited'),
+                'title' => translate('store commission credited'),
                 'message' => translate('store commission credited') . ': '
-                    . systemGet('currency') . ' ' . number_format($commission, 2),
+                    . systemGet('currency') . ' ' . number_format($commission, 2)
+                    . ' (pendiente de liquidacion)',
             ]);
         }
 
@@ -7420,7 +7861,7 @@ if (!function_exists('bingo_sum_store_recharge_commissions')) {
             ->select('amount')
             ->where('user', $storeId)
             ->where('type', 'store_commission')
-            ->where('status', 2)
+            ->whereIn('status', [1, 2])
             ->findAll();
 
         $total = 0.0;
@@ -7444,7 +7885,7 @@ if (!function_exists('bingo_sum_store_prize_commissions')) {
             ->select('amount')
             ->where('user', $storeId)
             ->where('type', 'store_prize_commission')
-            ->where('status', 2)
+            ->whereIn('status', [1, 2])
             ->findAll();
 
         $total = 0.0;

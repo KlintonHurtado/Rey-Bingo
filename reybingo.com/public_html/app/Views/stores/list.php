@@ -55,6 +55,9 @@
                             <button type="button" class="btn btn-sm btn-success text-white d-flex align-items-center gap-1" onclick="openCommissionLiquidationModal(<?= (int) $store['id'] ?>, function(){ storeRefreshList(); })" title="Pagar / Liquidar Comisiones">
                                 <i class="fa-duotone fa-solid fa-money-bill-wave"></i> Pagar
                             </button>
+                            <a class="btn btn-sm btn-outline-success d-flex align-items-center gap-1" href="<?= site_url('users/exportUserCommissions/' . (int) $store['id']); ?>" title="Descargar comisiones de este Punto de Venta">
+                                <i class="fa-duotone fa-solid fa-file-excel"></i>
+                            </a>
                             <button type="button" class="btn btn-sm btn-primary" onclick="storeEdit(<?= (int) $store['id'] ?>)" title="<?= translate('edit'); ?>">
                                 <i class="fa-duotone fa-solid fa-pen"></i>
                             </button>

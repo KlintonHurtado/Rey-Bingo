@@ -925,22 +925,27 @@ class Users extends Controller {
         $adminId = (int) session()->get('id');
         $modelPayments = new \App\Models\PaymentsModel();
 
+        if (function_exists('bingo_ensure_payments_schema')) {
+            bingo_ensure_payments_schema();
+        }
+
         // 1. Si es acreditación a saldo recargable, sumamos a la wallet
         if ($settlementType === 'credit_balance') {
             wallet_credit_recharge($userId, $amount);
         }
 
-        // 2. Registramos el movimiento de pago
-        $description = ($settlementType === 'credit_balance'
-            ? 'Liquidación de comisiones acreditada a Saldo de Recargas'
-            : 'Liquidación de comisiones pagada por Transferencia Bancaria' . ($reference !== '' ? ' (Ref: #' . $reference . ')' : '')
-        ) . ($notes !== '' ? ' | ' . $notes : '');
+        // 2. Registramos el movimiento como LIQUIDACION COMISIONES (no acreditación normal)
+        $methodLabel = $settlementType === 'credit_balance'
+            ? 'acreditada a Saldo de Recargas'
+            : ('pagada por Transferencia Bancaria' . ($reference !== '' ? ' (Ref: #' . $reference . ')' : ''));
 
-        $paymentType = $isOperator ? 'admin_operator_pay' : 'admin_store_credit';
+        $description = 'LIQUIDACION COMISIONES | ' . $methodLabel
+            . ($notes !== '' ? ' | ' . $notes : '');
 
         $modelPayments->insert([
             'user'        => $userId,
-            'type'        => $paymentType,
+            'from'        => $adminId,
+            'type'        => 'commission_liquidation',
             'type_id'     => $adminId,
             'amount'      => $amount,
             'status'      => 2,
@@ -975,8 +980,8 @@ class Users extends Controller {
         $modelNotifications = new \App\Models\NotificationsModel();
         $modelNotifications->insert([
             'user'       => $userId,
-            'title'      => '¡Liquidación de Comisiones Realizada!',
-            'message'    => 'La administración ha procesado la liquidación de tus comisiones por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' (' . ($settlementType === 'credit_balance' ? 'Acreditado a saldo recargable' : 'Transferencia bancaria') . ').',
+            'title'      => 'LIQUIDACION COMISIONES',
+            'message'    => 'La administración procesó una LIQUIDACION COMISIONES por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' (' . ($settlementType === 'credit_balance' ? 'Acreditado a saldo recargable' : 'Transferencia bancaria') . ').',
             'created_at' => date('Y-m-d H:i:s'),
             'status'     => 1,
         ]);
@@ -986,9 +991,75 @@ class Users extends Controller {
 
         return $this->response->setJSON([
             'success' => true,
-            'message' => '¡Liquidación y pago de comisiones procesado exitosamente!',
+            'message' => 'LIQUIDACION COMISIONES procesada exitosamente.',
             'balance' => round($newBalance, 2),
         ]);
+    }
+
+    public function exportUserCommissions($userId = null)
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+
+        $userId = (int) $userId;
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'store_id'  => (string) ($this->request->getGet('store_id') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $export = bingo_build_admin_user_commissions_export($userId, $filters);
+        if ($export === null) {
+            return redirect()->back()->with('error', 'No se pudo exportar: usuario no válido o sin rol Operador/Punto de Venta.');
+        }
+
+        $filename = ($export['filename_prefix'] ?? ('comisiones_' . $userId)) . '_' . date('Ymd_His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => $export['sheet_name'] ?? 'Comisiones',
+                'title' => $export['title'] ?? 'Rey Bingo - Comisiones',
+                'numeric_columns' => $export['numeric_columns'] ?? [],
+            ]
+        );
+    }
+
+    public function exportNetworkCommissions()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return redirect()->to('/signin');
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $export = bingo_build_admin_network_commissions_export($filters);
+        $filename = 'comisiones_red_tercerizada_' . date('Ymd_His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => $export['sheet_name'] ?? 'Red Tercerizada',
+                'title' => $export['title'] ?? 'Rey Bingo - Comisiones Red Tercerizada',
+                'numeric_columns' => $export['numeric_columns'] ?? [8, 10],
+            ]
+        );
     }
 
     public function lowBalancePlayers()
@@ -1884,7 +1955,17 @@ class Users extends Controller {
         }
 
         $purchaseRows = bingo_build_user_carton_purchase_report((int) $userId, 500);
-        $movements = bingo_build_user_movements_ledger((int) $userId, 1500);
+
+        $userGroup = (int) ($user['group'] ?? 0);
+        if ($userGroup === bingo_group_store() && function_exists('bingo_build_store_movements_ledger')) {
+            $ledgerData = bingo_build_store_movements_ledger((int) $userId);
+            $movements = $ledgerData['movements'] ?? [];
+        } elseif ($userGroup === bingo_group_operator() && function_exists('bingo_build_operator_movements_ledger')) {
+            $ledgerData = bingo_build_operator_movements_ledger((int) $userId);
+            $movements = $ledgerData['movements'] ?? [];
+        } else {
+            $movements = bingo_build_user_movements_ledger((int) $userId, 1500);
+        }
 
         $roulettes = $modelRoulettes->where('user', $userId)->orderBy('created_at', 'DESC')->findAll(80);
         $loginLogs = $modelLogs
@@ -2011,6 +2092,45 @@ class Users extends Controller {
         $user = $model->find((int) $userId);
         if (! $user) {
             return redirect()->back()->with('error', translate('user not found'));
+        }
+
+        $userGroup = (int) ($user['group'] ?? 0);
+        if ($userGroup === bingo_group_store() && function_exists('bingo_build_store_movements_ledger')) {
+            $ledgerData = bingo_build_store_movements_ledger((int) $userId);
+            $movements = $ledgerData['movements'] ?? [];
+            $export = bingo_store_movements_export_rows($movements);
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($user['code'] ?? $userId)) ?: (string) $userId;
+            $filename = 'movimientos-pv-' . $code . '-' . date('Ymd-His') . '.xls';
+
+            return (new ExcelExport())->downloadResponse(
+                $export['headers'],
+                $export['rows'],
+                $filename,
+                [
+                    'sheet_name' => 'Movimientos PV',
+                    'title' => 'Rey Bingo - Movimientos Punto de Venta',
+                    'numeric_columns' => [3, 4],
+                ]
+            );
+        }
+
+        if ($userGroup === bingo_group_operator() && function_exists('bingo_build_operator_movements_ledger')) {
+            $ledgerData = bingo_build_operator_movements_ledger((int) $userId);
+            $movements = $ledgerData['movements'] ?? [];
+            $export = bingo_operator_movements_export_rows($movements);
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($user['code'] ?? $userId)) ?: (string) $userId;
+            $filename = 'movimientos-operador-' . $code . '-' . date('Ymd-His') . '.xls';
+
+            return (new ExcelExport())->downloadResponse(
+                $export['headers'],
+                $export['rows'],
+                $filename,
+                [
+                    'sheet_name' => 'Movimientos Operador',
+                    'title' => 'Rey Bingo - Movimientos Operador',
+                    'numeric_columns' => [3],
+                ]
+            );
         }
 
         $movements = bingo_build_user_movements_ledger((int) $userId, 5000);

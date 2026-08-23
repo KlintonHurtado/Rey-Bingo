@@ -180,6 +180,9 @@ $sourceLabel = static function ($source) {
                             <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="openCommissionLiquidationModal(<?= (int) $user['id']; ?>, function(){ location.reload(); })" title="Liquidar y Pagar Comisiones Mensuales">
                                 <i class="fa-duotone fa-solid fa-money-bill-transfer me-1"></i> Liquidar Comisiones
                             </button>
+                            <a class="btn btn-sm btn-success text-nowrap" href="<?= site_url('users/exportUserCommissions/' . (int) $user['id']); ?>" title="Descargar comisiones individuales">
+                                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Excel Comisiones
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -418,7 +421,7 @@ $sourceLabel = static function ($source) {
             <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <p class="small text-muted mb-0">
                     Historial de movimientos operativos (recargas, pagos de retiros, acreditaciones de saldo y ajustes).
-                    La columna <strong>Saldo Total</strong> muestra cómo queda el saldo disponible después de cada movimiento.
+                    Las comisiones individuales de recarga/retiro <strong>no aparecen aquí</strong>: se revisan en la pestaña <strong>Comisiones</strong> y solo figuran como pagadas cuando se registra una <strong>LIQUIDACION COMISIONES</strong>.
                 </p>
                 <a class="btn btn-sm btn-outline-primary" href="<?= site_url('users/exportUserMovements/' . (int) $user['id']); ?>">
                     <i class="fa-duotone fa-solid fa-download"></i> Descargar Excel
