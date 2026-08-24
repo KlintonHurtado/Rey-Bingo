@@ -1,24 +1,24 @@
 <?php
 $isUpdate = ! empty($isUpdate);
 $userData = $userData ?? null;
-$adminRoles = $adminRoles ?? [];
-$canManageAdmins = ! empty($canManageAdmins);
-$showAdminOption = $canManageAdmins || ($isUpdate && (int) ($userData['group'] ?? 0) === 1);
-$currentGroup = $isUpdate ? (int) ($userData['group'] ?? 0) : 0;
-$currentRoleId = $isUpdate ? (int) ($userData['admin_role_id'] ?? 0) : 0;
-$rolesJson = [];
-foreach ($adminRoles as $role) {
-    $rid = (int) ($role['id'] ?? 0);
-    $isSuper = (int) ($role['is_superadmin'] ?? 0) === 1;
-    if ($isSuper && ! $canManageAdmins && (int) session()->get('admin_is_superadmin') !== 1) {
-        continue;
-    }
-    $rolesJson[] = [
-        'id' => $rid,
-        'name' => (string) ($role['name'] ?? ''),
-        'description' => (string) ($role['description'] ?? ''),
-        'is_superadmin' => $isSuper ? 1 : 0,
-        'permissions' => $role['permissions'] ?? [],
+$permissionsCatalog = $permissionsCatalog ?? bingo_assignable_permissions_catalog();
+$permissionPresets = $permissionPresets ?? bingo_staff_permission_presets();
+$selectedPermissionKeys = $selectedPermissionKeys ?? [];
+$selectedMap = array_fill_keys(array_map('strval', $selectedPermissionKeys), true);
+
+$permsByModule = [];
+foreach ($permissionsCatalog as $perm) {
+    $mod = (string) ($perm['module'] ?? 'General');
+    $permsByModule[$mod][] = $perm;
+}
+
+$presetsJson = [];
+foreach ($permissionPresets as $preset) {
+    $presetsJson[] = [
+        'slug' => (string) ($preset['slug'] ?? ''),
+        'name' => (string) ($preset['name'] ?? ''),
+        'description' => (string) ($preset['description'] ?? ''),
+        'permissions' => array_values($preset['permissions'] ?? []),
     ];
 }
 ?>
@@ -40,9 +40,9 @@ foreach ($adminRoles as $role) {
                 <div>
                     <h4 class="mb-1 text-dark">
                         <i class="fa-duotone fa-solid fa-user-plus text-success me-2"></i>
-                        <?= $isUpdate ? translate('update user') : 'Crear usuario'; ?>
+                        <?= $isUpdate ? 'Editar staff Admin' : 'Crear staff Admin'; ?>
                     </h4>
-                    <p class="text-muted small mb-0">Completa los datos y luego elige el grupo y permisos.</p>
+                    <p class="text-muted small mb-0">Solo para personas que trabajan en el panel. Paso 1: datos. Paso 2: permisos exactos.</p>
                 </div>
                 <a href="<?= site_url('games'); ?>" class="btn btn-sm btn-outline-secondary">
                     <i class="fa-duotone fa-solid fa-arrow-left me-1"></i> Volver
@@ -57,7 +57,7 @@ foreach ($adminRoles as $role) {
                 <div class="admin-user-step-line"></div>
                 <button type="button" class="admin-user-step" data-step-btn="2" id="step-btn-2">
                     <span class="admin-user-step-num">2</span>
-                    <span>Grupo y permisos</span>
+                    <span>Permisos</span>
                 </button>
             </div>
 
@@ -66,6 +66,8 @@ foreach ($adminRoles as $role) {
                 <input type="hidden" name="user-id" id="user-id" value="<?= $isUpdate ? (int) $userData['id'] : ''; ?>">
                 <input type="hidden" name="user-action" id="user-action" value="<?= $isUpdate ? 'update' : 'add'; ?>">
                 <input type="hidden" name="page_mode" value="1">
+                <input type="hidden" name="group" value="1">
+                <input type="hidden" name="status" id="status-hidden" value="<?= $isUpdate ? (int) ($userData['status'] ?? 1) : 1; ?>">
 
                 <div class="admin-user-step-pane is-active" id="user-step-1">
                     <h6 class="text-dark mb-3">Información personal y cuenta</h6>
@@ -125,20 +127,6 @@ foreach ($adminRoles as $role) {
                             <input type="text" class="form-control form-control-lg form-bingo" name="state" id="state" value="<?= $isUpdate ? esc($userData['state'] ?? '') : ''; ?>">
                         </div>
 
-                        <div class="col-12 mt-2"><hr class="my-2"><h6 class="text-dark mb-2">Saldos iniciales (opcional)</h6></div>
-                        <div class="col-md-4">
-                            <label class="form-label text-dark" for="wallet_bonus"><?= translate('bonus balance'); ?></label>
-                            <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="wallet_bonus" id="wallet_bonus" value="<?= $isUpdate ? number_format((float) ($userData['wallet_bonus'] ?? 0), 2, '.', '') : '0.00'; ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-dark" for="wallet_recharge"><?= translate('recharge balance'); ?></label>
-                            <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="wallet_recharge" id="wallet_recharge" value="<?= $isUpdate ? number_format((float) ($userData['wallet_recharge'] ?? 0), 2, '.', '') : '0.00'; ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label text-dark" for="wallet_withdraw"><?= translate('withdraw balance'); ?></label>
-                            <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="wallet_withdraw" id="wallet_withdraw" value="<?= $isUpdate ? number_format((float) ($userData['wallet_withdraw'] ?? 0), 2, '.', '') : '0.00'; ?>">
-                        </div>
-
                         <div class="col-12 mt-2"><hr class="my-2"><h6 class="text-dark mb-2">Datos bancarios (opcional)</h6></div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="bank"><?= translate('bank'); ?></label>
@@ -167,7 +155,7 @@ foreach ($adminRoles as $role) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="status"><?= translate('status'); ?></label>
-                            <select class="form-control form-control-lg form-bingo" name="status" id="status">
+                            <select class="form-control form-control-lg form-bingo" id="status" onchange="document.getElementById('status-hidden').value=this.value;">
                                 <option value="1" <?= ! $isUpdate || (int) ($userData['status'] ?? 1) === 1 ? 'selected' : ''; ?>><?= translate('active'); ?></option>
                                 <option value="0" <?= $isUpdate && (int) ($userData['status'] ?? 1) === 0 ? 'selected' : ''; ?>><?= translate('banned'); ?></option>
                             </select>
@@ -176,61 +164,61 @@ foreach ($adminRoles as $role) {
 
                     <div class="d-flex justify-content-end gap-2 mt-4">
                         <button type="button" class="btn btn-primary btn-lg px-4" id="btn-user-next-step">
-                            Siguiente: Grupo y permisos <i class="fa-duotone fa-solid fa-arrow-right ms-1"></i>
+                            Siguiente: Permisos <i class="fa-duotone fa-solid fa-arrow-right ms-1"></i>
                         </button>
                     </div>
                 </div>
 
                 <div class="admin-user-step-pane" id="user-step-2">
-                    <h6 class="text-dark mb-3">Grupo de acceso y permisos</h6>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label text-dark" for="group"><?= translate('group'); ?></label>
-                            <select class="form-control form-control-lg form-bingo" name="group" id="group">
-                                <option value="0" <?= $currentGroup === 0 ? 'selected' : ''; ?>><?= translate('player'); ?></option>
-                                <?php if ($showAdminOption) : ?>
-                                    <option value="1" <?= $currentGroup === 1 ? 'selected' : ''; ?>><?= translate('admin'); ?> / Staff</option>
-                                <?php endif; ?>
-                                <option value="2" <?= $currentGroup === 2 ? 'selected' : ''; ?>><?= translate('point of sale'); ?></option>
-                                <option value="3" <?= $currentGroup === 3 ? 'selected' : ''; ?>><?= translate('operator'); ?></option>
-                            </select>
-                            <small class="text-muted">El grupo define el panel al que ingresa el usuario.</small>
-                        </div>
-                        <div class="col-md-6" id="admin-role-wrap" style="<?= $currentGroup === 1 ? '' : 'display:none;'; ?>">
-                            <label class="form-label text-dark" for="admin_role_id">Rol de permisos <span class="text-danger">*</span></label>
-                            <select class="form-control form-control-lg form-bingo" name="admin_role_id" id="admin_role_id">
-                                <option value="">Selecciona un rol</option>
-                                <?php foreach ($rolesJson as $role) : ?>
-                                    <option value="<?= (int) $role['id']; ?>" <?= $currentRoleId === (int) $role['id'] ? 'selected' : ''; ?>>
-                                        <?= esc($role['name']); ?><?= ! empty($role['is_superadmin']) ? ' (acceso total)' : ''; ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small id="admin_role_id-error" class="text-danger d-none"></small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-dark" for="is_reseller"><?= translate('point of sale'); ?> (flag)</label>
-                            <select class="form-control form-control-lg form-bingo" name="is_reseller" id="is_reseller">
-                                <option value="0" <?= ! $isUpdate || (int) ($userData['is_reseller'] ?? 0) === 0 ? 'selected' : ''; ?>><?= translate('no'); ?></option>
-                                <option value="1" <?= $isUpdate && (int) ($userData['is_reseller'] ?? 0) === 1 ? 'selected' : ''; ?>><?= translate('yes'); ?></option>
-                            </select>
-                        </div>
-                    </div>
+                    <h6 class="text-dark mb-2">Selecciona qué puede hacer este staff</h6>
+                    <p class="small text-muted mb-3">
+                        Puedes marcar permisos uno a uno, o usar un atajo (Soporte, Finanzas, etc.) y luego ajustar.
+                    </p>
 
-                    <div id="role-permissions-box" class="admin-role-permissions mt-3" style="<?= $currentGroup === 1 ? '' : 'display:none;'; ?>">
-                        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                            <strong class="text-dark" id="role-permissions-title">Permisos del rol</strong>
-                            <span class="badge bg-primary" id="role-permissions-count">0</span>
-                        </div>
-                        <p class="small text-muted mb-2" id="role-permissions-desc"></p>
-                        <div class="admin-role-permissions-grid" id="role-permissions-grid">
-                            <div class="text-muted small">Selecciona un rol Admin / Staff para ver sus permisos.</div>
-                        </div>
+                    <div class="admin-perm-presets mb-3">
+                        <?php foreach ($presetsJson as $preset) : ?>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-primary admin-perm-preset-btn"
+                                data-preset="<?= esc($preset['slug']); ?>"
+                                title="<?= esc($preset['description']); ?>"
+                            >
+                                <?= esc($preset['name']); ?>
+                            </button>
+                        <?php endforeach; ?>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-clear-perms">Limpiar</button>
+                        <span class="badge bg-dark ms-1" id="selected-perms-count">0</span>
                     </div>
+                    <small id="permission_keys-error" class="text-danger d-none d-block mb-2"></small>
 
-                    <div id="non-admin-group-hint" class="alert alert-light border mt-3 mb-0" style="<?= $currentGroup === 1 ? 'display:none;' : ''; ?>">
-                        <i class="fa-duotone fa-solid fa-circle-info me-1 text-primary"></i>
-                        Este grupo usa su propio panel (jugador, punto de venta u operador). No requiere rol de permisos Admin.
+                    <div class="admin-perm-grid">
+                        <?php foreach ($permsByModule as $module => $items) : ?>
+                            <div class="admin-perm-module">
+                                <div class="admin-perm-module-head">
+                                    <strong><?= esc($module); ?></strong>
+                                    <button type="button" class="btn btn-link btn-sm p-0 admin-perm-toggle-module" data-module="<?= esc($module); ?>">Todos</button>
+                                </div>
+                                <ul class="admin-perm-list">
+                                    <?php foreach ($items as $perm) :
+                                        $key = (string) ($perm['key'] ?? '');
+                                        $checked = isset($selectedMap[$key]);
+                                        $isSensitive = ! empty($perm['sensitive']);
+                                        ?>
+                                        <li>
+                                            <label class="admin-perm-item<?= $isSensitive ? ' is-sensitive' : ''; ?>">
+                                                <input type="checkbox" class="form-check-input perm-checkbox" name="permission_keys[]" value="<?= esc($key); ?>" data-module="<?= esc($module); ?>" <?= $checked ? 'checked' : ''; ?>>
+                                                <span>
+                                                    <?= esc($perm['name'] ?? $key); ?>
+                                                    <?php if ($isSensitive) : ?>
+                                                        <em class="text-danger">sensible</em>
+                                                    <?php endif; ?>
+                                                </span>
+                                            </label>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
 
                     <div class="d-flex justify-content-between gap-2 mt-4 flex-wrap">
@@ -239,7 +227,7 @@ foreach ($adminRoles as $role) {
                         </button>
                         <button type="submit" class="btn btn-success btn-lg px-4" id="btn-user-save">
                             <i class="fa-duotone fa-solid fa-floppy-disk me-1"></i>
-                            <?= $isUpdate ? translate('update') : 'Crear usuario'; ?>
+                            <?= $isUpdate ? 'Guardar staff' : 'Crear staff'; ?>
                         </button>
                     </div>
                 </div>
@@ -251,7 +239,7 @@ foreach ($adminRoles as $role) {
 
 <script>
 (function () {
-    var roles = <?= json_encode($rolesJson, JSON_UNESCAPED_UNICODE); ?>;
+    var presets = <?= json_encode($presetsJson, JSON_UNESCAPED_UNICODE); ?>;
     var form = document.getElementById('user-page-form');
     if (!form) return;
 
@@ -264,6 +252,21 @@ foreach ($adminRoles as $role) {
         });
         var scroller = document.querySelector('.admin-user-form-scroll');
         if (scroller) scroller.scrollTop = 0;
+    }
+
+    function updatePermCount() {
+        var n = form.querySelectorAll('.perm-checkbox:checked').length;
+        var badge = document.getElementById('selected-perms-count');
+        if (badge) badge.textContent = String(n);
+    }
+
+    function setPermissions(keys) {
+        var map = {};
+        (keys || []).forEach(function (k) { map[String(k)] = true; });
+        form.querySelectorAll('.perm-checkbox').forEach(function (cb) {
+            cb.checked = !!map[cb.value];
+        });
+        updatePermCount();
     }
 
     function validateStep1() {
@@ -299,92 +302,40 @@ foreach ($adminRoles as $role) {
         return ok;
     }
 
-    function renderRolePermissions() {
-        var group = document.getElementById('group');
-        var roleSelect = document.getElementById('admin_role_id');
-        var wrap = document.getElementById('admin-role-wrap');
-        var box = document.getElementById('role-permissions-box');
-        var hint = document.getElementById('non-admin-group-hint');
-        var grid = document.getElementById('role-permissions-grid');
-        var title = document.getElementById('role-permissions-title');
-        var count = document.getElementById('role-permissions-count');
-        var desc = document.getElementById('role-permissions-desc');
-        if (!group) return;
-
-        var isAdmin = String(group.value) === '1';
-        if (wrap) wrap.style.display = isAdmin ? '' : 'none';
-        if (box) box.style.display = isAdmin ? '' : 'none';
-        if (hint) hint.style.display = isAdmin ? 'none' : '';
-        if (!isAdmin) {
-            if (roleSelect) roleSelect.value = '';
-            return;
-        }
-
-        var roleId = parseInt(roleSelect && roleSelect.value ? roleSelect.value : '0', 10) || 0;
-        var role = roles.find(function (r) { return Number(r.id) === roleId; });
-        if (!role) {
-            if (title) title.textContent = 'Permisos del rol';
-            if (count) count.textContent = '0';
-            if (desc) desc.textContent = 'Selecciona un rol para ver exactamente qué podrá hacer.';
-            if (grid) grid.innerHTML = '<div class="text-muted small">Selecciona un rol Admin / Staff para ver sus permisos.</div>';
-            return;
-        }
-
-        if (title) title.textContent = 'Permisos: ' + role.name;
-        if (desc) desc.textContent = role.description || (role.is_superadmin ? 'Acceso total al panel Admin.' : '');
-        var perms = role.permissions || [];
-        if (count) count.textContent = String(perms.length);
-        if (!grid) return;
-
-        if (!perms.length) {
-            grid.innerHTML = '<div class="text-muted small">Este rol no tiene permisos asignados.</div>';
-            return;
-        }
-
-        var byModule = {};
-        perms.forEach(function (p) {
-            var mod = p.module || 'General';
-            if (!byModule[mod]) byModule[mod] = [];
-            byModule[mod].push(p);
-        });
-
-        var html = '';
-        Object.keys(byModule).forEach(function (mod) {
-            html += '<div class="admin-role-module"><div class="admin-role-module-title">' + mod + '</div><ul>';
-            byModule[mod].forEach(function (p) {
-                html += '<li><i class="fa-duotone fa-solid fa-check text-success me-1"></i>' + (p.name || p.key) + '</li>';
-            });
-            html += '</ul></div>';
-        });
-        grid.innerHTML = html;
-    }
-
     document.getElementById('btn-user-next-step')?.addEventListener('click', function () {
         if (!validateStep1()) {
-            Toastify({
-                text: 'Completa los datos requeridos del paso 1.',
-                duration: 2800,
-                gravity: 'top',
-                position: 'right',
-                style: { background: '#dc3545' }
-            }).showToast();
+            Toastify({ text: 'Completa los datos requeridos del paso 1.', duration: 2800, gravity: 'top', position: 'right', style: { background: '#dc3545' } }).showToast();
             return;
         }
         goStep(2);
-        renderRolePermissions();
     });
     document.getElementById('btn-user-prev-step')?.addEventListener('click', function () { goStep(1); });
-    document.getElementById('group')?.addEventListener('change', renderRolePermissions);
-    document.getElementById('admin_role_id')?.addEventListener('change', renderRolePermissions);
     document.getElementById('step-btn-1')?.addEventListener('click', function () { goStep(1); });
     document.getElementById('step-btn-2')?.addEventListener('click', function () {
-        if (validateStep1()) {
-            goStep(2);
-            renderRolePermissions();
-        }
+        if (validateStep1()) goStep(2);
     });
 
-    renderRolePermissions();
+    document.querySelectorAll('.admin-perm-preset-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var slug = btn.getAttribute('data-preset');
+            var preset = presets.find(function (p) { return p.slug === slug; });
+            if (preset) setPermissions(preset.permissions || []);
+        });
+    });
+    document.getElementById('btn-clear-perms')?.addEventListener('click', function () { setPermissions([]); });
+    form.querySelectorAll('.perm-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', updatePermCount);
+    });
+    document.querySelectorAll('.admin-perm-toggle-module').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var mod = btn.getAttribute('data-module');
+            var boxes = form.querySelectorAll('.perm-checkbox[data-module="' + mod + '"]');
+            var allChecked = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+            boxes.forEach(function (b) { b.checked = !allChecked; });
+            updatePermCount();
+        });
+    });
+    updatePermCount();
 
     $(form).on('submit', function (e) {
         e.preventDefault();
@@ -392,13 +343,13 @@ foreach ($adminRoles as $role) {
             goStep(1);
             return;
         }
-        var group = $('#group').val();
-        if (String(group) === '1' && !$('#admin_role_id').val()) {
+        var checked = form.querySelectorAll('.perm-checkbox:checked').length;
+        if (checked < 1) {
             goStep(2);
-            $('#admin_role_id-error').text('Debes elegir un rol de permisos.').removeClass('d-none');
+            $('#permission_keys-error').text('Selecciona al menos un permiso.').removeClass('d-none');
             return;
         }
-        $('#admin_role_id-error').addClass('d-none');
+        $('#permission_keys-error').addClass('d-none');
 
         var $btn = $('#btn-user-save');
         $btn.prop('disabled', true);
@@ -409,41 +360,28 @@ foreach ($adminRoles as $role) {
             dataType: 'json',
             success: function (response) {
                 if (response.success) {
-                    Toastify({
-                        text: response.message || 'Usuario guardado',
-                        duration: 2500,
-                        gravity: 'top',
-                        position: 'right',
-                        style: { background: '#198754' }
-                    }).showToast();
+                    Toastify({ text: response.message || 'Usuario guardado', duration: 2500, gravity: 'top', position: 'right', style: { background: '#198754' } }).showToast();
                     setTimeout(function () {
                         window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'games';
                     }, 700);
                 } else {
-                    goStep(1);
-                    if (response.errors) {
-                        $.each(response.errors, function (field, message) {
-                            $('#' + field + '-error').text(message).removeClass('d-none');
-                            $('#' + field).addClass('is-invalid');
-                        });
+                    if (response.errors && response.errors.permission_keys) {
+                        goStep(2);
+                        $('#permission_keys-error').text(response.errors.permission_keys).removeClass('d-none');
+                    } else {
+                        goStep(1);
+                        if (response.errors) {
+                            $.each(response.errors, function (field, message) {
+                                $('#' + field + '-error').text(message).removeClass('d-none');
+                                $('#' + field).addClass('is-invalid');
+                            });
+                        }
                     }
-                    Toastify({
-                        text: response.message || 'Revisa los datos del formulario.',
-                        duration: 3000,
-                        gravity: 'top',
-                        position: 'right',
-                        style: { background: '#dc3545' }
-                    }).showToast();
+                    Toastify({ text: response.message || 'Revisa el formulario.', duration: 3000, gravity: 'top', position: 'right', style: { background: '#dc3545' } }).showToast();
                 }
             },
             error: function () {
-                Toastify({
-                    text: 'Error de servidor al guardar.',
-                    duration: 3000,
-                    gravity: 'top',
-                    position: 'right',
-                    style: { background: '#dc3545' }
-                }).showToast();
+                Toastify({ text: 'Error de servidor al guardar.', duration: 3000, gravity: 'top', position: 'right', style: { background: '#dc3545' } }).showToast();
             },
             complete: function () {
                 $btn.prop('disabled', false);

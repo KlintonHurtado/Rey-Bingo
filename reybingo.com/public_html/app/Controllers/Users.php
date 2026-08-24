@@ -87,7 +87,15 @@ class Users extends Controller {
 
         $data['adminRoles'] = bingo_list_admin_roles_with_permissions(false);
         $data['canManageAdmins'] = bingo_can('admins.manage');
-        $data['permissionsCatalog'] = bingo_permissions_catalog();
+        $data['permissionsCatalog'] = bingo_assignable_permissions_catalog();
+        $data['permissionPresets'] = bingo_staff_permission_presets();
+        $data['selectedPermissionKeys'] = [];
+        if (! empty($data['isUpdate']) && ! empty($data['userData']['id'])) {
+            $data['selectedPermissionKeys'] = bingo_fetch_user_admin_permission_keys((int) $data['userData']['id']);
+            if ($data['selectedPermissionKeys'] === [] && ! empty($data['userData']['admin_role_id'])) {
+                $data['selectedPermissionKeys'] = bingo_fetch_role_permission_keys((int) $data['userData']['admin_role_id']);
+            }
+        }
 
         // Modal AJAX (edición rápida desde listados)
         if ($this->request->isAJAX()) {
@@ -2476,59 +2484,106 @@ class Users extends Controller {
 
         $userId = $this->request->getPost('user-id');
         $action = $this->request->getPost('user-action');
-        $group = (int) $this->request->getPost('group');
-        $adminRoleId = (int) ($this->request->getPost('admin_role_id') ?? 0);
+        $pageMode = (int) $this->request->getPost('page_mode') === 1;
+        $permissionKeys = $this->request->getPost('permission_keys');
+        $permissionKeys = is_array($permissionKeys) ? $permissionKeys : [];
 
-        // Solo quien tiene admins.manage puede crear/editar cuentas Admin (group=1)
-        if ($group === bingo_group_admin() && ! bingo_can('admins.manage')) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'No tienes permiso para crear o editar usuarios Admin / staff.',
-                'errors' => ['group' => 'Permiso denegado para rol Admin'],
-            ]);
-        }
+        // Página de alta staff: siempre Admin/Staff + permisos seleccionados
+        if ($pageMode) {
+            $group = bingo_group_admin();
+            $adminRoleId = 0;
 
-        // Impedir que staff sin admins.manage edite un Admin existente (aunque el POST fuerce group player)
-        if ($action !== 'add' && (int) $userId > 0) {
-            $existingTarget = $model->find((int) $userId);
-            if ($existingTarget && (int) ($existingTarget['group'] ?? -1) === bingo_group_admin() && ! bingo_can('admins.manage')) {
+            if (! bingo_can('admins.manage') && (int) session()->get('admin_is_superadmin') !== 1) {
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'No tienes permiso para editar usuarios Admin / staff.',
-                    'errors' => ['group' => 'Permiso denegado'],
-                ]);
-            }
-        }
-
-        if ($group === bingo_group_admin()) {
-            if ($adminRoleId <= 0) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Debes asignar un rol de permisos al usuario Admin.',
-                    'errors' => ['admin_role_id' => 'Rol requerido'],
+                    'message' => 'No tienes permiso para crear o editar usuarios Admin / staff.',
+                    'errors' => ['permission_keys' => 'Permiso denegado'],
                 ]);
             }
 
+            $allowedKeys = array_column(bingo_assignable_permissions_catalog(), 'key');
+            $permissionKeys = array_values(array_intersect(
+                array_map('strval', $permissionKeys),
+                $allowedKeys
+            ));
+
+            if ($permissionKeys === []) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Debes seleccionar al menos un permiso.',
+                    'errors' => ['permission_keys' => 'Selecciona permisos'],
+                ]);
+            }
+
+            // Si coincide exactamente con un preset, guardar también admin_role_id de referencia
             $db = \Config\Database::connect();
-            $role = $db->table('admin_roles')->where('id', $adminRoleId)->where('status', 1)->get()->getRowArray();
-            if (! $role) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Rol de permisos inválido.',
-                    'errors' => ['admin_role_id' => 'Rol inválido'],
-                ]);
-            }
-
-            // Solo un superadmin puede asignar el rol Superadministrador
-            if ((int) ($role['is_superadmin'] ?? 0) === 1 && (int) session()->get('admin_is_superadmin') !== 1) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Solo un Superadministrador puede asignar ese rol.',
-                    'errors' => ['admin_role_id' => 'No autorizado'],
-                ]);
+            foreach (bingo_staff_roles_seed() as $seed) {
+                $seedPerms = array_values($seed['permissions'] ?? []);
+                sort($seedPerms);
+                $selected = $permissionKeys;
+                sort($selected);
+                if ($seedPerms === $selected) {
+                    $roleRow = $db->table('admin_roles')->where('slug', $seed['slug'])->get()->getRowArray();
+                    if ($roleRow) {
+                        $adminRoleId = (int) $roleRow['id'];
+                    }
+                    break;
+                }
             }
         } else {
-            $adminRoleId = 0;
+            $group = (int) $this->request->getPost('group');
+            $adminRoleId = (int) ($this->request->getPost('admin_role_id') ?? 0);
+
+            // Solo quien tiene admins.manage puede crear/editar cuentas Admin (group=1)
+            if ($group === bingo_group_admin() && ! bingo_can('admins.manage')) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No tienes permiso para crear o editar usuarios Admin / staff.',
+                    'errors' => ['group' => 'Permiso denegado para rol Admin'],
+                ]);
+            }
+
+            // Impedir que staff sin admins.manage edite un Admin existente
+            if ($action !== 'add' && (int) $userId > 0) {
+                $existingTarget = $model->find((int) $userId);
+                if ($existingTarget && (int) ($existingTarget['group'] ?? -1) === bingo_group_admin() && ! bingo_can('admins.manage')) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'No tienes permiso para editar usuarios Admin / staff.',
+                        'errors' => ['group' => 'Permiso denegado'],
+                    ]);
+                }
+            }
+
+            if ($group === bingo_group_admin()) {
+                if ($adminRoleId <= 0) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Debes asignar un rol de permisos al usuario Admin.',
+                        'errors' => ['admin_role_id' => 'Rol requerido'],
+                    ]);
+                }
+
+                $db = \Config\Database::connect();
+                $role = $db->table('admin_roles')->where('id', $adminRoleId)->where('status', 1)->get()->getRowArray();
+                if (! $role) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Rol de permisos inválido.',
+                        'errors' => ['admin_role_id' => 'Rol inválido'],
+                    ]);
+                }
+
+                if ((int) ($role['is_superadmin'] ?? 0) === 1 && (int) session()->get('admin_is_superadmin') !== 1) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Solo un Superadministrador puede asignar ese rol.',
+                        'errors' => ['admin_role_id' => 'No autorizado'],
+                    ]);
+                }
+            } else {
+                $adminRoleId = 0;
+            }
         }
 
         $validationRules = [
@@ -2581,7 +2636,7 @@ class Users extends Controller {
             'account' => $this->request->getPost('account') ?? '',
             'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
             'group' => $group,
-            'admin_role_id' => $group === bingo_group_admin() ? $adminRoleId : null,
+            'admin_role_id' => $group === bingo_group_admin() ? ($adminRoleId > 0 ? $adminRoleId : null) : null,
             'status' => $this->request->getPost('status'),
             'sounds' => $this->request->getPost('sounds') ?? 1,
             'narration' => $this->request->getPost('narration') ?? 1,
@@ -2590,20 +2645,26 @@ class Users extends Controller {
             'address_line' => $this->request->getPost('address_line') ?? '',
             'city' => $this->request->getPost('city') ?? '',
             'state' => $this->request->getPost('state') ?? '',
-            'is_reseller' => (int) ($this->request->getPost('is_reseller') ?? 0),
+            'is_reseller' => $pageMode ? 0 : (int) ($this->request->getPost('is_reseller') ?? 0),
         ];
 
         helper('wallet');
-        $walletBonus = max(0, round((float) ($this->request->getPost('wallet_bonus') ?? 0), 2));
-        $walletRecharge = max(0, round((float) ($this->request->getPost('wallet_recharge') ?? 0), 2));
-        $walletWithdraw = max(0, round((float) ($this->request->getPost('wallet_withdraw') ?? 0), 2));
-        // Compatibilidad: si solo llega "wallet" legacy y no los 3 campos
-        if (
-            $this->request->getPost('wallet_bonus') === null
-            && $this->request->getPost('wallet_recharge') === null
-            && $this->request->getPost('wallet_withdraw') === null
-        ) {
-            $walletRecharge = max(0, round((float) ($this->request->getPost('wallet') ?? 0), 2));
+        if ($pageMode) {
+            // Staff: no se asignan saldos iniciales desde esta pantalla
+            $walletBonus = 0.0;
+            $walletRecharge = 0.0;
+            $walletWithdraw = 0.0;
+        } else {
+            $walletBonus = max(0, round((float) ($this->request->getPost('wallet_bonus') ?? 0), 2));
+            $walletRecharge = max(0, round((float) ($this->request->getPost('wallet_recharge') ?? 0), 2));
+            $walletWithdraw = max(0, round((float) ($this->request->getPost('wallet_withdraw') ?? 0), 2));
+            if (
+                $this->request->getPost('wallet_bonus') === null
+                && $this->request->getPost('wallet_recharge') === null
+                && $this->request->getPost('wallet_withdraw') === null
+            ) {
+                $walletRecharge = max(0, round((float) ($this->request->getPost('wallet') ?? 0), 2));
+            }
         }
         $data['wallet_bonus'] = $walletBonus;
         $data['wallet_recharge'] = $walletRecharge;
@@ -2625,6 +2686,11 @@ class Users extends Controller {
             $data['verification_token'] = md5(uniqid());
             
             if ($model->insert($data)) {
+                $newId = (int) $model->getInsertID();
+                if ($pageMode && $newId > 0) {
+                    bingo_save_user_admin_permissions($newId, $permissionKeys);
+                }
+
                 return $this->response->setJSON([
                     'success' => true,
                     'message' => translate('user added successfully')
@@ -2637,6 +2703,10 @@ class Users extends Controller {
             }
             
             if ($model->update($userId, $data)) {
+                if ($pageMode) {
+                    bingo_save_user_admin_permissions((int) $userId, $permissionKeys);
+                }
+
                 // Si se edita el usuario en sesión, refrescar permisos
                 if ((int) $userId === (int) session()->get('id')) {
                     $fresh = $model->find((int) $userId);

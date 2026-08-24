@@ -320,6 +320,61 @@ html:has(#content-page > .operator-panel-fit) {
     padding: 3px 0;
 }
 
+.admin-perm-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.admin-perm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.admin-perm-module {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 12px;
+}
+
+.admin-perm-module-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    color: #4338ca;
+    font-size: 0.85rem;
+}
+
+.admin-perm-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.admin-perm-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 5px 0;
+    font-size: 0.84rem;
+    color: #1f2937;
+    cursor: pointer;
+}
+
+.admin-perm-item.is-sensitive span em {
+    font-size: 0.7rem;
+    font-style: normal;
+    margin-left: 4px;
+}
+
+.admin-perm-item .form-check-input {
+    margin-top: 0.2rem;
+}
+
 /* Lista de juegos admin: botón + anclado al card de filtros */
 .admin-games-filters-card {
     position: relative;

@@ -31,12 +31,12 @@ if (! function_exists('bingo_permissions_catalog')) {
             ['key' => 'ggr.view', 'name' => 'Ver GGR / afiliados', 'module' => 'GGR'],
             ['key' => 'ggr.manage', 'name' => 'Gestionar GGR', 'module' => 'GGR'],
             ['key' => 'legal.manage', 'name' => 'Contenido legal', 'module' => 'Legal'],
-            ['key' => 'settings.manage', 'name' => 'Configuración del sistema', 'module' => 'Sistema'],
+            ['key' => 'settings.manage', 'name' => 'Configuración del sistema', 'module' => 'Sistema', 'sensitive' => true],
             ['key' => 'notifications.manage', 'name' => 'Notificaciones push', 'module' => 'Marketing'],
             ['key' => 'email.manage', 'name' => 'Email marketing', 'module' => 'Marketing'],
             ['key' => 'packages.manage', 'name' => 'Paquetes', 'module' => 'Marketing'],
             ['key' => 'levels.manage', 'name' => 'Niveles / logros', 'module' => 'Marketing'],
-            ['key' => 'admins.manage', 'name' => 'Crear staff y asignar roles', 'module' => 'Administración'],
+            ['key' => 'admins.manage', 'name' => 'Crear staff y asignar permisos', 'module' => 'Administración', 'sensitive' => true],
         ];
     }
 }
@@ -231,6 +231,23 @@ if (! function_exists('bingo_ensure_permissions_schema')) {
                 $forge->createTable('admin_role_permissions', true);
             }
 
+            if (! $db->tableExists('admin_user_permissions')) {
+                $forge->addField([
+                    'user_id' => [
+                        'type'       => 'INT',
+                        'constraint' => 11,
+                        'unsigned'   => true,
+                    ],
+                    'permission_key' => [
+                        'type'       => 'VARCHAR',
+                        'constraint' => 80,
+                    ],
+                ]);
+                $forge->addKey(['user_id', 'permission_key'], true);
+                $forge->addKey('user_id');
+                $forge->createTable('admin_user_permissions', true);
+            }
+
             if ($db->tableExists('users') && ! $db->fieldExists('admin_role_id', 'users')) {
                 $forge->addColumn('users', [
                     'admin_role_id' => [
@@ -416,6 +433,118 @@ if (! function_exists('bingo_fetch_role_permission_keys')) {
     }
 }
 
+if (! function_exists('bingo_fetch_user_admin_permission_keys')) {
+    /**
+     * @return list<string>
+     */
+    function bingo_fetch_user_admin_permission_keys(int $userId): array
+    {
+        if ($userId <= 0) {
+            return [];
+        }
+
+        bingo_ensure_permissions_schema();
+        $db = \Config\Database::connect();
+        if (! $db->tableExists('admin_user_permissions')) {
+            return [];
+        }
+
+        $rows = $db->table('admin_user_permissions')
+            ->select('permission_key')
+            ->where('user_id', $userId)
+            ->get()
+            ->getResultArray();
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($r) => trim((string) ($r['permission_key'] ?? '')),
+            $rows
+        ))));
+    }
+}
+
+if (! function_exists('bingo_save_user_admin_permissions')) {
+    /**
+     * @param list<string> $permissionKeys
+     */
+    function bingo_save_user_admin_permissions(int $userId, array $permissionKeys): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        bingo_ensure_permissions_schema();
+        $db = \Config\Database::connect();
+        if (! $db->tableExists('admin_user_permissions')) {
+            return;
+        }
+
+        $allowed = array_column(bingo_permissions_catalog(), 'key');
+        $clean = [];
+        foreach ($permissionKeys as $key) {
+            $key = trim((string) $key);
+            if ($key !== '' && in_array($key, $allowed, true)) {
+                $clean[$key] = $key;
+            }
+        }
+        $clean = array_values($clean);
+
+        $db->table('admin_user_permissions')->where('user_id', $userId)->delete();
+        foreach ($clean as $key) {
+            $db->table('admin_user_permissions')->insert([
+                'user_id'        => $userId,
+                'permission_key' => $key,
+            ]);
+        }
+    }
+}
+
+if (! function_exists('bingo_staff_permission_presets')) {
+    /**
+     * Atajos de permisos para staff (no son el grupo del sistema).
+     *
+     * @return list<array{slug:string,name:string,description:string,permissions:list<string>}>
+     */
+    function bingo_staff_permission_presets(): array
+    {
+        $roles = bingo_staff_roles_seed();
+        $out = [];
+        foreach ($roles as $role) {
+            if ((int) ($role['is_superadmin'] ?? 0) === 1 && (int) session()->get('admin_is_superadmin') !== 1) {
+                continue;
+            }
+            $out[] = [
+                'slug'        => (string) $role['slug'],
+                'name'        => (string) $role['name'],
+                'description' => (string) $role['description'],
+                'permissions' => array_values($role['permissions'] ?? []),
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('bingo_assignable_permissions_catalog')) {
+    /**
+     * Permisos que el admin actual puede otorgar.
+     *
+     * @return list<array>
+     */
+    function bingo_assignable_permissions_catalog(): array
+    {
+        $canSensitive = (int) session()->get('admin_is_superadmin') === 1;
+        $out = [];
+        foreach (bingo_permissions_catalog() as $perm) {
+            if (! empty($perm['sensitive']) && ! $canSensitive) {
+                continue;
+            }
+            $out[] = $perm;
+        }
+
+        return $out;
+    }
+}
+
 if (! function_exists('bingo_load_admin_authz_into_session')) {
     function bingo_load_admin_authz_into_session(?array $user = null): void
     {
@@ -435,6 +564,7 @@ if (! function_exists('bingo_load_admin_authz_into_session')) {
 
         bingo_ensure_permissions_schema();
         $db = \Config\Database::connect();
+        $userId = (int) ($user['id'] ?? 0);
         $roleId = (int) ($user['admin_role_id'] ?? 0);
         $role = null;
 
@@ -442,15 +572,31 @@ if (! function_exists('bingo_load_admin_authz_into_session')) {
             $role = $db->table('admin_roles')->where('id', $roleId)->where('status', 1)->get()->getRowArray();
         }
 
-        // Sin rol asignado: tratar como superadmin (compatibilidad)
-        $isSuper = $role ? ((int) ($role['is_superadmin'] ?? 0) === 1) : true;
-        $permissions = $isSuper
-            ? array_column(bingo_permissions_catalog(), 'key')
-            : bingo_fetch_role_permission_keys((int) ($role['id'] ?? 0));
+        $userPerms = bingo_fetch_user_admin_permission_keys($userId);
+        $allKeys = array_column(bingo_permissions_catalog(), 'key');
+
+        if ($userPerms !== []) {
+            $permissions = $userPerms;
+            $isSuper = count(array_diff($allKeys, $userPerms)) === 0;
+            $slug = $isSuper ? 'superadmin' : 'custom';
+        } elseif ($role && (int) ($role['is_superadmin'] ?? 0) === 1) {
+            $permissions = $allKeys;
+            $isSuper = true;
+            $slug = (string) ($role['slug'] ?? 'superadmin');
+        } elseif ($role) {
+            $permissions = bingo_fetch_role_permission_keys((int) $role['id']);
+            $isSuper = false;
+            $slug = (string) ($role['slug'] ?? 'staff');
+        } else {
+            // Compatibilidad: admin sin permisos ni rol = superadmin
+            $permissions = $allKeys;
+            $isSuper = true;
+            $slug = 'superadmin';
+        }
 
         session()->set([
             'admin_role_id'       => $role ? (int) $role['id'] : 0,
-            'admin_role_slug'     => $role['slug'] ?? 'superadmin',
+            'admin_role_slug'     => $slug,
             'admin_is_superadmin' => $isSuper ? 1 : 0,
             'admin_permissions'   => $permissions,
         ]);
