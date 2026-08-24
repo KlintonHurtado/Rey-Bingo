@@ -302,10 +302,35 @@ $groupNames = [
         var startDate = $('#auditStartDate').val() || '';
         var endDate = $('#auditEndDate').val() || '';
         var search = $('#auditSearch').val() || '';
+        var perPage = <?= (int) $perPage; ?>;
+        var standalone = <?= ! empty($standalone_audit) ? 'true' : 'false'; ?>;
 
-        // Sincronizar con los filtros superiores si existen
         if (startDate) $('#startdate').val(startDate);
         if (endDate) $('#enddate').val(endDate);
+
+        if (standalone) {
+            var params = $.param({
+                actor_group: actorGroup,
+                movement_type: movementType,
+                startdate: startDate,
+                enddate: endDate,
+                search: search,
+                page: page,
+                per_page: perPage
+            });
+            var $body = $('#financial-audit-body');
+            if ($body.length) {
+                $body.html('<div class="text-center py-5 text-muted"><i class="fa-duotone fa-solid fa-spinner-third fa-spin fa-2x"></i></div>');
+                $.get((typeof site_url !== 'undefined' ? site_url : '/') + 'games/financialAuditGet?' + params, function (html) {
+                    $body.html(html);
+                }).fail(function () {
+                    $body.html('<div class="alert alert-danger">No se pudo cargar la auditoría.</div>');
+                });
+            } else {
+                window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'games/financialAudit?' + params;
+            }
+            return;
+        }
 
         if (typeof statisticsGet === 'function') {
             statisticsGet('audit', {
@@ -315,7 +340,7 @@ $groupNames = [
                 enddate: endDate,
                 search: search,
                 page: page,
-                per_page: <?= (int) $perPage; ?>
+                per_page: perPage
             });
         }
     }
@@ -360,8 +385,8 @@ $groupNames = [
 
         $('#auditStartDate').val(startStr);
         $('#auditEndDate').val(endStr);
-        $('#startdate').val(startStr);
-        $('#enddate').val(endStr);
+        if ($('#startdate').length) $('#startdate').val(startStr);
+        if ($('#enddate').length) $('#enddate').val(endStr);
 
         filterAudit(1);
     }

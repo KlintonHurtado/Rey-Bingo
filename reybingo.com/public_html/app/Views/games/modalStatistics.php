@@ -144,11 +144,6 @@
                             type="button" role="tab" aria-controls="operators" aria-selected="false"
                             data-module="operators">Operadores</button>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link text-primary fw-bold" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit"
-                            type="button" role="tab" aria-controls="audit" aria-selected="false"
-                            data-module="audit"><i class="fa-duotone fa-solid fa-file-invoice-dollar me-1"></i> Auditoría</button>
-                    </li>
                 </ul>
             </div>
 
@@ -179,9 +174,6 @@
                 </div>
                 <div class="tab-pane fade" id="operators" role="tabpanel" aria-labelledby="operators-tab">
                     <div id="operators-content" class="statistics-content"></div>
-                </div>
-                <div class="tab-pane fade" id="audit" role="tabpanel" aria-labelledby="audit-tab">
-                    <div id="audit-content" class="statistics-content"></div>
                 </div>
             </div>
         </div>
@@ -259,8 +251,7 @@
             'deposits': 'transactions',
             'retires': 'transactions',
             'roulette': 'roulette',
-            'referrals': 'referrals',
-            'audit': 'audit'
+            'referrals': 'referrals'
         };
 
         return moduleToTab[module] || 'summary';
@@ -277,8 +268,7 @@
             'operators': 'operators',
             'transactions': 'transactions',
             'roulette': 'roulette',
-            'referrals': 'referrals',
-            'audit': 'audit'
+            'referrals': 'referrals'
         };
 
         return tabToModule[tab] || 'games';
@@ -365,17 +355,6 @@
                 // Parámetros específicos para referidos
                 requestData.referral_status = extraParams.referral_status || $('#referralStatusFilter').val() || 'all';
                 requestData.commission_min = extraParams.commission_min || $('#commissionMinFilter').val() || '';
-                break;
-
-            case 'audit':
-                // Parámetros específicos para auditoría financiera
-                requestData.actor_group = extraParams.actor_group || $('#auditActorGroup').val() || 'all';
-                requestData.movement_type = extraParams.movement_type || $('#auditMovementType').val() || 'all';
-                requestData.startdate = extraParams.startdate || $('#auditStartDate').val() || requestData.startdate;
-                requestData.enddate = extraParams.enddate || $('#auditEndDate').val() || requestData.enddate;
-                requestData.search = extraParams.search !== undefined ? extraParams.search : ($('#auditSearch').val() || '');
-                requestData.page = extraParams.page || 1;
-                requestData.per_page = extraParams.per_page || 30;
                 break;
         }
 

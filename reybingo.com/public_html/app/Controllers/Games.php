@@ -211,7 +211,6 @@ class Games extends Controller {
             'referrals' => translate('referrals'),
             'stores' => 'Puntos de Venta',
             'operators' => 'Operadores',
-            'audit' => 'Auditoría',
         ];
         
         // Definir tipos de juego
@@ -1611,10 +1610,66 @@ class Games extends Controller {
         }
     }
 
+    public function financialAudit()
+    {
+        if ($deny = bingo_require_admin_permission('audit.view')) {
+            return $deny;
+        }
+
+        helper(['bingo', 'permissions']);
+        bingo_ensure_users_schema();
+
+        $modelUsers = new UsersModel();
+        $modelContacts = new ContactsModel();
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $auditStats = $this->buildFinancialAuditData($this->request->getGet());
+
+        $data = [
+            'page' => [
+                'title' => 'Auditoría Financiera',
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('games/financial_audit', [
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'contacts' => $modelContacts->findAll(),
+                'audit_stats' => $auditStats,
+                'standalone_audit' => true,
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function financialAuditGet()
+    {
+        if ($deny = bingo_require_admin_permission('audit.view')) {
+            return $deny;
+        }
+
+        helper(['bingo', 'permissions']);
+        bingo_ensure_users_schema();
+
+        $auditStats = $this->buildFinancialAuditData($this->request->getGet());
+
+        return view('games/statistics/audit', [
+            'audit_stats' => $auditStats,
+            'standalone_audit' => true,
+        ]);
+    }
+
     public function exportFinancialAudit()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('audit.view')) {
+            return $deny;
         }
 
         bingo_ensure_users_schema();

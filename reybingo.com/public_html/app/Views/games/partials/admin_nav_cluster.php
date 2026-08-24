@@ -7,6 +7,7 @@ $showUsers = $showUsers ?? false;
 
 $canStats = function_exists('bingo_can') ? bingo_can('stats.view') : (session()->get('group') == 1);
 $canUsers = function_exists('bingo_can') ? bingo_can_any(['users.view', 'users.manage']) : (session()->get('group') == 1);
+$canCreateUsers = function_exists('bingo_can') ? bingo_can_any(['users.manage', 'admins.manage']) : (session()->get('group') == 1);
 $canStores = function_exists('bingo_can') ? bingo_can_any(['stores.view', 'stores.manage']) : (session()->get('group') == 1);
 $canOperators = function_exists('bingo_can') ? bingo_can_any(['operators.view', 'operators.manage']) : (session()->get('group') == 1);
 $canLowBalance = function_exists('bingo_can') ? bingo_can('low_balance.view') : (session()->get('group') == 1);
@@ -21,6 +22,24 @@ $lowBalancePending = function_exists('bingo_low_balance_roulette_pending_count')
 
 $menuItems = [];
 
+if ($canCreateUsers) {
+    $menuItems[] = [
+        'type' => 'button',
+        'onclick' => 'adminAddUser();',
+        'label' => 'Crear usuario',
+        'icon' => 'fa-duotone fa-solid fa-user-plus',
+        'class' => 'admin-menu-tile--create-user',
+    ];
+}
+if ($showUsers && $canUsers) {
+    $menuItems[] = [
+        'type' => 'button',
+        'onclick' => 'statisticsViewUsers();',
+        'label' => 'Listado de usuarios',
+        'icon' => 'fa-duotone fa-solid fa-users',
+        'class' => 'admin-menu-tile--users',
+    ];
+}
 if ($canLowBalance) {
     $menuItems[] = [
         'type' => 'link',
@@ -58,22 +77,13 @@ if ($canOperators) {
         'class' => 'admin-menu-tile--operators' . ($activeNav === 'operators' ? ' is-active' : ''),
     ];
 }
-if ($showUsers && $canUsers) {
-    $menuItems[] = [
-        'type' => 'button',
-        'onclick' => 'statisticsViewUsers();',
-        'label' => translate('users management'),
-        'icon' => 'fa-duotone fa-solid fa-users',
-        'class' => 'admin-menu-tile--users',
-    ];
-}
 if ($canAudit) {
     $menuItems[] = [
-        'type' => 'button',
-        'onclick' => 'statisticsViewAudit();',
+        'type' => 'link',
+        'href' => site_url('games/financialAudit'),
         'label' => 'Auditoría',
         'icon' => 'fa-duotone fa-solid fa-file-invoice-dollar',
-        'class' => 'admin-menu-tile--audit',
+        'class' => 'admin-menu-tile--audit' . ($activeNav === 'audit' ? ' is-active' : ''),
     ];
 }
 if ($canKyc) {

@@ -554,7 +554,29 @@ function statisticsViewUsers() {
 }
 
 function statisticsViewAudit() {
-    statisticsView('audit');
+    window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'games/financialAudit';
+}
+
+/** Alta rápida de usuario/staff desde el menú Admin */
+function adminAddUser() {
+    var $modal = $('#modalUser');
+    if (!$modal.length) {
+        Toastify({
+            text: 'No se encontró el modal de usuarios.',
+            duration: 3000,
+            gravity: 'top',
+            position: 'right',
+            style: { background: '#dc3545' }
+        }).showToast();
+        return;
+    }
+    $modal.load(site_url + 'users/add', function () {
+        if (typeof showBsModal === 'function') {
+            showBsModal('#modalUser');
+        } else {
+            $modal.modal('show');
+        }
+    });
 }
 
 function openUserExportModal() {

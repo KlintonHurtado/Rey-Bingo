@@ -124,6 +124,8 @@ $routes->post('games/uploadVideo', 'Games::uploadVideo');
 $routes->get('games/statisticsView', 'Games::statisticsView');
 $routes->get('games/statisticsGet/(:segment)/(:segment)/(:segment)/(:segment)/(:segment)', 'Games::statisticsGet/$1/$2/$3/$4/$5');
 $routes->get('games/exportActiveUsers/(:segment)', 'Games::exportActiveUsers/$1');
+$routes->get('games/financialAudit', 'Games::financialAudit');
+$routes->get('games/financialAuditGet', 'Games::financialAuditGet');
 $routes->get('games/exportFinancialAudit', 'Games::exportFinancialAudit');
 
 $routes->get('playings', 'Playings::index');
