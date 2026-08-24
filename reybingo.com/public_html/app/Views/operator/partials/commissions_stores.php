@@ -30,8 +30,6 @@ $totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
                 <h5 class="mb-1"><?= translate('stores commissions panel'); ?></h5>
                 <p class="small text-muted mb-0"><?= translate('stores commissions panel description'); ?></p>
                 <?php if (bingo_ggr_pays_monthly()) : ?>
-                    <p class="small text-info mb-0 mt-1"><?= translate('ggr monthly settlement note'); ?></p>
-                <?php endif; ?>
             </div>
         </div>
         <button type="button" class="btn btn-sm btn-success" id="btn-export-stores-commissions" style="padding: 4px 10px; font-size: 0.82rem;">
