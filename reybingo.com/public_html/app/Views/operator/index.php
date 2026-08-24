@@ -1297,5 +1297,15 @@
             $('#operator-stores-date-to').val(to);
             loadOperatorStoresCommissions(from, to);
         });
+
+        $(document).on('click', '#btn-export-stores-commissions', function() {
+            const from = $('#operator-stores-date-from').val() || '';
+            const to = $('#operator-stores-date-to').val() || '';
+            const params = $.param({
+                date_from: from,
+                date_to: to
+            });
+            window.location.href = '<?= site_url('operator/exportStoresCommissions'); ?>?' + params;
+        });
     });
 </script>

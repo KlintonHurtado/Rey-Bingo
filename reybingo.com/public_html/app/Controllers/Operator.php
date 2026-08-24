@@ -882,4 +882,117 @@ class Operator extends Controller
             ]
         );
     }
+
+    public function exportStoresCommissions()
+    {
+        if (! session()->get('logged_in') || ! bingo_is_operator()) {
+            return redirect()->to('/signin');
+        }
+
+        $operatorId = (int) session()->get('id');
+        $modelUsers = new UsersModel();
+        $operator = $modelUsers->find($operatorId);
+        if (! $operator) {
+            return redirect()->to('/signin');
+        }
+
+        $dateFrom = trim((string) ($this->request->getGet('date_from') ?? ''));
+        $dateTo = trim((string) ($this->request->getGet('date_to') ?? ''));
+
+        if ($dateFrom !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) {
+            $dateFrom = '';
+        }
+        if ($dateTo !== '' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+            $dateTo = '';
+        }
+        if ($dateFrom === '' && $dateTo === '') {
+            $dateFrom = date('Y-m-d', strtotime('-30 days'));
+            $dateTo = date('Y-m-d');
+        }
+        if ($dateFrom !== '' && $dateTo !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $stores = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('operator_id', $operatorId)
+            ->where('deleted', 0)
+            ->orderBy('business_name', 'ASC')
+            ->findAll();
+
+        $chartDays = 30;
+        if ($dateFrom !== '' && $dateTo !== '') {
+            $chartDays = max(1, (int) ((strtotime($dateTo) - strtotime($dateFrom)) / 86400) + 1);
+        }
+
+        $storesCommissions = bingo_fetch_operator_stores_commissions_summary(
+            $stores,
+            $chartDays,
+            $operator,
+            $dateFrom !== '' ? $dateFrom : null,
+            $dateTo !== '' ? $dateTo : null
+        );
+
+        $headers = [
+            'Punto de Venta',
+            'Codigo',
+            'Total Recargas',
+            'Total Retiros',
+            'Total GGR',
+            'Total comisiones',
+        ];
+
+        $rows = [];
+        $sumRec = 0.0;
+        $sumRet = 0.0;
+        $sumGgr = 0.0;
+        $sumTotal = 0.0;
+
+        foreach ($storesCommissions['stores'] ?? [] as $storeRow) {
+            $rec = round((float) ($storeRow['recharge_store'] ?? 0), 2);
+            $ret = round((float) ($storeRow['withdraw_store'] ?? 0), 2);
+            $ggr = round((float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0), 2);
+            $total = round($rec + $ret + $ggr, 2);
+
+            $sumRec += $rec;
+            $sumRet += $ret;
+            $sumGgr += $ggr;
+            $sumTotal += $total;
+
+            $rows[] = [
+                (string) ($storeRow['name'] ?? '-'),
+                (string) ($storeRow['code'] ?? ''),
+                $rec,
+                $ret,
+                $ggr,
+                $total,
+            ];
+        }
+
+        $rows[] = [
+            'TOTALES',
+            '',
+            round($sumRec, 2),
+            round($sumRet, 2),
+            round($sumGgr, 2),
+            round($sumTotal, 2),
+        ];
+
+        $periodLabel = ($dateFrom !== '' || $dateTo !== '')
+            ? ' (' . ($dateFrom !== '' ? $dateFrom : '…') . ' a ' . ($dateTo !== '' ? $dateTo : '…') . ')'
+            : '';
+
+        $filename = 'comisiones_puntos_venta_' . date('Y-m-d_His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            $headers,
+            $rows,
+            $filename,
+            [
+                'sheet_name' => 'Comisiones PV',
+                'title' => 'Rey Bingo - Comisiones de Puntos de venta' . $periodLabel,
+                'numeric_columns' => [2, 3, 4, 5],
+            ]
+        );
+    }
 }

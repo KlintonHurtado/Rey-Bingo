@@ -217,6 +217,7 @@ $routes->get('operator/storesCommissionsGet', 'Operator::storesCommissionsGet');
 $routes->post('operator/storesCommissionsGet', 'Operator::storesCommissionsGet');
 $routes->get('operator/operatorCommissionsGet', 'Operator::operatorCommissionsGet');
 $routes->get('operator/exportOperatorCommissions', 'Operator::exportOperatorCommissions');
+$routes->get('operator/exportStoresCommissions', 'Operator::exportStoresCommissions');
 $routes->get('ggr/commissionsListGet', 'Ggr::commissionsListGet');
 $routes->get('ggr/statsGet', 'Ggr::statsGet');
 $routes->post('ggr/approveCommission', 'Ggr::approveCommission');

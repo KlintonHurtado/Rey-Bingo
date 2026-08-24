@@ -21,17 +21,22 @@ if ($totalRecargas <= 0 && $totalRetiros <= 0 && $totalGgr <= 0) {
 $totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
 ?>
 <div class="operator-pane-inner operator-pane-inner-commissions" id="operator-stores-commissions-root">
-    <div class="operator-panel-pane-head">
-        <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
-            <i class="fa-duotone fa-solid fa-store"></i>
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+        <div class="operator-panel-pane-head mb-0">
+            <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
+                <i class="fa-duotone fa-solid fa-store"></i>
+            </div>
+            <div>
+                <h5 class="mb-1"><?= translate('stores commissions panel'); ?></h5>
+                <p class="small text-muted mb-0"><?= translate('stores commissions panel description'); ?></p>
+                <?php if (bingo_ggr_pays_monthly()) : ?>
+                    <p class="small text-info mb-0 mt-1"><?= translate('ggr monthly settlement note'); ?></p>
+                <?php endif; ?>
+            </div>
         </div>
-        <div>
-            <h5 class="mb-1"><?= translate('stores commissions panel'); ?></h5>
-            <p class="small text-muted mb-0"><?= translate('stores commissions panel description'); ?></p>
-            <?php if (bingo_ggr_pays_monthly()) : ?>
-                <p class="small text-info mb-0 mt-1"><?= translate('ggr monthly settlement note'); ?></p>
-            <?php endif; ?>
-        </div>
+        <button type="button" class="btn btn-sm btn-success" id="btn-export-stores-commissions" style="padding: 4px 10px; font-size: 0.82rem;">
+            <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
+        </button>
     </div>
 
     <div class="row g-2 align-items-end mb-3 operator-stores-commissions-filters">
@@ -61,7 +66,7 @@ $totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
                         <th>Total Recargas</th>
                         <th>Total Retiros</th>
                         <th>Total GGR</th>
-                        <th>Total</th>
+                        <th>Total comisiones</th>
                     </tr>
                 </thead>
                 <tbody>
