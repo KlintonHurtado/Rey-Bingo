@@ -350,6 +350,45 @@ if (! function_exists('bingo_list_admin_roles')) {
     }
 }
 
+if (! function_exists('bingo_list_admin_roles_with_permissions')) {
+    /**
+     * Roles con listado de permisos (clave + nombre) para la UI de alta.
+     *
+     * @return list<array>
+     */
+    function bingo_list_admin_roles_with_permissions(bool $onlyAssignable = true): array
+    {
+        $catalog = [];
+        foreach (bingo_permissions_catalog() as $perm) {
+            $catalog[$perm['key']] = $perm;
+        }
+
+        $roles = bingo_list_admin_roles($onlyAssignable);
+        foreach ($roles as &$role) {
+            $keys = ((int) ($role['is_superadmin'] ?? 0) === 1)
+                ? array_keys($catalog)
+                : bingo_fetch_role_permission_keys((int) ($role['id'] ?? 0));
+
+            $items = [];
+            foreach ($keys as $key) {
+                if (! isset($catalog[$key])) {
+                    continue;
+                }
+                $items[] = [
+                    'key'    => $key,
+                    'name'   => $catalog[$key]['name'],
+                    'module' => $catalog[$key]['module'],
+                ];
+            }
+            $role['permission_keys'] = $keys;
+            $role['permissions'] = $items;
+        }
+        unset($role);
+
+        return $roles;
+    }
+}
+
 if (! function_exists('bingo_fetch_role_permission_keys')) {
     /**
      * @return list<string>

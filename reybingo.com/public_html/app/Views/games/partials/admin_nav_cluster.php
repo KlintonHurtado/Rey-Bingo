@@ -24,8 +24,8 @@ $menuItems = [];
 
 if ($canCreateUsers) {
     $menuItems[] = [
-        'type' => 'button',
-        'onclick' => 'adminAddUser();',
+        'type' => 'link',
+        'href' => site_url('users/add'),
         'label' => 'Crear usuario',
         'icon' => 'fa-duotone fa-solid fa-user-plus',
         'class' => 'admin-menu-tile--create-user',

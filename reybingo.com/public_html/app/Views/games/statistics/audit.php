@@ -20,9 +20,10 @@ $groupNames = [
 ];
 ?>
 
-<div class="row mt-3">
+<div class="audit-standalone-root">
+<div class="row mt-1">
     <div class="col-md-12 d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h4 class="mb-0">
+        <h4 class="mb-0 text-dark">
             <i class="fa-duotone fa-solid fa-file-invoice-dollar text-primary me-2"></i>Auditoría Financiera Global
         </h4>
         <div class="d-flex gap-2">
@@ -35,7 +36,7 @@ $groupNames = [
 </div>
 
 <!-- KPI Cards Resumen Financiero del Período -->
-<div class="row g-2 mb-3">
+<div class="row g-2 mb-3 admin-audit-kpi">
     <div class="col-6 col-md-3">
         <div class="card bg-success text-white shadow-sm h-100">
             <div class="card-body p-3">
@@ -90,7 +91,7 @@ $groupNames = [
 </div>
 
 <!-- Filtros de Auditoría -->
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm mb-3 admin-audit-filters">
     <div class="card-body p-3">
         <div class="row g-2 align-items-end">
             <!-- Filtro Rol / Actor -->
@@ -99,11 +100,11 @@ $groupNames = [
                     <i class="fa-solid fa-users me-1 text-primary"></i> Filtrar por Rol / Actor
                 </label>
                 <select class="form-select form-select-lg form-bingo" id="auditActorGroup" onchange="filterAudit(1)">
-                    <option value="all" <?= ($actorGroup === 'all' || $actorGroup === '') ? 'selected' : ''; ?>>🌐 Todos los Actores</option>
-                    <option value="1" <?= (string)$actorGroup === '1' ? 'selected' : ''; ?>>🛡️ Administrador</option>
-                    <option value="2" <?= (string)$actorGroup === '2' ? 'selected' : ''; ?>>🏪 Puntos de Venta</option>
-                    <option value="0" <?= (string)$actorGroup === '0' ? 'selected' : ''; ?>>👤 Usuarios / Jugadores</option>
-                    <option value="3" <?= (string)$actorGroup === '3' ? 'selected' : ''; ?>>👔 Operadores</option>
+                    <option value="all" <?= ($actorGroup === 'all' || $actorGroup === '') ? 'selected' : ''; ?>>Todos los Actores</option>
+                    <option value="1" <?= (string)$actorGroup === '1' ? 'selected' : ''; ?>>Administrador</option>
+                    <option value="2" <?= (string)$actorGroup === '2' ? 'selected' : ''; ?>>Puntos de Venta</option>
+                    <option value="0" <?= (string)$actorGroup === '0' ? 'selected' : ''; ?>>Usuarios / Jugadores</option>
+                    <option value="3" <?= (string)$actorGroup === '3' ? 'selected' : ''; ?>>Operadores</option>
                 </select>
             </div>
 
@@ -114,12 +115,12 @@ $groupNames = [
                 </label>
                 <select class="form-select form-select-lg form-bingo" id="auditMovementType" onchange="filterAudit(1)">
                     <option value="all" <?= ($movementType === 'all' || $movementType === '') ? 'selected' : ''; ?>>Todos los Movimientos</option>
-                    <option value="deposit" <?= $movementType === 'deposit' ? 'selected' : ''; ?>>📥 Recargas / Depósitos</option>
-                    <option value="retire" <?= $movementType === 'retire' ? 'selected' : ''; ?>>📤 Retiros / Pagos</option>
-                    <option value="carton_purchase" <?= $movementType === 'carton_purchase' ? 'selected' : ''; ?>>🎟️ Compras de Cartones</option>
-                    <option value="award" <?= $movementType === 'award' ? 'selected' : ''; ?>>🏆 Premios Ganados</option>
-                    <option value="bonus" <?= $movementType === 'bonus' ? 'selected' : ''; ?>>🎁 Bonos / Ruletas</option>
-                    <option value="transfer" <?= $movementType === 'transfer' ? 'selected' : ''; ?>>🔁 Transferencias</option>
+                    <option value="deposit" <?= $movementType === 'deposit' ? 'selected' : ''; ?>>Recargas / Depósitos</option>
+                    <option value="retire" <?= $movementType === 'retire' ? 'selected' : ''; ?>>Retiros / Pagos</option>
+                    <option value="carton_purchase" <?= $movementType === 'carton_purchase' ? 'selected' : ''; ?>>Compras de Cartones</option>
+                    <option value="award" <?= $movementType === 'award' ? 'selected' : ''; ?>>Premios Ganados</option>
+                    <option value="bonus" <?= $movementType === 'bonus' ? 'selected' : ''; ?>>Bonos / Ruletas</option>
+                    <option value="transfer" <?= $movementType === 'transfer' ? 'selected' : ''; ?>>Transferencias</option>
                 </select>
             </div>
 
@@ -164,8 +165,8 @@ $groupNames = [
 </div>
 
 <!-- Tabla Detallada de Auditoría -->
-<div class="card shadow-sm">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+<div class="card shadow-sm admin-audit-table-card">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
         <h6 class="mb-0 fw-bold text-dark">
             <i class="fa-solid fa-table-list me-1 text-primary"></i> Registro Cronológico de Movimientos Financieros
         </h6>
@@ -174,19 +175,19 @@ $groupNames = [
         </span>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
-                <thead class="table-dark text-nowrap">
+        <div class="admin-audit-table-wrap">
+            <table class="table table-hover align-middle admin-audit-table">
+                <thead>
                     <tr>
                         <th style="width: 140px;">Fecha / Hora</th>
-                        <th>Actor / Usuario</th>
-                        <th>Rol</th>
-                        <th>Concepto / Tipo</th>
-                        <th>Billetera Afectada</th>
+                        <th style="min-width: 180px;">Actor / Usuario</th>
+                        <th style="width: 110px;">Rol</th>
+                        <th style="min-width: 150px;">Concepto / Tipo</th>
+                        <th style="min-width: 130px;">Billetera</th>
                         <th class="text-end" style="width: 120px;">Monto</th>
-                        <th>Estado</th>
-                        <th>Detalles / Referencia</th>
-                        <th class="text-center" style="width: 60px;">Acción</th>
+                        <th style="width: 110px;">Estado</th>
+                        <th style="min-width: 200px;">Detalles / Referencia</th>
+                        <th class="text-center" style="width: 70px;">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -199,16 +200,12 @@ $groupNames = [
                                 $sign = $isPositive ? '+' : '-';
                             ?>
                             <tr>
-                                <td class="text-nowrap text-muted font-monospace" style="font-size: 0.82rem;">
+                                <td class="text-nowrap text-muted font-monospace" style="font-size: 0.8rem;">
                                     <?= date('d/m/Y H:i:s', strtotime($it['datetime'])); ?>
                                 </td>
                                 <td>
-                                    <div class="d-flex align-items-center">
-                                        <div>
-                                            <strong class="d-block text-dark"><?= esc($it['user_name']); ?></strong>
-                                            <span class="text-muted small">@<?= esc($it['username']); ?> · <code><?= esc($it['user_code']); ?></code></span>
-                                        </div>
-                                    </div>
+                                    <strong class="audit-user-name d-block"><?= esc($it['user_name']); ?></strong>
+                                    <span class="audit-user-meta">@<?= esc($it['username']); ?> · <code><?= esc($it['user_code']); ?></code></span>
                                 </td>
                                 <td>
                                     <span class="badge <?= $groupInfo['badge']; ?> small">
@@ -216,15 +213,15 @@ $groupNames = [
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="badge <?= $it['badge_class'] ?? 'bg-primary'; ?> px-2 py-1">
+                                    <span class="badge <?= $it['badge_class'] ?? 'bg-primary'; ?> px-2 py-1 text-wrap text-start">
                                         <i class="<?= $it['icon'] ?? 'fa-solid fa-money-bill'; ?> me-1"></i>
                                         <?= esc($it['type_label']); ?>
                                     </span>
                                 </td>
                                 <td>
-                                    <span class="text-muted small fw-semibold"><?= esc($it['wallet'] ?? 'Saldo Real'); ?></span>
+                                    <span class="small fw-semibold text-secondary"><?= esc($it['wallet'] ?? 'Saldo Real'); ?></span>
                                 </td>
-                                <td class="text-end <?= $amtClass; ?> font-monospace fs-6">
+                                <td class="text-end <?= $amtClass; ?> font-monospace">
                                     <?= $sign; ?> <?= $currency; ?> <?= number_format((float) $it['amount'], 2); ?>
                                 </td>
                                 <td>
@@ -232,8 +229,8 @@ $groupNames = [
                                         <?= esc($it['status_label'] ?? 'Completado'); ?>
                                     </span>
                                 </td>
-                                <td class="small text-muted" style="max-width: 250px;">
-                                    <div class="text-truncate" title="<?= esc($it['detail'] ?? ''); ?>">
+                                <td>
+                                    <div class="audit-detail" title="<?= esc($it['detail'] ?? ''); ?>">
                                         <?= esc($it['detail'] ?? '-'); ?>
                                     </div>
                                 </td>
@@ -262,7 +259,7 @@ $groupNames = [
 
     <!-- Paginación -->
     <?php if ($totalPages > 1): ?>
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center py-2">
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
             <span class="small text-muted">
                 Página <?= $currentPage; ?> de <?= $totalPages; ?> (<?= number_format($totalRecords); ?> movimientos en total)
             </span>
@@ -294,6 +291,7 @@ $groupNames = [
         </div>
     <?php endif; ?>
 </div>
+</div>
 
 <script type="text/javascript">
     function filterAudit(page = 1) {
@@ -323,6 +321,10 @@ $groupNames = [
                 $body.html('<div class="text-center py-5 text-muted"><i class="fa-duotone fa-solid fa-spinner-third fa-spin fa-2x"></i></div>');
                 $.get((typeof site_url !== 'undefined' ? site_url : '/') + 'games/financialAuditGet?' + params, function (html) {
                     $body.html(html);
+                    var scroller = document.querySelector('.admin-audit-scroll');
+                    if (scroller) scroller.scrollTop = 0;
+                    var tableWrap = document.querySelector('.admin-audit-table-wrap');
+                    if (tableWrap) tableWrap.scrollTop = 0;
                 }).fail(function () {
                     $body.html('<div class="alert alert-danger">No se pudo cargar la auditoría.</div>');
                 });

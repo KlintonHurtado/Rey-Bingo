@@ -21,6 +21,8 @@ body {
 body:has(#content-page > .admin-profile-scroll),
 body:has(#content-page > .legal-page-scroll),
 body:has(#content-page > .admin-stores-scroll),
+body:has(#content-page > .admin-audit-scroll),
+body:has(#content-page > .admin-user-form-scroll),
 body:has(#content-page > .store-signup-scroll),
 body:has(#content-page > .store-panel-fit),
 body:has(#content-page > .operator-panel-fit) {
@@ -38,6 +40,8 @@ body:has(#content-page > .operator-panel-fit) {
 html:has(#content-page > .admin-profile-scroll),
 html:has(#content-page > .legal-page-scroll),
 html:has(#content-page > .admin-stores-scroll),
+html:has(#content-page > .admin-audit-scroll),
+html:has(#content-page > .admin-user-form-scroll),
 html:has(#content-page > .store-signup-scroll),
 html:has(#content-page > .start-section),
 html:has(#content-page > .store-panel-fit),
@@ -49,6 +53,8 @@ html:has(#content-page > .operator-panel-fit) {
 #content-page:has(> .admin-profile-scroll),
 #content-page:has(> .legal-page-scroll),
 #content-page:has(> .admin-stores-scroll),
+#content-page:has(> .admin-audit-scroll),
+#content-page:has(> .admin-user-form-scroll),
 #content-page:has(> .store-signup-scroll),
 #content-page:has(> .start-section),
 #content-page:has(> .store-panel-fit),
@@ -61,6 +67,8 @@ html:has(#content-page > .operator-panel-fit) {
 .admin-profile-scroll,
 .legal-page-scroll,
 .admin-stores-scroll,
+.admin-audit-scroll,
+.admin-user-form-scroll,
 .store-signup-scroll {
     max-height: 100dvh;
     height: 100dvh;
@@ -79,6 +87,237 @@ html:has(#content-page > .operator-panel-fit) {
     display: none;
     width: 0;
     height: 0;
+}
+
+.admin-audit-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.45) transparent;
+    -ms-overflow-style: auto;
+}
+
+.admin-audit-scroll::-webkit-scrollbar {
+    display: block;
+    width: 10px;
+    height: 10px;
+}
+
+.admin-audit-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.admin-audit-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+}
+
+.admin-audit-page {
+    margin-top: 12px;
+    padding-top: 70px;
+    padding-bottom: 40px;
+    max-width: 1600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.admin-audit-card {
+    background: rgba(255, 255, 255, 0.97);
+    color: #1f2937;
+    border-radius: 16px;
+}
+
+.admin-audit-card .text-dark,
+.admin-audit-card h4,
+.admin-audit-card h6,
+.admin-audit-card label,
+.admin-audit-card .form-label {
+    color: #1f2937 !important;
+}
+
+.admin-audit-table-wrap {
+    max-height: min(62vh, 720px);
+    overflow: auto;
+    border-radius: 0 0 12px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.admin-audit-table {
+    width: 100%;
+    min-width: 1100px;
+    margin-bottom: 0;
+    font-size: 0.86rem;
+    color: #1f2937;
+}
+
+.admin-audit-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #111827 !important;
+    color: #fff !important;
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    border-bottom: 0;
+    vertical-align: middle;
+}
+
+.admin-audit-table tbody td {
+    vertical-align: middle;
+    border-color: #e5e7eb;
+    background: #fff;
+}
+
+.admin-audit-table tbody tr:hover td {
+    background: #f8fafc;
+}
+
+.admin-audit-table .audit-user-name {
+    color: #111827;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.admin-audit-table .audit-user-meta {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.admin-audit-table .audit-detail {
+    max-width: 280px;
+    white-space: normal;
+    word-break: break-word;
+    color: #4b5563;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.admin-audit-kpi h3 {
+    font-size: clamp(1.1rem, 2vw, 1.55rem);
+}
+
+.admin-audit-filters .form-control,
+.admin-audit-filters .form-select {
+    color: #111827;
+    background: #fff;
+}
+
+.admin-user-form-page {
+    margin-top: 12px;
+    padding-top: 70px;
+    padding-bottom: 40px;
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.admin-user-form-card {
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 16px;
+    color: #1f2937;
+}
+
+.admin-user-form-card .form-control,
+.admin-user-form-card .form-select {
+    color: #111827;
+    background: #fff;
+}
+
+.admin-user-steps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-user-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    color: #64748b;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.admin-user-step.is-active {
+    background: linear-gradient(145deg, #22c55e, #15803d);
+    border-color: transparent;
+    color: #fff;
+}
+
+.admin-user-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.12);
+    font-size: 0.8rem;
+}
+
+.admin-user-step.is-active .admin-user-step-num {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.admin-user-step-line {
+    flex: 1;
+    height: 2px;
+    background: #e5e7eb;
+    min-width: 24px;
+}
+
+.admin-user-step-pane {
+    display: none;
+}
+
+.admin-user-step-pane.is-active {
+    display: block;
+}
+
+.admin-role-permissions {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 14px;
+}
+
+.admin-role-permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.admin-role-module {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.admin-role-module-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #4338ca;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+}
+
+.admin-role-module ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.admin-role-module li {
+    font-size: 0.82rem;
+    color: #334155;
+    padding: 3px 0;
 }
 
 /* Lista de juegos admin: botón + anclado al card de filtros */

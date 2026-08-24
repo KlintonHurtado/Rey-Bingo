@@ -66,7 +66,9 @@ class Users extends Controller {
         }
 
         bingo_ensure_permissions_schema();
+        helper(['wallet', 'permissions']);
         $model = new UsersModel();
+        $modelContacts = new ContactsModel();
 
         $data = [];
         
@@ -77,17 +79,37 @@ class Users extends Controller {
             if (!$data['userData']) {
                 throw new \CodeIgniter\Exceptions\PageNotFoundException('Usuario no encontrado');
             }
-            helper('wallet');
             $data['userData'] = wallet_service()->normalizeUser($data['userData']);
         } else {
             $data['userData'] = null;
             $data['isUpdate'] = false;
         }
 
-        $data['adminRoles'] = bingo_list_admin_roles(false);
+        $data['adminRoles'] = bingo_list_admin_roles_with_permissions(false);
         $data['canManageAdmins'] = bingo_can('admins.manage');
-        
-        return view('users/modalUser', $data);
+        $data['permissionsCatalog'] = bingo_permissions_catalog();
+
+        // Modal AJAX (edición rápida desde listados)
+        if ($this->request->isAJAX()) {
+            return view('users/modalUser', $data);
+        }
+
+        $adminUser = $model->find(session()->get('id'));
+        $imagePath = ! empty($adminUser['image'])
+            ? site_url('uploads/users/' . $adminUser['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        return view('layout/index', [
+            'page' => [
+                'title' => $data['isUpdate'] ? translate('update user') : translate('add user'),
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('users/form_page', array_merge($data, [
+                'user' => $adminUser,
+                'imagePath' => $imagePath,
+                'contacts' => $modelContacts->findAll(),
+            ])),
+        ]);
     }
 
     public function stores()
