@@ -74,12 +74,12 @@ foreach ($permissionPresets as $preset) {
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="firstname"><?= translate('first name'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" value="<?= $isUpdate ? esc($userData['firstname']) : ''; ?>" required>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" value="<?= $isUpdate ? esc($userData['firstname']) : ''; ?>" required<?= $isUpdate ? ' readonly' : ''; ?>>
                             <small id="firstname-error" class="text-danger d-none"></small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="lastname"><?= translate('last name'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" value="<?= $isUpdate ? esc($userData['lastname']) : ''; ?>" required>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" value="<?= $isUpdate ? esc($userData['lastname']) : ''; ?>" required<?= $isUpdate ? ' readonly' : ''; ?>>
                             <small id="lastname-error" class="text-danger d-none"></small>
                         </div>
                         <div class="col-md-6">
@@ -89,7 +89,7 @@ foreach ($permissionPresets as $preset) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="email"><?= translate('email'); ?></label>
-                            <input type="email" class="form-control form-control-lg form-bingo" name="email" id="email" value="<?= $isUpdate ? esc($userData['email']) : ''; ?>" required>
+                            <input type="email" class="form-control form-control-lg form-bingo" name="email" id="email" value="<?= $isUpdate ? esc($userData['email']) : ''; ?>" required<?= $isUpdate ? ' readonly' : ''; ?>>
                             <small id="email-error" class="text-danger d-none"></small>
                         </div>
                         <div class="col-md-6">
@@ -99,8 +99,11 @@ foreach ($permissionPresets as $preset) {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="document"><?= translate('document'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo" name="document" id="document" value="<?= $isUpdate ? esc($userData['document']) : ''; ?>" required>
+                            <input type="text" class="form-control form-control-lg form-bingo" name="document" id="document" value="<?= $isUpdate ? esc($userData['document']) : ''; ?>" required<?= $isUpdate ? ' readonly' : ''; ?>>
                             <small id="document-error" class="text-danger d-none"></small>
+                            <?php if ($isUpdate) : ?>
+                                <small class="text-muted">Nombre, correo y cédula no se pueden modificar.</small>
+                            <?php endif; ?>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="password">

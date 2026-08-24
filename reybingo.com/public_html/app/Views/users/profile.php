@@ -60,20 +60,21 @@
                             <div class="col-md-9">
                                 <div class="col-md-12 mb-1">
                                     <label for="firstname" class="form-label"><?= translate('first name'); ?></label>
-                                    <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('first name')); ?>" autofocus autocomplete="off" value="<?= $user['firstname']; ?>">
+                                    <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('first name')); ?>" autofocus autocomplete="off" value="<?= esc($user['firstname']); ?>" readonly>
                                     <small id="firstname-error" class="text-danger d-none"></small>
                                 </div>
 
                                 <div class="col-md-12 mb-1">
                                     <label for="lastname" class="form-label"><?= translate('last name'); ?></label>
-                                    <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('last name')); ?>" autocomplete="off" value="<?= $user['lastname']; ?>">
+                                    <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('last name')); ?>" autocomplete="off" value="<?= esc($user['lastname']); ?>" readonly>
                                     <small id="lastname-error" class="text-danger d-none"></small>
                                 </div>
 
                                 <div class="col-md-12 mb-1">
                                     <label for="document" class="form-label"><?= translate('document'); ?></label>
-                                    <input type="number" class="form-control form-control-lg form-bingo" name="document" id="document" placeholder="<?= translate('document'); ?>" autocomplete="off" value="<?= $user['document']; ?>">
+                                    <input type="text" class="form-control form-control-lg form-bingo" name="document" id="document" placeholder="<?= translate('document'); ?>" autocomplete="off" value="<?= esc($user['document']); ?>" readonly>
                                     <small id="document-error" class="text-danger d-none"></small>
+                                    <small class="text-muted">Nombre, correo y cédula no se pueden modificar.</small>
                                 </div>
                             </div>
 
@@ -97,7 +98,7 @@
                             
                             <div class="col-md-12 mb-3">
                                 <label for="email" class="form-label"><?= translate('email'); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="email" id="email" placeholder="<?= translate('email'); ?>" autocomplete="off" value="<?= $user['email']; ?>">
+                                <input type="text" class="form-control form-control-lg form-bingo" name="email" id="email" placeholder="<?= translate('email'); ?>" autocomplete="off" value="<?= esc($user['email']); ?>" readonly>
                                 <small id="email-error" class="text-danger d-none"></small>
                             </div>
 

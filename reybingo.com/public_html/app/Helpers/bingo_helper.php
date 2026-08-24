@@ -6641,49 +6641,6 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
             }
         }
 
-        // Totales globales para las 3 Tarjetas
-        $stats = [
-            'ggr' => [
-                'rate' => $operatorGgrRate,
-                'total_base' => 0.0,
-                'stores_earned' => 0.0,
-                'operator_earned' => 0.0,
-                'count' => 0,
-            ],
-            'recharge' => [
-                'rate' => $operatorRechargeRate,
-                'total_base' => 0.0,
-                'stores_earned' => 0.0,
-                'operator_earned' => 0.0,
-                'count' => 0,
-            ],
-            'withdraw' => [
-                'rate' => $operatorWithdrawRate,
-                'total_base' => 0.0,
-                'stores_earned' => 0.0,
-                'operator_earned' => 0.0,
-                'count' => 0,
-            ],
-            'total_operator_profit' => 0.0,
-            'total_stores_earned' => 0.0,
-        ];
-
-        foreach ($items as $item) {
-            $t = (string) ($item['rate_type'] ?? '');
-            $base = (float) ($item['base_amount'] ?? 0);
-            $stEarn = (float) ($item['store_commission'] ?? 0);
-            $opEarn = (float) ($item['operator_profit'] ?? 0);
-
-            if (isset($stats[$t])) {
-                $stats[$t]['total_base'] += $base;
-                $stats[$t]['stores_earned'] += $stEarn;
-                $stats[$t]['operator_earned'] += $opEarn;
-                $stats[$t]['count']++;
-            }
-            $stats['total_operator_profit'] += $opEarn;
-            $stats['total_stores_earned'] += $stEarn;
-        }
-
         // Filtrado de items para la tabla
         $filteredItems = [];
         foreach ($items as $item) {
@@ -6719,6 +6676,57 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
             }
             $filteredItems[] = $item;
         }
+
+        // Totales de las 3 tasas según el filtro aplicado
+        $stats = [
+            'ggr' => [
+                'rate' => $operatorGgrRate,
+                'total_base' => 0.0,
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+                'count' => 0,
+            ],
+            'recharge' => [
+                'rate' => $operatorRechargeRate,
+                'total_base' => 0.0,
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+                'count' => 0,
+            ],
+            'withdraw' => [
+                'rate' => $operatorWithdrawRate,
+                'total_base' => 0.0,
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+                'count' => 0,
+            ],
+            'total_operator_profit' => 0.0,
+            'total_stores_earned' => 0.0,
+        ];
+
+        foreach ($filteredItems as $item) {
+            $t = (string) ($item['rate_type'] ?? '');
+            $base = (float) ($item['base_amount'] ?? 0);
+            $stEarn = (float) ($item['store_commission'] ?? 0);
+            $opEarn = (float) ($item['operator_profit'] ?? 0);
+
+            if (isset($stats[$t])) {
+                $stats[$t]['total_base'] += $base;
+                $stats[$t]['stores_earned'] += $stEarn;
+                $stats[$t]['operator_earned'] += $opEarn;
+                $stats[$t]['count']++;
+            }
+            $stats['total_operator_profit'] += $opEarn;
+            $stats['total_stores_earned'] += $stEarn;
+        }
+
+        foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
+            $stats[$tk]['total_base'] = round($stats[$tk]['total_base'], 2);
+            $stats[$tk]['stores_earned'] = round($stats[$tk]['stores_earned'], 2);
+            $stats[$tk]['operator_earned'] = round($stats[$tk]['operator_earned'], 2);
+        }
+        $stats['total_operator_profit'] = round($stats['total_operator_profit'], 2);
+        $stats['total_stores_earned'] = round($stats['total_stores_earned'], 2);
 
         // Ordenar DESC
         usort($filteredItems, static function ($a, $b) {

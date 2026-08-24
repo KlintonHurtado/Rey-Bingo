@@ -1445,17 +1445,97 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
         usort($breakdown, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']));
         ksort($chartMap);
 
+        $commissionStats = [
+            'ggr' => [
+                'rate' => $operatorTotalGgrRate,
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+            ],
+            'recharge' => [
+                'rate' => bingo_operator_recharge_rate($operator),
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+            ],
+            'withdraw' => [
+                'rate' => bingo_operator_withdraw_rate($operator),
+                'stores_earned' => 0.0,
+                'operator_earned' => 0.0,
+            ],
+            'total_stores_earned' => 0.0,
+            'total_operator_profit' => 0.0,
+        ];
+
+        $perStoreThree = [];
+        if ($operatorId > 0 && function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
+            $detailed = bingo_fetch_operator_detailed_commissions_breakdown($operatorId, [
+                'date_from' => $dateFrom,
+                'date_to'   => $dateTo,
+                'store_id'  => 'all',
+                'rate_type' => 'all',
+            ]);
+            $commissionStats = array_merge($commissionStats, $detailed['stats'] ?? []);
+
+            foreach ($detailed['items'] ?? [] as $item) {
+                $sid = (int) ($item['store_id'] ?? 0);
+                if ($sid <= 0 || $sid === $operatorId) {
+                    continue;
+                }
+                $type = (string) ($item['rate_type'] ?? '');
+                if (! in_array($type, ['ggr', 'recharge', 'withdraw'], true)) {
+                    continue;
+                }
+                if (! isset($perStoreThree[$sid])) {
+                    $perStoreThree[$sid] = [
+                        'recharge_store' => 0.0,
+                        'recharge_operator' => 0.0,
+                        'withdraw_store' => 0.0,
+                        'withdraw_operator' => 0.0,
+                        'ggr_store' => 0.0,
+                        'ggr_operator' => 0.0,
+                    ];
+                }
+                $perStoreThree[$sid][$type . '_store'] += (float) ($item['store_commission'] ?? 0);
+                $perStoreThree[$sid][$type . '_operator'] += (float) ($item['operator_profit'] ?? 0);
+            }
+        }
+
+        foreach ($breakdown as &$row) {
+            $sid = (int) ($row['id'] ?? 0);
+            $extra = $perStoreThree[$sid] ?? [
+                'recharge_store' => 0.0,
+                'recharge_operator' => 0.0,
+                'withdraw_store' => 0.0,
+                'withdraw_operator' => 0.0,
+                'ggr_store' => (float) ($row['ggr_commissions'] ?? 0),
+                'ggr_operator' => 0.0,
+            ];
+            foreach ($extra as $ek => $ev) {
+                $extra[$ek] = round((float) $ev, 2);
+            }
+            $row = array_merge($row, $extra);
+            $row['three_total_store'] = round(
+                $extra['recharge_store'] + $extra['withdraw_store'] + $extra['ggr_store'],
+                2
+            );
+            $row['three_total_operator'] = round(
+                $extra['recharge_operator'] + $extra['withdraw_operator'] + $extra['ggr_operator'],
+                2
+            );
+        }
+        unset($row);
+
         return [
-            'store_count'          => count($breakdown),
-            'total_commission'     => round($totalAffiliate + $totalGgrCommission, 2),
+            'store_count'           => count($breakdown),
+            'total_commission'      => round($totalAffiliate + $totalGgrCommission, 2),
             'affiliate_commissions' => round($totalAffiliate, 2),
-            'ggr_commissions'      => round($totalGgrCommission, 2),
-            'pending_commission'   => round($totalPending, 2),
-            'total_ggr'            => round($totalGgr, 2),
-            'stores'               => $breakdown,
-            'chart'                => array_values($chartMap),
-            'date_from'            => $dateFrom,
-            'date_to'              => $dateTo,
+            'ggr_commissions'       => round($totalGgrCommission, 2),
+            'pending_commission'    => round($totalPending, 2),
+            'total_ggr'             => round($totalGgr, 2),
+            'commission_stats'      => $commissionStats,
+            'stores'                => $breakdown,
+            'chart'                 => array_values($chartMap),
+            'date_from'             => $dateFrom,
+            'date_to'               => $dateTo,
         ];
     }
 }

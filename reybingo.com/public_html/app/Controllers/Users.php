@@ -291,11 +291,7 @@ class Users extends Controller {
             }
 
             $updateData = [
-                'firstname' => $data['firstname'],
-                'lastname' => $data['lastname'],
                 'business_name' => $data['business_name'],
-                'email' => $email,
-                'document' => $document,
                 'phone' => $data['phone'],
                 'address_line' => $data['address_line'],
                 'city' => trim((string) $this->request->getPost('city')),
@@ -308,10 +304,6 @@ class Users extends Controller {
                 'ggr_commission_rate' => $ggrCommissionRate,
                 'store_prize_commission_rate' => $prizeCommissionRate,
             ];
-
-            if ($email !== strtolower(trim((string) $existing['email']))) {
-                $updateData['username'] = bingo_generate_store_username($email, $model, $storeId);
-            }
 
             if ($this->request->getPost('password')) {
                 $updateData['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
@@ -656,11 +648,7 @@ class Users extends Controller {
             }
 
             $updateData = [
-                'firstname' => $data['firstname'],
-                'lastname' => $data['lastname'],
                 'business_name' => $businessName,
-                'email' => $email,
-                'document' => $document,
                 'phone' => $phone,
                 'address_line' => $address,
                 'city' => $city,
@@ -674,10 +662,6 @@ class Users extends Controller {
                 'store_prize_commission_rate' => $operatorWithdrawRate,
                 'ggr_commission_rate' => null,
             ];
-
-            if ($email !== strtolower(trim((string) $existing['email']))) {
-                $updateData['username'] = bingo_generate_operator_username($email, $model, $operatorId);
-            }
 
             if ($this->request->getPost('password')) {
                 $updateData['password'] = password_hash($this->request->getPost('password'), PASSWORD_DEFAULT);
@@ -2650,6 +2634,17 @@ class Users extends Controller {
             'is_reseller' => $pageMode ? 0 : (int) ($this->request->getPost('is_reseller') ?? 0),
         ];
 
+        // En edición: nombre, correo y cédula son inmutables
+        if ($action !== 'add' && (int) $userId > 0) {
+            $existingLocked = $model->find((int) $userId);
+            if ($existingLocked) {
+                $data['firstname'] = $existingLocked['firstname'] ?? $data['firstname'];
+                $data['lastname'] = $existingLocked['lastname'] ?? $data['lastname'];
+                $data['email'] = $existingLocked['email'] ?? $data['email'];
+                $data['document'] = $existingLocked['document'] ?? $data['document'];
+            }
+        }
+
         helper('wallet');
         if ($pageMode) {
             // Staff: no se asignan saldos iniciales desde esta pantalla
@@ -2825,18 +2820,6 @@ class Users extends Controller {
         $user = $model->getUserById(session()->get('id'));
     
         $validationRules = [
-            'firstname' => [
-                'label' => translate('first name'),
-                'rules' => 'required|min_length[3]'
-            ],
-            'lastname' => [
-                'label' => translate('last name'),
-                'rules' => 'required|min_length[3]'
-            ],
-            'document' => [
-                'label' => translate('document'),
-                'rules' => 'required|numeric|is_unique[users.document,id,' . session()->get('id') . ']'
-            ],
             'username' => [
                 'label' => translate('username'), 
                 'rules' => 'required|min_length[3]|is_unique[users.username,id,' . session()->get('id') . ']'
@@ -2845,10 +2828,6 @@ class Users extends Controller {
                 'label' => translate('phone'),  
                 'rules' => 'required|numeric|is_unique[users.phone,id,' . session()->get('id') . ']'
             ],
-            'email' => [
-                'label' => translate('email'), 
-                'rules' => 'required|valid_email|is_unique[users.email,id,' . session()->get('id') . ']'
-            ]
         ];
     
         if (!$this->validate($validationRules)) {
@@ -2861,12 +2840,12 @@ class Users extends Controller {
         }
     
         $data = [
-            'firstname' => $this->request->getPost('firstname'),
-            'lastname' => $this->request->getPost('lastname'),
-            'document' => $this->request->getPost('document'),
+            'firstname' => $user['firstname'] ?? '',
+            'lastname' => $user['lastname'] ?? '',
+            'document' => $user['document'] ?? '',
             'username' => $this->request->getPost('username'),
             'phone' => $this->request->getPost('phone'),
-            'email' => $this->request->getPost('email'),
+            'email' => $user['email'] ?? '',
             'address_line' => $this->request->getPost('address_line'),
             'city' => $this->request->getPost('city'),
             'state' => $this->request->getPost('state'),

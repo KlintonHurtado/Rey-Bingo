@@ -16,25 +16,28 @@
                 <div class="row">
                     <div class="col-md-6 mb-2">
                         <label for="operator-firstname" class="form-label"><?= translate('first name'); ?></label>
-                        <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="operator-firstname" value="<?= $isUpdate ? esc($operatorData['firstname']) : '' ?>" autocomplete="off" autofocus>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="operator-firstname" value="<?= $isUpdate ? esc($operatorData['firstname']) : '' ?>" autocomplete="off" autofocus<?= $isUpdate ? ' readonly' : ''; ?>>
                         <small id="firstname-error" class="text-danger d-none"></small>
                     </div>
 
                     <div class="col-md-6 mb-2">
                         <label for="operator-lastname" class="form-label"><?= translate('last name'); ?></label>
-                        <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="operator-lastname" value="<?= $isUpdate ? esc($operatorData['lastname']) : '' ?>" autocomplete="off">
+                        <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="operator-lastname" value="<?= $isUpdate ? esc($operatorData['lastname']) : '' ?>" autocomplete="off"<?= $isUpdate ? ' readonly' : ''; ?>>
                         <small id="lastname-error" class="text-danger d-none"></small>
                     </div>
 
                     <div class="col-md-6 mb-2">
                         <label for="operator-document" class="form-label"><?= translate('document'); ?></label>
-                        <input type="text" class="form-control form-control-lg form-bingo" name="document" id="operator-document" value="<?= $isUpdate ? esc($operatorData['document'] ?? '') : '' ?>" autocomplete="off">
+                        <input type="text" class="form-control form-control-lg form-bingo" name="document" id="operator-document" value="<?= $isUpdate ? esc($operatorData['document'] ?? '') : '' ?>" autocomplete="off"<?= $isUpdate ? ' readonly' : ''; ?>>
                         <small id="document-error" class="text-danger d-none"></small>
+                        <?php if ($isUpdate) : ?>
+                            <small class="text-muted">Nombre, correo y cédula no se pueden modificar.</small>
+                        <?php endif; ?>
                     </div>
 
                     <div class="col-md-6 mb-2">
                         <label for="operator-email" class="form-label"><?= translate('email'); ?></label>
-                        <input type="email" class="form-control form-control-lg form-bingo" name="email" id="operator-email" value="<?= $isUpdate ? esc($operatorData['email']) : '' ?>" autocomplete="off">
+                        <input type="email" class="form-control form-control-lg form-bingo" name="email" id="operator-email" value="<?= $isUpdate ? esc($operatorData['email']) : '' ?>" autocomplete="off"<?= $isUpdate ? ' readonly' : ''; ?>>
                         <small id="email-error" class="text-danger d-none"></small>
                     </div>
 
