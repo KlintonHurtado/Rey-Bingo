@@ -107,12 +107,40 @@
 
                     <div class="col-md-6 mb-2">
                         <label for="group" class="form-label"><?= translate('group'); ?></label>
-                        <select class="form-control form-control-lg form-bingo" name="group" id="group">
+                        <select class="form-control form-control-lg form-bingo" name="group" id="group" onchange="bingoToggleAdminRoleField()">
                             <option value="0" <?= $isUpdate && $userData['group'] == 0 ? 'selected' : ''; ?>><?= translate('player'); ?></option>
-                            <option value="1" <?= $isUpdate && $userData['group'] == 1 ? 'selected' : ''; ?>><?= translate('admin'); ?></option>
+                            <?php
+                            $showAdminOption = ! empty($canManageAdmins)
+                                || ($isUpdate && (int) ($userData['group'] ?? 0) === 1);
+                            ?>
+                            <?php if ($showAdminOption) : ?>
+                                <option value="1" <?= $isUpdate && $userData['group'] == 1 ? 'selected' : ''; ?>><?= translate('admin'); ?> / Staff</option>
+                            <?php endif; ?>
                             <option value="2" <?= $isUpdate && $userData['group'] == 2 ? 'selected' : ''; ?>><?= translate('point of sale'); ?></option>
                             <option value="3" <?= $isUpdate && $userData['group'] == 3 ? 'selected' : ''; ?>><?= translate('operator'); ?></option>
                         </select>
+                    </div>
+
+                    <div class="col-md-6 mb-2" id="admin-role-wrap" style="<?= ($isUpdate && (int) ($userData['group'] ?? 0) === 1) ? '' : 'display:none;'; ?>">
+                        <label for="admin_role_id" class="form-label">Rol de permisos <span class="text-danger">*</span></label>
+                        <select class="form-control form-control-lg form-bingo" name="admin_role_id" id="admin_role_id">
+                            <option value="">Selecciona un rol</option>
+                            <?php foreach (($adminRoles ?? []) as $role) : ?>
+                                <?php
+                                $rid = (int) ($role['id'] ?? 0);
+                                $selected = $isUpdate && (int) ($userData['admin_role_id'] ?? 0) === $rid;
+                                $isSuper = (int) ($role['is_superadmin'] ?? 0) === 1;
+                                if ($isSuper && empty($canManageAdmins) && (int) session()->get('admin_is_superadmin') !== 1) {
+                                    continue;
+                                }
+                                ?>
+                                <option value="<?= $rid; ?>" <?= $selected ? 'selected' : ''; ?>>
+                                    <?= esc($role['name'] ?? ''); ?><?= $isSuper ? ' (acceso total)' : ''; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Define qué puede hacer este usuario en el panel Admin.</small>
+                        <small id="admin_role_id-error" class="text-danger d-none"></small>
                     </div>
 
                     <div class="col-md-6 mb-2">
@@ -290,4 +318,11 @@
             });
         });
     });
+
+    function bingoToggleAdminRoleField() {
+        var group = document.getElementById('group');
+        var wrap = document.getElementById('admin-role-wrap');
+        if (!group || !wrap) return;
+        wrap.style.display = String(group.value) === '1' ? '' : 'none';
+    }
 </script>

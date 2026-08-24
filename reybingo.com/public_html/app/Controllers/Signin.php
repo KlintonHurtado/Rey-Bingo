@@ -9,7 +9,7 @@ use CodeIgniter\Controller;
 
 class Signin extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'bingo']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
         session();
     }
 
@@ -152,6 +152,10 @@ class Signin extends Controller {
         ];
         
         session()->set($sessionData);
+
+        if ((int) ($user['group'] ?? 0) === bingo_group_admin() && function_exists('bingo_load_admin_authz_into_session')) {
+            bingo_load_admin_authz_into_session($user);
+        }
         
         if ($remember == '1') {
             $rememberToken = random_string('md5');

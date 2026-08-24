@@ -12,17 +12,13 @@ class Ggr extends Controller
 {
     public function __construct()
     {
-        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo', 'affiliate_ggr']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo', 'affiliate_ggr', 'permissions']);
         session();
     }
 
     private function requireAdmin()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
-        }
-
-        return null;
+        return bingo_require_admin_permission(['ggr.view', 'ggr.manage']);
     }
 
 

@@ -26,13 +26,22 @@ use CodeIgniter\Controller;
 
 class Games extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'bingo']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
         session();
     }
     
     public function index() {
         if (!session()->get('logged_in') || session()->get('group') != 1) {
             return redirect()->to('/signin');
+        }
+
+        bingo_ensure_permissions_schema();
+        if (session()->get('admin_permissions') === null) {
+            bingo_load_admin_authz_into_session();
+        }
+
+        if (! bingo_can_any(['games.view', 'games.manage'])) {
+            return bingo_deny_permission_response('No tienes permiso para ver juegos.');
         }
         
         $modelUsers = new UsersModel();

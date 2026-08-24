@@ -61,6 +61,11 @@ class Users extends Controller {
     }
 
     public function add($userId = null) {
+        if ($deny = bingo_require_admin_permission(['users.manage', 'admins.manage'])) {
+            return $deny;
+        }
+
+        bingo_ensure_permissions_schema();
         $model = new UsersModel();
 
         $data = [];
@@ -78,14 +83,17 @@ class Users extends Controller {
             $data['userData'] = null;
             $data['isUpdate'] = false;
         }
+
+        $data['adminRoles'] = bingo_list_admin_roles(false);
+        $data['canManageAdmins'] = bingo_can('admins.manage');
         
         return view('users/modalUser', $data);
     }
 
     public function stores()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission(['stores.view', 'stores.manage'])) {
+            return $deny;
         }
 
         helper('bingo');
@@ -127,8 +135,8 @@ class Users extends Controller {
 
     public function addStore($storeId = null)
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('stores.manage')) {
+            return $deny;
         }
 
         helper('bingo');
@@ -152,8 +160,8 @@ class Users extends Controller {
 
     public function storeSubmit()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('stores.manage')) {
+            return $deny;
         }
 
         helper('bingo');
@@ -413,8 +421,8 @@ class Users extends Controller {
 
     public function operators()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission(['operators.view', 'operators.manage'])) {
+            return $deny;
         }
 
         helper(['bingo', 'wallet', 'affiliate_ggr']);
@@ -464,8 +472,8 @@ class Users extends Controller {
 
     public function addOperator($operatorId = null)
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('operators.manage')) {
+            return $deny;
         }
 
         helper('bingo');
@@ -501,8 +509,8 @@ class Users extends Controller {
 
     public function operatorSubmit()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('operators.manage')) {
+            return $deny;
         }
 
         helper('bingo');
@@ -869,11 +877,8 @@ class Users extends Controller {
 
     public function settleUserCommissionSubmit()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => translate('unauthorized'),
-            ]);
+        if ($deny = bingo_require_admin_permission('commissions.settle')) {
+            return $deny;
         }
 
         helper(['bingo', 'wallet', 'affiliate_ggr']);
@@ -1064,8 +1069,8 @@ class Users extends Controller {
 
     public function lowBalancePlayers()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('low_balance.view')) {
+            return $deny;
         }
 
         helper(['bingo', 'wallet']);
@@ -2440,14 +2445,69 @@ class Users extends Controller {
     }
 
     public function userSubmit() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission(['users.manage', 'admins.manage'])) {
+            return $deny;
         }
 
+        bingo_ensure_permissions_schema();
         $model = new UsersModel();
 
         $userId = $this->request->getPost('user-id');
         $action = $this->request->getPost('user-action');
+        $group = (int) $this->request->getPost('group');
+        $adminRoleId = (int) ($this->request->getPost('admin_role_id') ?? 0);
+
+        // Solo quien tiene admins.manage puede crear/editar cuentas Admin (group=1)
+        if ($group === bingo_group_admin() && ! bingo_can('admins.manage')) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No tienes permiso para crear o editar usuarios Admin / staff.',
+                'errors' => ['group' => 'Permiso denegado para rol Admin'],
+            ]);
+        }
+
+        // Impedir que staff sin admins.manage edite un Admin existente (aunque el POST fuerce group player)
+        if ($action !== 'add' && (int) $userId > 0) {
+            $existingTarget = $model->find((int) $userId);
+            if ($existingTarget && (int) ($existingTarget['group'] ?? -1) === bingo_group_admin() && ! bingo_can('admins.manage')) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No tienes permiso para editar usuarios Admin / staff.',
+                    'errors' => ['group' => 'Permiso denegado'],
+                ]);
+            }
+        }
+
+        if ($group === bingo_group_admin()) {
+            if ($adminRoleId <= 0) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Debes asignar un rol de permisos al usuario Admin.',
+                    'errors' => ['admin_role_id' => 'Rol requerido'],
+                ]);
+            }
+
+            $db = \Config\Database::connect();
+            $role = $db->table('admin_roles')->where('id', $adminRoleId)->where('status', 1)->get()->getRowArray();
+            if (! $role) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Rol de permisos inválido.',
+                    'errors' => ['admin_role_id' => 'Rol inválido'],
+                ]);
+            }
+
+            // Solo un superadmin puede asignar el rol Superadministrador
+            if ((int) ($role['is_superadmin'] ?? 0) === 1 && (int) session()->get('admin_is_superadmin') !== 1) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Solo un Superadministrador puede asignar ese rol.',
+                    'errors' => ['admin_role_id' => 'No autorizado'],
+                ]);
+            }
+        } else {
+            $adminRoleId = 0;
+        }
 
         $validationRules = [
             'firstname' => [
@@ -2498,7 +2558,8 @@ class Users extends Controller {
             'bank' => $this->request->getPost('bank') ?? '',
             'account' => $this->request->getPost('account') ?? '',
             'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
-            'group' => $this->request->getPost('group'),
+            'group' => $group,
+            'admin_role_id' => $group === bingo_group_admin() ? $adminRoleId : null,
             'status' => $this->request->getPost('status'),
             'sounds' => $this->request->getPost('sounds') ?? 1,
             'narration' => $this->request->getPost('narration') ?? 1,
@@ -2531,7 +2592,6 @@ class Users extends Controller {
             // Generar código único
             $lastUser = $model->orderBy('id', 'DESC')->first();
             $nextId = $lastUser ? $lastUser['id'] + 1 : 1;
-            $group = (int) ($data['group'] ?? 0);
             $codePrefix = $group === bingo_group_store() ? 'BGC-T' : 'BGC-A';
             $data['code'] = $codePrefix . str_pad($nextId, 5, '0', STR_PAD_LEFT);
             
@@ -2555,16 +2615,24 @@ class Users extends Controller {
             }
             
             if ($model->update($userId, $data)) {
+                // Si se edita el usuario en sesión, refrescar permisos
+                if ((int) $userId === (int) session()->get('id')) {
+                    $fresh = $model->find((int) $userId);
+                    if ($fresh) {
+                        bingo_load_admin_authz_into_session($fresh);
+                    }
+                }
+
                 return $this->response->setJSON([
                     'success' => true,
                     'message' => translate('user updated successfully')
                 ]);
             }
         }
-        
+
         return $this->response->setJSON([
             'success' => false,
-            'message' => translate('error processing request')
+            'message' => translate('an error occurred')
         ]);
     }
 

@@ -211,6 +211,9 @@ class Home extends Controller {
     }
 
     public function settingsGet() {
+        if ($deny = bingo_require_admin_permission('settings.manage')) {
+            return $deny;
+        }
 
         $modelBanks = new BanksModel();
 
@@ -230,6 +233,10 @@ class Home extends Controller {
     }
 
     public function settingsSubmit() {
+        if ($deny = bingo_require_admin_permission('settings.manage')) {
+            return $deny;
+        }
+
         /*if (defined('IS_DEMO') && IS_DEMO === 1) {
             $response = [
                 'success' => false,

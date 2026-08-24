@@ -10,8 +10,8 @@ class KycAdmin extends Controller
 {
     public function index()
     {
-        if (! session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('kyc.review')) {
+            return $deny;
         }
 
         $modelUsers = new UsersModel();
@@ -58,8 +58,8 @@ class KycAdmin extends Controller
 
     public function review(int $id)
     {
-        if (! session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('kyc.review')) {
+            return $deny;
         }
 
         $action = $this->request->getPost('action');
@@ -102,8 +102,8 @@ class KycAdmin extends Controller
 
     public function revoke(int $id)
     {
-        if (! session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('kyc.review')) {
+            return $deny;
         }
 
         $observations = trim((string) $this->request->getPost('kyc_observations'));

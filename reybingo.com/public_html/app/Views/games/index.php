@@ -22,7 +22,9 @@
 
 <button class="btn btn-small btn-game" onclick="awardsGameGet();"><i class="fa-duotone fa-solid fa-trophy-star"></i></button>
 
+<?php if (function_exists('bingo_can') && bingo_can('settings.manage')) : ?>
 <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
+<?php endif; ?>
 
 <div class="container">
     <div class="row d-flex justify-content-center">
@@ -31,7 +33,9 @@
                 <div class="collapse show">
                     <div class="card-body p-3">
                         <div class="d-flex justify-content-end mb-2">
+                            <?php if (! function_exists('bingo_can') || bingo_can('games.manage')) : ?>
                             <button type="button" class="btn btn-small btn-primary btn-modal-add text-white btn-add-new" onclick="gameAdd();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                            <?php endif; ?>
                         </div>
                         <div class="row g-2">
                             <?php $today = date('Y-m-d'); ?>

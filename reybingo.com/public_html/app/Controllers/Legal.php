@@ -35,8 +35,8 @@ class Legal extends Controller
 
     public function admin()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission('legal.manage')) {
+            return $deny;
         }
 
         if (function_exists('bingo_ensure_system_settings_schema')) {
@@ -74,11 +74,8 @@ class Legal extends Controller
 
     public function adminSubmit()
     {
-        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
-            return $this->response->setStatusCode(403)->setJSON([
-                'success' => false,
-                'message' => translate('unauthorized access'),
-            ]);
+        if ($deny = bingo_require_admin_permission('legal.manage')) {
+            return $deny;
         }
 
         if (function_exists('bingo_ensure_system_settings_schema')) {

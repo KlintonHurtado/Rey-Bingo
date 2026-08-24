@@ -91,5 +91,5 @@ class Autoload extends AutoloadConfig
      *
      * @var list<string>
      */
-    public $helpers = ['asset', 'form', 'url', 'cookie', 'text', 'system', 'translation', 'wallet', 'bingo', 'affiliate_ggr'];
+    public $helpers = ['asset', 'form', 'url', 'cookie', 'text', 'system', 'translation', 'wallet', 'bingo', 'affiliate_ggr', 'permissions'];
 }
