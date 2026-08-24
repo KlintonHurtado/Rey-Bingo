@@ -2629,9 +2629,11 @@ class Users extends Controller {
             'email' => $this->request->getPost('email'),
             'phone' => $this->request->getPost('phone') ?? '',
             'document' => $this->request->getPost('document') ?? '',
-            'document_expires_at' => ($exp = trim((string) $this->request->getPost('document_expires_at'))) !== ''
-                ? date('Y-m-d', strtotime($exp))
-                : null,
+            'document_expires_at' => $pageMode
+                ? null
+                : (($exp = trim((string) $this->request->getPost('document_expires_at'))) !== ''
+                    ? date('Y-m-d', strtotime($exp))
+                    : null),
             'bank' => $this->request->getPost('bank') ?? '',
             'account' => $this->request->getPost('account') ?? '',
             'account_type' => bingo_normalize_account_type($this->request->getPost('account_type')),
@@ -2644,7 +2646,7 @@ class Users extends Controller {
             'roulette' => $this->request->getPost('roulette') ?? 1,
             'address_line' => $this->request->getPost('address_line') ?? '',
             'city' => $this->request->getPost('city') ?? '',
-            'state' => $this->request->getPost('state') ?? '',
+            'state' => $pageMode ? '' : ($this->request->getPost('state') ?? ''),
             'is_reseller' => $pageMode ? 0 : (int) ($this->request->getPost('is_reseller') ?? 0),
         ];
 

@@ -32,10 +32,6 @@ if (! function_exists('bingo_permissions_catalog')) {
             ['key' => 'ggr.manage', 'name' => 'Gestionar GGR', 'module' => 'GGR'],
             ['key' => 'legal.manage', 'name' => 'Contenido legal', 'module' => 'Legal'],
             ['key' => 'settings.manage', 'name' => 'Configuración del sistema', 'module' => 'Sistema', 'sensitive' => true],
-            ['key' => 'notifications.manage', 'name' => 'Notificaciones push', 'module' => 'Marketing'],
-            ['key' => 'email.manage', 'name' => 'Email marketing', 'module' => 'Marketing'],
-            ['key' => 'packages.manage', 'name' => 'Paquetes', 'module' => 'Marketing'],
-            ['key' => 'levels.manage', 'name' => 'Niveles / logros', 'module' => 'Marketing'],
             ['key' => 'admins.manage', 'name' => 'Crear staff y asignar permisos', 'module' => 'Administración', 'sensitive' => true],
         ];
     }
@@ -104,21 +100,6 @@ if (! function_exists('bingo_staff_roles_seed')) {
                     'users.view',
                     'stats.view',
                     'low_balance.view',
-                ],
-            ],
-            [
-                'slug' => 'marketing',
-                'name' => 'Marketing',
-                'description' => 'Campañas, notificaciones y contenido',
-                'is_superadmin' => 0,
-                'permissions' => [
-                    'games.view',
-                    'stats.view',
-                    'legal.manage',
-                    'notifications.manage',
-                    'email.manage',
-                    'packages.manage',
-                    'levels.manage',
                 ],
             ],
         ];
@@ -330,6 +311,25 @@ if (! function_exists('bingo_seed_admin_permissions')) {
             }
         }
 
+        // Rol Marketing retirado: desactivar si quedó en BD
+        $marketingRole = $db->table('admin_roles')->where('slug', 'marketing')->get()->getRowArray();
+        if ($marketingRole) {
+            $db->table('admin_roles')->where('id', (int) $marketingRole['id'])->update([
+                'status'     => 0,
+                'updated_at' => $now,
+            ]);
+            $db->table('admin_role_permissions')->where('role_id', (int) $marketingRole['id'])->delete();
+        }
+        foreach (['notifications.manage', 'email.manage', 'packages.manage', 'levels.manage'] as $retiredKey) {
+            $retired = $db->table('admin_permissions')->where('key', $retiredKey)->get()->getRowArray();
+            if ($retired) {
+                $db->table('admin_role_permissions')->where('permission_id', (int) $retired['id'])->delete();
+                if ($db->tableExists('admin_user_permissions')) {
+                    $db->table('admin_user_permissions')->where('permission_id', (int) $retired['id'])->delete();
+                }
+            }
+        }
+
         // Admins existentes sin rol → Superadministrador
         if ($db->tableExists('users') && $db->fieldExists('admin_role_id', 'users')) {
             $super = $db->table('admin_roles')->where('slug', 'superadmin')->get()->getRowArray();
@@ -341,6 +341,14 @@ if (! function_exists('bingo_seed_admin_permissions')) {
                         ->orWhere('admin_role_id', 0)
                     ->groupEnd()
                     ->update(['admin_role_id' => (int) $super['id']]);
+            }
+
+            // Después del seed de legacy: quitar rol Marketing (no promover a superadmin)
+            if ($marketingRole) {
+                $db->table('users')
+                    ->where('group', bingo_group_admin())
+                    ->where('admin_role_id', (int) $marketingRole['id'])
+                    ->update(['admin_role_id' => null]);
             }
         }
     }

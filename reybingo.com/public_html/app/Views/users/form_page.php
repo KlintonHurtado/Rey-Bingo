@@ -103,10 +103,6 @@ foreach ($permissionPresets as $preset) {
                             <small id="document-error" class="text-danger d-none"></small>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-dark" for="document_expires_at"><?= translate('document expiry'); ?></label>
-                            <input type="date" class="form-control form-control-lg form-bingo" name="document_expires_at" id="document_expires_at" value="<?= $isUpdate ? esc($userData['document_expires_at'] ?? '') : ''; ?>">
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label text-dark" for="password">
                                 <?= translate('password'); ?>
                                 <?= ! $isUpdate ? '<span class="text-danger">*</span>' : '<small class="text-muted">(' . translate('leave empty to keep current') . ')</small>'; ?>
@@ -121,10 +117,6 @@ foreach ($permissionPresets as $preset) {
                         <div class="col-md-6">
                             <label class="form-label text-dark" for="city"><?= translate('city'); ?></label>
                             <input type="text" class="form-control form-control-lg form-bingo" name="city" id="city" value="<?= $isUpdate ? esc($userData['city'] ?? '') : ''; ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label text-dark" for="state"><?= translate('state'); ?></label>
-                            <input type="text" class="form-control form-control-lg form-bingo" name="state" id="state" value="<?= $isUpdate ? esc($userData['state'] ?? '') : ''; ?>">
                         </div>
 
                         <div class="col-12 mt-2"><hr class="my-2"><h6 class="text-dark mb-2">Datos bancarios (opcional)</h6></div>
@@ -172,7 +164,7 @@ foreach ($permissionPresets as $preset) {
                 <div class="admin-user-step-pane" id="user-step-2">
                     <h6 class="text-dark mb-2">Selecciona qué puede hacer este staff</h6>
                     <p class="small text-muted mb-3">
-                        Puedes marcar permisos uno a uno, o usar un atajo (Soporte, Finanzas, etc.) y luego ajustar.
+                        Puedes marcar permisos uno a uno, o usar un atajo (Soporte, Finanzas, Operaciones) y luego ajustar.
                     </p>
 
                     <div class="admin-perm-presets mb-3">
