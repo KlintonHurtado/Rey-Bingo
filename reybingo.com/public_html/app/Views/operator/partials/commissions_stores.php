@@ -5,17 +5,20 @@ $dateFrom = (string) ($storesCommissions['date_from'] ?? date('Y-m-d', strtotime
 $dateTo = (string) ($storesCommissions['date_to'] ?? date('Y-m-d'));
 
 $stats = $storesCommissions['commission_stats'] ?? [];
-$totalStores = (float) ($stats['total_stores_earned'] ?? 0);
-$totalOp = (float) ($stats['total_operator_profit'] ?? 0);
 
-if ($totalStores <= 0 && $totalOp <= 0) {
-    $totalStores = 0.0;
-    $totalOp = 0.0;
+$totalRecargas = (float) ($stats['recharge']['stores_earned'] ?? 0);
+$totalRetiros = (float) ($stats['withdraw']['stores_earned'] ?? 0);
+$totalGgr = (float) ($stats['ggr']['stores_earned'] ?? 0);
+
+if ($totalRecargas <= 0 && $totalRetiros <= 0 && $totalGgr <= 0) {
     foreach ($storesCommissions['stores'] ?? [] as $row) {
-        $totalStores += (float) ($row['three_total_store'] ?? $row['total_commission'] ?? 0);
-        $totalOp += (float) ($row['three_total_operator'] ?? 0);
+        $totalRecargas += (float) ($row['recharge_store'] ?? 0);
+        $totalRetiros += (float) ($row['withdraw_store'] ?? 0);
+        $totalGgr += (float) ($row['ggr_store'] ?? $row['ggr_commissions'] ?? 0);
     }
 }
+
+$totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
 ?>
 <div class="operator-pane-inner operator-pane-inner-commissions" id="operator-stores-commissions-root">
     <div class="operator-panel-pane-head">
@@ -53,16 +56,20 @@ if ($totalStores <= 0 && $totalOp <= 0) {
             <strong><?= (int) ($storesCommissions['store_count'] ?? 0); ?></strong>
         </div>
         <div class="operator-affiliate-stat">
+            <span>Total Recargas</span>
+            <strong><?= $currency; ?> <?= number_format($totalRecargas, 2); ?></strong>
+        </div>
+        <div class="operator-affiliate-stat">
+            <span>Total Retiros</span>
+            <strong><?= $currency; ?> <?= number_format($totalRetiros, 2); ?></strong>
+        </div>
+        <div class="operator-affiliate-stat">
+            <span>Total GGR</span>
+            <strong><?= $currency; ?> <?= number_format($totalGgr, 2); ?></strong>
+        </div>
+        <div class="operator-affiliate-stat">
             <span>Total Puntos de venta</span>
-            <strong><?= $currency; ?> <?= number_format($totalStores, 2); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total Operador</span>
-            <strong><?= $currency; ?> <?= number_format($totalOp, 2); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total general</span>
-            <strong><?= $currency; ?> <?= number_format($totalStores + $totalOp, 2); ?></strong>
+            <strong><?= $currency; ?> <?= number_format($totalPv, 2); ?></strong>
         </div>
     </div>
 
@@ -74,15 +81,18 @@ if ($totalStores <= 0 && $totalOp <= 0) {
                 <thead>
                     <tr>
                         <th><?= translate('business name'); ?></th>
-                        <th>Total PV</th>
-                        <th>Total Operador</th>
+                        <th>Total Recargas</th>
+                        <th>Total Retiros</th>
+                        <th>Total GGR</th>
                         <th>Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($storesCommissions['stores'] as $storeRow) :
-                        $pvTotal = (float) ($storeRow['three_total_store'] ?? $storeRow['total_commission'] ?? 0);
-                        $opTotal = (float) ($storeRow['three_total_operator'] ?? 0);
+                        $rec = (float) ($storeRow['recharge_store'] ?? 0);
+                        $ret = (float) ($storeRow['withdraw_store'] ?? 0);
+                        $ggr = (float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0);
+                        $rowTotal = round($rec + $ret + $ggr, 2);
                         ?>
                     <tr>
                         <td>
@@ -91,18 +101,20 @@ if ($totalStores <= 0 && $totalOp <= 0) {
                                 <br><small class="text-muted"><?= esc($storeRow['code']); ?></small>
                             <?php endif; ?>
                         </td>
-                        <td><strong><?= $currency; ?> <?= number_format($pvTotal, 2); ?></strong></td>
-                        <td><strong class="text-success"><?= $currency; ?> <?= number_format($opTotal, 2); ?></strong></td>
-                        <td><strong><?= $currency; ?> <?= number_format($pvTotal + $opTotal, 2); ?></strong></td>
+                        <td><strong><?= $currency; ?> <?= number_format($rec, 2); ?></strong></td>
+                        <td><strong><?= $currency; ?> <?= number_format($ret, 2); ?></strong></td>
+                        <td><strong><?= $currency; ?> <?= number_format($ggr, 2); ?></strong></td>
+                        <td><strong><?= $currency; ?> <?= number_format($rowTotal, 2); ?></strong></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
                     <tr>
                         <th>Totales</th>
-                        <th><strong><?= $currency; ?> <?= number_format($totalStores, 2); ?></strong></th>
-                        <th><strong class="text-success"><?= $currency; ?> <?= number_format($totalOp, 2); ?></strong></th>
-                        <th><strong><?= $currency; ?> <?= number_format($totalStores + $totalOp, 2); ?></strong></th>
+                        <th><strong><?= $currency; ?> <?= number_format($totalRecargas, 2); ?></strong></th>
+                        <th><strong><?= $currency; ?> <?= number_format($totalRetiros, 2); ?></strong></th>
+                        <th><strong><?= $currency; ?> <?= number_format($totalGgr, 2); ?></strong></th>
+                        <th><strong><?= $currency; ?> <?= number_format($totalPv, 2); ?></strong></th>
                     </tr>
                 </tfoot>
             </table>
