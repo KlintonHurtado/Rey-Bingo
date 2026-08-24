@@ -327,6 +327,51 @@ html:has(#content-page > .operator-panel-fit) {
     align-items: center;
 }
 
+/* Evita texto blanco del .btn global sobre fondo claro (outline ilegible) */
+.admin-perm-presets .btn {
+    font-weight: 600;
+    border-width: 1.5px;
+    border-radius: 8px;
+    padding: 0.35rem 0.75rem;
+}
+
+.admin-perm-presets .btn-outline-primary,
+.admin-perm-presets .admin-perm-preset-btn {
+    color: #4338ca !important;
+    background-color: #ffffff !important;
+    border-color: #6366f1 !important;
+}
+
+.admin-perm-presets .btn-outline-primary:hover,
+.admin-perm-presets .admin-perm-preset-btn:hover,
+.admin-perm-presets .btn-outline-primary:focus,
+.admin-perm-presets .admin-perm-preset-btn:focus {
+    color: #ffffff !important;
+    background-color: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+}
+
+.admin-perm-presets .btn-outline-primary.is-active,
+.admin-perm-presets .admin-perm-preset-btn.is-active {
+    color: #ffffff !important;
+    background-color: #4338ca !important;
+    border-color: #4338ca !important;
+}
+
+.admin-perm-presets .btn-outline-secondary,
+.admin-perm-presets #btn-clear-perms {
+    color: #475569 !important;
+    background-color: #ffffff !important;
+    border-color: #94a3b8 !important;
+}
+
+.admin-perm-presets .btn-outline-secondary:hover,
+.admin-perm-presets #btn-clear-perms:hover {
+    color: #ffffff !important;
+    background-color: #64748b !important;
+    border-color: #64748b !important;
+}
+
 .admin-perm-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

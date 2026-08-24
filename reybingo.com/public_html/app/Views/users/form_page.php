@@ -315,14 +315,25 @@ foreach ($permissionPresets as $preset) {
         if (validateStep1()) goStep(2);
     });
 
+    function markPresetActive(slug) {
+        document.querySelectorAll('.admin-perm-preset-btn').forEach(function (b) {
+            b.classList.toggle('is-active', slug && b.getAttribute('data-preset') === slug);
+        });
+    }
     document.querySelectorAll('.admin-perm-preset-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var slug = btn.getAttribute('data-preset');
             var preset = presets.find(function (p) { return p.slug === slug; });
-            if (preset) setPermissions(preset.permissions || []);
+            if (preset) {
+                setPermissions(preset.permissions || []);
+                markPresetActive(slug);
+            }
         });
     });
-    document.getElementById('btn-clear-perms')?.addEventListener('click', function () { setPermissions([]); });
+    document.getElementById('btn-clear-perms')?.addEventListener('click', function () {
+        setPermissions([]);
+        markPresetActive(null);
+    });
     form.querySelectorAll('.perm-checkbox').forEach(function (cb) {
         cb.addEventListener('change', updatePermCount);
     });
