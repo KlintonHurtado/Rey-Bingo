@@ -50,29 +50,6 @@ $totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
         </div>
     </div>
 
-    <div class="operator-commissions-stats mb-3">
-        <div class="operator-affiliate-stat">
-            <span><?= translate('points of sale'); ?></span>
-            <strong><?= (int) ($storesCommissions['store_count'] ?? 0); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total Recargas</span>
-            <strong><?= $currency; ?> <?= number_format($totalRecargas, 2); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total Retiros</span>
-            <strong><?= $currency; ?> <?= number_format($totalRetiros, 2); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total GGR</span>
-            <strong><?= $currency; ?> <?= number_format($totalGgr, 2); ?></strong>
-        </div>
-        <div class="operator-affiliate-stat">
-            <span>Total Puntos de venta</span>
-            <strong><?= $currency; ?> <?= number_format($totalPv, 2); ?></strong>
-        </div>
-    </div>
-
     <div class="operator-commissions-history">
         <h6 class="operator-commissions-history-title"><?= translate('points of sale'); ?></h6>
         <div class="store-table-wrap">
