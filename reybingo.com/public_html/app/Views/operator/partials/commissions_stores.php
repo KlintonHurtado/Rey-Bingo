@@ -21,34 +21,36 @@ if ($totalRecargas <= 0 && $totalRetiros <= 0 && $totalGgr <= 0) {
 $totalPv = round($totalRecargas + $totalRetiros + $totalGgr, 2);
 ?>
 <div class="operator-pane-inner operator-pane-inner-commissions" id="operator-stores-commissions-root">
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
-        <div class="operator-panel-pane-head mb-0">
-            <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
-                <i class="fa-duotone fa-solid fa-store"></i>
-            </div>
-            <div>
-                <h5 class="mb-1"><?= translate('stores commissions panel'); ?></h5>
-                <p class="small text-muted mb-0"><?= translate('stores commissions panel description'); ?></p>
-                <?php if (bingo_ggr_pays_monthly()) : ?>
-            </div>
+    <div class="operator-panel-pane-head mb-3">
+        <div class="operator-panel-pane-icon operator-panel-pane-icon-commissions">
+            <i class="fa-duotone fa-solid fa-store"></i>
         </div>
-        <button type="button" class="btn btn-sm btn-success" id="btn-export-stores-commissions" style="padding: 4px 10px; font-size: 0.82rem;">
-            <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
-        </button>
+        <div class="flex-grow-1">
+            <h5 class="mb-1"><?= translate('stores commissions panel'); ?></h5>
+            <p class="small text-muted mb-0"><?= translate('stores commissions panel description'); ?></p>
+        </div>
     </div>
 
     <div class="row g-2 align-items-end mb-3 operator-stores-commissions-filters">
-        <div class="col-md-4 col-sm-6">
+        <div class="col-md-3 col-sm-6">
             <label class="form-label small mb-1" for="operator-stores-date-from"><?= translate('from date'); ?></label>
             <input type="date" class="form-control form-bingo" id="operator-stores-date-from" value="<?= esc($dateFrom); ?>">
         </div>
-        <div class="col-md-4 col-sm-6">
+        <div class="col-md-3 col-sm-6">
             <label class="form-label small mb-1" for="operator-stores-date-to"><?= translate('to date'); ?></label>
             <input type="date" class="form-control form-bingo" id="operator-stores-date-to" value="<?= esc($dateTo); ?>">
         </div>
-        <div class="col-md-4 col-sm-12 d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-light" id="operator-stores-commissions-clear" style="border-color: rgba(255,255,255,0.25);">
+        <div class="col-md-6 col-sm-12 d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-outline-secondary" id="operator-stores-commissions-clear">
                 <i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('clear filters'); ?>
+            </button>
+            <button
+                type="button"
+                class="btn btn-success"
+                id="btn-export-stores-commissions"
+                style="background-color:#198754 !important; border-color:#198754 !important; color:#fff !important; font-weight:600;"
+            >
+                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel
             </button>
         </div>
     </div>
