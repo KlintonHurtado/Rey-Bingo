@@ -18,6 +18,7 @@ $dateTo = (string) ($filters['date_to'] ?? '');
 $search = (string) ($filters['search'] ?? '');
 $rateType = (string) ($filters['rate_type'] ?? 'all');
 ?>
+<div class="admin-stores-scroll">
 <?= view('games/partials/admin_nav_cluster', [
     'activeNav' => 'commissions',
     'showHome' => true,
@@ -171,6 +172,7 @@ $rateType = (string) ($filters['rate_type'] ?? 'all');
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script type="text/javascript">
