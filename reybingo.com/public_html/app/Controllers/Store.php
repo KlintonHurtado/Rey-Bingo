@@ -1228,7 +1228,9 @@ class Store extends Controller
             'Referencia',
             'Jugador / Beneficiario',
             'Cédula / Documento',
-            'Monto Base',
+            'Total apostado',
+            'Total premios',
+            'Monto Base / GGR',
             'Tasa Comisión (%)',
             'Comisión Ganada',
             'Estado',
@@ -1242,12 +1244,18 @@ class Store extends Controller
                 $datetime = date('d/m/Y H:i:s', strtotime($datetime));
             }
 
+            $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+            $totalStake = $isGgr ? round((float) ($it['total_stake'] ?? 0), 2) : '';
+            $totalPayout = $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '';
+
             $rows[] = [
                 $datetime,
                 (string) ($it['rate_type_label'] ?? ''),
                 (string) ($it['ref_code'] ?? ''),
                 (string) ($it['player_name'] ?? ''),
                 (string) ($it['player_doc'] ?? ''),
+                $totalStake,
+                $totalPayout,
                 round((float) ($it['base_amount'] ?? 0), 2),
                 number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
                 round((float) ($it['commission_amount'] ?? 0), 2),
@@ -1255,6 +1263,70 @@ class Store extends Controller
                 (string) ($it['detail'] ?? ''),
             ];
         }
+
+        $stats = $data['stats'] ?? [];
+        $ggrStats = $stats['ggr'] ?? [];
+        $recStats = $stats['recharge'] ?? [];
+        $withStats = $stats['withdraw'] ?? [];
+
+        $rows[] = ['', '', '', '', '', '', '', '', '', '', '', ''];
+        $rows[] = ['', 'TOTALES', '', '', '', '', '', '', '', '', '', ''];
+        $rows[] = [
+            '',
+            'Total GGR',
+            '',
+            '',
+            '',
+            round((float) ($ggrStats['total_stake'] ?? 0), 2),
+            round((float) ($ggrStats['total_payout'] ?? 0), 2),
+            round((float) ($ggrStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($ggrStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total Recargas',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($recStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($recStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total Retiros',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($withStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($withStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total comisiones',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($stats['total_commissions_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
 
         $filename = 'comisiones_punto_venta_' . $storeId . '_' . date('Ymd_His') . '.xls';
 
@@ -1265,7 +1337,7 @@ class Store extends Controller
             [
                 'sheet_name' => 'Comisiones',
                 'title' => 'Rey Bingo - Comisiones del Punto de Venta',
-                'numeric_columns' => [5, 7],
+                'numeric_columns' => [5, 6, 7, 9],
             ]
         );
     }

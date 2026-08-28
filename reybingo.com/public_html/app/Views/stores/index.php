@@ -18,9 +18,6 @@
                             <p class="text-muted small mb-0"><?= translate('manage point of sale accounts'); ?></p>
                         </div>
                         <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                            <button type="button" class="btn btn-success text-white" onclick="exportNetworkCommissions();" title="Descargar todas las comisiones de la Red Tercerizada">
-                                <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Red Tercerizada
-                            </button>
                             <button type="button" class="btn btn-primary btn-modal-add text-white stores-add-btn" onclick="storeAdd();">
                                 <i class="fa-duotone fa-solid fa-plus"></i>
                             </button>
@@ -39,10 +36,6 @@
 <?= view('partials/modal_commission_liquidation'); ?>
 
 <script type="text/javascript">
-    function exportNetworkCommissions() {
-        window.location.href = '<?= site_url('users/exportNetworkCommissions'); ?>';
-    }
-
     function storeRefreshList() {
         $.get('<?= site_url('users/storesListGet') ?>', function(html) {
             $('#stores-list').html(html);

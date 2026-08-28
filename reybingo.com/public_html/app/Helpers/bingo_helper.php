@@ -6628,6 +6628,8 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                     'store_id' => $stId,
                     'store_name' => $stName,
                     'base_amount' => $ggrAmt,
+                    'total_stake' => round((float) ($grow['total_stake'] ?? 0), 2),
+                    'total_payout' => round((float) ($grow['total_payout'] ?? 0), 2),
                     'store_rate' => $stRate,
                     'store_commission' => $stCommission,
                     'operator_rate' => $operatorGgrRate,
@@ -6682,6 +6684,8 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
             'ggr' => [
                 'rate' => $operatorGgrRate,
                 'total_base' => 0.0,
+                'total_stake' => 0.0,
+                'total_payout' => 0.0,
                 'stores_earned' => 0.0,
                 'operator_earned' => 0.0,
                 'count' => 0,
@@ -6715,6 +6719,10 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stats[$t]['stores_earned'] += $stEarn;
                 $stats[$t]['operator_earned'] += $opEarn;
                 $stats[$t]['count']++;
+                if ($t === 'ggr') {
+                    $stats[$t]['total_stake'] += (float) ($item['total_stake'] ?? 0);
+                    $stats[$t]['total_payout'] += (float) ($item['total_payout'] ?? 0);
+                }
             }
             $stats['total_operator_profit'] += $opEarn;
             $stats['total_stores_earned'] += $stEarn;
@@ -6724,6 +6732,10 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
             $stats[$tk]['total_base'] = round($stats[$tk]['total_base'], 2);
             $stats[$tk]['stores_earned'] = round($stats[$tk]['stores_earned'], 2);
             $stats[$tk]['operator_earned'] = round($stats[$tk]['operator_earned'], 2);
+            if ($tk === 'ggr') {
+                $stats[$tk]['total_stake'] = round($stats[$tk]['total_stake'], 2);
+                $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
+            }
         }
         $stats['total_operator_profit'] = round($stats['total_operator_profit'], 2);
         $stats['total_stores_earned'] = round($stats['total_stores_earned'], 2);
@@ -6892,6 +6904,8 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
                     'badge_class' => 'bg-warning text-dark',
                     'icon' => 'fa-duotone fa-solid fa-chart-pie',
                     'base_amount' => $ggrAmt,
+                    'total_stake' => round((float) ($grow['total_stake'] ?? 0), 2),
+                    'total_payout' => round((float) ($grow['total_payout'] ?? 0), 2),
                     'store_rate' => $ggrRate,
                     'commission_amount' => $commission,
                     'status' => $status,
@@ -6910,6 +6924,8 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
             'ggr' => [
                 'rate' => $ggrRate,
                 'total_base' => 0.0,
+                'total_stake' => 0.0,
+                'total_payout' => 0.0,
                 'total_earned' => 0.0,
                 'count' => 0,
             ],
@@ -6937,9 +6953,23 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
                 $stats[$t]['total_base'] += $base;
                 $stats[$t]['total_earned'] += $earn;
                 $stats[$t]['count']++;
+                if ($t === 'ggr') {
+                    $stats[$t]['total_stake'] += (float) ($item['total_stake'] ?? 0);
+                    $stats[$t]['total_payout'] += (float) ($item['total_payout'] ?? 0);
+                }
             }
             $stats['total_commissions_earned'] += $earn;
         }
+
+        foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
+            $stats[$tk]['total_base'] = round($stats[$tk]['total_base'], 2);
+            $stats[$tk]['total_earned'] = round($stats[$tk]['total_earned'], 2);
+            if ($tk === 'ggr') {
+                $stats[$tk]['total_stake'] = round($stats[$tk]['total_stake'], 2);
+                $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
+            }
+        }
+        $stats['total_commissions_earned'] = round($stats['total_commissions_earned'], 2);
 
         // Filtrado de items
         $filteredItems = [];
@@ -7035,14 +7065,23 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
                 'Punto de Venta / Origen',
                 'Tipo de Comision',
                 'Referencia',
-                'Monto Base',
-                'Tasa (%)',
-                'Comision',
+                'Total apostado',
+                'Total premios',
+                'Monto Base / GGR',
+                'Tasa PV (%)',
+                'Comision PV',
+                'Tasa Operador (%)',
+                'Margen Operador (%)',
+                'Ganancia Operador',
                 'Estado',
                 'Detalle',
             ];
             $rows = [];
             foreach (($data['items'] ?? []) as $it) {
+                $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+                $totalStake = $isGgr ? round((float) ($it['total_stake'] ?? 0), 2) : '';
+                $totalPayout = $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '';
+
                 $rows[] = [
                     bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
                     'Operador',
@@ -7051,20 +7090,109 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
                     (string) ($it['store_name'] ?? ''),
                     (string) ($it['rate_type_label'] ?? ''),
                     (string) ($it['ref_code'] ?? ''),
+                    $totalStake,
+                    $totalPayout,
                     round((float) ($it['base_amount'] ?? 0), 2),
-                    number_format(((float) ($it['operator_spread'] ?? $it['operator_rate'] ?? 0)) * 100, 2) . '%',
+                    number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
+                    round((float) ($it['store_commission'] ?? 0), 2),
+                    number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2) . '%',
+                    number_format(((float) ($it['operator_spread'] ?? 0)) * 100, 2) . '%',
                     round((float) ($it['operator_profit'] ?? 0), 2),
                     (string) ($it['status_label'] ?? ''),
                     (string) ($it['detail'] ?? ''),
                 ];
             }
 
+            $stats = $data['stats'] ?? [];
+            $ggrStats = $stats['ggr'] ?? [];
+            $recStats = $stats['recharge'] ?? [];
+            $withStats = $stats['withdraw'] ?? [];
+
+            $rows[] = array_fill(0, count($headers), '');
+            $rows[] = array_merge(['', 'TOTALES', $displayName, $code, '', '', '', '', '', '', '', '', '', '', '', '', '']);
+            $rows[] = [
+                '',
+                'Total GGR',
+                $displayName,
+                $code,
+                '',
+                'GGR Afiliados',
+                '',
+                round((float) ($ggrStats['total_stake'] ?? 0), 2),
+                round((float) ($ggrStats['total_payout'] ?? 0), 2),
+                round((float) ($ggrStats['total_base'] ?? 0), 2),
+                '',
+                round((float) ($ggrStats['stores_earned'] ?? 0), 2),
+                '',
+                '',
+                round((float) ($ggrStats['operator_earned'] ?? 0), 2),
+                '',
+                '',
+            ];
+            $rows[] = [
+                '',
+                'Total Recargas',
+                $displayName,
+                $code,
+                '',
+                'Recargas',
+                '',
+                '',
+                '',
+                round((float) ($recStats['total_base'] ?? 0), 2),
+                '',
+                round((float) ($recStats['stores_earned'] ?? 0), 2),
+                '',
+                '',
+                round((float) ($recStats['operator_earned'] ?? 0), 2),
+                '',
+                '',
+            ];
+            $rows[] = [
+                '',
+                'Total Retiros',
+                $displayName,
+                $code,
+                '',
+                'Retiros',
+                '',
+                '',
+                '',
+                round((float) ($withStats['total_base'] ?? 0), 2),
+                '',
+                round((float) ($withStats['stores_earned'] ?? 0), 2),
+                '',
+                '',
+                round((float) ($withStats['operator_earned'] ?? 0), 2),
+                '',
+                '',
+            ];
+            $rows[] = [
+                '',
+                'Total comisiones',
+                $displayName,
+                $code,
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                round((float) ($stats['total_stores_earned'] ?? 0), 2),
+                '',
+                '',
+                round((float) ($stats['total_operator_profit'] ?? 0), 2),
+                '',
+                '',
+            ];
+
             return [
                 'headers' => $headers,
                 'rows' => $rows,
                 'title' => 'Rey Bingo - Comisiones Operador: ' . $displayName . ($code !== '' ? ' (' . $code . ')' : ''),
                 'sheet_name' => 'Comisiones Operador',
-                'numeric_columns' => [7, 9],
+                'numeric_columns' => [7, 8, 9, 11, 14],
                 'filename_prefix' => 'comisiones_operador_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $code ?: (string) $userId),
             ];
         }
@@ -7079,7 +7207,9 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
             'Jugador / Beneficiario',
             'Documento',
             'Referencia',
-            'Monto Base',
+            'Total apostado',
+            'Total premios',
+            'Monto Base / GGR',
             'Tasa (%)',
             'Comision',
             'Estado',
@@ -7087,6 +7217,10 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
         ];
         $rows = [];
         foreach (($data['items'] ?? []) as $it) {
+            $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+            $totalStake = $isGgr ? round((float) ($it['total_stake'] ?? 0), 2) : '';
+            $totalPayout = $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '';
+
             $rows[] = [
                 bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
                 'Punto de Venta',
@@ -7096,6 +7230,8 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
                 (string) ($it['player_name'] ?? ''),
                 (string) ($it['player_doc'] ?? ''),
                 (string) ($it['ref_code'] ?? ''),
+                $totalStake,
+                $totalPayout,
                 round((float) ($it['base_amount'] ?? 0), 2),
                 number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
                 round((float) ($it['commission_amount'] ?? 0), 2),
@@ -7104,12 +7240,88 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
             ];
         }
 
+        $stats = $data['stats'] ?? [];
+        $ggrStats = $stats['ggr'] ?? [];
+        $recStats = $stats['recharge'] ?? [];
+        $withStats = $stats['withdraw'] ?? [];
+
+        $rows[] = array_fill(0, count($headers), '');
+        $rows[] = array_merge(['', 'TOTALES', $displayName, $code, '', '', '', '', '', '', '', '', '', '', '']);
+        $rows[] = [
+            '',
+            'Total GGR',
+            $displayName,
+            $code,
+            'GGR Afiliados',
+            '',
+            '',
+            '',
+            round((float) ($ggrStats['total_stake'] ?? 0), 2),
+            round((float) ($ggrStats['total_payout'] ?? 0), 2),
+            round((float) ($ggrStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($ggrStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total Recargas',
+            $displayName,
+            $code,
+            'Recargas',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($recStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($recStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total Retiros',
+            $displayName,
+            $code,
+            'Retiros',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($withStats['total_base'] ?? 0), 2),
+            '',
+            round((float) ($withStats['total_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+        $rows[] = [
+            '',
+            'Total comisiones',
+            $displayName,
+            $code,
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($stats['total_commissions_earned'] ?? 0), 2),
+            '',
+            '',
+        ];
+
         return [
             'headers' => $headers,
             'rows' => $rows,
             'title' => 'Rey Bingo - Comisiones Punto de Venta: ' . $displayName . ($code !== '' ? ' (' . $code . ')' : ''),
             'sheet_name' => 'Comisiones PV',
-            'numeric_columns' => [8, 10],
+            'numeric_columns' => [8, 9, 10, 12],
             'filename_prefix' => 'comisiones_pv_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $code ?: (string) $userId),
         ];
     }
@@ -7134,7 +7346,9 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
             'Tipo de Comision',
             'Origen / Beneficiario',
             'Referencia',
-            'Monto Base',
+            'Total apostado',
+            'Total premios',
+            'Monto Base / GGR',
             'Tasa (%)',
             'Comision',
             'Estado',
@@ -7155,6 +7369,10 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
             $data = bingo_fetch_operator_detailed_commissions_breakdown($opId, $filters);
 
             foreach (($data['items'] ?? []) as $it) {
+                $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+                $totalStake = $isGgr ? round((float) ($it['total_stake'] ?? 0), 2) : '';
+                $totalPayout = $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '';
+
                 $rows[] = [
                     bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
                     'Operador',
@@ -7164,6 +7382,8 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
                     (string) ($it['rate_type_label'] ?? ''),
                     (string) ($it['store_name'] ?? ''),
                     (string) ($it['ref_code'] ?? ''),
+                    $totalStake,
+                    $totalPayout,
                     round((float) ($it['base_amount'] ?? 0), 2),
                     number_format(((float) ($it['operator_spread'] ?? $it['operator_rate'] ?? 0)) * 100, 2) . '%',
                     round((float) ($it['operator_profit'] ?? 0), 2),
@@ -7201,6 +7421,7 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
                 if (! empty($it['player_doc'])) {
                     $beneficiary .= ($beneficiary !== '' ? ' / ' : '') . $it['player_doc'];
                 }
+                $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
 
                 $rows[] = [
                     bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
@@ -7211,6 +7432,8 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
                     (string) ($it['rate_type_label'] ?? ''),
                     $beneficiary,
                     (string) ($it['ref_code'] ?? ''),
+                    $isGgr ? round((float) ($it['total_stake'] ?? 0), 2) : '',
+                    $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '',
                     round((float) ($it['base_amount'] ?? 0), 2),
                     number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
                     round((float) ($it['commission_amount'] ?? 0), 2),
@@ -7224,12 +7447,294 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
             return strcmp((string) ($b[0] ?? ''), (string) ($a[0] ?? ''));
         });
 
+        $summary = bingo_fetch_admin_network_commissions_summary($filters);
+        $op = $summary['operators'] ?? [];
+        $st = $summary['stores'] ?? [];
+        $tot = $summary['totals'] ?? [];
+
+        $rows[] = array_fill(0, count($headers), '');
+        $rows[] = ['', 'TOTALES OPERADORES', '', '', '', 'Total GGR', '', '', '', '', '', '', round((float) ($op['ggr'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES OPERADORES', '', '', '', 'Total Recargas', '', '', '', '', '', '', round((float) ($op['recharge'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES OPERADORES', '', '', '', 'Total Retiros', '', '', '', '', '', '', round((float) ($op['withdraw'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES OPERADORES', '', '', '', 'Total comisiones', '', '', '', '', '', '', round((float) ($op['total'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES PUNTOS DE VENTA', '', '', '', 'Total GGR', '', '', round((float) ($st['ggr_stake'] ?? 0), 2), round((float) ($st['ggr_payout'] ?? 0), 2), '', '', round((float) ($st['ggr'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES PUNTOS DE VENTA', '', '', '', 'Total Recargas', '', '', '', '', '', '', round((float) ($st['recharge'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES PUNTOS DE VENTA', '', '', '', 'Total Retiros', '', '', '', '', '', '', round((float) ($st['withdraw'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES PUNTOS DE VENTA', '', '', '', 'Total comisiones', '', '', '', '', '', '', round((float) ($st['total'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES RED', '', '', '', 'Total GGR', '', '', '', '', '', '', round((float) ($tot['ggr'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES RED', '', '', '', 'Total Recargas', '', '', '', '', '', '', round((float) ($tot['recharge'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES RED', '', '', '', 'Total Retiros', '', '', '', '', '', '', round((float) ($tot['withdraw'] ?? 0), 2), '', ''];
+        $rows[] = ['', 'TOTALES RED', '', '', '', 'Total comisiones', '', '', '', '', '', '', round((float) ($tot['total'] ?? 0), 2), '', ''];
+
         return [
             'headers' => $headers,
             'rows' => $rows,
             'title' => 'Rey Bingo - Comisiones Generales Red Tercerizada',
             'sheet_name' => 'Red Tercerizada',
-            'numeric_columns' => [8, 10],
+            'numeric_columns' => [8, 9, 10, 12],
+        ];
+    }
+}
+
+if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
+    /**
+     * Totales de comisiones de operadores y puntos de venta (red tercerizada).
+     *
+     * @return array{
+     *   operators:array{ggr:float,recharge:float,withdraw:float,total:float,ggr_stake:float,ggr_payout:float,count:int},
+     *   stores:array{ggr:float,recharge:float,withdraw:float,total:float,ggr_stake:float,ggr_payout:float,count:int},
+     *   totals:array{ggr:float,recharge:float,withdraw:float,total:float}
+     * }
+     */
+    function bingo_fetch_admin_network_commissions_summary(array $filters = []): array
+    {
+        $modelUsers = new \App\Models\UsersModel();
+
+        $emptyBucket = static fn (): array => [
+            'ggr' => 0.0,
+            'recharge' => 0.0,
+            'withdraw' => 0.0,
+            'total' => 0.0,
+            'ggr_stake' => 0.0,
+            'ggr_payout' => 0.0,
+            'count' => 0,
+        ];
+
+        $operators = $emptyBucket();
+        $stores = $emptyBucket();
+
+        $operatorRows = $modelUsers
+            ->where('group', bingo_group_operator())
+            ->where('deleted', 0)
+            ->findAll();
+
+        foreach ($operatorRows as $operator) {
+            $opId = (int) ($operator['id'] ?? 0);
+            if ($opId <= 0) {
+                continue;
+            }
+            $data = bingo_fetch_operator_detailed_commissions_breakdown($opId, $filters);
+            foreach (($data['items'] ?? []) as $it) {
+                $t = (string) ($it['rate_type'] ?? '');
+                $opEarn = (float) ($it['operator_profit'] ?? 0);
+                if (! in_array($t, ['ggr', 'recharge', 'withdraw'], true)) {
+                    continue;
+                }
+                $operators[$t] += $opEarn;
+                $operators['total'] += $opEarn;
+                $operators['count']++;
+                if ($t === 'ggr') {
+                    $operators['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
+                    $operators['ggr_payout'] += (float) ($it['total_payout'] ?? 0);
+                }
+            }
+        }
+
+        $storeRows = $modelUsers
+            ->where('group', bingo_group_store())
+            ->where('deleted', 0)
+            ->findAll();
+
+        foreach ($storeRows as $store) {
+            $storeId = (int) ($store['id'] ?? 0);
+            if ($storeId <= 0) {
+                continue;
+            }
+            $data = bingo_fetch_store_detailed_commissions_breakdown($storeId, $filters);
+            foreach (($data['items'] ?? []) as $it) {
+                $t = (string) ($it['rate_type'] ?? '');
+                $earn = (float) ($it['commission_amount'] ?? 0);
+                if (! in_array($t, ['ggr', 'recharge', 'withdraw'], true)) {
+                    continue;
+                }
+                $stores[$t] += $earn;
+                $stores['total'] += $earn;
+                $stores['count']++;
+                if ($t === 'ggr') {
+                    $stores['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
+                    $stores['ggr_payout'] += (float) ($it['total_payout'] ?? 0);
+                }
+            }
+        }
+
+        foreach (['ggr', 'recharge', 'withdraw', 'total', 'ggr_stake', 'ggr_payout'] as $k) {
+            $operators[$k] = round($operators[$k], 2);
+            $stores[$k] = round($stores[$k], 2);
+        }
+
+        return [
+            'operators' => $operators,
+            'stores' => $stores,
+            'totals' => [
+                'ggr' => round($operators['ggr'] + $stores['ggr'], 2),
+                'recharge' => round($operators['recharge'] + $stores['recharge'], 2),
+                'withdraw' => round($operators['withdraw'] + $stores['withdraw'], 2),
+                'total' => round($operators['total'] + $stores['total'], 2),
+            ],
+        ];
+    }
+}
+
+if (! function_exists('bingo_fetch_admin_player_referral_commissions')) {
+    /**
+     * Comisiones por jugadores que recomiendan otros jugadores.
+     *
+     * @return array{stats:array,items:list<array>}
+     */
+    function bingo_fetch_admin_player_referral_commissions(array $filters = [], int $limit = 500): array
+    {
+        $modelReferrals = new \App\Models\ReferralsModel();
+        $modelUsers = new \App\Models\UsersModel();
+
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $search = strtolower(trim((string) ($filters['search'] ?? '')));
+
+        $builder = $modelReferrals->orderBy('updated_at', 'DESC')->orderBy('created_at', 'DESC');
+        if ($dateFrom !== '') {
+            $builder->where('created_at >=', $dateFrom . ' 00:00:00');
+        }
+        if ($dateTo !== '') {
+            $builder->where('created_at <=', $dateTo . ' 23:59:59');
+        }
+
+        $rows = $builder->findAll($limit);
+
+        $stats = [
+            'total_paid' => 0.0,
+            'total_pending' => 0.0,
+            'count_paid' => 0,
+            'count_pending' => 0,
+            'count_total' => 0,
+        ];
+        $items = [];
+
+        foreach ($rows as $row) {
+            $referrerId = (int) ($row['id_referred'] ?? 0);
+            $referredId = (int) ($row['id_referrer'] ?? 0);
+            $referrer = $referrerId > 0 ? $modelUsers->find($referrerId) : null;
+            $referred = $referredId > 0 ? $modelUsers->find($referredId) : null;
+
+            if (! $referrer || (int) ($referrer['group'] ?? -1) !== bingo_group_player()) {
+                continue;
+            }
+
+            $referrerName = trim(($referrer['firstname'] ?? '') . ' ' . ($referrer['lastname'] ?? ''));
+            $referredName = $referred
+                ? trim(($referred['firstname'] ?? '') . ' ' . ($referred['lastname'] ?? ''))
+                : 'Jugador';
+
+            if ($search !== '') {
+                $blob = strtolower(
+                    $referrerName . ' ' .
+                    ($referrer['username'] ?? '') . ' ' .
+                    ($referrer['document'] ?? '') . ' ' .
+                    $referredName . ' ' .
+                    ($referred['username'] ?? '') . ' ' .
+                    ($referred['document'] ?? '')
+                );
+                if (strpos($blob, $search) === false) {
+                    continue;
+                }
+            }
+
+            $status = (int) ($row['status'] ?? 0);
+            $amount = round((float) ($row['amount'] ?? 0), 2);
+            $isPaid = $status === 2;
+
+            if ($isPaid) {
+                $stats['total_paid'] += $amount;
+                $stats['count_paid']++;
+            } else {
+                $stats['count_pending']++;
+            }
+            $stats['count_total']++;
+
+            $items[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'datetime' => (string) ($row['updated_at'] ?? $row['created_at'] ?? ''),
+                'referrer_id' => $referrerId,
+                'referrer_name' => $referrerName !== '' ? $referrerName : (string) ($referrer['username'] ?? 'Jugador'),
+                'referrer_username' => (string) ($referrer['username'] ?? ''),
+                'referrer_document' => (string) ($referrer['document'] ?? ''),
+                'referrer_code' => (string) ($referrer['referred_code'] ?? $referrer['code'] ?? ''),
+                'referred_id' => $referredId,
+                'referred_name' => $referredName !== '' ? $referredName : '-',
+                'referred_username' => (string) ($referred['username'] ?? ''),
+                'referred_document' => (string) ($referred['document'] ?? ''),
+                'amount' => $amount,
+                'status' => $status,
+                'status_label' => $isPaid ? 'Pagada' : ($status === 3 ? 'Rechazada' : 'Pendiente'),
+            ];
+        }
+
+        $stats['total_paid'] = round($stats['total_paid'], 2);
+
+        return [
+            'stats' => $stats,
+            'items' => $items,
+        ];
+    }
+}
+
+if (! function_exists('bingo_build_admin_player_referral_commissions_export')) {
+    /**
+     * @return array{headers:list<string>,rows:list<list<mixed>>,title:string,sheet_name:string,numeric_columns:list<int>}
+     */
+    function bingo_build_admin_player_referral_commissions_export(array $filters = []): array
+    {
+        $data = bingo_fetch_admin_player_referral_commissions($filters, 5000);
+        $stats = $data['stats'] ?? [];
+
+        $headers = [
+            'Fecha',
+            'Jugador Referidor',
+            'Username Referidor',
+            'Documento Referidor',
+            'Codigo Referidor',
+            'Jugador Referido',
+            'Username Referido',
+            'Documento Referido',
+            'Comision',
+            'Estado',
+        ];
+
+        $rows = [];
+        foreach ($data['items'] ?? [] as $it) {
+            $rows[] = [
+                bingo_format_commission_export_datetime((string) ($it['datetime'] ?? '')),
+                (string) ($it['referrer_name'] ?? ''),
+                (string) ($it['referrer_username'] ?? ''),
+                (string) ($it['referrer_document'] ?? ''),
+                (string) ($it['referrer_code'] ?? ''),
+                (string) ($it['referred_name'] ?? ''),
+                (string) ($it['referred_username'] ?? ''),
+                (string) ($it['referred_document'] ?? ''),
+                round((float) ($it['amount'] ?? 0), 2),
+                (string) ($it['status_label'] ?? ''),
+            ];
+        }
+
+        $rows[] = ['', '', '', '', '', '', '', '', '', ''];
+        $rows[] = [
+            '',
+            'TOTALES',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            round((float) ($stats['total_paid'] ?? 0), 2),
+            (int) ($stats['count_paid'] ?? 0) . ' pagadas / ' . (int) ($stats['count_pending'] ?? 0) . ' pendientes',
+        ];
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+            'title' => 'Rey Bingo - Comisiones Referidos Jugadores',
+            'sheet_name' => 'Referidos Jugadores',
+            'numeric_columns' => [8],
         ];
     }
 }

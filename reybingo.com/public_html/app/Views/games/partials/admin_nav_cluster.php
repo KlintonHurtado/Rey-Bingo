@@ -77,6 +77,16 @@ if ($canOperators) {
         'class' => 'admin-menu-tile--operators' . ($activeNav === 'operators' ? ' is-active' : ''),
     ];
 }
+$canCommissionsHub = $canOperators || $canStores || $canUsers;
+if ($canCommissionsHub) {
+    $menuItems[] = [
+        'type' => 'link',
+        'href' => site_url('users/commissions'),
+        'label' => 'Comisiones',
+        'icon' => 'fa-duotone fa-solid fa-file-invoice-dollar',
+        'class' => 'admin-menu-tile--commissions' . ($activeNav === 'commissions' ? ' is-active' : ''),
+    ];
+}
 if ($canAudit) {
     $menuItems[] = [
         'type' => 'link',

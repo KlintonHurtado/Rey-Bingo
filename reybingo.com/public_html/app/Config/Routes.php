@@ -203,6 +203,8 @@ $routes->get('users/getCommissionLiquidationInfo/(:num)', 'Users::getCommissionL
 $routes->post('users/settleUserCommissionSubmit', 'Users::settleUserCommissionSubmit');
 $routes->get('users/exportUserCommissions/(:num)', 'Users::exportUserCommissions/$1');
 $routes->get('users/exportNetworkCommissions', 'Users::exportNetworkCommissions');
+$routes->get('users/exportPlayerReferralCommissions', 'Users::exportPlayerReferralCommissions');
+$routes->get('users/commissions', 'Users::commissions');
 $routes->get('users/operatorsListGet', 'Users::operatorsListGet');
 $routes->get('operator', 'Operator::index');
 $routes->get('operator/register', 'Operator::registerAffiliate');

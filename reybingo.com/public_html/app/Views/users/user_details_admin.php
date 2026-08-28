@@ -567,8 +567,67 @@ $sourceLabel = static function ($source) {
                 $cBreakdown = $commissionsBreakdown ?? ['stats' => [], 'items' => []];
                 $cStats = $cBreakdown['stats'] ?? [];
                 $cItems = $cBreakdown['items'] ?? [];
+                $ggrStats = $cStats['ggr'] ?? [];
+                $recStats = $cStats['recharge'] ?? [];
+                $withStats = $cStats['withdraw'] ?? [];
                 ?>
                 <?php if ($isOperator) : ?>
+                    <?php
+                    $opGgrPv = (float) ($ggrStats['stores_earned'] ?? 0);
+                    $opGgrOp = (float) ($ggrStats['operator_earned'] ?? 0);
+                    $opRecPv = (float) ($recStats['stores_earned'] ?? 0);
+                    $opRecOp = (float) ($recStats['operator_earned'] ?? 0);
+                    $opWithPv = (float) ($withStats['stores_earned'] ?? 0);
+                    $opWithOp = (float) ($withStats['operator_earned'] ?? 0);
+                    $opTotalPv = (float) ($cStats['total_stores_earned'] ?? ($opGgrPv + $opRecPv + $opWithPv));
+                    $opTotalOp = (float) ($cStats['total_operator_profit'] ?? ($opGgrOp + $opRecOp + $opWithOp));
+                    $opGgrStake = (float) ($ggrStats['total_stake'] ?? 0);
+                    $opGgrPayout = (float) ($ggrStats['total_payout'] ?? 0);
+                    ?>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #ffc107 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total GGR</div>
+                                <div class="small text-muted">Apostado: <strong class="text-dark"><?= esc($currency); ?> <?= number_format($opGgrStake, 2); ?></strong></div>
+                                <div class="small text-muted mb-1">Premios: <strong class="text-dark"><?= esc($currency); ?> <?= number_format($opGgrPayout, 2); ?></strong></div>
+                                <div class="d-flex justify-content-between small pt-1 border-top">
+                                    <span>Comisión PV: <strong><?= esc($currency); ?> <?= number_format($opGgrPv, 2); ?></strong></span>
+                                    <span class="text-success">Op: <strong>+<?= esc($currency); ?> <?= number_format($opGgrOp, 2); ?></strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #0dcaf0 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total Recargas</div>
+                                <div class="small text-muted mb-1"><?= (int) ($recStats['count'] ?? 0); ?> operaciones</div>
+                                <div class="d-flex justify-content-between small pt-1 border-top">
+                                    <span>Comisión PV: <strong><?= esc($currency); ?> <?= number_format($opRecPv, 2); ?></strong></span>
+                                    <span class="text-info">Op: <strong>+<?= esc($currency); ?> <?= number_format($opRecOp, 2); ?></strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #dc3545 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total Retiros</div>
+                                <div class="small text-muted mb-1"><?= (int) ($withStats['count'] ?? 0); ?> operaciones</div>
+                                <div class="d-flex justify-content-between small pt-1 border-top">
+                                    <span>Comisión PV: <strong><?= esc($currency); ?> <?= number_format($opWithPv, 2); ?></strong></span>
+                                    <span class="text-danger">Op: <strong>+<?= esc($currency); ?> <?= number_format($opWithOp, 2); ?></strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100 bg-light" style="border-radius: 10px; border-left: 3px solid #6236ff !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Totales Comisiones</div>
+                                <div class="d-flex justify-content-between small pt-1">
+                                    <span>Total PV: <strong class="text-primary"><?= esc($currency); ?> <?= number_format($opTotalPv, 2); ?></strong></span>
+                                </div>
+                                <div class="d-flex justify-content-between small pt-1 border-top">
+                                    <span>Total Operador: <strong class="text-success">+<?= esc($currency); ?> <?= number_format($opTotalOp, 2); ?></strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <!-- TABLA DE COMISIONES DETALLADAS OPERADOR -->
                     <div class="scroll-pane" style="max-height: 420px;">
                         <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
@@ -577,7 +636,9 @@ $sourceLabel = static function ($source) {
                                     <th>Fecha y Hora</th>
                                     <th>Punto de Venta</th>
                                     <th>Tipo de Tasa</th>
-                                    <th class="text-end">Monto Base</th>
+                                    <th class="text-end">Total apostado</th>
+                                    <th class="text-end">Total premios</th>
+                                    <th class="text-end">Monto Base / GGR</th>
                                     <th class="text-center">Tasa PV</th>
                                     <th class="text-end">Comisión PV</th>
                                     <th class="text-center">Tasa Op</th>
@@ -595,6 +656,9 @@ $sourceLabel = static function ($source) {
                                         $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
                                         $spreadPct = ((float) ($it['operator_spread'] ?? $it['spread_rate'] ?? 0)) * 100;
                                         $opProfit = (float) ($it['operator_profit'] ?? $it['op_net_profit'] ?? 0);
+                                        $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+                                        $totalStake = $isGgr ? (float) ($it['total_stake'] ?? 0) : null;
+                                        $totalPayout = $isGgr ? (float) ($it['total_payout'] ?? 0) : null;
                                         ?>
                                         <tr>
                                             <td class="text-nowrap"><?= esc($it['datetime'] ?? '-'); ?></td>
@@ -609,6 +673,12 @@ $sourceLabel = static function ($source) {
                                                     <i class="<?= esc($icon); ?> me-1"></i> <?= esc($it['rate_type_label'] ?? $it['rate_type']); ?>
                                                 </span>
                                             </td>
+                                            <td class="text-end text-muted">
+                                                <?= $totalStake !== null ? esc($currency) . ' ' . number_format($totalStake, 2) : '-'; ?>
+                                            </td>
+                                            <td class="text-end text-muted">
+                                                <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
+                                            </td>
                                             <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
                                             <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2); ?>%</span></td>
                                             <td class="text-end"><?= esc($currency); ?> <?= number_format((float) ($it['store_commission'] ?? 0), 2); ?></td>
@@ -622,13 +692,53 @@ $sourceLabel = static function ($source) {
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else : ?>
-                                    <tr><td colspan="11" class="text-center text-muted py-4">No se registran transacciones de comisiones para este operador.</td></tr>
+                                    <tr><td colspan="13" class="text-center text-muted py-4">No se registran transacciones de comisiones para este operador.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
 
                 <?php else : ?>
+                    <?php
+                    $pvGgrEarned = (float) ($ggrStats['total_earned'] ?? 0);
+                    $pvRecEarned = (float) ($recStats['total_earned'] ?? 0);
+                    $pvWithEarned = (float) ($withStats['total_earned'] ?? 0);
+                    $pvTotalEarned = (float) ($cStats['total_commissions_earned'] ?? ($pvGgrEarned + $pvRecEarned + $pvWithEarned));
+                    $pvGgrStake = (float) ($ggrStats['total_stake'] ?? 0);
+                    $pvGgrPayout = (float) ($ggrStats['total_payout'] ?? 0);
+                    ?>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #ffc107 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total GGR</div>
+                                <div class="small text-muted">Apostado: <strong class="text-dark"><?= esc($currency); ?> <?= number_format($pvGgrStake, 2); ?></strong></div>
+                                <div class="small text-muted mb-1">Premios: <strong class="text-dark"><?= esc($currency); ?> <?= number_format($pvGgrPayout, 2); ?></strong></div>
+                                <div class="small pt-1 border-top text-success fw-bold">Comisión: +<?= esc($currency); ?> <?= number_format($pvGgrEarned, 2); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #0dcaf0 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total Recargas</div>
+                                <div class="small text-muted mb-1"><?= (int) ($recStats['count'] ?? 0); ?> operaciones</div>
+                                <div class="small pt-1 border-top text-info fw-bold">Comisión: +<?= esc($currency); ?> <?= number_format($pvRecEarned, 2); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100" style="border-radius: 10px; border-left: 3px solid #dc3545 !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total Retiros</div>
+                                <div class="small text-muted mb-1"><?= (int) ($withStats['count'] ?? 0); ?> operaciones</div>
+                                <div class="small pt-1 border-top text-danger fw-bold">Comisión: +<?= esc($currency); ?> <?= number_format($pvWithEarned, 2); ?></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="card border-0 shadow-sm p-2 h-100 bg-light" style="border-radius: 10px; border-left: 3px solid #6236ff !important;">
+                                <div class="text-uppercase fw-bold text-muted small mb-1">Total Comisiones</div>
+                                <div class="pt-1">
+                                    <strong class="text-primary" style="font-size: 1.1rem;"><?= esc($currency); ?> <?= number_format($pvTotalEarned, 2); ?></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <!-- TABLA DE COMISIONES DETALLADAS PUNTO DE VENTA -->
                     <div class="scroll-pane" style="max-height: 420px;">
                         <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.82rem;">
@@ -636,7 +746,9 @@ $sourceLabel = static function ($source) {
                                 <tr>
                                     <th>Fecha y Hora</th>
                                     <th>Tipo de Tasa</th>
-                                    <th class="text-end">Monto Base</th>
+                                    <th class="text-end">Total apostado</th>
+                                    <th class="text-end">Total premios</th>
+                                    <th class="text-end">Monto Base / GGR</th>
                                     <th class="text-center">Tasa (%)</th>
                                     <th class="text-end text-success fw-bold">Comisión Ganada</th>
                                     <th>Jugador / Beneficiario</th>
@@ -653,6 +765,9 @@ $sourceLabel = static function ($source) {
                                         $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
                                         $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
                                         $ratePct = ((float) ($it['store_rate'] ?? 0)) * 100;
+                                        $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+                                        $totalStake = $isGgr ? (float) ($it['total_stake'] ?? 0) : null;
+                                        $totalPayout = $isGgr ? (float) ($it['total_payout'] ?? 0) : null;
                                         ?>
                                         <tr>
                                             <td class="text-nowrap"><?= esc($it['datetime'] ?? '-'); ?></td>
@@ -660,6 +775,12 @@ $sourceLabel = static function ($source) {
                                                 <span class="badge <?= esc($badgeClass); ?>">
                                                     <i class="<?= esc($icon); ?> me-1"></i> <?= esc($it['rate_type_label'] ?? $it['rate_type']); ?>
                                                 </span>
+                                            </td>
+                                            <td class="text-end text-muted">
+                                                <?= $totalStake !== null ? esc($currency) . ' ' . number_format($totalStake, 2) : '-'; ?>
+                                            </td>
+                                            <td class="text-end text-muted">
+                                                <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
                                             </td>
                                             <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
                                             <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($ratePct, 2); ?>%</span></td>
@@ -691,7 +812,7 @@ $sourceLabel = static function ($source) {
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else : ?>
-                                    <tr><td colspan="10" class="text-center text-muted py-4">No se registran transacciones de comisiones para este punto de venta.</td></tr>
+                                    <tr><td colspan="12" class="text-center text-muted py-4">No se registran transacciones de comisiones para este punto de venta.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>

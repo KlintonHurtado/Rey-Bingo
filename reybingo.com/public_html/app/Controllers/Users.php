@@ -1053,8 +1053,8 @@ class Users extends Controller {
 
     public function exportNetworkCommissions()
     {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return redirect()->to('/signin');
+        if ($deny = bingo_require_admin_permission(['operators.view', 'stores.view', 'users.view'])) {
+            return $deny;
         }
 
         helper(['bingo', 'wallet', 'affiliate_ggr']);
@@ -1076,7 +1076,91 @@ class Users extends Controller {
             [
                 'sheet_name' => $export['sheet_name'] ?? 'Red Tercerizada',
                 'title' => $export['title'] ?? 'Rey Bingo - Comisiones Red Tercerizada',
-                'numeric_columns' => $export['numeric_columns'] ?? [8, 10],
+                'numeric_columns' => $export['numeric_columns'] ?? [8, 9, 10, 12],
+            ]
+        );
+    }
+
+    public function commissions()
+    {
+        if ($deny = bingo_require_admin_permission(['operators.view', 'stores.view', 'users.view'])) {
+            return $deny;
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+
+        $modelUsers = new UsersModel();
+        $modelContacts = new ContactsModel();
+
+        $user = $modelUsers->find(session()->get('id'));
+        $imagePath = ! empty($user['image'])
+            ? site_url('uploads/users/' . $user['image'])
+            : site_url('assets/img/avatar.jpg');
+
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'rate_type' => (string) ($this->request->getGet('rate_type') ?? 'all'),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $activeTab = (string) ($this->request->getGet('tab') ?? 'network');
+        if (! in_array($activeTab, ['network', 'player_referrals'], true)) {
+            $activeTab = 'network';
+        }
+
+        $networkSummary = bingo_fetch_admin_network_commissions_summary($filters);
+        $playerReferrals = bingo_fetch_admin_player_referral_commissions($filters);
+
+        $data = [
+            'page' => [
+                'title' => 'Comisiones — Red Tercerizada y Referidos',
+            ],
+            'validation' => \Config\Services::validation(),
+            'contentPage' => view('users/commissions', [
+                'contacts' => $modelContacts->findAll(),
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'filters' => $filters,
+                'activeTab' => $activeTab,
+                'networkSummary' => $networkSummary,
+                'playerReferrals' => $playerReferrals,
+                'referralRatePct' => round((float) (systemGet('rateReferrals') ?? 0) * 100, 2),
+            ]),
+        ];
+
+        if ($this->request->isAJAX()) {
+            return $this->response->setBody($data['contentPage']);
+        }
+
+        return view('layout/index', $data);
+    }
+
+    public function exportPlayerReferralCommissions()
+    {
+        if ($deny = bingo_require_admin_permission(['operators.view', 'stores.view', 'users.view'])) {
+            return $deny;
+        }
+
+        helper(['bingo', 'wallet', 'affiliate_ggr']);
+
+        $filters = [
+            'date_from' => (string) ($this->request->getGet('date_from') ?? ''),
+            'date_to'   => (string) ($this->request->getGet('date_to') ?? ''),
+            'search'    => (string) ($this->request->getGet('search') ?? ''),
+        ];
+
+        $export = bingo_build_admin_player_referral_commissions_export($filters);
+        $filename = 'comisiones_referidos_jugadores_' . date('Ymd_His') . '.xls';
+
+        return (new ExcelExport())->downloadResponse(
+            $export['headers'],
+            $export['rows'],
+            $filename,
+            [
+                'sheet_name' => $export['sheet_name'] ?? 'Referidos Jugadores',
+                'title' => $export['title'] ?? 'Rey Bingo - Comisiones Referidos Jugadores',
+                'numeric_columns' => $export['numeric_columns'] ?? [7],
             ]
         );
     }

@@ -17,7 +17,9 @@ $items = $items ?? [];
             <tr>
                 <th style="min-width: 125px;">Fecha y Hora</th>
                 <th>Tipo de Tasa</th>
-                <th class="text-end">Monto Base</th>
+                <th class="text-end">Total apostado</th>
+                <th class="text-end">Total premios</th>
+                <th class="text-end">Monto Base / GGR</th>
                 <th class="text-center">Tasa (%)</th>
                 <th class="text-end text-success fw-bold" style="min-width: 120px;">Comisión Ganada</th>
                 <th>Jugador / Beneficiario</th>
@@ -36,6 +38,9 @@ $items = $items ?? [];
                     $ratePct = ((float) ($it['store_rate'] ?? 0)) * 100;
                     $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
                     $icon = $it['icon'] ?? 'fa-duotone fa-solid fa-percent';
+                    $isGgr = (string) ($it['rate_type'] ?? '') === 'ggr';
+                    $totalStake = $isGgr ? (float) ($it['total_stake'] ?? 0) : null;
+                    $totalPayout = $isGgr ? (float) ($it['total_payout'] ?? 0) : null;
                     ?>
                     <tr>
                         <td>
@@ -50,6 +55,12 @@ $items = $items ?? [];
                             <span class="badge <?= esc($badgeClass); ?> py-1 px-2">
                                 <i class="<?= esc($icon); ?> me-1"></i> <?= esc($it['rate_type_label'] ?? $it['rate_type']); ?>
                             </span>
+                        </td>
+                        <td class="text-end text-muted">
+                            <?= $totalStake !== null ? esc($currency) . ' ' . number_format($totalStake, 2) : '-'; ?>
+                        </td>
+                        <td class="text-end text-muted">
+                            <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
                         </td>
                         <td class="text-end fw-semibold text-dark">
                             <?= esc($currency); ?> <?= number_format($baseAmt, 2); ?>
@@ -101,7 +112,7 @@ $items = $items ?? [];
                 <?php endforeach; ?>
             <?php else : ?>
                 <tr>
-                    <td colspan="10" class="text-center py-5 text-muted">
+                    <td colspan="12" class="text-center py-5 text-muted">
                         <i class="fa-duotone fa-solid fa-chart-line-down fs-1 d-block mb-2 text-secondary"></i>
                         No se encontraron registros de comisiones para este criterio de búsqueda.
                     </td>
