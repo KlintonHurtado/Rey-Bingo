@@ -456,6 +456,90 @@ html:has(#content-page > .operator-panel-fit) {
     flex-shrink: 0;
 }
 
+.admin-network-filters {
+    background: rgba(98, 54, 255, 0.05);
+    border: 1px solid rgba(98, 54, 255, 0.12);
+    border-radius: 14px;
+}
+
+.admin-network-kpi {
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    height: 100%;
+}
+
+.admin-network-kpi-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    margin-bottom: 6px;
+}
+
+.admin-network-kpi-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #212529;
+    line-height: 1.2;
+}
+
+.admin-network-kpi-value--hero {
+    font-size: 1.35rem;
+    color: #6236ff;
+}
+
+.admin-network-kpi-sub {
+    font-size: 0.72rem;
+    color: #6c757d;
+    margin-top: 4px;
+    line-height: 1.35;
+}
+
+.admin-network-kpi--ggr {
+    border-left: 4px solid #ffc107;
+}
+
+.admin-network-kpi--rec {
+    border-left: 4px solid #0dcaf0;
+}
+
+.admin-network-kpi--ret {
+    border-left: 4px solid #dc3545;
+}
+
+.admin-network-kpi--total {
+    border-left: 4px solid #6236ff;
+    background: linear-gradient(135deg, rgba(98, 54, 255, 0.08) 0%, rgba(98, 54, 255, 0.02) 100%);
+}
+
+.admin-network-matrix-card {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.admin-network-matrix thead th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+    background: #f8f9fa;
+}
+
+.admin-network-matrix tbody td {
+    padding: 0.55rem 0.75rem;
+}
+
+.admin-network-table-scroll {
+    max-height: 360px;
+}
+
 .low-balance-history-scroll {
     max-height: 65vh;
     overflow-y: auto;

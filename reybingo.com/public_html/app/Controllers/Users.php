@@ -1110,6 +1110,7 @@ class Users extends Controller {
         }
 
         $networkSummary = bingo_fetch_admin_network_commissions_summary($filters);
+        $networkEntities = bingo_fetch_admin_network_commissions_entities($filters);
         $playerReferrals = bingo_fetch_admin_player_referral_commissions($filters);
 
         $data = [
@@ -1124,6 +1125,7 @@ class Users extends Controller {
                 'filters' => $filters,
                 'activeTab' => $activeTab,
                 'networkSummary' => $networkSummary,
+                'networkEntities' => $networkEntities,
                 'playerReferrals' => $playerReferrals,
                 'referralRatePct' => round((float) (systemGet('rateReferrals') ?? 0) * 100, 2),
             ]),

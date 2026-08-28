@@ -9,6 +9,7 @@ $referralRatePct = (float) ($referralRatePct ?? 0);
 $opSum = $networkSummary['operators'] ?? [];
 $stSum = $networkSummary['stores'] ?? [];
 $totSum = $networkSummary['totals'] ?? [];
+$networkEntities = $networkEntities ?? ['operators' => [], 'stores' => []];
 $refStats = $playerReferrals['stats'] ?? [];
 $refItems = $playerReferrals['items'] ?? [];
 
@@ -52,123 +53,12 @@ $rateType = (string) ($filters['rate_type'] ?? 'all');
                     </ul>
 
                     <?php if ($activeTab === 'network') : ?>
-                        <form method="get" action="<?= site_url('users/commissions'); ?>" class="row g-2 align-items-end mb-3">
-                            <input type="hidden" name="tab" value="network">
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small mb-1">Desde</label>
-                                <input type="date" class="form-control form-bingo" name="date_from" value="<?= esc($dateFrom); ?>">
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small mb-1">Hasta</label>
-                                <input type="date" class="form-control form-bingo" name="date_to" value="<?= esc($dateTo); ?>">
-                            </div>
-                            <div class="col-md-2 col-sm-6">
-                                <label class="form-label small mb-1">Tipo</label>
-                                <select class="form-select form-bingo" name="rate_type">
-                                    <option value="all" <?= $rateType === 'all' ? 'selected' : ''; ?>>Todos</option>
-                                    <option value="ggr" <?= $rateType === 'ggr' ? 'selected' : ''; ?>>GGR</option>
-                                    <option value="recharge" <?= $rateType === 'recharge' ? 'selected' : ''; ?>>Recargas</option>
-                                    <option value="withdraw" <?= $rateType === 'withdraw' ? 'selected' : ''; ?>>Retiros</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3 col-sm-6">
-                                <label class="form-label small mb-1">Buscar</label>
-                                <input type="text" class="form-control form-bingo" name="search" value="<?= esc($search); ?>" placeholder="Nombre, código, ref...">
-                            </div>
-                            <div class="col-md-5 col-sm-12 d-flex flex-wrap gap-2">
-                                <button type="submit" class="btn btn-primary"><i class="fa-duotone fa-solid fa-filter me-1"></i> Filtrar</button>
-                                <a href="<?= site_url('users/commissions?tab=network'); ?>" class="btn btn-outline-secondary">Limpiar</a>
-                                <button type="button" class="btn btn-success" onclick="exportNetworkCommissions();">
-                                    <i class="fa-duotone fa-solid fa-file-excel me-1"></i> Descargar Excel Red
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="row g-2 mb-3">
-                            <div class="col-12">
-                                <h6 class="text-muted small fw-bold mb-2">OPERADORES — ganancia diferencial</h6>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #ffc107;">
-                                    <small class="text-muted">Total GGR</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($opSum['ggr'] ?? 0), 2); ?></strong>
-                                    <small class="text-muted d-block">Apostado: <?= $currency; ?> <?= number_format((float) ($opSum['ggr_stake'] ?? 0), 2); ?></small>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #0dcaf0;">
-                                    <small class="text-muted">Total Recargas</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($opSum['recharge'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #dc3545;">
-                                    <small class="text-muted">Total Retiros</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($opSum['withdraw'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2 bg-light" style="border-left: 3px solid #6236ff;">
-                                    <small class="text-muted">Total Operadores</small>
-                                    <strong class="text-primary"><?= $currency; ?> <?= number_format((float) ($opSum['total'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-3">
-                            <div class="col-12">
-                                <h6 class="text-muted small fw-bold mb-2">PUNTOS DE VENTA / AGENCIAS</h6>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #ffc107;">
-                                    <small class="text-muted">Total GGR</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($stSum['ggr'] ?? 0), 2); ?></strong>
-                                    <small class="text-muted d-block">Apostado: <?= $currency; ?> <?= number_format((float) ($stSum['ggr_stake'] ?? 0), 2); ?></small>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #0dcaf0;">
-                                    <small class="text-muted">Total Recargas</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($stSum['recharge'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2" style="border-left: 3px solid #dc3545;">
-                                    <small class="text-muted">Total Retiros</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($stSum['withdraw'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="card border-0 shadow-sm p-2 bg-light" style="border-left: 3px solid #198754;">
-                                    <small class="text-muted">Total PV</small>
-                                    <strong class="text-success"><?= $currency; ?> <?= number_format((float) ($stSum['total'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card border-0 shadow-sm p-3 mb-0" style="background: rgba(98,54,255,0.06);">
-                            <div class="row text-center g-2">
-                                <div class="col-md-3">
-                                    <small class="text-muted d-block">Total GGR Red</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($totSum['ggr'] ?? 0), 2); ?></strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted d-block">Total Recargas Red</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($totSum['recharge'] ?? 0), 2); ?></strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted d-block">Total Retiros Red</small>
-                                    <strong><?= $currency; ?> <?= number_format((float) ($totSum['withdraw'] ?? 0), 2); ?></strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted d-block">Total Comisiones Red</small>
-                                    <strong class="text-primary fs-5"><?= $currency; ?> <?= number_format((float) ($totSum['total'] ?? 0), 2); ?></strong>
-                                </div>
-                            </div>
-                            <p class="small text-muted mt-2 mb-0">
-                                El Excel incluye el detalle línea por línea de todos los operadores y puntos de venta, más totales por GGR, recargas y retiros.
-                            </p>
-                        </div>
+                        <?= view('users/partials/network_commissions_tab', [
+                            'currency' => $currency,
+                            'filters' => $filters,
+                            'networkSummary' => $networkSummary,
+                            'networkEntities' => $networkEntities,
+                        ]); ?>
                     <?php else : ?>
                         <form method="get" action="<?= site_url('users/commissions'); ?>" class="row g-2 align-items-end mb-3">
                             <input type="hidden" name="tab" value="player_referrals">
@@ -284,6 +174,28 @@ $rateType = (string) ($filters['rate_type'] ?? 'all');
 </div>
 
 <script type="text/javascript">
+    function viewUser(userId) {
+        $.ajax({
+            url: '<?= site_url('users/getUserDetails/'); ?>' + userId,
+            method: 'GET',
+            dataType: 'json',
+            success: function (response) {
+                if (response.success && response.html) {
+                    $('#userDetailsContent').html(response.html);
+                    $('#modalUserDetails').modal('show');
+                } else {
+                    Toastify({
+                        text: (response && response.error) ? response.error : 'Usuario no encontrado',
+                        duration: 3000,
+                        gravity: 'top',
+                        position: 'right',
+                        style: { background: '#dc3545' }
+                    }).showToast();
+                }
+            }
+        });
+    }
+
     function exportNetworkCommissions() {
         const params = new URLSearchParams(window.location.search);
         params.delete('tab');

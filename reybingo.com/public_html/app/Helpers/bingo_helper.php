@@ -7570,7 +7570,138 @@ if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
                 'recharge' => round($operators['recharge'] + $stores['recharge'], 2),
                 'withdraw' => round($operators['withdraw'] + $stores['withdraw'], 2),
                 'total' => round($operators['total'] + $stores['total'], 2),
+                'ggr_stake' => round($operators['ggr_stake'] + $stores['ggr_stake'], 2),
+                'ggr_payout' => round($operators['ggr_payout'] + $stores['ggr_payout'], 2),
             ],
+        ];
+    }
+}
+
+if (! function_exists('bingo_fetch_admin_network_commissions_entities')) {
+    /**
+     * Desglose por operador y punto de venta para el panel admin Red Tercerizada.
+     *
+     * @return array{operators:list<array>,stores:list<array>}
+     */
+    function bingo_fetch_admin_network_commissions_entities(array $filters = []): array
+    {
+        $modelUsers = new \App\Models\UsersModel();
+        $search = strtolower(trim((string) ($filters['search'] ?? '')));
+        $dateFrom = trim((string) ($filters['date_from'] ?? ''));
+        $dateTo = trim((string) ($filters['date_to'] ?? ''));
+        $rateType = (string) ($filters['rate_type'] ?? 'all');
+        $hasFilter = $dateFrom !== '' || $dateTo !== '' || $rateType !== 'all' || $search !== '';
+
+        $accumulate = static function (array $it, array $bucket, bool $isOperator): array {
+            $t = (string) ($it['rate_type'] ?? '');
+            if (! in_array($t, ['ggr', 'recharge', 'withdraw'], true)) {
+                return $bucket;
+            }
+            $earn = $isOperator
+                ? (float) ($it['operator_profit'] ?? 0)
+                : (float) ($it['commission_amount'] ?? 0);
+            $bucket[$t] += $earn;
+            $bucket['total'] += $earn;
+            $bucket['count']++;
+            if ($t === 'ggr') {
+                $bucket['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
+                $bucket['ggr_payout'] += (float) ($it['total_payout'] ?? 0);
+            }
+
+            return $bucket;
+        };
+
+        $operators = [];
+        foreach ($modelUsers->where('group', bingo_group_operator())->where('deleted', 0)->orderBy('firstname', 'ASC')->findAll() as $operator) {
+            $opId = (int) ($operator['id'] ?? 0);
+            if ($opId <= 0) {
+                continue;
+            }
+            $name = trim(($operator['firstname'] ?? '') . ' ' . ($operator['lastname'] ?? ''));
+            $code = (string) ($operator['code'] ?? '');
+
+            $bucket = [
+                'id' => $opId,
+                'name' => $name !== '' ? $name : 'Operador',
+                'code' => $code,
+                'ggr' => 0.0,
+                'recharge' => 0.0,
+                'withdraw' => 0.0,
+                'total' => 0.0,
+                'ggr_stake' => 0.0,
+                'ggr_payout' => 0.0,
+                'count' => 0,
+            ];
+
+            $data = bingo_fetch_operator_detailed_commissions_breakdown($opId, $filters);
+            foreach (($data['items'] ?? []) as $it) {
+                $bucket = $accumulate($it, $bucket, true);
+            }
+
+            if ($hasFilter && $bucket['total'] <= 0) {
+                continue;
+            }
+
+            foreach (['ggr', 'recharge', 'withdraw', 'total', 'ggr_stake', 'ggr_payout'] as $k) {
+                $bucket[$k] = round($bucket[$k], 2);
+            }
+            $operators[] = $bucket;
+        }
+
+        $operatorNameCache = [];
+        $stores = [];
+        foreach ($modelUsers->where('group', bingo_group_store())->where('deleted', 0)->orderBy('business_name', 'ASC')->findAll() as $store) {
+            $storeId = (int) ($store['id'] ?? 0);
+            if ($storeId <= 0) {
+                continue;
+            }
+            $name = function_exists('bingo_store_display_name')
+                ? bingo_store_display_name($store)
+                : trim((string) ($store['business_name'] ?? ''));
+            $code = (string) ($store['code'] ?? '');
+            $opId = (int) ($store['operator_id'] ?? 0);
+            if ($opId > 0 && ! isset($operatorNameCache[$opId])) {
+                $op = $modelUsers->find($opId);
+                $operatorNameCache[$opId] = $op
+                    ? trim(($op['firstname'] ?? '') . ' ' . ($op['lastname'] ?? ''))
+                    : '';
+            }
+
+            $bucket = [
+                'id' => $storeId,
+                'name' => $name !== '' ? $name : 'Punto de Venta',
+                'code' => $code,
+                'operator_name' => $opId > 0 ? ($operatorNameCache[$opId] ?? '') : 'Sin operador',
+                'ggr' => 0.0,
+                'recharge' => 0.0,
+                'withdraw' => 0.0,
+                'total' => 0.0,
+                'ggr_stake' => 0.0,
+                'ggr_payout' => 0.0,
+                'count' => 0,
+            ];
+
+            $data = bingo_fetch_store_detailed_commissions_breakdown($storeId, $filters);
+            foreach (($data['items'] ?? []) as $it) {
+                $bucket = $accumulate($it, $bucket, false);
+            }
+
+            if ($hasFilter && $bucket['total'] <= 0) {
+                continue;
+            }
+
+            foreach (['ggr', 'recharge', 'withdraw', 'total', 'ggr_stake', 'ggr_payout'] as $k) {
+                $bucket[$k] = round($bucket[$k], 2);
+            }
+            $stores[] = $bucket;
+        }
+
+        usort($operators, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+        usort($stores, static fn (array $a, array $b): int => $b['total'] <=> $a['total']);
+
+        return [
+            'operators' => $operators,
+            'stores' => $stores,
         ];
     }
 }

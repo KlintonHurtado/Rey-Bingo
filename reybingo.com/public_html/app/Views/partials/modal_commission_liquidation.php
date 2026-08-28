@@ -146,13 +146,14 @@ $currency = systemGet('currency') ?? '$';
                                             type="text"
                                             class="form-control form-control-lg fw-bold text-dark border-start-0 liq-amount-input"
                                             id="liq-input-amount"
-                                            value="0.00"
+                                            value=""
+                                            placeholder="0.00"
                                             autocomplete="off"
                                             inputmode="decimal"
                                             aria-describedby="liq-amount-help"
                                         >
                                     </div>
-                                    <small id="liq-amount-help" class="text-danger fw-semibold d-block mt-1">Inicia en 0. Ingresa manualmente el monto exacto a liquidar para evitar errores.</small>
+                                    <small id="liq-amount-help" class="text-danger fw-semibold d-block mt-1">Campo vacío por defecto. Ingresa manualmente el monto exacto a liquidar.</small>
                                 </div>
 
                                 <!-- Referencia de Transferencia -->
@@ -190,13 +191,14 @@ $currency = systemGet('currency') ?? '$';
     let liqSuccessCallback = null;
 
     function resetLiqAmountInput() {
-        const $input = $('#liq-input-amount');
-        $input.data('liqDigits', '0');
-        $input.val('0.00');
+        $('#liq-input-amount').val('');
     }
 
     function parseLiqAmountInput() {
         const raw = String($('#liq-input-amount').val() || '').replace(/,/g, '').trim();
+        if (raw === '') {
+            return 0;
+        }
         const num = parseFloat(raw);
         return Number.isFinite(num) ? num : 0;
     }
@@ -208,63 +210,30 @@ $currency = systemGet('currency') ?? '$';
         }
         $input.data('liqBound', true);
 
-        $input.on('focus', function() {
-            const el = this;
-            setTimeout(function() {
-                if (el.setSelectionRange) {
-                    el.setSelectionRange(0, 0);
-                }
-            }, 0);
-        });
-
-        $input.on('keydown', function(e) {
-            if (e.key === 'Tab' || e.key === 'Enter' || e.key === 'Escape') {
-                return;
+        $input.on('input', function() {
+            let v = this.value.replace(/[^\d.]/g, '');
+            const parts = v.split('.');
+            if (parts.length > 2) {
+                v = parts[0] + '.' + parts.slice(1).join('');
             }
-            if (e.ctrlKey || e.metaKey || e.altKey) {
-                return;
+            if (parts[1] && parts[1].length > 2) {
+                v = parts[0] + '.' + parts[1].slice(0, 2);
             }
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault();
-                return;
-            }
-
-            e.preventDefault();
-
-            let digits = String($input.data('liqDigits') || '0');
-            if (digits === '0') {
-                digits = '';
-            }
-
-            if (e.key === 'Backspace') {
-                digits = digits.slice(0, -1);
-            } else if (e.key === 'Delete') {
-                digits = '';
-            } else if (/^\d$/.test(e.key)) {
-                digits = (digits + e.key).slice(0, 12);
-            } else {
-                return;
-            }
-
-            if (!digits) {
-                digits = '0';
-            }
-
-            $input.data('liqDigits', digits);
-            const amount = (parseInt(digits, 10) / 100).toFixed(2);
-            $input.val(amount);
-
-            const el = $input.get(0);
-            if (el && el.setSelectionRange) {
-                el.setSelectionRange(0, 0);
-            }
+            this.value = v;
         });
 
         $input.on('blur', function() {
-            const amount = parseLiqAmountInput();
-            const digits = Math.max(0, Math.round(amount * 100)).toString();
-            $input.data('liqDigits', digits === '0' ? '0' : digits);
-            $input.val(amount.toFixed(2));
+            const raw = String($input.val() || '').replace(/,/g, '').trim();
+            if (raw === '') {
+                $input.val('');
+                return;
+            }
+            const num = parseFloat(raw);
+            if (Number.isFinite(num) && num > 0) {
+                $input.val(num.toFixed(2));
+            } else {
+                $input.val('');
+            }
         });
     }
 
