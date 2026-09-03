@@ -679,13 +679,13 @@ $sourceLabel = static function ($source) {
                                             <td class="text-end text-muted">
                                                 <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
                                             </td>
-                                            <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
+                                            <td class="text-end fw-semibold <?= ((float) ($it['base_amount'] ?? 0)) < 0 ? 'text-danger' : ''; ?>"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
                                             <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2); ?>%</span></td>
-                                            <td class="text-end"><?= esc($currency); ?> <?= number_format((float) ($it['store_commission'] ?? 0), 2); ?></td>
+                                            <td class="text-end <?= ((float) ($it['store_commission'] ?? 0)) < 0 ? 'text-danger' : ''; ?>"><?= esc($currency); ?> <?= bingo_format_exact_amount((float) ($it['store_commission'] ?? 0)); ?></td>
                                             <td class="text-center"><span class="badge bg-primary-subtle text-primary border border-primary"><?= number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2); ?>%</span></td>
                                             <td class="text-center"><span class="badge bg-success-subtle text-success border border-success fw-bold">+<?= number_format($spreadPct, 2); ?>%</span></td>
-                                            <td class="text-end text-success fw-bold" style="font-size: 0.90rem;">
-                                                +<?= esc($currency); ?> <?= number_format($opProfit, 2); ?>
+                                            <td class="text-end fw-bold <?= $opProfit < 0 ? 'text-danger' : 'text-success'; ?>" style="font-size: 0.90rem;">
+                                                <?= ($opProfit < 0 ? '' : '+') . esc($currency); ?> <?= bingo_format_exact_amount($opProfit); ?>
                                             </td>
                                             <td class="text-center"><span class="badge bg-success"><?= esc($it['status_label'] ?? 'Completado'); ?></span></td>
                                             <td><small class="text-muted"><?= esc($it['detail'] ?? '-'); ?></small></td>
@@ -782,10 +782,11 @@ $sourceLabel = static function ($source) {
                                             <td class="text-end text-muted">
                                                 <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
                                             </td>
-                                            <td class="text-end fw-semibold"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
+                                            <td class="text-end fw-semibold <?= ((float) ($it['base_amount'] ?? 0)) < 0 ? 'text-danger' : ''; ?>"><?= esc($currency); ?> <?= number_format((float) ($it['base_amount'] ?? 0), 2); ?></td>
                                             <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($ratePct, 2); ?>%</span></td>
-                                            <td class="text-end text-success fw-bold" style="font-size: 0.90rem;">
-                                                +<?= esc($currency); ?> <?= number_format((float) ($it['commission_amount'] ?? 0), 2); ?>
+                                            <td class="text-end fw-bold <?= ((float) ($it['commission_amount'] ?? 0)) < 0 ? 'text-danger' : 'text-success'; ?>" style="font-size: 0.90rem;">
+                                                <?php $commAmt = (float) ($it['commission_amount'] ?? 0); ?>
+                                                <?= ($commAmt < 0 ? '' : '+') . esc($currency); ?> <?= bingo_format_exact_amount($commAmt); ?>
                                             </td>
                                             <td>
                                                 <strong><?= esc($it['player_name'] ?? 'Jugador'); ?></strong>

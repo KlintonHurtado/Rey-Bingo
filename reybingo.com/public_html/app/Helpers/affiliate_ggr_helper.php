@@ -3,6 +3,7 @@
 /**
  * Sistema de afiliados basado en GGR (Gross Gaming Revenue).
  * GGR = total apostado - total ganado por el jugador referido.
+ * Puede ser negativo (ej. apostó 6 y ganó 6.72 → GGR = -0.72).
  */
 
 if (! function_exists('bingo_ensure_affiliate_ggr_schema')) {
@@ -46,7 +47,7 @@ if (! function_exists('bingo_ensure_affiliate_ggr_schema')) {
                     'total_payout'        => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
                     'ggr_amount'          => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
                     'commission_rate'     => ['type' => 'DECIMAL', 'constraint' => '8,4', 'default' => '0.0000'],
-                    'commission_amount'   => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
+                    'commission_amount'   => ['type' => 'DECIMAL', 'constraint' => '18,8', 'default' => '0.00000000'],
                     'status'              => ['type' => 'TINYINT', 'constraint' => 1, 'unsigned' => true, 'default' => 0],
                     'payment_id'          => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],
                     'period_date'         => ['type' => 'DATE', 'null' => true],
@@ -67,7 +68,7 @@ if (! function_exists('bingo_ensure_affiliate_ggr_schema')) {
                     'total_stake'       => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
                     'total_payout'      => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
                     'total_ggr'         => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
-                    'commission_amount' => ['type' => 'DECIMAL', 'constraint' => '12,2', 'default' => '0.00'],
+                    'commission_amount' => ['type' => 'DECIMAL', 'constraint' => '18,8', 'default' => '0.00000000'],
                     'commission_count'  => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'default' => 0],
                     'payment_id'        => ['type' => 'INT', 'constraint' => 11, 'unsigned' => true, 'null' => true],
                     'status'            => ['type' => 'TINYINT', 'constraint' => 1, 'unsigned' => true, 'default' => 2],
@@ -113,6 +114,13 @@ if (! function_exists('bingo_ensure_affiliate_ggr_schema')) {
                         ],
                     ]);
                 }
+            }
+
+            if ($db->tableExists('affiliate_ggr_commissions') && $db->fieldExists('commission_amount', 'affiliate_ggr_commissions')) {
+                $db->query('ALTER TABLE `affiliate_ggr_commissions` MODIFY `commission_amount` DECIMAL(18,8) NOT NULL DEFAULT 0.00000000');
+            }
+            if ($db->tableExists('affiliate_ggr_monthly_settlements') && $db->fieldExists('commission_amount', 'affiliate_ggr_monthly_settlements')) {
+                $db->query('ALTER TABLE `affiliate_ggr_monthly_settlements` MODIFY `commission_amount` DECIMAL(18,8) NOT NULL DEFAULT 0.00000000');
             }
 
             if ($db->tableExists('system')) {
@@ -588,7 +596,7 @@ if (! function_exists('bingo_credit_ggr_commission')) {
             'title'   => '💰 ' . translate('ggr commission credited'),
             'message' => translate('ggr commission for player') . ' ' . $playerName
                 . ' — GGR: ' . systemGet('currency') . ' ' . number_format((float) ($commission['ggr_amount'] ?? 0), 2)
-                . ' | ' . translate('commission') . ': ' . systemGet('currency') . ' ' . number_format($amount, 2),
+                . ' | ' . translate('commission') . ': ' . systemGet('currency') . ' ' . bingo_format_exact_amount($amount),
         ]);
 
         return ['success' => true, 'payment_id' => $paymentId];
@@ -661,17 +669,27 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
                 continue;
             }
 
-            if ($rate <= 0 || $ggr <= 0) {
+            // Sin tasa: no hay comisión que registrar
+            if ($rate <= 0) {
                 if ($existing && in_array($existingStatus, [0, 1], true)) {
                     $modelCommissions->update((int) $existing['id'], ['status' => 3]);
                 }
                 continue;
             }
 
-            $commissionAmount = round($ggr * $rate, 2);
-            if ($commissionAmount <= 0) {
+            // GGR puede ser negativo (premio > apuesta). La comisión hereda el signo, sin redondear a 2.
+            $commissionAmount = bingo_commission_multiply($ggr, $rate);
+            if (bingo_commission_is_zero($commissionAmount) && bingo_commission_is_zero($ggr)) {
                 if ($existing && in_array($existingStatus, [0, 1], true)) {
-                    $modelCommissions->update((int) $existing['id'], ['status' => 3]);
+                    $modelCommissions->update((int) $existing['id'], [
+                        'total_stake'       => $stakes,
+                        'total_payout'      => $payouts,
+                        'ggr_amount'        => $ggr,
+                        'commission_rate'   => $rate,
+                        'commission_amount' => 0,
+                        'status'            => 3,
+                        'period_date'       => $periodDate,
+                    ]);
                 }
                 continue;
             }
@@ -704,7 +722,8 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
                 $row = $modelCommissions->find((int) $modelCommissions->getInsertID());
             }
 
-            if ($autoApprove && $row) {
+            // Pago inmediato solo si la comisión es positiva (negativas reducen el neto mensual)
+            if ($autoApprove && $row && $commissionAmount > 0) {
                 bingo_credit_ggr_commission($row, $fromUserId);
             }
 
@@ -927,10 +946,10 @@ if (! function_exists('bingo_fetch_affiliate_ggr_dashboard')) {
             $chartMap[$label]['ggr'] += $ggr;
 
             $chartCommission = $commission;
-            if ($chartCommission <= 0 && $ggr > 0) {
-                $chartCommission = round($ggr * (float) ($row['commission_rate'] ?? 0), 2);
+            if (bingo_commission_is_zero($chartCommission) && ! bingo_commission_is_zero($ggr)) {
+                $chartCommission = bingo_commission_multiply($ggr, (float) ($row['commission_rate'] ?? 0));
             }
-            if ($chartCommission > 0) {
+            if (! bingo_commission_is_zero($chartCommission)) {
                 $chartMap[$label]['commission'] += $chartCommission;
             }
 
@@ -1667,7 +1686,6 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
             ->whereIn('affiliate_type', ['store', 'operator'])
             ->where('period_date >=', $period['start'])
             ->where('period_date <=', $period['end'])
-            ->where('commission_amount >', 0)
             ->findAll();
 
         if ($rows === []) {
@@ -1716,11 +1734,8 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
         foreach ($groups as $group) {
             $affiliateId = (int) $group['affiliate_id'];
             $affiliateType = (string) $group['affiliate_type'];
-            $commissionAmount = round((float) $group['commission'], 2);
-
-            if ($commissionAmount <= 0) {
-                continue;
-            }
+            // Neto del período: positivos + negativos (GGR en rojo reduce la comisión)
+            $commissionAmount = (float) $group['commission'];
 
             $alreadySettled = $modelSettlements
                 ->where('affiliate_id', $affiliateId)
@@ -1737,6 +1752,8 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
                 continue;
             }
 
+            $payAmount = $commissionAmount > 0 ? $commissionAmount : 0.0;
+
             $modelSettlements->insert([
                 'affiliate_id'      => $affiliateId,
                 'affiliate_type'    => $affiliateType,
@@ -1750,20 +1767,23 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
             ]);
             $settlementId = (int) $modelSettlements->getInsertID();
 
-            wallet_credit_recharge($affiliateId, $commissionAmount);
+            $paymentId = 0;
+            if ($payAmount > 0) {
+                wallet_credit_recharge($affiliateId, $payAmount);
 
-            $paymentType = bingo_ggr_payment_type($affiliateType);
-            $modelPayments->insert([
-                'user'    => $affiliateId,
-                'type'    => $paymentType,
-                'type_id' => $settlementId,
-                'amount'  => $commissionAmount,
-                'status'  => 2,
-            ]);
-            $paymentId = (int) $modelPayments->getInsertID();
+                $paymentType = bingo_ggr_payment_type($affiliateType);
+                $modelPayments->insert([
+                    'user'    => $affiliateId,
+                    'type'    => $paymentType,
+                    'type_id' => $settlementId,
+                    'amount'  => $payAmount,
+                    'status'  => 2,
+                ]);
+                $paymentId = (int) $modelPayments->getInsertID();
+            }
 
             $modelSettlements->update($settlementId, [
-                'payment_id' => $paymentId,
+                'payment_id' => $paymentId > 0 ? $paymentId : null,
                 'status'     => 2,
             ]);
 
@@ -1775,7 +1795,7 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
 
                 $modelCommissions->update($commissionId, [
                     'status'     => 2,
-                    'payment_id' => $paymentId,
+                    'payment_id' => $paymentId > 0 ? $paymentId : null,
                 ]);
             }
 
@@ -1787,19 +1807,19 @@ if (! function_exists('bingo_settle_monthly_ggr_commissions')) {
                 'user'    => $affiliateId,
                 'from'    => $fromUserId ?? 0,
                 'type'    => 'payment',
-                'type_id' => $paymentId,
+                'type_id' => $paymentId > 0 ? $paymentId : $settlementId,
                 'title'   => '💰 ' . strtoupper(translate('ggr monthly commission credited')),
                 'message' => translate('ggr monthly settlement for period') . ' ' . $period['label']
                     . ' — ' . translate('ggr generated') . ': ' . systemGet('currency') . ' '
                     . number_format(round((float) $group['total_ggr'], 2), 2)
                     . ' | ' . translate('commission') . ': ' . systemGet('currency') . ' '
-                    . number_format($commissionAmount, 2)
+                    . bingo_format_exact_amount($commissionAmount)
                     . ($affiliateName !== '' ? ' (' . $affiliateName . ')' : ''),
             ]);
 
             $settledCount += count($group['rows']);
             $affiliateCount++;
-            $totalCommission += $commissionAmount;
+            $totalCommission += $payAmount;
         }
 
         return [

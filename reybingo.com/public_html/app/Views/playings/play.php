@@ -105,6 +105,11 @@
         opacity: 0.9;
     }
 
+    .play-room-slide.is-filtered-out,
+    .play-cards .card.is-filtered-out {
+        display: none !important;
+    }
+
     .player-play-view .play-filter-input.form-bingo {
         width: 100%;
         margin: 0;
@@ -227,6 +232,28 @@
             scroll-snap-align: none !important;
             scroll-snap-stop: normal !important;
             box-sizing: border-box;
+        }
+
+        /* Debe ganar a display:flex !important; si no, el buscador no oculta salas en móvil */
+        .player-play-view .play-room-slide.is-filtered-out,
+        .player-play-view .play-cards .card.is-filtered-out {
+            display: none !important;
+        }
+
+        .player-play-view .play-filters-bar {
+            position: relative;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .player-play-view .play-filter-input.form-bingo {
+            /* Evita zoom forzado de iOS al enfocar (< 16px) */
+            font-size: 16px !important;
+            line-height: 40px !important;
+            height: 40px !important;
+            -webkit-appearance: none;
+            appearance: none;
+            touch-action: manipulation;
         }
 
         .player-play-view .play-cards .card,
@@ -603,7 +630,11 @@
                                                 </div>
                                             <ul class="list-group list-group-flush">
                                                 <li class="p-0" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
-                                                <li class="p-0" id="card-accumulated-<?= $game['id'] ?>"></li>
+                                                <li class="p-0 card-prize" id="card-accumulated-<?= $game['id'] ?>">
+                                                    <?php if (! empty($game['prize_html'])) : ?>
+                                                        Premio: <?= $game['prize_html']; ?>
+                                                    <?php endif; ?>
+                                                </li>
                                                 <li class="p-0" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
                                             </ul>
                                             <div class="card-body p-1 card-buy-actions">
@@ -858,9 +889,9 @@
             .filter(function(card) {
                 const slide = card.closest('.play-room-slide');
                 if (slide) {
-                    return slide.style.display !== 'none';
+                    return !slide.classList.contains('is-filtered-out') && slide.style.display !== 'none';
                 }
-                return card.style.display !== 'none';
+                return !card.classList.contains('is-filtered-out') && card.style.display !== 'none';
             });
         const count = visibleCards.length;
 
@@ -894,9 +925,11 @@
             const visible = (!q || text.includes(q)) && (price >= minStart);
             const slide = card.closest('.play-room-slide');
             if (slide) {
-                slide.style.display = visible ? '' : 'none';
+                slide.classList.toggle('is-filtered-out', !visible);
+                slide.style.removeProperty('display');
             } else {
-                card.style.display = visible ? '' : 'none';
+                card.classList.toggle('is-filtered-out', !visible);
+                card.style.removeProperty('display');
             }
         });
 
@@ -932,6 +965,7 @@
             window.syncPlayCardsLayout();
         }
     }
+    window.applyGameFiltersAndFavorites = applyGameFiltersAndFavorites;
 
     function formatPlayCountdownText(targetDate) {
         const timeDiff = targetDate - Date.now();
@@ -960,8 +994,21 @@
     // Countdown unificado en layout (window.initPlayCardsCountdownsFromDom).
     // No crear un segundo setInterval aquí: provoca el parpadeo Jugando... / Comprar cartones.
 
-    document.getElementById('play-games-search')?.addEventListener('input', applyGameFiltersAndFavorites);
-    document.getElementById('play-min-start-filter')?.addEventListener('input', applyGameFiltersAndFavorites);
+    (function bindPlayRoomFilters() {
+        const searchInput = document.getElementById('play-games-search');
+        const minInput = document.getElementById('play-min-start-filter');
+        const filterEvents = ['input', 'keyup', 'search', 'change'];
+
+        filterEvents.forEach(function(evtName) {
+            searchInput?.addEventListener(evtName, applyGameFiltersAndFavorites);
+            minInput?.addEventListener(evtName, applyGameFiltersAndFavorites);
+        });
+
+        // En móvil, a veces el teclado virtual no dispara input de inmediato
+        searchInput?.addEventListener('touchend', function() {
+            setTimeout(applyGameFiltersAndFavorites, 0);
+        }, { passive: true });
+    })();
     document.querySelectorAll('[data-favorite-game]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             const gameId = parseInt(this.getAttribute('data-favorite-game') || '0', 10);

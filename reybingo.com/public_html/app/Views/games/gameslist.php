@@ -45,7 +45,13 @@
                     <?php endif; ?>
                     <td><?= esc(translate_day($game['date'] . ' ' . $game['time'])) ?> <br /> <?= esc(translate_date($game['date'])) ?></td>
                     <td class="text-center"><?= systemGet('currency'); ?> <?= number_format($game['price'], 2) ?></td>
-                    <td class="text-center" id="game-total-<?= esc($game['id']) ?>"><?= systemGet('currency'); ?> <?= number_format($game['total'], 2) ?></td>
+                    <td class="text-center" id="game-total-<?= esc($game['id']) ?>">
+                        <?php if (! empty($game['prize_html'])) : ?>
+                            <?= $game['prize_html']; ?>
+                        <?php else : ?>
+                            <?= systemGet('currency'); ?> <?= number_format($game['total'], 2) ?>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-center" id="game-status-<?= esc($game['id']) ?>"><?= $game['status'] ?></td>
                     <td><?= $game['buttons'] ?></td>
                 </tr>

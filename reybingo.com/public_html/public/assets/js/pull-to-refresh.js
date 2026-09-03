@@ -29,6 +29,13 @@
         return false;
     }
 
+    function isFormField(target) {
+        if (!target || !target.closest) {
+            return false;
+        }
+        return !!target.closest('input, textarea, select, [contenteditable="true"]');
+    }
+
     function getScrollTop() {
         var candidates = [
             document.querySelector('.admin-profile-scroll'),
@@ -103,7 +110,7 @@
     }
 
     document.addEventListener('touchstart', function (e) {
-        if (isBlocked() || !e.touches || e.touches.length !== 1) {
+        if (isBlocked() || isFormField(e.target) || !e.touches || e.touches.length !== 1) {
             armed = false;
             return;
         }
@@ -118,7 +125,7 @@
     }, { passive: true });
 
     document.addEventListener('touchmove', function (e) {
-        if (!armed || isBlocked() || !e.touches || e.touches.length !== 1) {
+        if (!armed || isBlocked() || isFormField(e.target) || !e.touches || e.touches.length !== 1) {
             return;
         }
         if (getScrollTop() > 2) {

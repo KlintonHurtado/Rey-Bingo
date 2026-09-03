@@ -72,11 +72,11 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
                 <div class="d-flex justify-content-between align-items-center pt-1 border-top border-warning-subtle" style="font-size: 0.72rem;">
                     <div>
                         <span class="text-muted">Tiendas:</span>
-                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-ggr-stores"><?= number_format($ggrStoresEarned, 2); ?></span></strong>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-ggr-stores"><?= bingo_format_exact_amount($ggrStoresEarned); ?></span></strong>
                     </div>
                     <div class="text-end">
                         <span class="text-success fw-semibold">Operador:</span>
-                        <strong class="text-success">+<?= $currency; ?> <span id="op-comm-stat-ggr-profit"><?= number_format($ggrOpEarned, 2); ?></span></strong>
+                        <strong class="text-success">+<?= $currency; ?> <span id="op-comm-stat-ggr-profit"><?= bingo_format_exact_amount($ggrOpEarned); ?></span></strong>
                     </div>
                 </div>
             </div>
@@ -98,11 +98,11 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
                 <div class="d-flex justify-content-between align-items-center pt-1 border-top border-info-subtle" style="font-size: 0.72rem;">
                     <div>
                         <span class="text-muted">Tiendas:</span>
-                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-rec-stores"><?= number_format($recStoresEarned, 2); ?></span></strong>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-rec-stores"><?= bingo_format_exact_amount($recStoresEarned); ?></span></strong>
                     </div>
                     <div class="text-end">
                         <span class="text-info fw-semibold">Operador:</span>
-                        <strong class="text-info">+<?= $currency; ?> <span id="op-comm-stat-rec-profit"><?= number_format($recOpEarned, 2); ?></span></strong>
+                        <strong class="text-info">+<?= $currency; ?> <span id="op-comm-stat-rec-profit"><?= bingo_format_exact_amount($recOpEarned); ?></span></strong>
                     </div>
                 </div>
             </div>
@@ -124,11 +124,11 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
                 <div class="d-flex justify-content-between align-items-center pt-1 border-top border-danger-subtle" style="font-size: 0.72rem;">
                     <div>
                         <span class="text-muted">Tiendas:</span>
-                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-with-stores"><?= number_format($withStoresEarned, 2); ?></span></strong>
+                        <strong class="text-secondary"><?= $currency; ?> <span id="op-comm-stat-with-stores"><?= bingo_format_exact_amount($withStoresEarned); ?></span></strong>
                     </div>
                     <div class="text-end">
                         <span class="text-danger fw-semibold">Operador:</span>
-                        <strong class="text-danger">+<?= $currency; ?> <span id="op-comm-stat-with-profit"><?= number_format($withOpEarned, 2); ?></span></strong>
+                        <strong class="text-danger">+<?= $currency; ?> <span id="op-comm-stat-with-profit"><?= bingo_format_exact_amount($withOpEarned); ?></span></strong>
                     </div>
                 </div>
             </div>
@@ -225,20 +225,26 @@ $totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recO
                 }
                 if (res && res.stats) {
                     const st = res.stats;
-                    const formatNum = function(num) {
-                        return parseFloat(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const formatNum = function(num, exact) {
+                        const n = parseFloat(num || 0);
+                        if (exact) {
+                            let s = n.toFixed(8).replace(/\.?0+$/, '');
+                            if (s === '-0') s = '0';
+                            return s;
+                        }
+                        return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     };
                     if (st.ggr) {
-                        $('#op-comm-stat-ggr-stores').text(formatNum(st.ggr.stores_earned));
-                        $('#op-comm-stat-ggr-profit').text(formatNum(st.ggr.operator_earned));
+                        $('#op-comm-stat-ggr-stores').text(formatNum(st.ggr.stores_earned, true));
+                        $('#op-comm-stat-ggr-profit').text(formatNum(st.ggr.operator_earned, true));
                     }
                     if (st.recharge) {
-                        $('#op-comm-stat-rec-stores').text(formatNum(st.recharge.stores_earned));
-                        $('#op-comm-stat-rec-profit').text(formatNum(st.recharge.operator_earned));
+                        $('#op-comm-stat-rec-stores').text(formatNum(st.recharge.stores_earned, true));
+                        $('#op-comm-stat-rec-profit').text(formatNum(st.recharge.operator_earned, true));
                     }
                     if (st.withdraw) {
-                        $('#op-comm-stat-with-stores').text(formatNum(st.withdraw.stores_earned));
-                        $('#op-comm-stat-with-profit').text(formatNum(st.withdraw.operator_earned));
+                        $('#op-comm-stat-with-stores').text(formatNum(st.withdraw.stores_earned, true));
+                        $('#op-comm-stat-with-profit').text(formatNum(st.withdraw.operator_earned, true));
                     }
                 }
             },

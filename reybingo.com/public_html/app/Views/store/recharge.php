@@ -103,9 +103,52 @@
         let selectedPlayer = null;
         let lookupTimer = null;
         let lookupRequest = null;
+        let lookupSuppressed = false;
+        let rechargeSubmitting = false;
+        const csrfTokenName = '<?= csrf_token() ?>';
         const hasBalance = <?= (float) ($walletSummary['recharge'] ?? 0) > 0 ? 'true' : 'false' ?>;
         const minDocumentDigits = 6;
         const currencyLabel = '<?= esc(systemGet('currency'), 'js'); ?>';
+        const serverErrorMessage = '<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>';
+
+        function storeGetCsrfData() {
+            const $csrfField = $('#store-recharge-form input[name="' + csrfTokenName + '"]');
+            const tokenValue = $csrfField.length ? $csrfField.val() : '<?= csrf_hash() ?>';
+
+            return {
+                [csrfTokenName]: tokenValue
+            };
+        }
+
+        function storeHandleRechargeSuccess(response) {
+            storeShowToast(response.message, 'success');
+            $('#store-amount').val('');
+            $('#store-reference').val('');
+            $('#store-lookup-error').addClass('d-none').text('');
+
+            if (typeof response.store_balance !== 'undefined') {
+                storeUpdateBalance(response.store_balance);
+            }
+
+            if (typeof response.player_wallet !== 'undefined') {
+                $('#store-player-wallet').text(response.player_wallet);
+            }
+
+            storeUpdateRechargeCommissionTotal(response);
+            storeRefreshRecharges();
+        }
+
+        function storeParseAjaxJson(xhr) {
+            if (!xhr || !xhr.responseText) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(xhr.responseText);
+            } catch (parseError) {
+                return null;
+            }
+        }
 
         function storeUpdateRechargeCommissionTotal(response) {
             if (typeof response.recharge_commission_total === 'undefined') {
@@ -145,6 +188,10 @@
         }
 
         function storeLookupPlayer() {
+            if (lookupSuppressed || rechargeSubmitting) {
+                return;
+            }
+
             const query = $('#store-lookup').val().trim();
             const digits = storeNormalizeDocument(query);
 
@@ -167,23 +214,36 @@
             $('#store-lookup-hint').removeClass('d-none');
             $('#store-lookup-btn').prop('disabled', true);
 
-            lookupRequest = $.post('<?= site_url('store/lookupPlayer') ?>', {
-                <?= csrf_token() ?>: '<?= csrf_hash() ?>',
-                query: query
-            }, function(response) {
-                if (!response.success) {
-                    storeClearPlayerSelection();
-                    $('#store-lookup-error').text(response.message || '<?= esc(translate('player not found'), 'js'); ?>').removeClass('d-none');
+            lookupRequest = $.post(
+                '<?= site_url('store/lookupPlayer') ?>',
+                $.extend({ query: query }, storeGetCsrfData()),
+                function(response) {
+                    if (lookupSuppressed || rechargeSubmitting) {
+                        return;
+                    }
+
+                    if (!response.success) {
+                        storeClearPlayerSelection();
+                        $('#store-lookup-error').text(response.message || '<?= esc(translate('player not found'), 'js'); ?>').removeClass('d-none');
+                        return;
+                    }
+
+                    storeShowPlayer(response);
+                },
+                'json'
+            ).fail(function(xhr, status) {
+                if (status === 'abort' || lookupSuppressed || rechargeSubmitting) {
                     return;
                 }
 
-                storeShowPlayer(response);
-            }, 'json').fail(function(xhr, status) {
-                if (status === 'abort') {
+                const payload = storeParseAjaxJson(xhr);
+                if (payload && payload.success) {
+                    storeShowPlayer(payload);
                     return;
                 }
+
                 storeClearPlayerSelection();
-                $('#store-lookup-error').text('<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>').removeClass('d-none');
+                $('#store-lookup-error').text(serverErrorMessage).removeClass('d-none');
             }).always(function() {
                 lookupRequest = null;
                 $('#store-lookup-hint').addClass('d-none');
@@ -228,6 +288,11 @@
 
         $('#store-recharge-form').on('submit', function(e) {
             e.preventDefault();
+
+            if (rechargeSubmitting) {
+                return;
+            }
+
             storeClearErrors('#store-recharge-form');
 
             if (!selectedPlayer || !$('#store-player-id').val()) {
@@ -240,40 +305,62 @@
                 return;
             }
 
+            lookupSuppressed = true;
+            rechargeSubmitting = true;
+            clearTimeout(lookupTimer);
+
+            if (lookupRequest) {
+                lookupRequest.abort();
+                lookupRequest = null;
+            }
+
+            $('#store-lookup-hint').addClass('d-none');
+            $('#store-lookup-error').addClass('d-none').text('');
+
             const $btn = $('#store-recharge-btn');
+            const $form = $(this);
             $btn.prop('disabled', true);
 
             $.ajax({
                 url: '<?= site_url('store/rechargeSubmit') ?>',
                 method: 'POST',
-                data: $(this).serialize(),
+                data: $form.serialize(),
                 dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        storeShowToast(response.message, 'success');
-                        $('#store-amount').val('');
-                        $('#store-reference').val('');
-                        if (typeof response.store_balance !== 'undefined') {
-                            storeUpdateBalance(response.store_balance);
-                        }
-                        storeUpdateRechargeCommissionTotal(response);
-                        storeRefreshRecharges();
-                    } else if (response.errors) {
+                        storeHandleRechargeSuccess(response);
+                        return;
+                    }
+
+                    if (response.errors) {
                         $.each(response.errors, function(field, message) {
                             $('#' + field + '-error').text(message).removeClass('d-none');
                             $('#store-' + field + ', #' + field).addClass('is-invalid');
                         });
-                        if (response.message) {
-                            storeShowToast(response.message, 'error');
-                        }
-                    } else if (response.message) {
+                    }
+
+                    if (response.message) {
                         storeShowToast(response.message, 'error');
                     }
                 },
-                error: function() {
-                    storeShowToast('<?= esc(translate('there was an error in the request to the server.'), 'js'); ?>', 'error');
+                error: function(xhr) {
+                    const payload = storeParseAjaxJson(xhr);
+
+                    if (payload && payload.success) {
+                        storeHandleRechargeSuccess(payload);
+                        return;
+                    }
+
+                    if (payload && payload.message) {
+                        storeShowToast(payload.message, 'error');
+                        return;
+                    }
+
+                    storeShowToast(serverErrorMessage, 'error');
                 },
                 complete: function() {
+                    rechargeSubmitting = false;
+                    lookupSuppressed = false;
                     storeUpdateRechargeButton();
                 }
             });

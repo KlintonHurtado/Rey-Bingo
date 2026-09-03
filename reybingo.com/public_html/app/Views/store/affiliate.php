@@ -72,7 +72,7 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
                         </div>
                         <div class="text-end">
                             <span class="text-success fw-semibold">Ganado:</span>
-                            <strong class="text-success">+<?= $currency; ?> <span id="store-stat-ggr-earned"><?= number_format($ggrEarned, 2); ?></span></strong>
+                            <strong class="text-success">+<?= $currency; ?> <span id="store-stat-ggr-earned"><?= bingo_format_exact_amount($ggrEarned); ?></span></strong>
                         </div>
                     </div>
                 </div>
@@ -98,7 +98,7 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
                         </div>
                         <div class="text-end">
                             <span class="text-info fw-semibold">Ganado:</span>
-                            <strong class="text-info">+<?= $currency; ?> <span id="store-stat-rec-earned"><?= number_format($recEarned, 2); ?></span></strong>
+                            <strong class="text-info">+<?= $currency; ?> <span id="store-stat-rec-earned"><?= bingo_format_exact_amount($recEarned); ?></span></strong>
                         </div>
                     </div>
                 </div>
@@ -124,7 +124,7 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
                         </div>
                         <div class="text-end">
                             <span class="text-danger fw-semibold">Ganado:</span>
-                            <strong class="text-danger">+<?= $currency; ?> <span id="store-stat-with-earned"><?= number_format($withEarned, 2); ?></span></strong>
+                            <strong class="text-danger">+<?= $currency; ?> <span id="store-stat-with-earned"><?= bingo_format_exact_amount($withEarned); ?></span></strong>
                         </div>
                     </div>
                 </div>
@@ -211,20 +211,26 @@ $totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned +
                 }
                 if (res && res.stats) {
                     const st = res.stats;
-                    const formatNum = function(num) {
-                        return parseFloat(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const formatNum = function(num, exact) {
+                        const n = parseFloat(num || 0);
+                        if (exact) {
+                            let s = n.toFixed(8).replace(/\.?0+$/, '');
+                            if (s === '-0') s = '0';
+                            return s;
+                        }
+                        return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     };
                     if (st.ggr) {
-                        $('#store-stat-ggr-base').text(formatNum(st.ggr.total_base));
-                        $('#store-stat-ggr-earned').text(formatNum(st.ggr.total_earned));
+                        $('#store-stat-ggr-base').text(formatNum(st.ggr.total_base, false));
+                        $('#store-stat-ggr-earned').text(formatNum(st.ggr.total_earned, true));
                     }
                     if (st.recharge) {
-                        $('#store-stat-rec-base').text(formatNum(st.recharge.total_base));
-                        $('#store-stat-rec-earned').text(formatNum(st.recharge.total_earned));
+                        $('#store-stat-rec-base').text(formatNum(st.recharge.total_base, false));
+                        $('#store-stat-rec-earned').text(formatNum(st.recharge.total_earned, true));
                     }
                     if (st.withdraw) {
-                        $('#store-stat-with-base').text(formatNum(st.withdraw.total_base));
-                        $('#store-stat-with-earned').text(formatNum(st.withdraw.total_earned));
+                        $('#store-stat-with-base').text(formatNum(st.withdraw.total_base, false));
+                        $('#store-stat-with-earned').text(formatNum(st.withdraw.total_earned, true));
                     }
                 }
             },

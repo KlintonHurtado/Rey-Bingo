@@ -5,15 +5,15 @@ $items = $items ?? [];
 ?>
 <div class="table-responsive" id="operator-commissions-table-wrapper"
      data-ggr-base="<?= esc(number_format((float)($stats['ggr']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-ggr-stores="<?= esc(number_format((float)($stats['ggr']['stores_earned'] ?? 0), 2, '.', '')); ?>"
-     data-ggr-operator="<?= esc(number_format((float)($stats['ggr']['operator_earned'] ?? 0), 2, '.', '')); ?>"
+     data-ggr-stores="<?= esc(bingo_format_exact_amount((float)($stats['ggr']['stores_earned'] ?? 0))); ?>"
+     data-ggr-operator="<?= esc(bingo_format_exact_amount((float)($stats['ggr']['operator_earned'] ?? 0))); ?>"
      data-rec-base="<?= esc(number_format((float)($stats['recharge']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-rec-stores="<?= esc(number_format((float)($stats['recharge']['stores_earned'] ?? 0), 2, '.', '')); ?>"
-     data-rec-operator="<?= esc(number_format((float)($stats['recharge']['operator_earned'] ?? 0), 2, '.', '')); ?>"
+     data-rec-stores="<?= esc(bingo_format_exact_amount((float)($stats['recharge']['stores_earned'] ?? 0))); ?>"
+     data-rec-operator="<?= esc(bingo_format_exact_amount((float)($stats['recharge']['operator_earned'] ?? 0))); ?>"
      data-with-base="<?= esc(number_format((float)($stats['withdraw']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-with-stores="<?= esc(number_format((float)($stats['withdraw']['stores_earned'] ?? 0), 2, '.', '')); ?>"
-     data-with-operator="<?= esc(number_format((float)($stats['withdraw']['operator_earned'] ?? 0), 2, '.', '')); ?>"
-     data-total-profit="<?= esc(number_format((float)($stats['total_operator_profit'] ?? 0), 2, '.', '')); ?>">
+     data-with-stores="<?= esc(bingo_format_exact_amount((float)($stats['withdraw']['stores_earned'] ?? 0))); ?>"
+     data-with-operator="<?= esc(bingo_format_exact_amount((float)($stats['withdraw']['operator_earned'] ?? 0))); ?>"
+     data-total-profit="<?= esc(bingo_format_exact_amount((float)($stats['total_operator_profit'] ?? 0))); ?>">
 
     <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
         <thead class="table-light">
@@ -74,14 +74,14 @@ $items = $items ?? [];
                         <td class="text-end text-muted">
                             <?= $totalPayout !== null ? esc($currency) . ' ' . number_format($totalPayout, 2) : '-'; ?>
                         </td>
-                        <td class="text-end fw-semibold text-dark">
+                        <td class="text-end fw-semibold <?= $baseAmt < 0 ? 'text-danger' : 'text-dark'; ?>">
                             <?= esc($currency); ?> <?= number_format($baseAmt, 2); ?>
                         </td>
                         <td class="text-center">
                             <span class="badge bg-light text-dark border"><?= number_format($stRate, 2); ?>%</span>
                         </td>
-                        <td class="text-end text-muted">
-                            <?= esc($currency); ?> <?= number_format($stCommission, 2); ?>
+                        <td class="text-end <?= $stCommission < 0 ? 'text-danger' : 'text-muted'; ?>">
+                            <?= esc($currency); ?> <?= bingo_format_exact_amount($stCommission); ?>
                         </td>
                         <td class="text-center">
                             <span class="badge bg-light text-dark border"><?= number_format($opRate, 2); ?>%</span>
@@ -91,8 +91,8 @@ $items = $items ?? [];
                                 +<?= number_format($opSpread, 2); ?>%
                             </span>
                         </td>
-                        <td class="text-end text-success fw-bold" style="font-size: 0.95rem;">
-                            +<?= esc($currency); ?> <?= number_format($opProfit, 2); ?>
+                        <td class="text-end fw-bold <?= $opProfit < 0 ? 'text-danger' : 'text-success'; ?>" style="font-size: 0.95rem;">
+                            <?= ($opProfit < 0 ? '' : '+') . esc($currency); ?> <?= bingo_format_exact_amount($opProfit); ?>
                         </td>
                         <td class="text-center">
                             <?php

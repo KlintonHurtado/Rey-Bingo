@@ -3620,6 +3620,10 @@ class Games extends Controller {
 
             $cartons = bingo_count_game_cartons((int) $game['id']);
             $game['total'] = bingo_get_game_award_total_for_display($game, (int) $cartons);
+            $prizeDisplay = bingo_fetch_game_card_prize_display($game, (int) $cartons);
+            $game['award_type'] = (int) ($prizeDisplay['award_type'] ?? 1);
+            $game['prize_lines'] = $prizeDisplay['prize_lines'] ?? [];
+            $game['prize_html'] = (string) ($prizeDisplay['prize_html'] ?? '');
 
             $numbers = $modelBoards->where('game', $game['id'])->countAllResults();
 

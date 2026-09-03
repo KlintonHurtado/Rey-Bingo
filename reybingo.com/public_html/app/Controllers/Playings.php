@@ -168,6 +168,11 @@ class Playings extends Controller
             $cartons = $modelCartons->where('user', $user['id'])->where('game', $game['id'])->countAllResults();
             $game['room'] = $room['name'];
             $game['cartons'] = $cartons;
+            $soldCartons = bingo_count_game_cartons((int) $game['id']);
+            $prizeDisplay = bingo_fetch_game_card_prize_display($game, (int) $soldCartons);
+            $game['award_type'] = (int) ($prizeDisplay['award_type'] ?? 1);
+            $game['prize_html'] = (string) ($prizeDisplay['prize_html'] ?? '');
+            $game['prize_lines'] = $prizeDisplay['prize_lines'] ?? [];
             $activeGames[] = $game;
         }
         $games = $activeGames;

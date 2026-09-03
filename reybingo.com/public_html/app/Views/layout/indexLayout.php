@@ -1515,6 +1515,22 @@
                 }
             }
 
+            function fillCardPrize(accEl, game) {
+                if (!accEl) {
+                    return;
+                }
+
+                const currency = <?= json_encode(systemGet('currency') ?? '$'); ?>;
+                const amount = game.accumulated || '0.00';
+
+                if (game.prize_html) {
+                    accEl.innerHTML = 'Premio: ' + game.prize_html;
+                    return;
+                }
+
+                accEl.textContent = 'Premio: ' + currency + ' ' + amount;
+            }
+
             function renderOrUpdateCard(game, cardsContainer) {
                 let buttonsHtml = '';
                 let card = document.querySelector(`.card-game-${game.id}`);
@@ -1543,7 +1559,7 @@
                         </div>
                         <ul class="list-group list-group-flush">
                             <li class="p-0" style="font-size: 0.8rem;">${game.date_translate}</li>
-                            <li class="p-0" id="card-accumulated-${game.id}">Premio: <?= systemGet('currency'); ?> ${game.accumulated}</li>
+                            <li class="p-0 card-prize" id="card-accumulated-${game.id}"></li>
                             <li class="p-0" style="font-size: 0.7rem;" id="card-time-${game.id}"></li>
                         </ul>
                         <div class="card-body p-1">
@@ -1553,9 +1569,9 @@
                     slide.className = 'play-room-slide';
                     slide.appendChild(card);
                     cardsContainer.appendChild(slide);
+                    fillCardPrize(document.getElementById(`card-accumulated-${game.id}`), game);
                 } else {
-                    const accEl = document.getElementById(`card-accumulated-${game.id}`);
-                    if (accEl) accEl.textContent = `Premio: <?= systemGet('currency'); ?> ${game.accumulated}`;
+                    fillCardPrize(document.getElementById(`card-accumulated-${game.id}`), game);
 
                     const btnElPlay = document.getElementById(`card-button-play-${game.id}`);
                     if (btnElPlay) {
@@ -1611,6 +1627,12 @@
 
                     if (totalElement) {
                         totalElement.innerHTML = game.total;
+                    }
+
+                    const mobileTotalElement = document.getElementById(`mobile-game-total-${game.game_id}`);
+
+                    if (mobileTotalElement) {
+                        mobileTotalElement.innerHTML = game.total;
                     }
 
                     // Buscar la barra dentro del contenedor

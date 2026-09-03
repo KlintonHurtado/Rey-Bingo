@@ -689,6 +689,51 @@ if (!function_exists('bingo_cents_to_money')) {
     }
 }
 
+if (!function_exists('bingo_commission_multiply')) {
+    /**
+     * Multiplica base × tasa sin redondear a 2 decimales (resultado exacto hasta $scale).
+     */
+    function bingo_commission_multiply(float $base, float $rate, int $scale = 8): float
+    {
+        $scale = max(2, min(12, $scale));
+        $baseStr = sprintf('%.12F', $base);
+        $rateStr = sprintf('%.12F', $rate);
+
+        if (function_exists('bcmul')) {
+            return (float) bcmul($baseStr, $rateStr, $scale);
+        }
+
+        return (float) number_format($base * $rate, $scale, '.', '');
+    }
+}
+
+if (!function_exists('bingo_format_exact_amount')) {
+    /**
+     * Formatea un monto de comisión sin forzar 2 decimales (quita ceros sobrantes).
+     * Ej: 0.072 → "0.072", 1.50 → "1.5", 2 → "2"
+     */
+    function bingo_format_exact_amount($amount, int $maxDecimals = 8): string
+    {
+        $n = (float) $amount;
+        $formatted = number_format($n, max(0, min(12, $maxDecimals)), '.', '');
+        if (str_contains($formatted, '.')) {
+            $formatted = rtrim(rtrim($formatted, '0'), '.');
+        }
+        if ($formatted === '-0' || $formatted === '') {
+            return '0';
+        }
+
+        return $formatted;
+    }
+}
+
+if (!function_exists('bingo_commission_is_zero')) {
+    function bingo_commission_is_zero(float $amount): bool
+    {
+        return abs($amount) < 0.00000001;
+    }
+}
+
 if (!function_exists('bingo_normalize_earnings_rate')) {
     /** rateEarnings en BD como fracción (0.20). Si viniera como 20, normaliza. */
     function bingo_normalize_earnings_rate(): float
@@ -1825,6 +1870,57 @@ if (!function_exists('bingo_get_game_award_total_for_display')) {
     }
 }
 
+if (!function_exists('bingo_fetch_game_card_prize_display')) {
+    /**
+     * Datos visuales del premio para cards de partida.
+     * Monto fijo (award=2): suma de montos de modalidades (ej. 10+10=20).
+     * Acumulado (award=1): pozo acumulado (porcentaje sobre ventas).
+     *
+     * @return array{
+     *   award_type:int,
+     *   accumulated:string,
+     *   prize_html:string,
+     *   prize_lines:list<array{name:string,amount:string}>
+     * }
+     */
+    function bingo_fetch_game_card_prize_display(array $game, int $cartonCount = 0): array
+    {
+        $currency = (string) (systemGet('currency') ?? '$');
+        $awardType = (int) ($game['award'] ?? 1);
+
+        $awardModel = new AwardsModel();
+        $awards = $awardModel
+            ->where('game', (int) ($game['id'] ?? 0))
+            ->where('status', 1)
+            ->findAll();
+
+        if ($awardType === 2) {
+            $total = 0.0;
+            foreach ($awards as $award) {
+                $total += (float) ($award['amount'] ?? 0);
+            }
+            $formatted = number_format($total, 2);
+
+            return [
+                'award_type'  => 2,
+                'accumulated' => $formatted,
+                'prize_html'  => esc($currency) . ' ' . esc($formatted),
+                'prize_lines' => [],
+            ];
+        }
+
+        $prizePool = bingo_calculate_game_prize_pool($game, $cartonCount);
+        $accumulated = number_format($prizePool, 2);
+
+        return [
+            'award_type'  => 1,
+            'accumulated' => $accumulated,
+            'prize_html'  => esc($currency) . ' ' . esc($accumulated),
+            'prize_lines' => [],
+        ];
+    }
+}
+
 if (!function_exists('bingo_calculate_single_award_amount')) {
     function bingo_calculate_single_award_amount(array $game, array $award, int $cartonCount): float
     {
@@ -2372,12 +2468,18 @@ if (!function_exists('bingo_ensure_deposits_schema')) {
                 $forge->addColumn('deposits', [
                     'commission_amount' => [
                         'type' => 'DECIMAL',
-                        'constraint' => '12,2',
+                        'constraint' => '18,8',
                         'null' => true,
                         'default' => null,
                         'after' => 'amount',
                     ],
                 ]);
+            } else {
+                try {
+                    $db->query('ALTER TABLE `deposits` MODIFY `commission_amount` DECIMAL(18,8) NULL DEFAULT NULL');
+                } catch (\Throwable $e) {
+                    // ignore if already migrated
+                }
             }
 
             // Evitar truncar nombres de archivo del comprobante
@@ -6513,8 +6615,8 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stRate = $isDirect ? 0.0 : (float) $stInfo['recharge_rate'];
                 $opSpread = $isDirect ? $operatorRechargeRate : max(0.0, $operatorRechargeRate - $stRate);
 
-                $stCommission = round($amt * $stRate, 2);
-                $opProfit = round($amt * $opSpread, 2);
+                $stCommission = bingo_commission_multiply($amt, $stRate);
+                $opProfit = bingo_commission_multiply($amt, $opSpread);
                 $stName = $isDirect ? 'Directo Operador' : ($stInfo['name'] ?? 'Punto de Venta');
 
                 $status = (int) ($dep['status'] ?? 0);
@@ -6559,8 +6661,8 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stRate = $isDirect ? 0.0 : (float) $stInfo['prize_rate'];
                 $opSpread = $isDirect ? $operatorWithdrawRate : max(0.0, $operatorWithdrawRate - $stRate);
 
-                $stCommission = round($amt * $stRate, 2);
-                $opProfit = round($amt * $opSpread, 2);
+                $stCommission = bingo_commission_multiply($amt, $stRate);
+                $opProfit = bingo_commission_multiply($amt, $opSpread);
                 $stName = $isDirect ? 'Directo Operador' : ($stInfo['name'] ?? 'Punto de Venta');
 
                 $status = (int) ($pay['status'] ?? 2);
@@ -6612,8 +6714,8 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stRate = $isDirect ? 0.0 : (float) ($stInfo['ggr_rate'] ?? 0);
                 $opSpread = $isDirect ? $operatorGgrRate : max(0.0, $operatorGgrRate - $stRate);
 
-                $stCommission = $isDirect ? 0.0 : round((float) ($grow['commission_amount'] ?? ($ggrAmt * $stRate)), 2);
-                $opProfit = round($ggrAmt * $opSpread, 2);
+                $stCommission = $isDirect ? 0.0 : (float) ($grow['commission_amount'] ?? bingo_commission_multiply($ggrAmt, $stRate));
+                $opProfit = bingo_commission_multiply($ggrAmt, $opSpread);
                 $stName = $isDirect ? 'Directo Operador' : ($stInfo['name'] ?? 'Punto de Venta');
 
                 $status = (int) ($grow['status'] ?? 0);
@@ -6730,15 +6832,16 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
 
         foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
             $stats[$tk]['total_base'] = round($stats[$tk]['total_base'], 2);
-            $stats[$tk]['stores_earned'] = round($stats[$tk]['stores_earned'], 2);
-            $stats[$tk]['operator_earned'] = round($stats[$tk]['operator_earned'], 2);
+            // Comisiones: sin redondear a 2 (número exacto)
+            $stats[$tk]['stores_earned'] = (float) number_format((float) $stats[$tk]['stores_earned'], 8, '.', '');
+            $stats[$tk]['operator_earned'] = (float) number_format((float) $stats[$tk]['operator_earned'], 8, '.', '');
             if ($tk === 'ggr') {
                 $stats[$tk]['total_stake'] = round($stats[$tk]['total_stake'], 2);
                 $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
             }
         }
-        $stats['total_operator_profit'] = round($stats['total_operator_profit'], 2);
-        $stats['total_stores_earned'] = round($stats['total_stores_earned'], 2);
+        $stats['total_operator_profit'] = (float) number_format((float) $stats['total_operator_profit'], 8, '.', '');
+        $stats['total_stores_earned'] = (float) number_format((float) $stats['total_stores_earned'], 8, '.', '');
 
         // Ordenar DESC
         usort($filteredItems, static function ($a, $b) {
@@ -6813,7 +6916,7 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
 
         foreach ($recharges as $dep) {
             $amt = round((float) ($dep['amount'] ?? 0), 2);
-            $commission = round($amt * $rechargeRate, 2);
+            $commission = bingo_commission_multiply($amt, $rechargeRate);
             $status = (int) ($dep['status'] ?? 0);
             $pId = (int) ($dep['user'] ?? 0);
             $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
@@ -6857,7 +6960,7 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
             $pDoc = (string) ($retireRecord['document'] ?? $pUser['document'] ?? '');
             $retCode = (string) ($retireRecord['account'] ?? '');
             $amt = round((float) ($pay['amount'] ?? 0), 2);
-            $commission = round($amt * $prizeRate, 2);
+            $commission = bingo_commission_multiply($amt, $prizeRate);
             $status = (int) ($pay['status'] ?? 2);
 
             $items[] = [
@@ -6890,7 +6993,7 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
 
             foreach ($ggrRows as $grow) {
                 $ggrAmt = round((float) ($grow['ggr_amount'] ?? 0), 2);
-                $commission = round((float) ($grow['commission_amount'] ?? ($ggrAmt * $ggrRate)), 2);
+                $commission = (float) ($grow['commission_amount'] ?? bingo_commission_multiply($ggrAmt, $ggrRate));
                 $status = (int) ($grow['status'] ?? 0);
                 $pId = (int) ($grow['player_id'] ?? 0);
                 $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
@@ -6963,13 +7066,14 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
 
         foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
             $stats[$tk]['total_base'] = round($stats[$tk]['total_base'], 2);
-            $stats[$tk]['total_earned'] = round($stats[$tk]['total_earned'], 2);
+            // Comisiones: sin redondear a 2 (número exacto)
+            $stats[$tk]['total_earned'] = (float) number_format((float) $stats[$tk]['total_earned'], 8, '.', '');
             if ($tk === 'ggr') {
                 $stats[$tk]['total_stake'] = round($stats[$tk]['total_stake'], 2);
                 $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
             }
         }
-        $stats['total_commissions_earned'] = round($stats['total_commissions_earned'], 2);
+        $stats['total_commissions_earned'] = (float) number_format((float) $stats['total_commissions_earned'], 8, '.', '');
 
         // Filtrado de items
         $filteredItems = [];
@@ -7094,7 +7198,7 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
                     $totalPayout,
                     round((float) ($it['base_amount'] ?? 0), 2),
                     number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                    round((float) ($it['store_commission'] ?? 0), 2),
+                    round((float) ($it['store_commission'] ?? 0), 8),
                     number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2) . '%',
                     number_format(((float) ($it['operator_spread'] ?? 0)) * 100, 2) . '%',
                     round((float) ($it['operator_profit'] ?? 0), 2),
@@ -7234,7 +7338,7 @@ if (! function_exists('bingo_build_admin_user_commissions_export')) {
                 $totalPayout,
                 round((float) ($it['base_amount'] ?? 0), 2),
                 number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                round((float) ($it['commission_amount'] ?? 0), 2),
+                round((float) ($it['commission_amount'] ?? 0), 8),
                 (string) ($it['status_label'] ?? ''),
                 (string) ($it['detail'] ?? ''),
             ];
@@ -7436,7 +7540,7 @@ if (! function_exists('bingo_build_admin_network_commissions_export')) {
                     $isGgr ? round((float) ($it['total_payout'] ?? 0), 2) : '',
                     round((float) ($it['base_amount'] ?? 0), 2),
                     number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                    round((float) ($it['commission_amount'] ?? 0), 2),
+                    round((float) ($it['commission_amount'] ?? 0), 8),
                     (string) ($it['status_label'] ?? ''),
                     (string) ($it['detail'] ?? ''),
                 ];
@@ -7882,7 +7986,7 @@ if (!function_exists('bingo_calculate_store_commission')) {
             return 0.0;
         }
 
-        return round($amount * $rate, 2);
+        return bingo_commission_multiply($amount, $rate);
     }
 }
 
@@ -7937,17 +8041,21 @@ if (!function_exists('bingo_credit_store_operation_commission')) {
 
         $fromUserId = $fromUserId ?? (int) (session()->get('id') ?? 0);
         if ($paymentId > 0) {
-            $modelNotifications = new \App\Models\NotificationsModel();
-            $modelNotifications->insert([
-                'user' => $storeId,
-                'from' => $fromUserId > 0 ? $fromUserId : $storeId,
-                'type' => 'payment',
-                'type_id' => $paymentId,
-                'title' => translate('store commission credited'),
-                'message' => translate('store commission credited') . ': '
-                    . systemGet('currency') . ' ' . number_format($commission, 2)
-                    . ' (pendiente de liquidacion)',
-            ]);
+            try {
+                $modelNotifications = new \App\Models\NotificationsModel();
+                $modelNotifications->insert([
+                    'user' => $storeId,
+                    'from' => $fromUserId > 0 ? $fromUserId : $storeId,
+                    'type' => 'payment',
+                    'type_id' => $paymentId,
+                    'title' => translate('store commission credited'),
+                    'message' => translate('store commission credited') . ': '
+                        . systemGet('currency') . ' ' . number_format($commission, 2)
+                        . ' (pendiente de liquidacion)',
+                ]);
+            } catch (\Throwable $e) {
+                log_message('error', 'bingo_credit_store_operation_commission notification: ' . $e->getMessage());
+            }
         }
 
         return $commission;

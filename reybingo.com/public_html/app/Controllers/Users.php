@@ -3480,8 +3480,7 @@ class Users extends Controller {
                 }
 
                 $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
-                $accumulated = $cartons * $game['price'];
-                $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+                $prizeDisplay = bingo_fetch_game_card_prize_display($game, (int) $cartons);
 
                 $cartonsUser = $modelCartons->where('game', $game['id'])->where('user', session()->get('id'))->countAllResults();
 
@@ -3495,7 +3494,10 @@ class Users extends Controller {
                     'date_translate' => translate_date($game['date']),
                     'time'           => $game['time'],
                     'time_translate' => translate_time($game['time']),
-                    'accumulated'    => number_format($gameAccumulated, 2),
+                    'award_type'     => (int) ($prizeDisplay['award_type'] ?? 1),
+                    'accumulated'    => (string) ($prizeDisplay['accumulated'] ?? '0.00'),
+                    'prize_lines'    => $prizeDisplay['prize_lines'] ?? [],
+                    'prize_html'     => (string) ($prizeDisplay['prize_html'] ?? ''),
                     'color'          => $this->getCardColor($index),
                     'label'          => $game['description'] . ' · ' . systemGet('currency') . ' ' . $game['price'] . ' · ' . translate_day($game['date'] . ' ' . $game['time'])
                 ];
@@ -3519,8 +3521,7 @@ class Users extends Controller {
 
                     // Incluir cartones en temp_cartons para mostrar conteo real
                     $cartons = bingo_count_game_cartons((int) $game['id']);
-                    $accumulated = $cartons * $game['price'];
-                    $gameAccumulated = $accumulated - ($accumulated * systemGet('rateEarnings'));
+                    $prizeDisplay = bingo_fetch_game_card_prize_display($game, (int) $cartons);
                     
                     $percentage = ($numbers / 75) * 100;
 
@@ -3536,7 +3537,7 @@ class Users extends Controller {
                         'game_id'        => $game['id'],
                         'numbers_called' => $numbers,
                         'status'         => $status,
-                        'total'          => systemGet('currency') .' ' . number_format($gameAccumulated, 2),
+                        'total'          => (string) ($prizeDisplay['prize_html'] ?? (systemGet('currency') . ' 0.00')),
                         'players'        => $players,
                         'total_numbers'  => 75,
                         'percentage'     => round($percentage, 1)

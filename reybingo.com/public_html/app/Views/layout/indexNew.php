@@ -1800,6 +1800,12 @@
                         totalElement.innerHTML = game.total;
                     }
 
+                    const mobileTotalElement = document.getElementById(`mobile-game-total-${game.game_id}`);
+
+                    if (mobileTotalElement) {
+                        mobileTotalElement.innerHTML = game.total;
+                    }
+
                     // Buscar la barra dentro del contenedor
                     const progressBar = progressElement.querySelector('.progress-bar');
                     if (!progressBar) {

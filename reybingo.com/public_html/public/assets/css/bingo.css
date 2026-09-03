@@ -2316,6 +2316,22 @@ html.reybingo-skip-preloader .preloader {
     box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 
+.card-prize,
+#game-total-container,
+[id^="game-total-"],
+[id^="mobile-game-total-"] {
+    line-height: 1.25;
+}
+
+.card-prize-line {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Hacer más atractivo el título */
 .card-title {
     font-size: 1.1rem;
@@ -7510,6 +7526,11 @@ input[type=number]::-webkit-outer-spin-button {
         align-items: stretch;
         scroll-snap-align: none;
         box-sizing: border-box;
+    }
+
+    .player-play-view .play-room-slide.is-filtered-out,
+    .player-play-view .play-cards .card.is-filtered-out {
+        display: none !important;
     }
 
     .player-play-view .play-section--multi,

@@ -93,7 +93,11 @@
                                 </div>
                                 <ul class="list-group list-group-flush">
                                     <li class="p-0" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
-                                    <li class="p-0" id="card-accumulated-<?= $game['id'] ?>"></li>
+                                    <li class="p-0 card-prize" id="card-accumulated-<?= $game['id'] ?>">
+                                        <?php if (! empty($game['prize_html'])) : ?>
+                                            Premio: <?= $game['prize_html']; ?>
+                                        <?php endif; ?>
+                                    </li>
                                     <li class="p-0" style="font-size: 0.7rem;" id="card-time-<?= $game['id'] ?>"></li>
                                 </ul>
                                 <div class="card-body p-1">

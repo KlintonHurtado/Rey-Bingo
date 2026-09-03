@@ -499,65 +499,77 @@ class Store extends Controller
         wallet_credit_recharge($playerId, $amount);
 
         $commission = bingo_calculate_store_commission($amount, $store);
-
         $storeName = bingo_store_display_name($store);
 
         if ($reference === '') {
             $reference = 'TIENDA-' . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 8));
         }
 
-        $depositData = [
-            'user' => $playerId,
-            'store' => $storeId,
-            'account' => 'store',
-            'method' => 'store player recharge',
-            'bank' => translate('store'),
-            'document' => $player['document'],
-            'phone' => $player['phone'],
-            'reference' => $reference,
-            'amount' => $amount,
-            'commission_amount' => $commission > 0 ? $commission : null,
-            'date' => date('Y-m-d'),
-            'voucher' => '',
-            'observation' => translate('recharge from store') . ': ' . $storeName,
-            'status' => 2,
-        ];
+        $depositId = 0;
 
-        $modelDeposits->insert($depositData);
-        $depositId = (int) $modelDeposits->getInsertID();
+        try {
+            $depositData = [
+                'user' => $playerId,
+                'store' => $storeId,
+                'account' => 'store',
+                'method' => 'store player recharge',
+                'bank' => translate('store'),
+                'document' => $player['document'],
+                'phone' => $player['phone'],
+                'reference' => $reference,
+                'amount' => $amount,
+                'commission_amount' => $commission > 0 ? $commission : null,
+                'date' => date('Y-m-d'),
+                'voucher' => '',
+                'observation' => translate('recharge from store') . ': ' . $storeName,
+                'status' => 2,
+            ];
 
-        $fromUserId = (int) session()->get('id');
+            $modelDeposits->insert($depositData);
+            $depositId = (int) $modelDeposits->getInsertID();
 
-        if ($commission > 0 && $depositId > 0) {
-            $commission = bingo_credit_store_operation_commission(
-                $storeId,
-                $amount,
-                'store_commission',
-                $depositId,
-                $store,
-                $fromUserId
-            );
+            $fromUserId = (int) session()->get('id');
+
+            if ($commission > 0 && $depositId > 0) {
+                $commission = bingo_credit_store_operation_commission(
+                    $storeId,
+                    $amount,
+                    'store_commission',
+                    $depositId,
+                    $store,
+                    $fromUserId
+                );
+            }
+
+            try {
+                $modelNotifications->insert([
+                    'user' => $playerId,
+                    'from' => $storeId,
+                    'type' => 'deposit',
+                    'type_id' => $depositId,
+                    'title' => '✅ ' . strtoupper(translate('balance credited')),
+                    'message' => translate('your recharge of') . ' ' . systemGet('currency') . ' ' . number_format($amount, 2)
+                        . ' ' . translate('was credited from store') . ' ' . $storeName,
+                ]);
+            } catch (\Throwable $notificationError) {
+                log_message('error', 'rechargeSubmit player notification: ' . $notificationError->getMessage());
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'rechargeSubmit post-wallet: ' . $e->getMessage());
         }
 
-        $modelNotifications->insert([
-            'user' => $playerId,
-            'from' => $storeId,
-            'type' => 'deposit',
-            'type_id' => $depositId,
-            'title' => '✅ ' . strtoupper(translate('balance credited')),
-            'message' => translate('your recharge of') . ' ' . systemGet('currency') . ' ' . number_format($amount, 2)
-                . ' ' . translate('was credited from store') . ' ' . $storeName,
-        ]);
-
         $updatedStore = wallet_summary_payload($modelUsers->find($storeId));
+        $updatedPlayer = wallet_service()->normalizeUser($modelUsers->find($playerId));
 
         $response = [
             'success' => true,
             'message' => translate('player recharge completed successfully'),
             'deposit_id' => $depositId,
             'reference' => $reference,
-            'store_balance' => $updatedStore['recharge'],
-            'commission' => $commission,
+            'store_balance' => (float) $updatedStore['recharge'],
+            'player_wallet' => number_format(wallet_total($updatedPlayer), 2, '.', ''),
+            'commission' => (float) $commission,
+            'recharge_commission_total' => (float) bingo_sum_store_recharge_commissions($storeId),
         ];
 
         if ($commission > 0) {
@@ -570,8 +582,6 @@ class Store extends Controller
             $response['player_linked_to_store'] = true;
             $response['message'] .= '. ' . translate('player linked to store for ggr');
         }
-
-        $response['recharge_commission_total'] = bingo_sum_store_recharge_commissions($storeId);
 
         return $this->response->setJSON($response);
     }
