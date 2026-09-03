@@ -974,7 +974,10 @@ class Store extends Controller
             'paymentCommissionTotal' => $paymentCommissionTotal,
             'ggrRate' => bingo_ggr_commission_rate_for($store ?? [], 'store'),
             'ggrCommissionTotal' => $ggrCommissionTotal,
-            'totalCommission' => round($paymentCommissionTotal + $ggrCommissionTotal, 2),
+            'totalCommission' => round(
+                $paymentCommissionTotal + max(0.0, $ggrCommissionTotal),
+                2
+            ),
             'activeNav' => 'commissions',
         ], translate('store commissions'));
     }

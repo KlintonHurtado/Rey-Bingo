@@ -1274,7 +1274,9 @@ if (! function_exists('bingo_fetch_store_withdraw_summary')) {
         }
 
         $walletWithdraw = wallet_withdrawable($storeUser);
-        $displayTotal = round($paidGgr + $pendingGgr + $paymentCommissions, 2);
+        // GGR negativo no reduce comisiones fijas de recargas/retiros
+        $ggrForTotal = max(0.0, (float) $paidGgr) + max(0.0, (float) $pendingGgr);
+        $displayTotal = round($ggrForTotal + $paymentCommissions, 2);
         $monthlyMode = true;
         $canWithdraw = false; // Comisiones quedan acumuladas como deuda del mes y son liquidadas por la administración al fin de mes.
 
@@ -1328,7 +1330,7 @@ if (! function_exists('bingo_fetch_operator_withdraw_summary')) {
         }
 
         $walletWithdraw = wallet_withdrawable($operatorUser);
-        $displayTotal = round($paidGgr + $pendingGgr, 2);
+        $displayTotal = round(max(0.0, (float) $paidGgr) + max(0.0, (float) $pendingGgr), 2);
         $monthlyMode = true;
         $canWithdraw = false; // Comisiones quedan acumuladas como deuda del mes y son liquidadas por la administración al fin de mes.
 

@@ -27,7 +27,7 @@ $ggrEarned = (float) ($stats['ggr']['total_earned'] ?? 0);
 $recEarned = (float) ($stats['recharge']['total_earned'] ?? 0);
 $withEarned = (float) ($stats['withdraw']['total_earned'] ?? 0);
 
-$totalCommissions = (float) ($stats['total_commissions_earned'] ?? ($ggrEarned + $recEarned + $withEarned));
+$totalCommissions = (float) ($stats['total_commissions_earned'] ?? bingo_commission_totals_sum($ggrEarned, $recEarned, $withEarned));
 ?>
 
 <div class="card store-panel-card h-100" style="min-height: 0; display: flex; flex-direction: column; overflow: hidden;">

@@ -579,8 +579,8 @@ $sourceLabel = static function ($source) {
                     $opRecOp = (float) ($recStats['operator_earned'] ?? 0);
                     $opWithPv = (float) ($withStats['stores_earned'] ?? 0);
                     $opWithOp = (float) ($withStats['operator_earned'] ?? 0);
-                    $opTotalPv = (float) ($cStats['total_stores_earned'] ?? ($opGgrPv + $opRecPv + $opWithPv));
-                    $opTotalOp = (float) ($cStats['total_operator_profit'] ?? ($opGgrOp + $opRecOp + $opWithOp));
+                    $opTotalPv = (float) ($cStats['total_stores_earned'] ?? bingo_commission_totals_sum($opGgrPv, $opRecPv, $opWithPv));
+                    $opTotalOp = (float) ($cStats['total_operator_profit'] ?? bingo_commission_totals_sum($opGgrOp, $opRecOp, $opWithOp));
                     $opGgrStake = (float) ($ggrStats['total_stake'] ?? 0);
                     $opGgrPayout = (float) ($ggrStats['total_payout'] ?? 0);
                     ?>
@@ -703,7 +703,7 @@ $sourceLabel = static function ($source) {
                     $pvGgrEarned = (float) ($ggrStats['total_earned'] ?? 0);
                     $pvRecEarned = (float) ($recStats['total_earned'] ?? 0);
                     $pvWithEarned = (float) ($withStats['total_earned'] ?? 0);
-                    $pvTotalEarned = (float) ($cStats['total_commissions_earned'] ?? ($pvGgrEarned + $pvRecEarned + $pvWithEarned));
+                    $pvTotalEarned = (float) ($cStats['total_commissions_earned'] ?? bingo_commission_totals_sum($pvGgrEarned, $pvRecEarned, $pvWithEarned));
                     $pvGgrStake = (float) ($ggrStats['total_stake'] ?? 0);
                     $pvGgrPayout = (float) ($ggrStats['total_payout'] ?? 0);
                     ?>

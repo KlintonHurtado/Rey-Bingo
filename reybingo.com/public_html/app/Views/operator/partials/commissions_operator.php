@@ -34,7 +34,7 @@ $ggrStoresEarned = (float) ($stats['ggr']['stores_earned'] ?? 0);
 $recStoresEarned = (float) ($stats['recharge']['stores_earned'] ?? 0);
 $withStoresEarned = (float) ($stats['withdraw']['stores_earned'] ?? 0);
 
-$totalProfit = (float) ($stats['total_operator_profit'] ?? ($ggrOpEarned + $recOpEarned + $withOpEarned));
+$totalProfit = (float) ($stats['total_operator_profit'] ?? bingo_commission_totals_sum($ggrOpEarned, $recOpEarned, $withOpEarned));
 ?>
 <div class="operator-pane-inner operator-pane-inner-commissions" id="operator-commissions-main-root">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">

@@ -734,6 +734,20 @@ if (!function_exists('bingo_commission_is_zero')) {
     }
 }
 
+if (!function_exists('bingo_commission_totals_sum')) {
+    /**
+     * Total de comisiones a mostrar/pagar:
+     * - GGR positivo + recargas + retiros
+     * - GGR negativo: solo recargas + retiros (no reduce el total)
+     */
+    function bingo_commission_totals_sum(float $ggr, float $recharge, float $withdraw): float
+    {
+        $ggrPart = $ggr > 0 ? $ggr : 0.0;
+
+        return $ggrPart + $recharge + $withdraw;
+    }
+}
+
 if (!function_exists('bingo_normalize_earnings_rate')) {
     /** rateEarnings en BD como fracción (0.20). Si viniera como 20, normaliza. */
     function bingo_normalize_earnings_rate(): float
@@ -6860,8 +6874,6 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                     $stats[$t]['total_payout'] += (float) ($item['total_payout'] ?? 0);
                 }
             }
-            $stats['total_operator_profit'] += $opEarn;
-            $stats['total_stores_earned'] += $stEarn;
         }
 
         foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
@@ -6874,8 +6886,27 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
             }
         }
-        $stats['total_operator_profit'] = (float) number_format((float) $stats['total_operator_profit'], 8, '.', '');
-        $stats['total_stores_earned'] = (float) number_format((float) $stats['total_stores_earned'], 8, '.', '');
+        // GGR negativo no reduce el total: solo se suma si es positivo
+        $stats['total_operator_profit'] = (float) number_format(
+            bingo_commission_totals_sum(
+                (float) $stats['ggr']['operator_earned'],
+                (float) $stats['recharge']['operator_earned'],
+                (float) $stats['withdraw']['operator_earned']
+            ),
+            8,
+            '.',
+            ''
+        );
+        $stats['total_stores_earned'] = (float) number_format(
+            bingo_commission_totals_sum(
+                (float) $stats['ggr']['stores_earned'],
+                (float) $stats['recharge']['stores_earned'],
+                (float) $stats['withdraw']['stores_earned']
+            ),
+            8,
+            '.',
+            ''
+        );
 
         // Ordenar DESC
         usort($filteredItems, static function ($a, $b) {
@@ -7106,7 +7137,6 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
                     $stats[$t]['total_payout'] += (float) ($item['total_payout'] ?? 0);
                 }
             }
-            $stats['total_commissions_earned'] += $earn;
         }
 
         foreach (['ggr', 'recharge', 'withdraw'] as $tk) {
@@ -7118,7 +7148,17 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
                 $stats[$tk]['total_payout'] = round($stats[$tk]['total_payout'], 2);
             }
         }
-        $stats['total_commissions_earned'] = (float) number_format((float) $stats['total_commissions_earned'], 8, '.', '');
+        // GGR negativo no reduce el total: solo se suma si es positivo
+        $stats['total_commissions_earned'] = (float) number_format(
+            bingo_commission_totals_sum(
+                (float) $stats['ggr']['total_earned'],
+                (float) $stats['recharge']['total_earned'],
+                (float) $stats['withdraw']['total_earned']
+            ),
+            8,
+            '.',
+            ''
+        );
 
         // Filtrado de items
         $filteredItems = [];
@@ -7670,7 +7710,6 @@ if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
                     continue;
                 }
                 $operators[$t] += $opEarn;
-                $operators['total'] += $opEarn;
                 $operators['count']++;
                 if ($t === 'ggr') {
                     $operators['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
@@ -7697,7 +7736,6 @@ if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
                     continue;
                 }
                 $stores[$t] += $earn;
-                $stores['total'] += $earn;
                 $stores['count']++;
                 if ($t === 'ggr') {
                     $stores['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
@@ -7705,6 +7743,17 @@ if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
                 }
             }
         }
+
+        $operators['total'] = bingo_commission_totals_sum(
+            (float) $operators['ggr'],
+            (float) $operators['recharge'],
+            (float) $operators['withdraw']
+        );
+        $stores['total'] = bingo_commission_totals_sum(
+            (float) $stores['ggr'],
+            (float) $stores['recharge'],
+            (float) $stores['withdraw']
+        );
 
         foreach (['ggr', 'recharge', 'withdraw', 'total', 'ggr_stake', 'ggr_payout'] as $k) {
             $operators[$k] = round($operators[$k], 2);
@@ -7718,7 +7767,14 @@ if (! function_exists('bingo_fetch_admin_network_commissions_summary')) {
                 'ggr' => round($operators['ggr'] + $stores['ggr'], 2),
                 'recharge' => round($operators['recharge'] + $stores['recharge'], 2),
                 'withdraw' => round($operators['withdraw'] + $stores['withdraw'], 2),
-                'total' => round($operators['total'] + $stores['total'], 2),
+                'total' => round(
+                    bingo_commission_totals_sum(
+                        (float) ($operators['ggr'] + $stores['ggr']),
+                        (float) ($operators['recharge'] + $stores['recharge']),
+                        (float) ($operators['withdraw'] + $stores['withdraw'])
+                    ),
+                    2
+                ),
                 'ggr_stake' => round($operators['ggr_stake'] + $stores['ggr_stake'], 2),
                 'ggr_payout' => round($operators['ggr_payout'] + $stores['ggr_payout'], 2),
             ],
@@ -7750,7 +7806,6 @@ if (! function_exists('bingo_fetch_admin_network_commissions_entities')) {
                 ? (float) ($it['operator_profit'] ?? 0)
                 : (float) ($it['commission_amount'] ?? 0);
             $bucket[$t] += $earn;
-            $bucket['total'] += $earn;
             $bucket['count']++;
             if ($t === 'ggr') {
                 $bucket['ggr_stake'] += (float) ($it['total_stake'] ?? 0);
@@ -7786,6 +7841,12 @@ if (! function_exists('bingo_fetch_admin_network_commissions_entities')) {
             foreach (($data['items'] ?? []) as $it) {
                 $bucket = $accumulate($it, $bucket, true);
             }
+
+            $bucket['total'] = bingo_commission_totals_sum(
+                (float) $bucket['ggr'],
+                (float) $bucket['recharge'],
+                (float) $bucket['withdraw']
+            );
 
             if ($hasFilter && $bucket['total'] <= 0) {
                 continue;
@@ -7834,6 +7895,12 @@ if (! function_exists('bingo_fetch_admin_network_commissions_entities')) {
             foreach (($data['items'] ?? []) as $it) {
                 $bucket = $accumulate($it, $bucket, false);
             }
+
+            $bucket['total'] = bingo_commission_totals_sum(
+                (float) $bucket['ggr'],
+                (float) $bucket['recharge'],
+                (float) $bucket['withdraw']
+            );
 
             if ($hasFilter && $bucket['total'] <= 0) {
                 continue;
