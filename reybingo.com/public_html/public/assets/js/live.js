@@ -1319,6 +1319,14 @@ function applyLiveStatusUi(data) {
     if (accumulatedEl.length && typeof data.gameAccumulated !== 'undefined') {
         accumulatedEl.text(currency + ' ' + data.gameAccumulated);
     }
+    if (data.prizeLabel) {
+        const labelEl = $('#accumulated-label');
+        if (labelEl.length) {
+            labelEl.text(data.prizeLabel);
+        } else {
+            accumulatedEl.closest('.total-accumulated').find('small').first().text(data.prizeLabel);
+        }
+    }
 
     if (data.modalities && data.modalities.length > 0) {
         data.modalities.forEach(modality => {

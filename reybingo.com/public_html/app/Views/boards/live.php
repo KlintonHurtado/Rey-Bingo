@@ -255,7 +255,9 @@
 
         <button class="btn btn-small btn-sliders" onclick="ViewSliders();"><i class="fa-duotone fa-solid fa-sliders-simple"></i></button>
 
-        <h6 class="total-accumulated m-0"><small><?= translate('accumulated'); ?></small> <br /><span id="accumulated-counter" data-counter="0.00"><?= systemGet('currency'); ?> 0.00</span></h6>
+        <h6 class="total-accumulated m-0"><?php
+            $hudPrize = bingo_live_prize_hud($game, bingo_count_game_cartons((int) ($game['id'] ?? 0)));
+        ?><small id="accumulated-label"><?= esc($hudPrize['label']); ?></small> <br /><span id="accumulated-counter" data-counter="<?= esc($hudPrize['amount']); ?>"><?= systemGet('currency'); ?> <?= esc($hudPrize['amount']); ?></span></h6>
         <div class="top-content">
             <div class="left">
                 <?php $class = $lastNumber ? $getClass($lastNumber) : 'STOP'; ?> <?php $letter = $lastNumber ? $getClass($lastNumber) : ''; ?>

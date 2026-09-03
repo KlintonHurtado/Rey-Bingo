@@ -1335,7 +1335,7 @@ if (!function_exists('bingo_pay_sing_award')) {
             'amount' => $awardPerSing,
             'status' => 2,
         ]);
-        $paymentId = (int) $modelPayments->insertID();
+        $paymentId = (int) $modelPayments->getInsertID();
 
         if ($debitStore) {
             $modelPayments->insert([
@@ -1361,9 +1361,13 @@ if (!function_exists('bingo_pay_sing_award')) {
         $modalitySing = $modelModalities->find($sing['modality']) ?? ['name' => ''];
         bingo_notify_award_payment($user, $game, $sing, $modalitySing, $awardPerSing, $paymentId, $paidByUserId, $awardCreditSplit);
 
-        helper('affiliate_ggr');
-        bingo_record_ggr_payout((int) $sing['user'], (int) $game['id'], $awardPerSing, 'award', $singId);
-        bingo_settle_player_game_ggr_commissions((int) $sing['user'], (int) $game['id'], $paidByUserId);
+        try {
+            helper('affiliate_ggr');
+            bingo_record_ggr_payout((int) $sing['user'], (int) $game['id'], $awardPerSing, 'award', $singId);
+            bingo_settle_player_game_ggr_commissions((int) $sing['user'], (int) $game['id'], $paidByUserId);
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_pay_sing_award ggr: ' . $e->getMessage());
+        }
 
         $result = [
             'success' => true,
@@ -1917,6 +1921,25 @@ if (!function_exists('bingo_fetch_game_card_prize_display')) {
             'accumulated' => $accumulated,
             'prize_html'  => esc($currency) . ' ' . esc($accumulated),
             'prize_lines' => [],
+        ];
+    }
+}
+
+if (!function_exists('bingo_live_prize_hud')) {
+    /**
+     * HUD de premio en tablero/playing: Monto fijo vs Acumulado.
+     *
+     * @return array{award_type:int, amount:string, label:string}
+     */
+    function bingo_live_prize_hud(array $game, int $cartonCount = 0): array
+    {
+        $display = bingo_fetch_game_card_prize_display($game, $cartonCount);
+        $awardType = (int) ($display['award_type'] ?? 1);
+
+        return [
+            'award_type' => $awardType,
+            'amount'     => (string) ($display['accumulated'] ?? '0.00'),
+            'label'      => $awardType === 2 ? translate('amount') : translate('accumulated'),
         ];
     }
 }
@@ -6708,6 +6731,17 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                 $stId = (int) ($grow['affiliate_id'] ?? 0);
                 $affType = (string) ($grow['affiliate_type'] ?? '');
                 $ggrAmt = round((float) ($grow['ggr_amount'] ?? 0), 2);
+                $payoutAmt = round((float) ($grow['total_payout'] ?? 0), 2);
+                $playerId = (int) ($grow['player_id'] ?? 0);
+                $gameId = (int) ($grow['game_id'] ?? 0);
+                if ($playerId > 0 && $gameId > 0 && function_exists('bingo_player_game_actual_prize_payout')) {
+                    $actualPayout = bingo_player_game_actual_prize_payout($playerId, $gameId);
+                    if ($actualPayout > $payoutAmt) {
+                        $payoutAmt = $actualPayout;
+                        $stakeAmt = round((float) ($grow['total_stake'] ?? 0), 2);
+                        $ggrAmt = round($stakeAmt - $payoutAmt, 2);
+                    }
+                }
                 $stInfo = $storeMap[$stId] ?? null;
                 $isDirect = ($affType === 'operator' || $stId === $operatorId || ! $stInfo);
 
@@ -6731,7 +6765,7 @@ if (! function_exists('bingo_fetch_operator_detailed_commissions_breakdown')) {
                     'store_name' => $stName,
                     'base_amount' => $ggrAmt,
                     'total_stake' => round((float) ($grow['total_stake'] ?? 0), 2),
-                    'total_payout' => round((float) ($grow['total_payout'] ?? 0), 2),
+                    'total_payout' => $payoutAmt,
                     'store_rate' => $stRate,
                     'store_commission' => $stCommission,
                     'operator_rate' => $operatorGgrRate,
@@ -6993,9 +7027,20 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
 
             foreach ($ggrRows as $grow) {
                 $ggrAmt = round((float) ($grow['ggr_amount'] ?? 0), 2);
+                $payoutAmt = round((float) ($grow['total_payout'] ?? 0), 2);
+                $playerId = (int) ($grow['player_id'] ?? 0);
+                $gameId = (int) ($grow['game_id'] ?? 0);
+                if ($playerId > 0 && $gameId > 0 && function_exists('bingo_player_game_actual_prize_payout')) {
+                    $actualPayout = bingo_player_game_actual_prize_payout($playerId, $gameId);
+                    if ($actualPayout > $payoutAmt) {
+                        $payoutAmt = $actualPayout;
+                        $stakeAmt = round((float) ($grow['total_stake'] ?? 0), 2);
+                        $ggrAmt = round($stakeAmt - $payoutAmt, 2);
+                    }
+                }
                 $commission = (float) ($grow['commission_amount'] ?? bingo_commission_multiply($ggrAmt, $ggrRate));
                 $status = (int) ($grow['status'] ?? 0);
-                $pId = (int) ($grow['player_id'] ?? 0);
+                $pId = $playerId;
                 $pUser = $pId > 0 ? $modelUsers->find($pId) : null;
                 $pName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : 'Jugadores vinculados';
 
@@ -7008,7 +7053,7 @@ if (! function_exists('bingo_fetch_store_detailed_commissions_breakdown')) {
                     'icon' => 'fa-duotone fa-solid fa-chart-pie',
                     'base_amount' => $ggrAmt,
                     'total_stake' => round((float) ($grow['total_stake'] ?? 0), 2),
-                    'total_payout' => round((float) ($grow['total_payout'] ?? 0), 2),
+                    'total_payout' => $payoutAmt,
                     'store_rate' => $ggrRate,
                     'commission_amount' => $commission,
                     'status' => $status,

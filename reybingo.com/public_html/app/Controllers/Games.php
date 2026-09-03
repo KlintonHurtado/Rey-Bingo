@@ -3861,8 +3861,13 @@ class Games extends Controller {
         $accumulated = $cartons * $price;
         $rateEarnings = (float) (systemGet('rateEarnings') ?: 0);
         $gameAccumulated = $accumulated - ($accumulated * $rateEarnings);
+        $prizeHud = bingo_live_prize_hud($game, (int) $cartons);
 
-        $response = ['gameAccumulated' => number_format($gameAccumulated, 2)];
+        $response = [
+            'gameAccumulated' => $prizeHud['amount'],
+            'awardType' => $prizeHud['award_type'],
+            'prizeLabel' => $prizeHud['label'],
+        ];
         $response['status'] = 'success';
 
         $modalityIds = array_values(array_filter(array_map('intval', explode(',', (string) ($game['modalities'] ?? '')))));
@@ -3894,7 +3899,9 @@ class Games extends Controller {
         if ($totalNumbersGenerated == 75) {
             return $this->response->setJSON([
                 'status' => 'completed',
-                'gameAccumulated' => number_format($gameAccumulated, 2),
+                'gameAccumulated' => $prizeHud['amount'],
+                'awardType' => $prizeHud['award_type'],
+                'prizeLabel' => $prizeHud['label'],
                 'modalities' => $modalitiesData, 
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
             ]);
@@ -3908,7 +3915,9 @@ class Games extends Controller {
         if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             return $this->response->setJSON([
                 'status' => 'completed',
-                'gameAccumulated' => number_format($gameAccumulated, 2),
+                'gameAccumulated' => $prizeHud['amount'],
+                'awardType' => $prizeHud['award_type'],
+                'prizeLabel' => $prizeHud['label'],
                 'modalities' => $modalitiesData, 
                 'message' => translate('the game is over, all the prizes have been awarded'),
             ]);
@@ -3974,6 +3983,7 @@ class Games extends Controller {
         $accumulated = $cartons * $price;
         $rateEarnings = (float) (systemGet('rateEarnings') ?: 0);
         $gameAccumulated = $accumulated - ($accumulated * $rateEarnings);
+        $prizeHud = bingo_live_prize_hud($game, (int) $cartons);
 
         $modalityIds = array_values(array_filter(array_map('intval', explode(',', (string) ($game['modalities'] ?? '')))));
         $modalities = ! empty($modalityIds)
@@ -4011,7 +4021,9 @@ class Games extends Controller {
         $payload = [
             'status' => $status,
             'userCount' => $userCount,
-            'gameAccumulated' => number_format($gameAccumulated, 2),
+            'gameAccumulated' => $prizeHud['amount'],
+            'awardType' => $prizeHud['award_type'],
+            'prizeLabel' => $prizeHud['label'],
             'modalities' => $modalitiesData,
             'message' => $message,
         ];

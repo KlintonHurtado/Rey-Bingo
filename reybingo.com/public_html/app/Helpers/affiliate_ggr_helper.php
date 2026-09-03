@@ -603,6 +603,71 @@ if (! function_exists('bingo_credit_ggr_commission')) {
     }
 }
 
+if (! function_exists('bingo_player_game_actual_prize_payout')) {
+    /**
+     * Premio realmente pagado (o cantado) a un jugador en una partida.
+     * Incluye monto fijo y acumulado, para que el PV afiliado vea Total premios.
+     */
+    function bingo_player_game_actual_prize_payout(int $playerId, int $gameId): float
+    {
+        if ($playerId <= 0 || $gameId <= 0) {
+            return 0.0;
+        }
+
+        $db = \Config\Database::connect();
+        $fromPayments = 0.0;
+        $fromSings = 0.0;
+
+        try {
+            $row = $db->table('payments p')
+                ->selectSum('p.amount', 'total')
+                ->join('sings s', 's.id = p.type_id', 'inner')
+                ->where('p.type', 'award')
+                ->where('s.game', $gameId)
+                ->where('s.user', $playerId)
+                ->get()
+                ->getRow();
+            $fromPayments = (float) ($row->total ?? 0);
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_player_game_actual_prize_payout payments: ' . $e->getMessage());
+        }
+
+        try {
+            $modelSings = new \App\Models\SingsModel();
+            $modelGames = new \App\Models\GamesModel();
+            $modelAwards = new \App\Models\AwardsModel();
+            $game = $modelGames->find($gameId);
+            if ($game) {
+                $sings = $modelSings
+                    ->where('game', $gameId)
+                    ->where('user', $playerId)
+                    ->whereIn('status', [1, 2])
+                    ->findAll();
+                foreach ($sings as $sing) {
+                    $award = $modelAwards
+                        ->where('game', $gameId)
+                        ->where('modality', $sing['modality'])
+                        ->where('status', 1)
+                        ->first();
+                    if (! $award) {
+                        continue;
+                    }
+                    $fromSings += bingo_calculate_award_per_sing(
+                        $game,
+                        $award,
+                        $gameId,
+                        (int) $sing['modality']
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_player_game_actual_prize_payout sings: ' . $e->getMessage());
+        }
+
+        return round(max($fromPayments, $fromSings), 2);
+    }
+}
+
 if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
     function bingo_settle_player_game_ggr_commissions(int $playerId, int $gameId, ?int $fromUserId = null): int
     {
@@ -647,6 +712,12 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
             ->getRow()
             ->amount ?? 0);
 
+        // Monto fijo (y pagos ya acreditados) deben restar del GGR igual que el acumulado.
+        $actualPrizePayout = bingo_player_game_actual_prize_payout($playerId, $gameId);
+        if ($actualPrizePayout > $payouts) {
+            $payouts = $actualPrizePayout;
+        }
+
         $ggr = round($stakes - $payouts, 2);
         $autoApprove = bingo_ggr_should_auto_approve();
         $periodDate = ! empty($game['date']) ? $game['date'] : date('Y-m-d');
@@ -665,9 +736,7 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
                 ->first();
 
             $existingStatus = (int) ($existing['status'] ?? 0);
-            if ($existing && $existingStatus === 2) {
-                continue;
-            }
+            $alreadyPaid = $existingStatus === 2;
 
             // Sin tasa: no hay comisión que registrar
             if ($rate <= 0) {
@@ -695,15 +764,18 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
             }
 
             if ($existing) {
-                $modelCommissions->update((int) $existing['id'], [
-                    'total_stake'       => $stakes,
-                    'total_payout'      => $payouts,
-                    'ggr_amount'        => $ggr,
-                    'commission_rate'   => $rate,
-                    'commission_amount' => $commissionAmount,
-                    'status'            => 0,
-                    'period_date'       => $periodDate,
-                ]);
+                $update = [
+                    'total_stake'  => $stakes,
+                    'total_payout' => $payouts,
+                    'ggr_amount'   => $ggr,
+                    'commission_rate' => $rate,
+                    'period_date'  => $periodDate,
+                ];
+                if (! $alreadyPaid) {
+                    $update['commission_amount'] = $commissionAmount;
+                    $update['status'] = 0;
+                }
+                $modelCommissions->update((int) $existing['id'], $update);
                 $row = $modelCommissions->find((int) $existing['id']);
             } else {
                 $modelCommissions->insert([
@@ -723,7 +795,7 @@ if (! function_exists('bingo_settle_player_game_ggr_commissions')) {
             }
 
             // Pago inmediato solo si la comisión es positiva (negativas reducen el neto mensual)
-            if ($autoApprove && $row && $commissionAmount > 0) {
+            if ($autoApprove && $row && ! $alreadyPaid && $commissionAmount > 0) {
                 bingo_credit_ggr_commission($row, $fromUserId);
             }
 
