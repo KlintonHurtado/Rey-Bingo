@@ -7,7 +7,12 @@ if (! function_exists('systemGet')) {
 
         $result = $system->select('value')->where('key', $key)->get()->getRow();
 
-        return $result->value ?? null;
+        $val = $result->value ?? null;
+        if ($key === 'name' && (empty($val) || stripos($val, 'Bingo Family') !== false)) {
+            return 'Reybingo.com';
+        }
+
+        return $val;
     }
 }
 

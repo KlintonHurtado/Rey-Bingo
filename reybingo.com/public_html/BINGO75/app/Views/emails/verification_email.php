@@ -15,7 +15,7 @@
             </table>
             <div style="padding: 40px; border-top: 1px solid rgba(0,0,0,0.05);">
                 <h1 style="margin-top: 0px; font-size: 1.5rem;">
-                    <?= translate('welcome to'); ?> <strong><?= systemGet('name'); ?></strong>.
+                    <?= translate('welcome to'); ?> <strong>Reybingo.com</strong>.
                 </h1>
                 <div style="color: #636363; font-size: 14px;">
                     <?= translate('hello'); ?> <strong><?= $user['firstname']; ?></strong>,<br /> <?= translate('thank you for creating an account in our system.'); ?> <?= translate('we are excited to welcome you to our great family.'); ?> <?= translate('get ready to enjoy a world full of fun and excitement with our exclusive features designed to give you the bingo experience like never before.'); ?>

@@ -371,19 +371,20 @@ class Users extends Controller {
 
     public function profileStepSubmit() {
         $model = new UsersModel();
+        $userId = (int) session()->get('id');
 
         $validationRules = [
             'firstname' => [
                 'label' => translate('first name'),
-                'rules' => 'required|min_length[3]'
+                'rules' => 'required|min_length[2]'
             ],
             'lastname' => [
                 'label' => translate('last name'),
-                'rules' => 'required|min_length[3]'
+                'rules' => 'required|min_length[2]'
             ],
             'document' => [
                 'label' => translate('document'),
-                'rules' => 'required|numeric|is_unique[users.document,id,' . session()->get('id') . ']'
+                'rules' => 'required|numeric|is_unique[users.document,id,' . $userId . ']'
             ]
         ];
 
@@ -394,6 +395,27 @@ class Users extends Controller {
                 'errors' => $errors
             ];
             return $this->response->setJSON($response);
+        }
+
+        $user = $model->getUserById($userId);
+        $doc = trim((string) $this->request->getPost('document'));
+        $fn  = trim((string) $this->request->getPost('firstname'));
+        $ln  = trim((string) $this->request->getPost('lastname'));
+
+        $updateData = [];
+        if ($doc !== '') {
+            $updateData['document'] = $doc;
+        }
+        if ($fn !== '') {
+            $updateData['firstname'] = $fn;
+        }
+        if ($ln !== '') {
+            $updateData['lastname'] = $ln;
+        }
+
+        if (!empty($updateData)) {
+            $model->update($userId, $updateData);
+            session()->set($updateData);
         }
 
         $response = [

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= esc(systemGet('name') ?: APP_NAME); ?> · <?= translate('please verify your email address'); ?></title>
+    <title>Reybingo.com · <?= translate('please verify your email address'); ?></title>
 </head>
 <body style="margin:0;padding:0;background-color:#1b1238;font-family:Arial,Helvetica,sans-serif;color:#2d3748;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#1b1238;padding:24px 12px;">
@@ -16,7 +16,7 @@
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="left">
-                                        <img src="<?= site_url('assets/img/logo.png'); ?>" alt="<?= esc(systemGet('name') ?: APP_NAME); ?>" width="110" style="display:block;border:0;max-width:110px;height:auto;">
+                                        <img src="<?= site_url('assets/img/logo.png'); ?>" alt="Reybingo.com" width="110" style="display:block;border:0;max-width:110px;height:auto;">
                                     </td>
                                     <td align="right" style="vertical-align:middle;">
                                         <a href="<?= site_url('signin'); ?>" style="color:#ffffff;text-decoration:underline;font-size:13px;font-weight:700;"><?= translate('signin'); ?></a>
@@ -28,7 +28,7 @@
                     <tr>
                         <td style="padding:32px 28px 12px 28px;">
                             <h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;color:#3b1f9c;">
-                                <?= translate('welcome to'); ?> <strong><?= esc(systemGet('name') ?: APP_NAME); ?></strong>
+                                <?= translate('welcome to'); ?> <strong>Reybingo.com</strong>
                             </h1>
                             <p style="margin:0 0 12px 0;font-size:15px;line-height:1.6;color:#4a5568;">
                                 <?= translate('hello'); ?> <strong><?= esc($user['firstname'] ?? ''); ?></strong>,
