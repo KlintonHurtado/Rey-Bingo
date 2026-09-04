@@ -10,7 +10,9 @@
     <meta name="author" content="IsAppWeb">
     <meta name="robots" content="noindex, nofollow">
 
-    <link rel="icon" href="<?= asset_url('img/favicon.ico'); ?>" type="image/x-icon" sizes="512x512">
+    <link rel="icon" href="<?= asset_url('img/favicon.ico'); ?>" type="image/x-icon">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= asset_url('img/favicon-32x32.png'); ?>">
+    <link rel="icon" type="image/png" sizes="16x16" href="<?= asset_url('img/favicon-16x16.png'); ?>">
     
     <link rel="apple-touch-icon" href="<?= asset_url('img/192x192.png'); ?>" sizes="192x192">
     <link rel="apple-touch-icon" href="<?= asset_url('img/256x256.png'); ?>" sizes="256x256">
