@@ -73,7 +73,7 @@
 
                     <div class="col-md-12" id="step-deposit-button">
                         <button type="button" class="btn btn-primary d-block w-50 btn-bingo mt-3"
-                            id="deposit-step-button"><?= translate('continue'); ?></button>
+                            id="deposit-step-button" onclick="depositStepContinue();"><?= translate('continue'); ?></button>
                     </div>
                 </div>
 
@@ -184,8 +184,10 @@
                         </div>
                     <?php endif; ?>
 
-                    <div class="col-md-12">
-                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2"
+                    <div class="col-md-12 d-flex gap-2">
+                        <button type="button" class="btn btn-secondary w-50 btn-bingo mt-2"
+                            onclick="depositStepBack();"><i class="fa-duotone fa-solid fa-arrow-left me-1"></i> <?= translate('go back'); ?></button>
+                        <button type="submit" class="btn btn-primary w-50 btn-bingo mt-2"
                             id="deposit-button"><?= translate('send'); ?></button>
                     </div>
                 </div>
@@ -250,6 +252,84 @@
         }
     };
 
+    function depositStepContinue() {
+        var method = $('#deposit-method').val();
+        var account = $('#deposit-account').val();
+
+        $('.text-danger').addClass('d-none').text('');
+        $('.form-control').removeClass('is-invalid');
+
+        var hasError = false;
+        if (!method) {
+            $('#deposit-method-error').text("<?= translate('payment method'); ?> <?= strtolower(translate('it is mandatory')); ?>").removeClass('d-none');
+            $('#deposit-method').addClass('is-invalid');
+            hasError = true;
+        }
+
+        if (method === 'transfer' && !account) {
+            $('#deposit-account-error').text("<?= translate('bingo bank'); ?> <?= strtolower(translate('it is mandatory')); ?>").removeClass('d-none');
+            $('#deposit-account').addClass('is-invalid');
+            hasError = true;
+        }
+
+        if (hasError) {
+            Toastify({
+                text: "<?= translate('payment method'); ?> y <?= translate('bingo bank'); ?> son requeridos",
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                style: { background: "#dc3545" },
+                stopOnFocus: true
+            }).showToast();
+            return;
+        }
+
+        if (method === "paypal") {
+            $("#paypal-button").show();
+            $("#deposit-paypal-amount").show();
+            $("#deposit-stripe-amount").hide();
+            $("#deposit-method-bank").hide();
+            $("#deposit-info-bank").hide();
+            $("#step-deposit-button").hide();
+            return;
+        }
+
+        if (method === "stripe") {
+            $("#paypal-button").hide();
+            $("#deposit-paypal-amount").hide();
+            $("#deposit-stripe-amount").show();
+            $("#deposit-method-bank").hide();
+            $("#deposit-info-bank").hide();
+            $("#step-deposit-button").hide();
+            return;
+        }
+
+        // Para transferencia: avanzamos al paso 2
+        $("#paypal-button").hide();
+        $("#deposit-method-bank").show();
+        $("#deposit-info-bank").show();
+        $('#step-deposit-1').hide();
+        $('#step-deposit-2').show();
+
+        // Sincronización en segundo plano con protección HTTPS
+        var stepUrl = '<?= site_url('payments/depositStepSubmit') ?>';
+        if (window.location.protocol === 'https:' && stepUrl.startsWith('http://')) {
+            stepUrl = stepUrl.replace(/^http:\/\//i, 'https://');
+        }
+
+        $.ajax({
+            url: stepUrl,
+            method: 'POST',
+            data: { account: account, method: method },
+            dataType: 'json'
+        });
+    }
+
+    function depositStepBack() {
+        $('#step-deposit-2').hide();
+        $('#step-deposit-1').show();
+    }
+
     $(document).ready(function () {
         infobankGet();
 
@@ -265,7 +345,12 @@
                     return;
                 }
 
-                fetch(`<?= site_url('payments/userAccreditationStatsGet') ?>/${userId}`)
+                var statsUrl = `<?= site_url('payments/userAccreditationStatsGet') ?>/${userId}`;
+                if (window.location.protocol === 'https:' && statsUrl.startsWith('http://')) {
+                    statsUrl = statsUrl.replace(/^http:\/\//i, 'https://');
+                }
+
+                fetch(statsUrl)
                     .then(response => response.json())
                     .then(data => {
                         if (!data.success || !data.stats) {
@@ -290,64 +375,7 @@
             }
         <?php endif; ?>
 
-        $('#deposit-step-button').on('click', function () {
-
-            var button = $('#deposit-step-button');
-            button.prop("disabled", true);
-
-            $('.text-danger').addClass('d-none').text('');
-            $('.form-control').removeClass('is-invalid');
-
-            var formData = {
-                account: $('#deposit-account').val(),
-                method: $('#deposit-method').val()
-            };
-
-            $.ajax({
-                url: '<?= site_url('payments/depositStepSubmit') ?>',
-                method: 'POST',
-                data: formData,
-                dataType: 'json',
-                success: function (response) {
-                    if (response.success) {
-                        if (response.paypal) {
-                            $("#paypal-button").show();
-                            $("#deposit-stripe-amount").hide();
-                            $("#deposit-method-bank").hide();
-                            $("#deposit-info-bank").hide();
-                            $("#step-deposit-button").hide();
-                        } else {
-                            $("#paypal-button").hide();
-                            $("#deposit-method-bank").show();
-                            $("#deposit-info-bank").show();
-                            $("#step-deposit-button").show();
-                            $('#step-deposit-1').hide();
-                            $('#step-deposit-2').show();
-                        }
-                    } else {
-                        if (response.errors) {
-                            $.each(response.errors, function (field, message) {
-                                $('#' + field + '-error').text(message).removeClass('d-none');
-                                $('#' + field).addClass('is-invalid');
-                            });
-                        }
-                    }
-                },
-                error: function () {
-                    Toastify({
-                        text: "<?= translate('there was an error in the request to the server'); ?>",
-                        duration: 3000,
-                        gravity: "top",
-                        position: "right",
-                        style: { background: "#dc3545" },
-                        stopOnFocus: true
-                    }).showToast();
-                },
-                complete: function () {
-                    button.prop("disabled", false);
-                }
-            });
-        });
+        $('#deposit-step-button').off('click').on('click', depositStepContinue);
 
         $('#deposit-form').on('submit', function (e) {
             e.preventDefault();
@@ -389,8 +417,13 @@
                 formData.set('deposit-voucher-file', fileInput.files[0]);
             }
 
+            var submitUrl = '<?= site_url('payments/depositSubmit') ?>';
+            if (window.location.protocol === 'https:' && submitUrl.startsWith('http://')) {
+                submitUrl = submitUrl.replace(/^http:\/\//i, 'https://');
+            }
+
             $.ajax({
-                url: '<?= site_url('payments/depositSubmit') ?>',
+                url: submitUrl,
                 method: 'POST',
                 data: formData,
                 processData: false,
@@ -469,9 +502,14 @@
                 return;
             }
 
+            var stripeUrl = '<?= site_url('payments/stripe/create') ?>';
+            if (window.location.protocol === 'https:' && stripeUrl.startsWith('http://')) {
+                stripeUrl = stripeUrl.replace(/^http:\/\//i, 'https://');
+            }
+
             button.prop('disabled', true);
             $.ajax({
-                url: '<?= site_url('payments/stripe/create') ?>',
+                url: stripeUrl,
                 method: 'POST',
                 dataType: 'json',
                 data: {
@@ -510,7 +548,8 @@
             });
         });
 
-        paypal.Button.render({
+        if (typeof paypal !== 'undefined' && paypal && paypal.Button) {
+            paypal.Button.render({
             env: '<?= esc($paypalCredentials['env'], 'js') ?>',
             style: {
                 label: 'paypal',
@@ -652,6 +691,9 @@
             }
 
         }, '#paypal-button');
+        } else {
+            console.info('PayPal SDK no disponible o bloqueado por el navegador.');
+        }
     });
 
     function updateTableDeposit(payment) {
@@ -851,21 +893,6 @@
                     stopOnFocus: true
                 }).showToast();
             });
-    }
-
-            /*.then(data => {
-                document.getElementById('deposit-info-bank').innerHTML = `<div class="row"><div class="col-md-12 px-3 pt-2"><h6 class="help-block"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('bank'); ?>: ${ data.bank } <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6 ><h6 class="help-block"><?= translate('holder'); ?>: ${data.holder} - <?= translate('account'); ?>: ${data.account} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6><h6 class="help-block"><?= translate('document'); ?>: ${data.document} - <?= translate('phone'); ?>: ${data.phone} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6></div ></div >`})
-            .catch(error => {
-                Toastify({
-                    text: "<?= translate('bank details could not be loaded'); ?>",
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    style: { background: "#dc3545" },
-                    stopOnFocus: true
-                }).showToast();
-            });*/
-        }
     }
 
     function copyText(data, text) {
