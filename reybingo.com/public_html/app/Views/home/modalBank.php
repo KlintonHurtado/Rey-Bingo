@@ -100,7 +100,7 @@
             $('#account-bank').val('<?= esc($bankData['account']) ?>');
             $('#holder-bank').val('<?= esc($bankData['holder']) ?>');
             $('#document-bank').val('<?= esc($bankData['document']) ?>');
-            $('#type-bank').val('<?= esc($bankData['type'] ?? '') ?>');
+            $('#type-bank').val('<?= esc($bankData['type'] ?? $bankData['phone'] ?? '') ?>');
             $('#logoBankImage').attr('src', '<?= esc($logo_url) ?>');
             $('#bank-modal-title').html('<i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('update bank'); ?>');
             $('#bank-button').text('<?= translate('update'); ?>');

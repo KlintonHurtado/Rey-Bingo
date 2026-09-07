@@ -90,7 +90,7 @@ class Home extends Controller {
             ],
             'type-bank' => [
                 'label' => translate('type'),
-                'rules' => 'required'
+                'rules' => 'permit_empty'
             ]
         ];
 
@@ -103,13 +103,17 @@ class Home extends Controller {
             return $this->response->setJSON($response);
         }
 
+        $typeVal = (string) ($this->request->getPost('type-bank') ?? $this->request->getPost('phone-bank') ?? '');
+        $phoneVal = (string) ($this->request->getPost('phone-bank') ?? $this->request->getPost('type-bank') ?? '');
+
         $bank = [
-            'name'    => $this->request->getPost('name-bank'),
-            'account' => $this->request->getPost('account-bank'),
-            'holder'  => $this->request->getPost('holder-bank'),
-            'document'=> $this->request->getPost('document-bank'),
-            'type'    => $this->request->getPost('type-bank'),
-            'status'  => 1
+            'name'     => $this->request->getPost('name-bank'),
+            'account'  => $this->request->getPost('account-bank'),
+            'holder'   => $this->request->getPost('holder-bank'),
+            'document' => $this->request->getPost('document-bank'),
+            'type'     => $typeVal,
+            'phone'    => $phoneVal,
+            'status'   => 1
         ];
 
         $bankLogoImage = $this->request->getPost('bank-logo');

@@ -297,7 +297,7 @@ $routes->get('payments/paymentsAjax', 'Payments::paymentsAjax');
 $routes->post('payments/updateStatus', 'Payments::updateStatus');
 $routes->get('payments/export', 'Payments::exportData');
 
-$routes->get('payments/infobankGet/(:num)', 'Payments::infobankGet/$1');
+$routes->get('payments/infobankGet/(:segment)', 'Payments::infobankGet/$1');
 $routes->get('payments/retirebankGet', 'Payments::retirebankGet');
 $routes->get('payments/settingswalletGet', 'Payments::settingswalletGet');
 $routes->post('payments/settingswalletSubmit', 'Payments::settingswalletSubmit');

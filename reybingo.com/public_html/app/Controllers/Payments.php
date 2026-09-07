@@ -1591,6 +1591,11 @@ class Payments extends Controller {
     }
 
     public function infobankGet($id) {
+        helper(['bingo', 'url']);
+        if (function_exists('bingo_ensure_banks_schema')) {
+            bingo_ensure_banks_schema();
+        }
+
         $modelBanks = new BanksModel();
 
         $bank = $modelBanks->find($id);
@@ -1600,18 +1605,22 @@ class Payments extends Controller {
         }
 
         if (!empty($bank['logo'])) {
-            $logo_url = '<img src="'.site_url('uploads/banks/'.$bank['logo']).'" alt="logo banco" class="img-fluid" style="width:50px; height:50px; object-fit:cover;">';
+            $logo_url = '<img src="'.site_url('uploads/banks/'.$bank['logo']).'" alt="logo banco" class="img-fluid" style="width:50px; height:50px; object-fit:cover;" onerror="this.onerror=null;this.style.display=\'none\';">';
         } else {
-            $logo_url = '<i class="fa-duotone fa-solid fa-building-columns fs-1 text-white"></i>';
+            $logo_url = '<i class="fa-duotone fa-solid fa-building-columns fs-1 text-primary"></i>';
         }
+
+        $phone = $bank['phone'] ?? '';
+        $type = $bank['type'] ?? '';
 
         return $this->response->setJSON([
             'logo_url' => $logo_url,
-            'bank' => $bank['name'],
-            'account' => $bank['account'],
-            'holder' => $bank['holder'],
-            'document' => $bank['document'],
-            'type' => $bank['type']
+            'bank'     => $bank['name'] ?? '',
+            'account'  => $bank['account'] ?? '',
+            'holder'   => $bank['holder'] ?? '',
+            'document' => $bank['document'] ?? '',
+            'phone'    => $phone,
+            'type'     => $type !== '' ? $type : $phone
         ]);
     }
 

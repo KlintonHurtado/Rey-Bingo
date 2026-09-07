@@ -765,69 +765,93 @@
 
     function infobankGet() {
 
-        const bankId = document.getElementById('deposit-account').value;
+        const bankSelect = document.getElementById('deposit-account');
+        if (!bankSelect) {
+            return;
+        }
 
+        const bankId = bankSelect.value;
         const infoBankDiv = document.getElementById('deposit-info-bank');
+        if (!infoBankDiv) {
+            return;
+        }
 
         infoBankDiv.style.display = 'none';
 
         if (!bankId) {
             infoBankDiv.innerHTML = '';
             return;
-        } else {
-            fetch(`<?= site_url('payments/infobankGet') ?>/${bankId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('<?= translate('error getting data'); ?>');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    infoBankDiv.innerHTML = `
-                <div class="card shadow-sm p-3 mb-3" style="border-radius: 12px; width: 85%; background:#fff;">
-                    <div class="d-flex align-items-center mb-2">
-                        <!-- Logo -->
-                        <div style="flex:0 0 70px; text-align:center;">
-                            ${data.logo_url}
-                        </div>
-                        <!-- Nombre banco -->
-                        <div style="flex:1; padding-left:10px;">
-                            <h6 class="mb-0"><strong>${data.bank}</strong></h6>
-                        </div>
-                    </div>
+        }
 
-                    <!-- Datos -->
-                    <div class="mt-2">
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                            <small><strong><?= translate('account'); ?>:</strong> ${data.account}</small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('account'); ?>', '${data.account}')"></i>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                            <small><strong><?= translate('holder'); ?>:</strong> ${data.holder}</small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('holder'); ?>', '${data.holder}')"></i>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                            <small><strong><?= translate('document'); ?>:</strong> ${data.document}</small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('document'); ?>', '${data.document}')"></i>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center py-1">
-                            <small><strong><?= translate('type'); ?>:</strong> ${data.type}</small>
-                            <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('type'); ?>', '${data.type}')"></i>
-                        </div>
+        let requestUrl = `<?= site_url('payments/infobankGet') ?>/${encodeURIComponent(bankId)}`;
+        if (window.location.protocol === 'https:' && requestUrl.startsWith('http://')) {
+            requestUrl = requestUrl.replace(/^http:\/\//i, 'https://');
+        }
+
+        fetch(requestUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('<?= translate('error getting data'); ?> (HTTP ' + response.status + ')');
+                }
+                return response.json();
+            })
+            .then(data => {
+                infoBankDiv.innerHTML = `
+            <div class="card shadow-sm p-3 mb-3" style="border-radius: 12px; width: 85%; background:#fff;">
+                <div class="d-flex align-items-center mb-2">
+                    <!-- Logo -->
+                    <div style="flex:0 0 70px; text-align:center;">
+                        ${data.logo_url}
                     </div>
-                </div>`;
-                    infoBankDiv.style.display = 'block';
-                })
-                .catch(error => {
-                    Toastify({
-                        text: "<?= translate('bank details could not be loaded'); ?>",
-                        duration: 3000,
-                        gravity: "top",
-                        position: "right",
-                        style: { background: "#dc3545" },
-                        stopOnFocus: true
-                    }).showToast();
-                });
+                    <!-- Nombre banco -->
+                    <div style="flex:1; padding-left:10px;">
+                        <h6 class="mb-0"><strong>${escapeHtml(data.bank || '')}</strong></h6>
+                    </div>
+                </div>
+
+                <!-- Datos -->
+                <div class="mt-2">
+                    ${data.account ? `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                        <small><strong><?= translate('account'); ?>:</strong> ${escapeHtml(data.account)}</small>
+                        <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('account'); ?>', '${escapeHtml(data.account)}')"></i>
+                    </div>` : ''}
+                    ${data.holder ? `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                        <small><strong><?= translate('holder'); ?>:</strong> ${escapeHtml(data.holder)}</small>
+                        <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('holder'); ?>', '${escapeHtml(data.holder)}')"></i>
+                    </div>` : ''}
+                    ${data.document ? `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                        <small><strong><?= translate('document'); ?>:</strong> ${escapeHtml(data.document)}</small>
+                        <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('document'); ?>', '${escapeHtml(data.document)}')"></i>
+                    </div>` : ''}
+                    ${(data.type && data.type !== data.phone) ? `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                        <small><strong><?= translate('type'); ?>:</strong> ${escapeHtml(data.type)}</small>
+                        <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('type'); ?>', '${escapeHtml(data.type)}')"></i>
+                    </div>` : ''}
+                    ${data.phone ? `
+                    <div class="d-flex justify-content-between align-items-center py-1">
+                        <small><strong><?= translate('phone'); ?>:</strong> ${escapeHtml(data.phone)}</small>
+                        <i class="fa-duotone fa-copy text-primary cursor-pointer" onclick="copyText('<?= translate('phone'); ?>', '${escapeHtml(data.phone)}')"></i>
+                    </div>` : ''}
+                </div>
+            </div>`;
+                infoBankDiv.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error cargando detalles bancarios:', error);
+                Toastify({
+                    text: "<?= translate('bank details could not be loaded'); ?>",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+            });
+    }
 
             /*.then(data => {
                 document.getElementById('deposit-info-bank').innerHTML = `<div class="row"><div class="col-md-12 px-3 pt-2"><h6 class="help-block"><i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('bank'); ?>: ${ data.bank } <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6 ><h6 class="help-block"><?= translate('holder'); ?>: ${data.holder} - <?= translate('account'); ?>: ${data.account} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6><h6 class="help-block"><?= translate('document'); ?>: ${data.document} - <?= translate('phone'); ?>: ${data.phone} <span class="float-end"><i class="fa-duotone fa-solid fa-copy"></i></span></h6></div ></div >`})

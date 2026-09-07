@@ -88,7 +88,12 @@
             return;
         }
 
-        fetch(`<?= site_url('payments/infobankGet') ?>/${bankId}`)
+        let requestUrl = `<?= site_url('payments/infobankGet') ?>/${encodeURIComponent(bankId)}`;
+        if (window.location.protocol === 'https:' && requestUrl.startsWith('http://')) {
+            requestUrl = requestUrl.replace(/^http:\/\//i, 'https://');
+        }
+
+        fetch(requestUrl)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('<?= esc(translate('error getting data'), 'js'); ?>');
@@ -106,17 +111,22 @@
                         </div>
                         <div class="store-bank-info-details">
                             <div class="store-bank-info-row">
-                                <small><strong><?= translate('account'); ?>:</strong> ${data.account}</small>
+                                <small><strong><?= translate('account'); ?>:</strong> ${data.account || '-'}</small>
                             </div>
                             <div class="store-bank-info-row">
-                                <small><strong><?= translate('holder'); ?>:</strong> ${data.holder}</small>
+                                <small><strong><?= translate('holder'); ?>:</strong> ${data.holder || '-'}</small>
                             </div>
                             <div class="store-bank-info-row">
                                 <small><strong><?= translate('document'); ?>:</strong> ${data.document || '-'}</small>
                             </div>
+                            ${(data.type && data.type !== data.phone) ? `
                             <div class="store-bank-info-row">
-                                <small><strong><?= translate('type'); ?>:</strong> ${data.type || '-'}</small>
-                            </div>
+                                <small><strong><?= translate('type'); ?>:</strong> ${data.type}</small>
+                            </div>` : ''}
+                            ${data.phone ? `
+                            <div class="store-bank-info-row">
+                                <small><strong><?= translate('phone'); ?>:</strong> ${data.phone}</small>
+                            </div>` : ''}
                         </div>
                     </div>
                 `;

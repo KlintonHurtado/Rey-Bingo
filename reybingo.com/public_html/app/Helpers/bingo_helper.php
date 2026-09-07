@@ -9654,3 +9654,49 @@ if (!function_exists('bingo_ensure_roulettes_schema')) {
         }
     }
 }
+
+if (! function_exists('bingo_ensure_banks_schema')) {
+    function bingo_ensure_banks_schema(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $ensured = true;
+
+        try {
+            $db = \Config\Database::connect();
+            if (!$db->tableExists('banks')) {
+                return;
+            }
+
+            $forge = \Config\Database::forge();
+
+            if (!$db->fieldExists('type', 'banks')) {
+                $forge->addColumn('banks', [
+                    'type' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 100,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'document',
+                    ],
+                ]);
+            }
+
+            if (!$db->fieldExists('phone', 'banks')) {
+                $forge->addColumn('banks', [
+                    'phone' => [
+                        'type' => 'VARCHAR',
+                        'constraint' => 100,
+                        'null' => true,
+                        'default' => null,
+                        'after' => 'document',
+                    ],
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'No se pudo actualizar el esquema de banks: ' . $e->getMessage());
+        }
+    }
+}
