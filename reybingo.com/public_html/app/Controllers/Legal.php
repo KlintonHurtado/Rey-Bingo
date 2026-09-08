@@ -11,7 +11,7 @@ class Legal extends Controller
 {
     public function __construct()
     {
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
         session();
     }
 

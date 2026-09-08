@@ -1,3 +1,9 @@
+<?php
+if (!function_exists('bingo_can')) {
+    helper('permissions');
+}
+$canManageUsers = function_exists('bingo_can') ? bingo_can_any(['users.manage', 'admins.manage']) : false;
+?>
 <div class="row mt-4">
     <div class="col-md-12">
         <h4><?= translate('users management'); ?></h4>
@@ -76,7 +82,9 @@
         <div class="card">
             <div class="collapse show">
                 <div class="card-body p-3">
+	        		<?php if ($canManageUsers): ?>
 	        		<button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" onclick="addUser();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+	        		<?php endif; ?>
 				    <div class="row g-2">
 					    <div class="col-md-4">
 					    	<label class="form-label small"><?= translate('user'); ?></label>
@@ -188,6 +196,7 @@
 	                                        <button type="button" class="btn btn-info" onclick="viewUser(<?= $user['id']; ?>)" title="<?= translate('view details'); ?>">
 	                                            <i class="fa-duotone fa-eye fs-5"></i>
 	                                        </button>
+	                                        <?php if ($canManageUsers): ?>
 	                                        <button type="button" class="btn btn-primary" onclick="updateUser(<?= $user['id']; ?>)" title="<?= translate('edit'); ?>">
 	                                            <i class="fa-duotone fa-edit fs-5"></i>
 	                                        </button>
@@ -197,6 +206,7 @@
 	                                        <button type="button" class="btn btn-danger" onclick="deleteUser(<?= $user['id']; ?>)" title="<?= translate('delete'); ?>">
 	                                            <i class="fa-duotone fa-trash fs-5"></i>
 	                                        </button>
+	                                        <?php endif; ?>
 	                                    </div>
 	                                </td>
 	                            </tr>
@@ -335,19 +345,24 @@
 	    }
 	});
 
+	var canManageUsers = <?= $canManageUsers ? 'true' : 'false'; ?>;
+
 	function addUser() {
+	    if (!canManageUsers) return;
 	    $("#modalUser").load('<?= site_url('users/add'); ?>', function() {
 	        $('#modalUser').modal('show');
 	    });
 	}
 
 	function updateUser(userId) {
+	    if (!canManageUsers) return;
 	    $("#modalUser").load('<?= site_url('users/add/'); ?>' + userId, function() {
 	        $('#modalUser').modal('show');
 	    });
 	}
 
 	function deleteUser(userId) {
+	    if (!canManageUsers) return;
 	    if (userId != "") {
 	        Swal.fire({
 	            title: '<?= translate('do you want to continue?'); ?>',
@@ -410,6 +425,7 @@
 	}
 
 	function banUser(userId, status) {
+	    if (!canManageUsers) return;
 	    const action = status == 0 ? '<?= translate('ban'); ?>' : '<?= translate('unban'); ?>';
 	    const message = status == 0 ? '<?= translate('this will ban the user'); ?>' : '<?= translate('this will unban the user'); ?>';
 	    

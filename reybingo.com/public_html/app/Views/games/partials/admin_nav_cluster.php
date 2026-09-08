@@ -1,20 +1,27 @@
 <?php
+if (!function_exists('bingo_can')) {
+    helper('permissions');
+}
+if (function_exists('bingo_ensure_permissions_schema')) {
+    bingo_ensure_permissions_schema();
+}
+
 $activeNav = $activeNav ?? '';
 $showHome = $showHome ?? false;
 $showWallet = $showWallet ?? true;
 $showStatistics = $showStatistics ?? false;
 $showUsers = $showUsers ?? false;
 
-$canStats = function_exists('bingo_can') ? bingo_can('stats.view') : (session()->get('group') == 1);
-$canUsers = function_exists('bingo_can') ? bingo_can_any(['users.view', 'users.manage']) : (session()->get('group') == 1);
-$canCreateUsers = function_exists('bingo_can') ? bingo_can_any(['users.manage', 'admins.manage']) : (session()->get('group') == 1);
-$canStores = function_exists('bingo_can') ? bingo_can_any(['stores.view', 'stores.manage']) : (session()->get('group') == 1);
-$canOperators = function_exists('bingo_can') ? bingo_can_any(['operators.view', 'operators.manage']) : (session()->get('group') == 1);
-$canLowBalance = function_exists('bingo_can') ? bingo_can('low_balance.view') : (session()->get('group') == 1);
-$canAudit = function_exists('bingo_can') ? bingo_can('audit.view') : (session()->get('group') == 1);
-$canKyc = function_exists('bingo_can') ? bingo_can('kyc.review') : (session()->get('group') == 1);
-$canLegal = function_exists('bingo_can') ? bingo_can('legal.manage') : (session()->get('group') == 1);
-$canPayments = function_exists('bingo_can') ? bingo_can_any(['payments.view', 'payments.manage']) : true;
+$canStats = function_exists('bingo_can') ? bingo_can('stats.view') : false;
+$canUsers = function_exists('bingo_can') ? bingo_can_any(['users.view', 'users.manage']) : false;
+$canCreateUsers = function_exists('bingo_can') ? bingo_can_any(['users.manage', 'admins.manage']) : false;
+$canStores = function_exists('bingo_can') ? bingo_can_any(['stores.view', 'stores.manage']) : false;
+$canOperators = function_exists('bingo_can') ? bingo_can_any(['operators.view', 'operators.manage']) : false;
+$canLowBalance = function_exists('bingo_can') ? bingo_can('low_balance.view') : false;
+$canAudit = function_exists('bingo_can') ? bingo_can('audit.view') : false;
+$canKyc = function_exists('bingo_can') ? bingo_can('kyc.review') : false;
+$canLegal = function_exists('bingo_can') ? bingo_can('legal.manage') : false;
+$canPayments = function_exists('bingo_can') ? bingo_can_any(['payments.view', 'payments.manage']) : false;
 
 $lowBalancePending = function_exists('bingo_low_balance_roulette_pending_count')
     ? (int) bingo_low_balance_roulette_pending_count()
@@ -77,7 +84,9 @@ if ($canOperators) {
         'class' => 'admin-menu-tile--operators' . ($activeNav === 'operators' ? ' is-active' : ''),
     ];
 }
-$canCommissionsHub = $canOperators || $canStores || $canUsers;
+$canCommissionsHub = function_exists('bingo_can')
+    ? bingo_can_any(['commissions.settle', 'operators.manage', 'stores.manage'])
+    : false;
 if ($canCommissionsHub) {
     $menuItems[] = [
         'type' => 'link',

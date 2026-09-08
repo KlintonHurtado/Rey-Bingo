@@ -507,9 +507,11 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="<?= site_url('games'); ?>"><i class="fa-duotone fa-solid fa-gamepad me-2"></i><?= translate('games'); ?></a>
                             </li>
+                            <?php if (function_exists('bingo_can') && bingo_can('settings.manage')) : ?>
                             <li class="nav-item">
                                 <a class="nav-link"  onclick="settingsGet();" href="javascript:void(0);"><i class="fa-duotone fa-solid fa-cog me-2"></i><?= translate('settings'); ?></a>
                             </li>
+                            <?php endif; ?>
                         <?php endif; ?>
                         <?php if (session()->get('group') == 0) : ?>
                             <li class="nav-item">
@@ -526,7 +528,7 @@
                                 <a class="nav-link" href="<?= site_url('kyc'); ?>"><i class="fa-duotone fa-solid fa-id-card me-2"></i>Verificación KYC</a>
                             </li>
                         <?php endif; ?>
-                        <?php if (session()->get('group') == 1) : ?>
+                        <?php if (session()->get('group') == 1 && function_exists('bingo_can') && bingo_can('kyc.review')) : ?>
                             <li class="nav-item">
                                 <a class="nav-link" href="<?= site_url('kycAdmin'); ?>"><i class="fa-duotone fa-solid fa-user-check me-2"></i>Revisión KYC</a>
                             </li>
@@ -570,12 +572,14 @@
                                 <span class="nav-text">Notificaciones</span>
                             </div>
                         </div>
+                        <?php if (function_exists('bingo_can') && bingo_can('settings.manage')): ?>
                         <div class="col nav-item" onclick="settingsGet();">
                             <div class="d-flex flex-column align-items-center">
                                 <i class="fa-duotone fa-solid fa-cog"></i>
                                 <span class="nav-text">Ajustes</span>
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </nav>

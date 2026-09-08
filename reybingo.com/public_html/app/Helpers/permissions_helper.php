@@ -56,12 +56,11 @@ if (! function_exists('bingo_staff_roles_seed')) {
             [
                 'slug' => 'support',
                 'name' => 'Soporte',
-                'description' => 'Usuarios, KYC y saldo bajo',
+                'description' => 'Usuarios (solo consulta), KYC y saldo bajo',
                 'is_superadmin' => 0,
                 'permissions' => [
                     'games.view',
                     'users.view',
-                    'users.manage',
                     'kyc.review',
                     'low_balance.view',
                     'stats.view',
@@ -349,6 +348,23 @@ if (! function_exists('bingo_seed_admin_permissions')) {
                     ->where('group', bingo_group_admin())
                     ->where('admin_role_id', (int) $marketingRole['id'])
                     ->update(['admin_role_id' => null]);
+            }
+
+            // Asegurar que usuarios con rol soporte no conserven permisos de editar/eliminar usuarios ni legal
+            $supportRole = $db->table('admin_roles')->where('slug', 'support')->get()->getRowArray();
+            if ($supportRole && $db->tableExists('admin_user_permissions')) {
+                $supportUserIds = $db->table('users')
+                    ->select('id')
+                    ->where('admin_role_id', (int) $supportRole['id'])
+                    ->get()
+                    ->getResultArray();
+                if (! empty($supportUserIds)) {
+                    $uids = array_column($supportUserIds, 'id');
+                    $db->table('admin_user_permissions')
+                        ->whereIn('user_id', $uids)
+                        ->whereIn('permission_key', ['users.manage', 'legal.manage', 'settings.manage'])
+                        ->delete();
+                }
             }
         }
     }

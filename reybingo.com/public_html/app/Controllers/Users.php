@@ -23,7 +23,7 @@ use CodeIgniter\Controller;
 
 class Users extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'bingo']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
         session();
     }
 
@@ -1780,6 +1780,10 @@ class Users extends Controller {
     }
 
     public function deleteUser() {
+        if ($deny = bingo_require_admin_permission(['users.manage', 'admins.manage'])) {
+            return $deny;
+        }
+
         $model = new UsersModel();
 
         $userId = $this->request->getPost('user_id');
@@ -1815,11 +1819,8 @@ class Users extends Controller {
     }
 
     public function banUser() {
-        if (! session()->get('logged_in') || ! bingo_is_admin()) {
-            return $this->response->setStatusCode(403)->setJSON([
-                'success' => false,
-                'error' => translate('unauthorized'),
-            ]);
+        if ($deny = bingo_require_admin_permission(['users.manage', 'admins.manage'])) {
+            return $deny;
         }
 
         $model = new UsersModel();

@@ -44,11 +44,13 @@
                             <i class="fa-duotone fa-solid fa-building-columns"></i> <?= translate('banks'); ?>
                         </button>
                     </li>
+                    <?php if (function_exists('bingo_can') && bingo_can('legal.manage')): ?>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="legal-tab" data-bs-toggle="tab" data-bs-target="#legal" type="button" role="tab">
                             <i class="fa-duotone fa-solid fa-scale-balanced"></i> <?= translate('legal'); ?>
                         </button>
                     </li>
+                    <?php endif; ?>
                 </ul>
 
                 <!-- Contenido de las pestañas -->
@@ -747,6 +749,7 @@
                     </div>
 
                     <!-- PESTAÑA LEGAL / TyC -->
+                    <?php if (function_exists('bingo_can') && bingo_can('legal.manage')): ?>
                     <div class="tab-pane fade" id="legal" role="tabpanel">
                         <div class="row mt-3">
                             <div class="col-md-12 mb-3">
@@ -773,6 +776,7 @@
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Botones de acción -->

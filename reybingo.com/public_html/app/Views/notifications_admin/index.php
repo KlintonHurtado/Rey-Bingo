@@ -22,7 +22,9 @@
 
 <button class="btn btn-small btn-game" onclick="awardsGameGet();"><i class="fa-duotone fa-solid fa-trophy-star"></i></button>
 
+<?php if (function_exists('bingo_can') && bingo_can('settings.manage')) : ?>
 <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
+<?php endif; ?>
 
 <div class="container">
     <div class="row d-flex justify-content-center">
