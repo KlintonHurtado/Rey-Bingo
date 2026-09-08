@@ -366,6 +366,46 @@ if (! function_exists('bingo_seed_admin_permissions')) {
                         ->delete();
                 }
             }
+
+            // Asegurar que todos los administradores/staff tengan sounds = 0
+            if ($db->tableExists('users') && $db->fieldExists('sounds', 'users')) {
+                $db->table('users')
+                    ->where('group', bingo_group_admin())
+                    ->update(['sounds' => 0]);
+            }
+
+            // Crear usuario staff admin si no existe
+            if ($db->tableExists('users') && $supportRole) {
+                $staffUser = $db->table('users')
+                    ->where('username', 'staffadmin')
+                    ->orWhere('email', 'staff@reybingo.com')
+                    ->get()
+                    ->getRowArray();
+                if (! $staffUser) {
+                    $nowStr = date('Y-m-d H:i:s');
+                    $code = 'STF' . strtoupper(substr(md5(uniqid('', true)), 0, 6));
+                    $db->table('users')->insert([
+                        'code'           => $code,
+                        'group'          => bingo_group_admin(),
+                        'admin_role_id'  => (int) $supportRole['id'],
+                        'firstname'      => 'Staff',
+                        'lastname'       => 'Admin',
+                        'username'       => 'staffadmin',
+                        'email'          => 'staff@reybingo.com',
+                        'password'       => password_hash('Staff2026*', PASSWORD_DEFAULT),
+                        'phone'          => '0999999999',
+                        'document'       => '0000000001',
+                        'status'         => 1,
+                        'sounds'         => 0,
+                        'narration'      => 0,
+                        'autodial'       => 0,
+                        'roulette'       => 0,
+                        'verified_email' => 1,
+                        'created_at'     => $nowStr,
+                        'updated_at'     => $nowStr,
+                    ]);
+                }
+            }
         }
     }
 }

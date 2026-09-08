@@ -9,6 +9,7 @@
     <i class="fa-duotone fa-solid fa-gamepad"></i>
 </button>
 
+<?php if ((int) (session()->get('group') ?? 0) !== 1): ?>
 <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
     <?php if ($user['sounds'] == 1): ?>
         <i class="fa-duotone fa-solid fa-volume"></i>
@@ -16,6 +17,7 @@
         <i class="fa-duotone fa-solid fa-volume-slash"></i>
     <?php endif; ?>
 </button>
+<?php endif; ?>
 
 <a class="btn btn-small btn-user hidden" href="<?= site_url('profile'); ?>"><i class="fa-duotone fa-solid fa-user-hair"></i></a>
 

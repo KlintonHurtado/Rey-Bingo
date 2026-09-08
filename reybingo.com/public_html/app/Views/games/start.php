@@ -4,6 +4,7 @@
     'showWonCartons' => false,
 ]); ?>
 
+<?php if ((int) (session()->get('group') ?? 0) !== 1): ?>
 <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();">
     <?php if ($user['sounds'] == 1): ?>
         <i class="fa-duotone fa-solid fa-volume"></i>
@@ -11,6 +12,7 @@
         <i class="fa-duotone fa-solid fa-volume-slash"></i>
     <?php endif; ?>
 </button>
+<?php endif; ?>
 
 <a class="btn btn-small btn-lock hidden" href="<?= site_url('password'); ?>"><i class="fa-duotone fa-solid fa-lock"></i></a>
 

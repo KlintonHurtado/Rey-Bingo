@@ -209,11 +209,12 @@
                         <hr class="mt-1 mb-0">
                     </div>
 
-                    <div class="col-md-3 mb-2">
+                    <?php $isTargetAdmin = ($isUpdate && (int) ($userData['group'] ?? 0) === 1); ?>
+                    <div class="col-md-3 mb-2" id="config-sounds-wrap" style="<?= $isTargetAdmin ? 'display:none;' : ''; ?>">
                         <label for="sounds" class="form-label"><?= translate('sounds'); ?></label>
                         <select class="form-control form-control-lg form-bingo" name="sounds" id="sounds">
                             <option value="1" <?= $isUpdate && $userData['sounds'] == 1 ? 'selected' : ''; ?>><?= translate('enabled'); ?></option>
-                            <option value="0" <?= $isUpdate && $userData['sounds'] == 0 ? 'selected' : ''; ?>><?= translate('disabled'); ?></option>
+                            <option value="0" <?= ! $isUpdate || ($isUpdate && $userData['sounds'] == 0) ? 'selected' : ''; ?>><?= translate('disabled'); ?></option>
                         </select>
                     </div>
 
@@ -325,7 +326,13 @@
     function bingoToggleAdminRoleField() {
         var group = document.getElementById('group');
         var wrap = document.getElementById('admin-role-wrap');
-        if (!group || !wrap) return;
-        wrap.style.display = String(group.value) === '1' ? '' : 'none';
+        var soundsWrap = document.getElementById('config-sounds-wrap');
+        var soundsSelect = document.getElementById('sounds');
+        if (!group) return;
+        var isAdmin = String(group.value) === '1';
+        if (wrap) wrap.style.display = isAdmin ? '' : 'none';
+        if (soundsWrap) soundsWrap.style.display = isAdmin ? 'none' : '';
+        if (isAdmin && soundsSelect) soundsSelect.value = '0';
     }
+    bingoToggleAdminRoleField();
 </script>

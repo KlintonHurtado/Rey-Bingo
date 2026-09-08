@@ -56,8 +56,16 @@
     <link href="<?= asset_url('css/sweetalert.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/components/font-awesome/css/fontawesome.min.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/czm-chat-support.css') ?>" rel="stylesheet">
+<?php
+$isNoMusicRole = session()->get('logged_in') && (
+    (int) (session()->get('group') ?? 0) === 1
+    || (function_exists('bingo_is_admin') && bingo_is_admin())
+    || (function_exists('bingo_is_operator') && bingo_is_operator())
+    || (function_exists('bingo_is_store') && bingo_is_store())
+);
+?>
 </head>
-<body class="bg-gradient-bingo<?= (session()->get('logged_in') && function_exists('bingo_is_operator') && function_exists('bingo_is_store') && (bingo_is_operator() || bingo_is_store())) ? ' bingo-no-music' : ''; ?>">
+<body class="bg-gradient-bingo<?= $isNoMusicRole ? ' bingo-no-music' : ''; ?>">
 <?php include APPPATH . 'Views/layout/_layout_user_bootstrap.php'; ?>
     <div class="preloader">
         <div class="canvas">
@@ -83,9 +91,8 @@
     <?php if (session()->get('logged_in')) : ?>
         <?php
             $layoutSounds = (int) ($user['sounds'] ?? 0);
-            // Operador y Punto de venta: sin música de fondo
-            if (function_exists('bingo_is_operator') && function_exists('bingo_is_store')
-                && (bingo_is_operator() || bingo_is_store())) {
+            // Admin/Staff, Operador y Punto de venta: sin música de fondo
+            if ($isNoMusicRole) {
                 $layoutSounds = 0;
             }
         ?>
