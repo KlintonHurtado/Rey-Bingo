@@ -35,13 +35,18 @@ class Legal extends Controller
 
     public function admin()
     {
-        if ($deny = bingo_require_admin_permission('legal.manage')) {
-            return $deny;
+        if (! session()->get('logged_in') || ! bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access'),
+            ]);
         }
 
         if (function_exists('bingo_ensure_system_settings_schema')) {
             bingo_ensure_system_settings_schema();
         }
+
+        $canEdit = function_exists('bingo_can') && bingo_can('legal.manage');
 
         $modelUsers = new UsersModel();
         $user = $modelUsers->find(session()->get('id'));
@@ -55,13 +60,14 @@ class Legal extends Controller
             ],
             'validation' => \Config\Services::validation(),
             'contentPage' => view('legal/admin', [
-                'user' => $user,
-                'imagePath' => $imagePath,
-                'activeNav' => 'legal',
-                'termsHtml' => bingo_legal_html('termsHtml'),
-                'promotionsHtml' => bingo_legal_html('promotionsHtml'),
+                'user'               => $user,
+                'imagePath'          => $imagePath,
+                'activeNav'          => 'legal',
+                'termsHtml'          => bingo_legal_html('termsHtml'),
+                'promotionsHtml'     => bingo_legal_html('promotionsHtml'),
                 'termsRequireAccept' => bingo_terms_require_accept() ? '1' : '0',
-                'termsUpdatedAt' => (string) (systemGet('termsUpdatedAt') ?: ''),
+                'termsUpdatedAt'     => (string) (systemGet('termsUpdatedAt') ?: ''),
+                'canEdit'            => $canEdit,
             ]),
         ];
 

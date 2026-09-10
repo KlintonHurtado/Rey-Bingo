@@ -20,7 +20,7 @@ $canOperators = function_exists('bingo_can') ? bingo_can_any(['operators.view', 
 $canLowBalance = function_exists('bingo_can') ? bingo_can('low_balance.view') : false;
 $canAudit = function_exists('bingo_can') ? bingo_can('audit.view') : false;
 $canKyc = function_exists('bingo_can') ? bingo_can('kyc.review') : false;
-$canLegal = function_exists('bingo_can') ? bingo_can('legal.manage') : false;
+$canLegal = bingo_is_admin(); // Todos los admins pueden ver T&C; la vista controla si pueden editar
 $canPayments = function_exists('bingo_can') ? bingo_can_any(['payments.view', 'payments.manage']) : false;
 
 $lowBalancePending = function_exists('bingo_low_balance_roulette_pending_count')

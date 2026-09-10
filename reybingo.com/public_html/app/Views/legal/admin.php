@@ -70,9 +70,18 @@
             <form id="legal-admin-form" method="post" action="<?= site_url('legal/adminSubmit'); ?>">
                 <?= csrf_field(); ?>
 
+                <?php $canEdit = $canEdit ?? false; ?>
+
+                <?php if (! $canEdit): ?>
+                <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+                    <i class="fa fa-eye"></i>
+                    <span>Estás viendo el contenido legal en modo <strong>solo lectura</strong>. No tienes permiso para editar.</span>
+                </div>
+                <?php endif; ?>
+
                 <div class="mb-3">
                     <label class="form-label" for="termsRequireAccept"><?= translate('require terms acceptance on signup'); ?></label>
-                    <select class="form-control form-control-lg form-bingo" name="termsRequireAccept" id="termsRequireAccept">
+                    <select class="form-control form-control-lg form-bingo" name="termsRequireAccept" id="termsRequireAccept" <?= $canEdit ? '' : 'disabled'; ?>>
                         <option value="1" <?= ($termsRequireAccept ?? '1') === '1' ? 'selected' : ''; ?>><?= translate('active'); ?></option>
                         <option value="0" <?= ($termsRequireAccept ?? '1') === '0' ? 'selected' : ''; ?>><?= translate('inactive'); ?></option>
                     </select>
@@ -91,12 +100,18 @@
                     <small id="promotionsHtml-error" class="text-danger d-none"></small>
                 </div>
 
+                <?php if ($canEdit): ?>
                 <div class="d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-primary btn-bingo" id="legal-save-btn">
                         <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save'); ?>
                     </button>
                     <a href="<?= site_url('games'); ?>" class="btn btn-secondary"><?= translate('cancel'); ?></a>
                 </div>
+                <?php else: ?>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="<?= site_url('games'); ?>" class="btn btn-secondary"><i class="fa fa-arrow-left me-1"></i><?= translate('back'); ?></a>
+                </div>
+                <?php endif; ?>
             </form>
         </div>
     </div>
@@ -105,6 +120,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.4/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
 (function () {
+    var canEdit = <?= (isset($canEdit) && $canEdit) ? 'true' : 'false'; ?>;
+
     function initEditors() {
         if (typeof tinymce === 'undefined') {
             return;
@@ -116,10 +133,13 @@
             height: 360,
             menubar: false,
             plugins: 'lists link table code',
-            toolbar: 'undo redo | styles | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | removeformat | code',
+            toolbar: canEdit
+                ? 'undo redo | styles | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | removeformat | code'
+                : false,
             content_style: 'body { font-family: Arial, sans-serif; font-size: 15px; }',
             branding: false,
-            convert_urls: false
+            convert_urls: false,
+            readonly: canEdit ? 0 : 1
         });
     }
 
@@ -131,6 +151,8 @@
 
     $('#legal-admin-form').on('submit', function (e) {
         e.preventDefault();
+        if (! canEdit) { return; }
+
         if (typeof tinymce !== 'undefined') {
             tinymce.triggerSave();
         }
