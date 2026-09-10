@@ -92,6 +92,7 @@
                         <small id="password-error" class="text-danger d-none"></small>
                     </div>
 
+                    <?php if (function_exists('bingo_can') && bingo_can('users.wallets')): ?>
                     <div class="col-md-4 mb-2">
                         <label for="wallet_bonus" class="form-label"><?= translate('bonus balance'); ?></label>
                         <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="wallet_bonus" id="wallet_bonus" placeholder="0.00" value="<?= $isUpdate ? number_format((float) ($userData['wallet_bonus'] ?? 0), 2, '.', '') : '0.00'; ?>">
@@ -107,6 +108,7 @@
                         <input type="number" step="0.01" min="0" class="form-control form-control-lg form-bingo" name="wallet_withdraw" id="wallet_withdraw" placeholder="0.00" value="<?= $isUpdate ? number_format((float) ($userData['wallet_withdraw'] ?? 0), 2, '.', '') : '0.00'; ?>">
                         <small id="wallet_withdraw-error" class="text-danger d-none"></small>
                     </div>
+                    <?php endif; ?>
 
                     <div class="col-md-6 mb-2">
                         <label for="group" class="form-label"><?= translate('group'); ?></label>

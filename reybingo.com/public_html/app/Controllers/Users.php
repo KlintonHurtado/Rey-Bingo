@@ -2738,6 +2738,18 @@ class Users extends Controller {
             $walletBonus = 0.0;
             $walletRecharge = 0.0;
             $walletWithdraw = 0.0;
+        } elseif (! (function_exists('bingo_can') && bingo_can('users.wallets'))) {
+            // Sin permiso users.wallets: preservar saldos existentes del usuario
+            if ($action === 'update' && $userId) {
+                $existingForWallet = $model->find((int) $userId);
+                $walletBonus    = (float) ($existingForWallet['wallet_bonus']    ?? 0);
+                $walletRecharge = (float) ($existingForWallet['wallet_recharge'] ?? 0);
+                $walletWithdraw = (float) ($existingForWallet['wallet_withdraw'] ?? 0);
+            } else {
+                $walletBonus = 0.0;
+                $walletRecharge = 0.0;
+                $walletWithdraw = 0.0;
+            }
         } else {
             $walletBonus = max(0, round((float) ($this->request->getPost('wallet_bonus') ?? 0), 2));
             $walletRecharge = max(0, round((float) ($this->request->getPost('wallet_recharge') ?? 0), 2));
