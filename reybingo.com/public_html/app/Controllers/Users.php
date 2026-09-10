@@ -1459,6 +1459,13 @@ class Users extends Controller {
             ]);
         }
 
+        if (! (function_exists('bingo_can') && bingo_can('users.wallets'))) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'error' => translate('unauthorized'),
+            ]);
+        }
+
         helper('wallet');
 
         $userId = (int) $this->request->getPost('user_id');

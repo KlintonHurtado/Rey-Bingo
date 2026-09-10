@@ -107,7 +107,8 @@ $sourceLabel = static function ($source) {
                             <div class="input-group input-group-sm mt-1">
                                 <span class="input-group-text"><?= esc($currency); ?></span>
                                 <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-bonus"
-                                       value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>">
+                                       value="<?= number_format((float) ($stats['wallet_bonus'] ?? 0), 2, '.', ''); ?>"
+                                       <?= (function_exists('bingo_can') && bingo_can('users.wallets')) ? '' : 'readonly disabled'; ?>>
                             </div>
                         </div>
                     </div>
@@ -117,7 +118,8 @@ $sourceLabel = static function ($source) {
                             <div class="input-group input-group-sm mt-1">
                                 <span class="input-group-text"><?= esc($currency); ?></span>
                                 <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-recharge"
-                                       value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>">
+                                       value="<?= number_format((float) ($stats['wallet_recharge'] ?? 0), 2, '.', ''); ?>"
+                                       <?= (function_exists('bingo_can') && bingo_can('users.wallets')) ? '' : 'readonly disabled'; ?>>
                             </div>
                         </div>
                     </div>
@@ -127,7 +129,8 @@ $sourceLabel = static function ($source) {
                             <div class="input-group input-group-sm mt-1">
                                 <span class="input-group-text"><?= esc($currency); ?></span>
                                 <input type="number" step="0.01" min="0" class="form-control" id="admin-wallet-withdraw"
-                                       value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>">
+                                       value="<?= number_format((float) ($stats['wallet_withdraw'] ?? 0), 2, '.', ''); ?>"
+                                       <?= (function_exists('bingo_can') && bingo_can('users.wallets')) ? '' : 'readonly disabled'; ?>>
                             </div>
                         </div>
                     </div>
@@ -154,10 +157,14 @@ $sourceLabel = static function ($source) {
             </div>
             <?php if (! $isNonPlayer) : ?>
                 <div class="mb-2">
+                    <?php if (function_exists('bingo_can') && bingo_can('users.wallets')): ?>
                     <button type="button" class="btn btn-sm btn-primary" onclick="savePlayerWallets(<?= (int) $user['id']; ?>)">
                         <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save wallets'); ?>
                     </button>
                     <small class="text-muted ms-2"><?= translate('edit wallets help'); ?></small>
+                    <?php else: ?>
+                    <small class="text-muted"><i class="fa fa-lock me-1"></i><?= translate('no permission'); ?></small>
+                    <?php endif; ?>
                 </div>
             <?php else : ?>
                 <!-- Panel de Recargar (Sumar) / Retirar (Quitar) saldo para Operadores y Puntos de Venta -->
