@@ -51,14 +51,18 @@
                     </td>
                     <td class="text-center">
                         <?php if (! $canSpin) : ?>
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-warning text-dark"
-                                onclick="grantPlayerRoulette(<?= (int) $player['id'] ?>, '<?= esc($playerLabel !== '' ? $playerLabel : ($player['username'] ?? ''), 'js') ?>')"
-                                title="<?= translate('grant roulette'); ?>"
-                            >
-                                <i class="fa-duotone fa-solid fa-gift"></i>
-                            </button>
+                            <?php if ($canManageRoulette ?? (function_exists('bingo_can') ? bingo_can_any(['settings.manage', 'games.manage']) : false)) : ?>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-warning text-dark"
+                                    onclick="grantPlayerRoulette(<?= (int) $player['id'] ?>, '<?= esc($playerLabel !== '' ? $playerLabel : ($player['username'] ?? ''), 'js') ?>')"
+                                    title="<?= translate('grant roulette'); ?>"
+                                >
+                                    <i class="fa-duotone fa-solid fa-gift"></i>
+                                </button>
+                            <?php else : ?>
+                                <span class="text-muted" title="<?= translate('no permission'); ?>"><i class="fa-duotone fa-solid fa-lock text-secondary"></i></span>
+                            <?php endif; ?>
                         <?php elseif ($latestGrant) : ?>
                             <i class="fa-duotone fa-solid fa-circle-check text-success" title="<?= translate('roulette granted successfully'); ?>"></i>
                         <?php endif; ?>

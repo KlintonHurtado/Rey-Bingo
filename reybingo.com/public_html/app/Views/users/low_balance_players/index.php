@@ -5,6 +5,7 @@ $thresholdValue = ($configuredThreshold !== null && $configuredThreshold !== '')
     ? number_format((float) $configuredThreshold, 2, '.', '')
     : '';
 $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
+$canManageRoulette = $canManageRoulette ?? (function_exists('bingo_can') ? bingo_can_any(['settings.manage', 'games.manage']) : false);
 ?>
 
 <div class="admin-stores-scroll">
@@ -24,6 +25,13 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                 <div class="card-body p-3">
                     <h5 class="mb-3"><i class="fa-duotone fa-solid fa-sliders"></i> <?= translate('low balance configuration'); ?></h5>
 
+                    <?php if (! $canManageRoulette) : ?>
+                        <div class="alert alert-info d-flex align-items-center gap-2 mb-3 py-2" role="alert">
+                            <i class="fa fa-eye"></i>
+                            <span class="small">Estás viendo la información de saldo bajo y ruleta en modo <strong>solo lectura</strong>.</span>
+                        </div>
+                    <?php endif; ?>
+
                     <form id="low-balance-settings-form" class="row g-3 align-items-end">
                         <?= csrf_field() ?>
                         <div class="col-md-4">
@@ -39,13 +47,13 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                                     step="0.01"
                                     value="<?= esc($thresholdValue) ?>"
                                     placeholder="<?= number_format((float) ($threshold ?? 0), 2, '.', '') ?>"
-                                    required
+                                    <?= $canManageRoulette ? 'required' : 'disabled readonly' ?>
                                 >
                             </div>
                         </div>
                         <div class="col-md-4">
                             <label for="lowBalanceAutoRoulette" class="form-label"><?= translate('low balance auto roulette short'); ?></label>
-                            <select class="form-control form-bingo" name="lowBalanceAutoRoulette" id="lowBalanceAutoRoulette">
+                            <select class="form-control form-bingo" name="lowBalanceAutoRoulette" id="lowBalanceAutoRoulette" <?= $canManageRoulette ? '' : 'disabled' ?>>
                                 <option value="1" <?= $autoRouletteEnabled ? 'selected' : '' ?>><?= translate('active'); ?></option>
                                 <option value="0" <?= ! $autoRouletteEnabled ? 'selected' : '' ?>><?= translate('inactive'); ?></option>
                             </select>
@@ -56,9 +64,11 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                                 <button type="button" class="btn btn-outline-primary btn-bingo flex-grow-1" onclick="lowBalanceHistoryOpen();">
                                     <i class="fa-duotone fa-solid fa-clock-rotate-left"></i> <?= translate('history'); ?>
                                 </button>
+                                <?php if ($canManageRoulette) : ?>
                                 <button type="submit" class="btn btn-primary btn-bingo flex-grow-1">
                                     <i class="fa-duotone fa-solid fa-floppy-disk"></i> <?= translate('save changes'); ?>
                                 </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </form>
@@ -104,6 +114,7 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
                         <?= view('users/low_balance_players/list', [
                             'players' => $players ?? [],
                             'threshold' => $threshold ?? 0,
+                            'canManageRoulette' => $canManageRoulette,
                         ]); ?>
                     </div>
                 </div>
@@ -148,8 +159,11 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
         }
     }
 
+    var canManageRoulette = <?= $canManageRoulette ? 'true' : 'false' ?>;
+
     $('#low-balance-settings-form').on('submit', function(event) {
         event.preventDefault();
+        if (! canManageRoulette) { return; }
 
         $.post('<?= site_url('users/lowBalanceSettingsSubmit') ?>', $(this).serialize(), function(response) {
             if (response.success) {
@@ -186,6 +200,7 @@ $autoRouletteEnabled = (int) systemGet('lowBalanceAutoRoulette') === 1;
     });
 
     function grantPlayerRoulette(userId, playerName) {
+        if (! canManageRoulette) { return; }
         Swal.fire({
             title: '<?= esc(translate('grant roulette'), 'js'); ?>',
             text: '<?= esc(translate('are you sure you want to grant roulette to this player?'), 'js'); ?>',

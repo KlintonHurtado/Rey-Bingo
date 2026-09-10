@@ -1185,6 +1185,8 @@ class Users extends Controller {
 
         $payload = bingo_fetch_low_balance_players();
 
+        $canManageRoulette = function_exists('bingo_can') ? bingo_can_any(['settings.manage', 'games.manage']) : false;
+
         $data = [
             'page' => [
                 'title' => translate('low balance players'),
@@ -1196,6 +1198,7 @@ class Users extends Controller {
                 'imagePath' => $imagePath,
                 'players' => $payload['players'],
                 'threshold' => $payload['threshold'],
+                'canManageRoulette' => $canManageRoulette,
             ]),
         ];
 
@@ -1219,10 +1222,12 @@ class Users extends Controller {
         }
 
         $payload = bingo_fetch_low_balance_players();
+        $canManageRoulette = function_exists('bingo_can') ? bingo_can_any(['settings.manage', 'games.manage']) : false;
 
         return view('users/low_balance_players/list', [
             'players' => $payload['players'],
             'threshold' => $payload['threshold'],
+            'canManageRoulette' => $canManageRoulette,
         ]);
     }
 
@@ -1312,6 +1317,10 @@ class Users extends Controller {
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        if ($deny = bingo_require_admin_permission(['settings.manage', 'games.manage'])) {
+            return $deny;
         }
 
         if (! $this->request->isAJAX()) {
@@ -1732,6 +1741,10 @@ class Users extends Controller {
     {
         if (! session()->get('logged_in') || ! bingo_is_admin()) {
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+
+        if ($deny = bingo_require_admin_permission(['settings.manage', 'games.manage'])) {
+            return $deny;
         }
 
         if (! $this->request->isAJAX()) {
