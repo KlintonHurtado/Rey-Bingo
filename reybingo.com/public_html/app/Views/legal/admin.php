@@ -90,14 +90,26 @@
 
                 <div class="mb-4">
                     <label class="form-label" for="termsHtml"><?= translate('terms and conditions'); ?></label>
-                    <textarea name="termsHtml" id="termsHtml" rows="14"><?= esc($termsHtml ?? '', 'html'); ?></textarea>
-                    <small id="termsHtml-error" class="text-danger d-none"></small>
+                    <?php if ($canEdit) : ?>
+                        <textarea name="termsHtml" id="termsHtml" rows="14"><?= esc($termsHtml ?? '', 'html'); ?></textarea>
+                        <small id="termsHtml-error" class="text-danger d-none"></small>
+                    <?php else : ?>
+                        <div class="p-3 border rounded bg-white shadow-sm" style="min-height: 200px; max-height: 420px; overflow-y: auto; border: 1px solid #dee2e6; color: #333; line-height: 1.6;">
+                            <?= $termsHtml ?? ''; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label" for="promotionsHtml"><?= translate('promotions'); ?></label>
-                    <textarea name="promotionsHtml" id="promotionsHtml" rows="14"><?= esc($promotionsHtml ?? '', 'html'); ?></textarea>
-                    <small id="promotionsHtml-error" class="text-danger d-none"></small>
+                    <?php if ($canEdit) : ?>
+                        <textarea name="promotionsHtml" id="promotionsHtml" rows="14"><?= esc($promotionsHtml ?? '', 'html'); ?></textarea>
+                        <small id="promotionsHtml-error" class="text-danger d-none"></small>
+                    <?php else : ?>
+                        <div class="p-3 border rounded bg-white shadow-sm" style="min-height: 200px; max-height: 420px; overflow-y: auto; border: 1px solid #dee2e6; color: #333; line-height: 1.6;">
+                            <?= $promotionsHtml ?? ''; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <?php if ($canEdit): ?>
@@ -117,11 +129,10 @@
     </div>
 </div>
 
+<?php if ($canEdit) : ?>
 <script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.4/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
 (function () {
-    var canEdit = <?= (isset($canEdit) && $canEdit) ? 'true' : 'false'; ?>;
-
     function initEditors() {
         if (typeof tinymce === 'undefined') {
             return;
@@ -133,13 +144,10 @@
             height: 360,
             menubar: false,
             plugins: 'lists link table code',
-            toolbar: canEdit
-                ? 'undo redo | styles | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | removeformat | code'
-                : false,
+            toolbar: 'undo redo | styles | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | removeformat | code',
             content_style: 'body { font-family: Arial, sans-serif; font-size: 15px; }',
             branding: false,
-            convert_urls: false,
-            readonly: canEdit ? 0 : 1
+            convert_urls: false
         });
     }
 
@@ -151,7 +159,6 @@
 
     $('#legal-admin-form').on('submit', function (e) {
         e.preventDefault();
-        if (! canEdit) { return; }
 
         if (typeof tinymce !== 'undefined') {
             tinymce.triggerSave();
@@ -206,3 +213,4 @@
     });
 })();
 </script>
+<?php endif; ?>
