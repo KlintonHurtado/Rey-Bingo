@@ -1378,6 +1378,12 @@ class Users extends Controller {
             return redirect()->to('/signin');
         }
 
+        if (function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission('users.wallets')) {
+                return $deny;
+            }
+        }
+
         helper('wallet');
 
         $modelUsers = new UsersModel();
@@ -1425,6 +1431,12 @@ class Users extends Controller {
                 'success' => false,
                 'error' => translate('unauthorized'),
             ]);
+        }
+
+        if (function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission('users.wallets')) {
+                return $deny;
+            }
         }
 
         helper('wallet');

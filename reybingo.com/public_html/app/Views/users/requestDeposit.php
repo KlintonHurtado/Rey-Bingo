@@ -1,4 +1,7 @@
 <?php
+if (! function_exists('bingo_can')) {
+    helper('permissions');
+}
 $deposit = $deposit ?? null;
 $user = $user ?? null;
 $storeUser = $storeUser ?? null;
@@ -118,7 +121,7 @@ $voucherUrl = ($voucherOk && function_exists('bingo_voucher_url')) ? bingo_vouch
                 </div>
             </div>
 
-            <?php if ($isPending) : ?>
+            <?php if ($isPending && (function_exists('bingo_can') ? bingo_can('payments.manage') : true)) : ?>
                 <div class="col-md-12 text-center">
                     <button type="button" class="btn btn-primary w-25 btn-bingo inline mt-2" onclick="statusSubmit('<?= esc($type, 'js') ?>', '<?= (int) $deposit['id'] ?>', 'approve');"><?= translate('approve'); ?></button>
                     <button type="button" class="btn btn-primary w-25 btn-bingo inline mt-2" onclick="statusSubmit('<?= esc($type, 'js') ?>', '<?= (int) $deposit['id'] ?>', 'refuse');"><?= translate('refuse'); ?></button>

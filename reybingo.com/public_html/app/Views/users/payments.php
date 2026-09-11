@@ -1,3 +1,8 @@
+<?php
+if (! function_exists('bingo_can')) {
+    helper('permissions');
+}
+?>
 <div class="modal-dialog modal-dialog-centered games max-w-80">
     <div class="modal-content">
         
@@ -160,11 +165,17 @@
                 <div class="collapse show" id="filtersCollapse">
                     <div class="card-body p-3">
                         <?php if (session()->get('group') == 1) : ?>
-                            <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('deposit'); ?>" onclick="depositGet();"><i class="fa-duotone fa-solid fa-plus"></i></button>
-                            <button type="button" class="btn btn-small btn-warning text-dark float-end mt-4 me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('grant bonus'); ?>" onclick="grantBonusGet();"><i class="fa-duotone fa-solid fa-gift"></i></button>
-                            <button type="button" class="btn btn-success btn-sm float-end mt-4 me-2" id="export-data">
-                                <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('export'); ?>
-                            </button>
+                            <?php if (function_exists('bingo_can') ? bingo_can('payments.manage') : true) : ?>
+                                <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('deposit'); ?>" onclick="depositGet();"><i class="fa-duotone fa-solid fa-plus"></i></button>
+                            <?php endif; ?>
+                            <?php if (function_exists('bingo_can') ? bingo_can('users.wallets') : true) : ?>
+                                <button type="button" class="btn btn-small btn-warning text-dark float-end mt-4 me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="<?= translate('grant bonus'); ?>" onclick="grantBonusGet();"><i class="fa-duotone fa-solid fa-gift"></i></button>
+                            <?php endif; ?>
+                            <?php if (function_exists('bingo_can') ? bingo_can_any(['payments.manage', 'audit.view']) : true) : ?>
+                                <button type="button" class="btn btn-success btn-sm float-end mt-4 me-2" id="export-data">
+                                    <i class="fa-duotone fa-solid fa-file-arrow-down"></i> <?= translate('export'); ?>
+                                </button>
+                            <?php endif; ?>
                         <?php endif; ?>
                         <div class="row g-2">
                             <!-- Búsqueda general -->
@@ -248,9 +259,11 @@
                                 <button type="button" class="btn btn-secondary btn-sm" id="clear-filters">
                                     <i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('clear filters'); ?>
                                 </button>
+                                <?php if (function_exists('bingo_can') ? bingo_can_any(['payments.manage', 'audit.view']) : true) : ?>
                                 <button type="button" class="btn btn-success btn-sm" id="export-data">
                                     <i class="fa fa-download"></i> <?= translate('export'); ?>
                                 </button>
+                                <?php endif; ?>
                                 <span class="text-muted small ms-3" id="results-count">
                                     <?= translate('showing'); ?> <span id="showing-count"><?= count($payments); ?></span> 
                                     <?= translate('of'); ?> <span id="total-count"><?= count($payments); ?></span> 

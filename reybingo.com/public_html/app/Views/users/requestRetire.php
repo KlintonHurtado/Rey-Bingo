@@ -1,3 +1,8 @@
+<?php
+if (! function_exists('bingo_can')) {
+    helper('permissions');
+}
+?>
 <div class="modal-dialog modal-dialog-centered max-w-40">
     <div class="modal-content">
         <div class="modal-header pb-2">
@@ -61,7 +66,7 @@
                 </div>
             </div>
 
-            <?php if (session()->get('group') == 1) : ?>
+            <?php if (session()->get('group') == 1 && (function_exists('bingo_can') ? bingo_can('payments.manage') : true)) : ?>
                 <!-- ACCIONES ADMINISTRADOR -->
                 <?php if ($retire['status'] == 1) : ?>
                     <div class="col-md-12 text-center mt-3">

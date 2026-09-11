@@ -1,4 +1,7 @@
 <?php
+if (! function_exists('bingo_can')) {
+    helper('permissions');
+}
 $isOperator = (int) ($user['group'] ?? 0) === bingo_group_operator();
 $isStore = (int) ($user['group'] ?? 0) === bingo_group_store();
 $isNonPlayer = $isOperator || $isStore;
@@ -380,7 +383,7 @@ $sourceLabel = static function ($source) {
             </table>
 
             <div class="d-flex flex-wrap gap-2">
-                <?php if (! $isNonPlayer) : ?>
+                <?php if (! $isNonPlayer && (function_exists('bingo_can') ? bingo_can('users.wallets') : true)) : ?>
                     <button type="button" class="btn btn-sm btn-success" onclick="grantBonusGet(<?= (int) $user['id']; ?>)">
                         <i class="fa-duotone fa-solid fa-gift"></i> <?= translate('grant bonus'); ?>
                     </button>

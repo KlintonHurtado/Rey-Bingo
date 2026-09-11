@@ -362,7 +362,7 @@ if (! function_exists('bingo_seed_admin_permissions')) {
                     $uids = array_column($supportUserIds, 'id');
                     $db->table('admin_user_permissions')
                         ->whereIn('user_id', $uids)
-                        ->whereIn('permission_key', ['users.manage', 'legal.manage', 'settings.manage'])
+                        ->whereIn('permission_key', ['users.manage', 'legal.manage', 'settings.manage', 'users.wallets', 'payments.manage', 'audit.view'])
                         ->delete();
                 }
             }

@@ -21,7 +21,7 @@ use CodeIgniter\Controller;
 
 class Payments extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo', 'affiliate_ggr']);
+        helper(['form', 'url', 'cookie', 'text', 'wallet', 'bingo', 'affiliate_ggr', 'permissions']);
         session();
     }
 
@@ -914,6 +914,12 @@ class Payments extends Controller {
             return redirect()->to('/signin');
         }
 
+        if (function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission(['payments.manage', 'audit.view'])) {
+                return $deny;
+            }
+        }
+
         $filters = $this->getFilters();
         $allTransactions = $this->getAllTransactions();
         $filteredTransactions = $this->applyFilters($allTransactions, $filters);
@@ -1201,6 +1207,14 @@ class Payments extends Controller {
     }
   
     public function depositGet() {
+        if (! session()->get('logged_in')) {
+            return redirect()->to('/signin');
+        }
+        if (session()->get('group') == 1 && function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission('payments.manage')) {
+                return $deny;
+            }
+        }
         $modelBanks = new BanksModel();
 
         $data['banks'] = $modelBanks->where('status', 1)->findAll();
@@ -1284,6 +1298,14 @@ class Payments extends Controller {
     }
 
     public function depositSubmit() {
+        if (! session()->get('logged_in')) {
+            return $this->response->setStatusCode(401)->setJSON(['success' => false, 'message' => 'No autenticado']);
+        }
+        if (session()->get('group') == 1 && function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission('payments.manage')) {
+                return $deny;
+            }
+        }
         if (function_exists('bingo_ensure_deposits_schema')) {
             bingo_ensure_deposits_schema();
         }
@@ -2118,6 +2140,14 @@ class Payments extends Controller {
     }
 
     public function statusSubmit() {
+        if (! session()->get('logged_in')) {
+            return $this->response->setStatusCode(401)->setJSON(['success' => false, 'error' => translate('unauthorized')]);
+        }
+        if (session()->get('group') == 1 && function_exists('bingo_require_admin_permission')) {
+            if ($deny = bingo_require_admin_permission('payments.manage')) {
+                return $deny;
+            }
+        }
         $modelPayments = new PaymentsModel();
         $modelDeposits = new DepositsModel();
         $modelRetires = new RetiresModel();
