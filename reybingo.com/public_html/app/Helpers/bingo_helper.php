@@ -3978,18 +3978,27 @@ if (!function_exists('bingo_ensure_contacts_schema')) {
             }
 
             $phoneTarget = '+593987166233';
+            $nameTarget = 'Rey Bingo';
+            $chargeTarget = 'Atención al cliente';
 
             $existing = $db->table('contacts')
                 ->where('id', 1)
                 ->orWhere('name', 'Luis Perez')
+                ->orWhere('name', $nameTarget)
                 ->get()
                 ->getRowArray();
 
             if ($existing) {
-                if (($existing['phone'] ?? '') !== $phoneTarget) {
+                if (
+                    ($existing['phone'] ?? '') !== $phoneTarget
+                    || ($existing['name'] ?? '') !== $nameTarget
+                    || ($existing['charge'] ?? '') !== $chargeTarget
+                ) {
                     $db->table('contacts')
                         ->where('id', (int) $existing['id'])
                         ->update([
+                            'name' => $nameTarget,
+                            'charge' => $chargeTarget,
                             'phone' => $phoneTarget,
                             'updated_at' => date('Y-m-d H:i:s'),
                         ]);
@@ -3997,9 +4006,9 @@ if (!function_exists('bingo_ensure_contacts_schema')) {
             } else {
                 $db->table('contacts')->insert([
                     'id' => 1,
-                    'name' => 'Luis Perez',
+                    'name' => $nameTarget,
                     'phone' => $phoneTarget,
-                    'charge' => 'Soporte de Ventas',
+                    'charge' => $chargeTarget,
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s'),
                     'status' => 1,

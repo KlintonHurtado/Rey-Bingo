@@ -166,7 +166,7 @@ CREATE TABLE `contacts` (
 --
 
 INSERT INTO `contacts` (`id`, `name`, `phone`, `charge`, `created_at`, `updated_at`, `status`) VALUES
-(1, 'Luis Perez', '+593987166233', 'Soporte de Ventas', '2025-01-26 17:29:51', '2025-08-25 04:31:42', 1);
+(1, 'Rey Bingo', '+593987166233', 'Atención al cliente', '2025-01-26 17:29:51', '2025-08-25 04:31:42', 1);
 
 -- --------------------------------------------------------
 
