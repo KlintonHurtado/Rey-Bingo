@@ -3954,8 +3954,59 @@ if (!function_exists('bingo_ensure_system_settings_schema')) {
                     ]);
                 }
             }
+
+            bingo_ensure_contacts_schema();
         } catch (\Throwable $e) {
             log_message('error', 'No se pudo actualizar el esquema de system: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_ensure_contacts_schema')) {
+    function bingo_ensure_contacts_schema(): void
+    {
+        static $contactsEnsured = false;
+        if ($contactsEnsured) {
+            return;
+        }
+        $contactsEnsured = true;
+
+        try {
+            $db = \Config\Database::connect();
+            if (!$db->tableExists('contacts')) {
+                return;
+            }
+
+            $phoneTarget = '+593987166233';
+
+            $existing = $db->table('contacts')
+                ->where('id', 1)
+                ->orWhere('name', 'Luis Perez')
+                ->get()
+                ->getRowArray();
+
+            if ($existing) {
+                if (($existing['phone'] ?? '') !== $phoneTarget) {
+                    $db->table('contacts')
+                        ->where('id', (int) $existing['id'])
+                        ->update([
+                            'phone' => $phoneTarget,
+                            'updated_at' => date('Y-m-d H:i:s'),
+                        ]);
+                }
+            } else {
+                $db->table('contacts')->insert([
+                    'id' => 1,
+                    'name' => 'Luis Perez',
+                    'phone' => $phoneTarget,
+                    'charge' => 'Soporte de Ventas',
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                    'status' => 1,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'Error en bingo_ensure_contacts_schema: ' . $e->getMessage());
         }
     }
 }
