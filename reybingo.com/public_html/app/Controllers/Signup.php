@@ -422,7 +422,7 @@ class Signup extends Controller {
 
             return $this->response->setJSON([
                 'success' => true,
-                'redirect' => site_url('/store/funding?store_registered=1'),
+                'redirect' => site_url('/store/recharge?store_registered=1'),
             ]);
         }
 

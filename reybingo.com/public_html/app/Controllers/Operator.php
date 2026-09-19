@@ -142,7 +142,7 @@ class Operator extends Controller
 
         bingo_set_acting_store_id($storeId);
 
-        return redirect()->to('/store/funding');
+        return redirect()->to('/store/recharge');
     }
 
     public function leaveStore()

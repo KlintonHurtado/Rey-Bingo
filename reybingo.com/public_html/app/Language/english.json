@@ -1157,7 +1157,7 @@
     "back to store panel": "Back to point of sale panel",
     "store registering player note": "You are registering a player affiliated to your point of sale.",
     "invalid operator signup session": "Invalid OPERATOR signup session. Please use the affiliate link again.",
-    "operator enter store hint": "Enter the full point of sale panel to request balance, recharge players, and more.",
+    "operator enter store hint": "Enter the full point of sale panel to recharge players and more.",
     "operator commissions panel": "OPERATOR commissions",
     "operator commissions panel description": "OPERATOR GGR commission summary (margin = total rate − PV % per player).",
     "operator commissions three rates description": "Configured commissions: Affiliates, Recharges and Withdrawals.",

@@ -109,7 +109,7 @@ class Store extends Controller
             return $redirect;
         }
 
-        return redirect()->to('/store/funding');
+        return redirect()->to('/store/recharge');
     }
 
     private function renderStorePage(string $view, array $viewData, string $title)
@@ -147,25 +147,7 @@ class Store extends Controller
             return $redirect;
         }
 
-        $modelDeposits = new DepositsModel();
-        $modelBanks = new BanksModel();
-        $storeId = $this->getEffectiveStoreId();
-        $banks = $modelBanks->where('status', 1)->findAll();
-
-        $fundingRequests = $this->applyStoreFundingFilter(
-            $modelDeposits->where('user', $storeId)
-        )
-            ->orderBy('created_at', 'DESC')
-            ->findAll(30);
-
-        foreach ($fundingRequests as &$request) {
-            $request['status_label'] = $this->formatRechargeStatus((int) $request['status']);
-        }
-
-        return $this->renderStorePage('store/funding', [
-            'fundingRequests' => $fundingRequests,
-            'banks' => $banks,
-        ], translate('request store balance'));
+        return redirect()->to('/store/recharge');
     }
 
     public function recharge()

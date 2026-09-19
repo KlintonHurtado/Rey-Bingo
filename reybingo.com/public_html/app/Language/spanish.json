@@ -1154,7 +1154,7 @@
     "back to store panel": "Volver al panel del Punto de venta",
     "store registering player note": "Estás registrando un jugador afiliado a tu Punto de venta.",
     "invalid operator signup session": "La sesión de registro de OPERADOR no es válida. Usa el enlace de afiliado nuevamente.",
-    "operator enter store hint": "Ingresa al panel completo del Punto de venta para solicitar saldo, recargar jugadores y más.",
+    "operator enter store hint": "Ingresa al panel completo del Punto de venta para recargar jugadores y más.",
     "operator commissions panel": "Comisiones del OPERADOR",
     "operator commissions panel description": "Resumen de comisiones GGR del OPERADOR (margen = tasa total − % del PV por jugador).",
     "operator commissions three rates description": "Comisiones configuradas: Afiliados, Recargas y Retiros.",

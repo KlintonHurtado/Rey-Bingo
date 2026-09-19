@@ -19,12 +19,6 @@
                 </div>
             </div>
 
-            <?php if ((float) ($walletSummary['recharge'] ?? 0) <= 0) : ?>
-                <div class="alert alert-warning store-alert-compact small">
-                    <?= translate('no store balance yet request admin approval'); ?>
-                    <a href="<?= site_url('store/funding'); ?>" class="alert-link"><?= translate('request store balance'); ?></a>
-                </div>
-            <?php endif; ?>
 
             <?php echo form_open(site_url('store/rechargeSubmit'), ['id' => 'store-recharge-form']); ?>
                 <?= csrf_field() ?>
