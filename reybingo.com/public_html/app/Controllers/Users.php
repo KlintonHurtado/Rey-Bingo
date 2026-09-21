@@ -215,7 +215,11 @@ class Users extends Controller {
             ],
             'business_name' => [
                 'label' => translate('business name'),
-                'rules' => 'required|min_length[2]|max_length[255]',
+                'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name,id,' . $storeId . ']',
+            ],
+            'username' => [
+                'label' => translate('username'),
+                'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username,id,' . $storeId . ']',
             ],
             'document' => [
                 'label' => translate('document'),
@@ -251,12 +255,16 @@ class Users extends Controller {
         $storeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_commission_rate'));
         $ggrCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('ggr_commission_rate'));
         $prizeCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('store_prize_commission_rate'));
+        $customUsername = trim((string) $this->request->getPost('username'));
+        $storeUsername = $customUsername !== ''
+            ? $customUsername
+            : bingo_generate_store_username($email, $model, $storeId ?: null);
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
             'business_name' => trim((string) $this->request->getPost('business_name')),
             'email' => $email,
-            'username' => bingo_generate_store_username($email, $model, $storeId ?: null),
+            'username' => $storeUsername,
             'group' => bingo_group_store(),
             'status' => 1,
             'sounds' => 0,
@@ -556,6 +564,14 @@ class Users extends Controller {
                 'label' => translate('email'),
                 'rules' => 'required|valid_email|is_unique[users.email,id,' . $operatorId . ']',
             ],
+            'business_name' => [
+                'label' => translate('business name'),
+                'rules' => 'permit_empty|min_length[2]|max_length[255]|is_unique[users.business_name,id,' . $operatorId . ']',
+            ],
+            'username' => [
+                'label' => translate('username'),
+                'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username,id,' . $operatorId . ']',
+            ],
             'document' => [
                 'label' => translate('document'),
                 'rules' => 'permit_empty|max_length[50]',
@@ -603,12 +619,16 @@ class Users extends Controller {
         $operatorCommissionRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_commission_rate'));
         $operatorRechargeRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_recharge_rate'));
         $operatorWithdrawRate = bingo_parse_store_commission_rate_post($this->request->getPost('operator_withdraw_rate'));
+        $customUsername = trim((string) $this->request->getPost('username'));
+        $opUsername = $customUsername !== ''
+            ? $customUsername
+            : bingo_generate_operator_username($email, $model, $operatorId ?: null);
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
             'business_name' => $businessName,
             'email' => $email,
-            'username' => bingo_generate_operator_username($email, $model, $operatorId ?: null),
+            'username' => $opUsername,
             'group' => bingo_group_operator(),
             'status' => 1,
             'sounds' => 0,

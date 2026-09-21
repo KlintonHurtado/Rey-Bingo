@@ -14,12 +14,20 @@ class UsersModel extends Model {
     // Desactivar timestamps automáticos
     protected $useTimestamps = true;
 
-    // Función para obtener el usuario por email o username (incluyendo usuarios inactivos o eliminados)
+    // Función para obtener el usuario por email, username, business_name o teléfono (incluyendo usuarios inactivos o eliminados)
     public function getUserByUsername($input) {
-        return $this->where('username', $input)
+        $input = trim((string) $input);
+        if ($input === '') {
+            return null;
+        }
+
+        return $this->groupStart()
+                    ->where('username', $input)
                     ->orWhere('email', $input)
+                    ->orWhere('business_name', $input)
                     ->orWhere('phone', $input)
-                    ->first();
+                ->groupEnd()
+                ->first();
     }
     
     // Función para obtener el usuario por id (incluyendo usuarios inactivos o eliminados)

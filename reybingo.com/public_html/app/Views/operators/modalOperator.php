@@ -42,8 +42,9 @@
                     </div>
 
                     <div class="col-md-12 mb-2">
-                        <label for="operator-business-name" class="form-label">Nombre Comercial / Marca del Operador</label>
-                        <input type="text" class="form-control form-control-lg form-bingo" name="business_name" id="operator-business-name" value="<?= $isUpdate ? esc($operatorData['business_name'] ?? '') : '' ?>" autocomplete="off" placeholder="Nombre comercial o marca">
+                        <label for="operator-business_name" class="form-label">Nombre Comercial / Marca del Operador</label>
+                        <input type="text" class="form-control form-control-lg form-bingo" name="business_name" id="operator-business_name" value="<?= $isUpdate ? esc($operatorData['business_name'] ?? '') : '' ?>" autocomplete="off" placeholder="Nombre comercial o marca">
+                        <small id="business_name-error" class="text-danger d-none"></small>
                     </div>
 
                     <div class="col-md-6 mb-2">

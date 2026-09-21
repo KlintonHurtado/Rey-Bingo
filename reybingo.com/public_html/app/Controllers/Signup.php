@@ -212,6 +212,14 @@ class Signup extends Controller {
                 'label' => translate('email'),
                 'rules' => 'required|valid_email|is_unique[users.email]',
             ],
+            'business_name' => [
+                'label' => translate('business name'),
+                'rules' => 'permit_empty|min_length[2]|max_length[255]|is_unique[users.business_name]',
+            ],
+            'username' => [
+                'label' => translate('username'),
+                'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username]',
+            ],
             'document' => [
                 'label' => translate('document'),
                 'rules' => 'required|numeric|is_unique[users.document]',
@@ -343,7 +351,11 @@ class Signup extends Controller {
             ],
             'business_name' => [
                 'label' => translate('business name'),
-                'rules' => 'required|min_length[2]|max_length[255]',
+                'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name]',
+            ],
+            'username' => [
+                'label' => translate('username'),
+                'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username]',
             ],
             'email' => [
                 'label' => translate('email'),

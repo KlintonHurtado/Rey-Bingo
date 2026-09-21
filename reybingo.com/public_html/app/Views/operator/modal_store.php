@@ -19,6 +19,12 @@
                     </div>
 
                     <div class="col-md-12 mb-2">
+                        <label for="operator-store-email" class="form-label"><?= translate('email'); ?> <small class="text-muted">(<?= translate('optional'); ?>)</small></label>
+                        <input type="email" class="form-control form-control-lg form-bingo" name="email" id="operator-store-email" placeholder="<?= translate('email'); ?>" autocomplete="off">
+                        <small id="email-error" class="text-danger d-none"></small>
+                    </div>
+
+                    <div class="col-md-12 mb-2">
                         <label for="operator-store-phone" class="form-label"><?= translate('phone'); ?></label>
                         <input type="text" class="form-control form-control-lg form-bingo" name="phone" id="operator-store-phone" placeholder="<?= translate('phone'); ?>" autocomplete="off">
                         <small id="phone-error" class="text-danger d-none"></small>

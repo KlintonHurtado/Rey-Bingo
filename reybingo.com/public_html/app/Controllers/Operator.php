@@ -246,7 +246,11 @@ class Operator extends Controller
         $validationRules = [
             'business_name' => [
                 'label' => translate('business name'),
-                'rules' => 'required|min_length[2]|max_length[255]',
+                'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name]',
+            ],
+            'email' => [
+                'label' => translate('email'),
+                'rules' => 'permit_empty|valid_email|is_unique[users.email]',
             ],
             'address_line' => [
                 'label' => translate('address'),
@@ -268,12 +272,17 @@ class Operator extends Controller
         $businessName = trim((string) $this->request->getPost('business_name'));
         $addressLine = trim((string) $this->request->getPost('address_line'));
         $phoneInput = trim((string) $this->request->getPost('phone'));
+        $emailInput = strtolower(trim((string) $this->request->getPost('email')));
         $lastUser = $model->orderBy('id', 'DESC')->first();
         $nextId = $lastUser ? ((int) $lastUser['id'] + 1) : 1;
 
-        do {
-            $email = sprintf('pv.%d.%s@reybingo.local', $operatorId, bin2hex(random_bytes(6)));
-        } while ($model->where('email', $email)->first());
+        if ($emailInput !== '') {
+            $email = $emailInput;
+        } else {
+            do {
+                $email = sprintf('pv.%d.%s@reybingo.local', $operatorId, bin2hex(random_bytes(6)));
+            } while ($model->where('email', $email)->first());
+        }
 
         $data = [
             'firstname' => $businessName,
