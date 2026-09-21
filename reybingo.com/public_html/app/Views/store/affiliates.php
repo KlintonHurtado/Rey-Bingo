@@ -11,9 +11,6 @@ $storeAffiliateLink = function_exists('bingo_store_affiliate_link') ? bingo_stor
 $storeCode = $storeUser['referred_code'] ?? $storeUser['code'] ?? '';
 $referredPlayers = $referredPlayers ?? [];
 $referredCount = (int) ($referredCount ?? count($referredPlayers));
-$appName = defined('APP_NAME') ? APP_NAME : 'Rey Bingo';
-$whatsappShareText = rawurlencode("🎉 ¡Regístrate en {$appName} 🎱 y empieza a jugar!\n👉 Crea tu cuenta gratis con nuestro Punto de Venta aquí:\n{$storeAffiliateLink}");
-$whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappShareText}";
 ?>
 
 <div class="card store-panel-card h-100" style="min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
@@ -80,9 +77,6 @@ $whatsappUrl = "https://api.whatsapp.com/send?text={$whatsappShareText}";
                         <button class="btn btn-primary btn-sm px-3" type="button" onclick="copyStoreAffiliateLinkMain();" style="background: #6236ff; border-color: #6236ff; font-weight: 600;">
                             <i class="fa-duotone fa-solid fa-copy me-1"></i> Copiar Enlace
                         </button>
-                        <a href="<?= $whatsappUrl; ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm px-3" style="background: #25D366; border-color: #25D366; font-weight: 600;">
-                            <i class="fa-brands fa-whatsapp me-1"></i> Compartir por WhatsApp
-                        </a>
                         <a href="<?= esc($storeAffiliateLink); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm px-3">
                             <i class="fa-duotone fa-solid fa-arrow-up-right-from-square me-1"></i> Probar Enlace
                         </a>
