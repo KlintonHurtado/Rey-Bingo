@@ -660,13 +660,25 @@ html:has(#content-page > .operator-panel-fit) {
     overflow: hidden;
 }
 
-.store-panel-fit .store-panel-card {
+.store-panel-fit .store-panel-card:not(.operator-panel-pane) {
     height: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     pointer-events: auto;
+}
+
+.store-panel-fit .operator-panel-pane {
+    display: none !important;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.store-panel-fit .operator-panel-pane.is-active {
+    display: flex !important;
+    flex-direction: column;
 }
 
 .store-panel-fit .store-tab-body,
@@ -4122,14 +4134,14 @@ small.text-danger {
 }
 
 .operator-panel-pane {
-    display: none;
+    display: none !important;
     flex: 1;
     min-height: 0;
     height: 100%;
 }
 
 .operator-panel-pane.is-active {
-    display: flex;
+    display: flex !important;
     flex-direction: column;
 }
 
