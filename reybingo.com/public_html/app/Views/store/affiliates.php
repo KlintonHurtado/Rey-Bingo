@@ -14,9 +14,9 @@ $referredCount = (int) ($referredCount ?? count($referredPlayers));
 ?>
 
 <div class="card store-panel-card h-100" style="min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
-    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 2.5rem !important;">
+    <div class="card-body p-3 p-md-4 store-movements-scroll-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 3.5rem !important;">
         <!-- Encabezado de la Sección -->
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" style="flex-shrink: 0;">
             <div class="d-flex align-items-center gap-2">
                 <div class="operator-panel-pane-icon" style="width: 38px; height: 38px; font-size: 1.15rem; background: rgba(98, 54, 255, 0.12); color: #6236ff; display: flex; align-items: center; justify-content: center; border-radius: 10px;">
                     <i class="fa-duotone fa-solid fa-users"></i>
@@ -34,8 +34,8 @@ $referredCount = (int) ($referredCount ?? count($referredPlayers));
         </div>
 
         <!-- Tarjeta Principal de Enlace de Afiliado y Código QR -->
-        <div class="card border-0 shadow-sm p-3 p-md-4 mb-3" style="border-radius: 14px; background: linear-gradient(135deg, rgba(98,54,255,0.06) 0%, rgba(98,54,255,0.02) 100%); border: 1px solid rgba(98,54,255,0.18) !important;">
-            <div class="row align-items-center g-3">
+        <div class="card border-0 shadow-sm p-3 p-md-4 mb-4" style="flex-shrink: 0; border-radius: 14px; background: linear-gradient(135deg, rgba(98,54,255,0.06) 0%, rgba(98,54,255,0.02) 100%); border: 1px solid rgba(98,54,255,0.18) !important; overflow: visible !important;">
+            <div class="row align-items-start g-3">
                 <!-- QR Code Box -->
                 <div class="col-12 col-md-auto text-center">
                     <div class="p-2 bg-white rounded-3 shadow-sm d-inline-block border">
@@ -65,7 +65,7 @@ $referredCount = (int) ($referredCount ?? count($referredPlayers));
                     </p>
 
                     <!-- Caja con el enlace completo visible (sin cortes) -->
-                    <div class="p-2 px-3 bg-white rounded border mb-2" style="word-break: break-all; word-wrap: break-word; font-family: monospace; font-size: 0.86rem; color: #4b2be0; background-color: #ffffff; border: 1px solid #dee2e6;">
+                    <div class="p-2 px-3 bg-white rounded border mb-3" style="word-break: break-all; word-wrap: break-word; font-family: monospace; font-size: 0.86rem; color: #4b2be0; background-color: #ffffff; border: 1px solid #dee2e6;">
                         <i class="fa-duotone fa-solid fa-globe me-1 text-muted"></i>
                         <span id="store-affiliate-link-text"><?= esc($storeAffiliateLink); ?></span>
                     </div>
@@ -73,11 +73,11 @@ $referredCount = (int) ($referredCount ?? count($referredPlayers));
                     <input type="hidden" id="store-affiliate-link-input" value="<?= esc($storeAffiliateLink); ?>">
 
                     <!-- Botones de Acción -->
-                    <div class="d-flex flex-wrap gap-2 pt-1">
-                        <button class="btn btn-primary btn-sm px-3" type="button" onclick="copyStoreAffiliateLinkMain();" style="background: #6236ff; border-color: #6236ff; font-weight: 600;">
+                    <div class="d-flex flex-wrap gap-2 pt-1 pb-1">
+                        <button class="btn btn-primary btn-sm px-3 py-2" type="button" onclick="copyStoreAffiliateLinkMain();" style="background: #6236ff; border-color: #6236ff; font-weight: 600; box-shadow: 0 2px 4px rgba(98,54,255,0.2);">
                             <i class="fa-duotone fa-solid fa-copy me-1"></i> Copiar Enlace
                         </button>
-                        <a href="<?= esc($storeAffiliateLink); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm px-3">
+                        <a href="<?= esc($storeAffiliateLink); ?>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm px-3 py-2 fw-semibold">
                             <i class="fa-duotone fa-solid fa-arrow-up-right-from-square me-1"></i> Probar Enlace
                         </a>
                     </div>
@@ -86,7 +86,7 @@ $referredCount = (int) ($referredCount ?? count($referredPlayers));
         </div>
 
         <!-- Lista de Jugadores Vinculados -->
-        <div class="card border-0 shadow-sm p-3" style="border-radius: 14px;">
+        <div class="card border-0 shadow-sm p-3 mb-4" style="flex-shrink: 0; border-radius: 14px; overflow: visible !important;">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <div>
                     <h6 class="mb-0 fw-bold text-dark">

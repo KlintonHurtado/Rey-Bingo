@@ -961,13 +961,17 @@ html:has(#content-page > .operator-panel-fit) {
 }
 
 .store-movements-scroll-body {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto !important;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
     -webkit-overflow-scrolling: touch;
+}
+
+.store-movements-scroll-body > * {
+    flex-shrink: 0;
 }
 
 .store-filter-input {
