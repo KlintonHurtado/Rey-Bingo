@@ -62,8 +62,8 @@
                         
                         <div class="row">
                             <div class="col-md-12 mb-1">
-                                <label for="username" class="form-label"><?= translate('username'); ?> o <?= strtolower(translate('email')); ?></label>
-                                <input type="text" class="form-control form-control-lg form-bingo" name="username" id="username" placeholder="<?= translate('username'); ?> o <?= strtolower(translate('email')); ?>" autofocus autocomplete="off">
+                                <label for="username" class="form-label"><?= translate('business name'); ?>, <?= strtolower(translate('username')); ?> o <?= strtolower(translate('email')); ?></label>
+                                <input type="text" class="form-control form-control-lg form-bingo" name="username" id="username" placeholder="<?= translate('business name'); ?>, <?= strtolower(translate('username')); ?> o <?= strtolower(translate('email')); ?>" autofocus autocomplete="off">
                                 <small id="username-error" class="text-danger d-none"></small>
                             </div>
                             

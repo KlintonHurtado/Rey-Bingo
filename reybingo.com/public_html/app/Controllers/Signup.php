@@ -251,13 +251,19 @@ class Signup extends Controller {
 
         $phoneInput = trim((string) $this->request->getPost('phone'));
 
+        $customUsername = trim((string) $this->request->getPost('username'));
+        $opUsername = $customUsername !== ''
+            ? $customUsername
+            : bingo_generate_operator_username($email, $model);
+
         $data = [
             'firstname' => trim((string) $this->request->getPost('firstname')),
             'lastname' => trim((string) $this->request->getPost('lastname')),
+            'business_name' => trim((string) $this->request->getPost('business_name')),
             'email' => $email,
             'document' => trim((string) $this->request->getPost('document')),
             'address_line' => trim((string) $this->request->getPost('address_line')),
-            'username' => bingo_generate_operator_username($email, $model),
+            'username' => $opUsername,
             'group' => bingo_group_operator(),
             'status' => 1,
             'sounds' => 0,
