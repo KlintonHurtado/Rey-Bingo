@@ -216,10 +216,16 @@ class Users extends Controller {
             'business_name' => [
                 'label' => translate('business name'),
                 'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name,id,' . $storeId . ']',
+                'errors' => [
+                    'is_unique' => 'El nombre del negocio ya está registrado. No se puede repetir el nombre del negocio.',
+                ],
             ],
             'username' => [
                 'label' => translate('username'),
                 'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username,id,' . $storeId . ']',
+                'errors' => [
+                    'is_unique' => translate('username already in use'),
+                ],
             ],
             'document' => [
                 'label' => translate('document'),
@@ -567,10 +573,16 @@ class Users extends Controller {
             'business_name' => [
                 'label' => translate('business name'),
                 'rules' => 'permit_empty|min_length[2]|max_length[255]|is_unique[users.business_name,id,' . $operatorId . ']',
+                'errors' => [
+                    'is_unique' => 'El nombre del negocio ya está registrado. No se puede repetir el nombre del negocio.',
+                ],
             ],
             'username' => [
                 'label' => translate('username'),
                 'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username,id,' . $operatorId . ']',
+                'errors' => [
+                    'is_unique' => translate('username already in use'),
+                ],
             ],
             'document' => [
                 'label' => translate('document'),

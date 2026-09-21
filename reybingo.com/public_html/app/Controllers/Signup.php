@@ -215,10 +215,16 @@ class Signup extends Controller {
             'business_name' => [
                 'label' => translate('business name'),
                 'rules' => 'permit_empty|min_length[2]|max_length[255]|is_unique[users.business_name]',
+                'errors' => [
+                    'is_unique' => 'El nombre del negocio ya está registrado. No se puede repetir el nombre del negocio.',
+                ],
             ],
             'username' => [
                 'label' => translate('username'),
                 'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username]',
+                'errors' => [
+                    'is_unique' => translate('username already in use'),
+                ],
             ],
             'document' => [
                 'label' => translate('document'),
@@ -358,10 +364,16 @@ class Signup extends Controller {
             'business_name' => [
                 'label' => translate('business name'),
                 'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name]',
+                'errors' => [
+                    'is_unique' => 'El nombre del negocio ya está registrado. No se puede repetir el nombre del negocio.',
+                ],
             ],
             'username' => [
                 'label' => translate('username'),
                 'rules' => 'permit_empty|min_length[3]|max_length[100]|is_unique[users.username]',
+                'errors' => [
+                    'is_unique' => translate('username already in use'),
+                ],
             ],
             'email' => [
                 'label' => translate('email'),

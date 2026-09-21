@@ -247,10 +247,16 @@ class Operator extends Controller
             'business_name' => [
                 'label' => translate('business name'),
                 'rules' => 'required|min_length[2]|max_length[255]|is_unique[users.business_name]',
+                'errors' => [
+                    'is_unique' => 'El nombre del negocio ya está registrado. No se puede repetir el nombre del negocio.',
+                ],
             ],
             'email' => [
                 'label' => translate('email'),
                 'rules' => 'permit_empty|valid_email|is_unique[users.email]',
+                'errors' => [
+                    'is_unique' => translate('email already in use'),
+                ],
             ],
             'address_line' => [
                 'label' => translate('address'),
