@@ -30,8 +30,8 @@ $withEarned = (float) ($stats['withdraw']['total_earned'] ?? 0);
 $totalCommissions = (float) ($stats['total_commissions_earned'] ?? bingo_commission_totals_sum($ggrEarned, $recEarned, $withEarned));
 ?>
 
-<div class="card store-panel-card h-100" style="min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
-    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
+<div class="card store-panel-card h-100" style="min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 2.5rem !important;">
         <!-- Encabezado de Comisiones -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
             <div class="d-flex align-items-center gap-2">

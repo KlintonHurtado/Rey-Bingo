@@ -10,8 +10,8 @@ $currency = systemGet('currency') ?? '$';
 $stats = $stats ?? [];
 ?>
 
-<div class="card store-panel-card h-100" style="min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
-    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;">
+<div class="card store-panel-card h-100" style="min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="card-body p-3 store-movements-scroll-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 2.5rem !important;">
         <!-- Encabezado de la Sección -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
             <div>

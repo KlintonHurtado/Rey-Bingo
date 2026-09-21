@@ -90,4 +90,4 @@ $currency = systemGet('currency') ?? '$';
             </div>
         </aside>
 
-        <main class="store-panel-page-content">
+        <main class="store-panel-page-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; overflow: hidden;">

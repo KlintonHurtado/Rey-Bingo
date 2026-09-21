@@ -651,8 +651,32 @@ html:has(#content-page > .operator-panel-fit) {
     pointer-events: auto;
 }
 
+.store-panel-page-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
 .store-panel-fit .store-panel-card {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     pointer-events: auto;
+}
+
+.store-panel-fit .store-tab-body,
+.store-panel-fit .store-movements-scroll-body,
+.store-panel-fit .store-panel-card > .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 .store-panel-shell {

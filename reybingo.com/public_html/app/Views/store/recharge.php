@@ -7,8 +7,8 @@
 
 <?php $currency = esc(systemGet('currency')); ?>
 
-<div class="card store-panel-card h-100">
-    <div class="card-body store-tab-body">
+<div class="card store-panel-card h-100" style="min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+    <div class="card-body store-tab-body" style="flex: 1 1 auto; min-height: 0; overflow-y: auto !important; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 2.5rem !important;">
         <div class="store-tab-form">
             <h6 class="store-tab-form-title"><i class="fa-duotone fa-solid fa-bolt"></i> <?= translate('recharge player'); ?></h6>
 
