@@ -956,134 +956,88 @@ class Operator extends Controller
             $dateTo !== '' ? $dateTo : null
         );
 
-        $storeCodeMap = [];
-        foreach ($stores as $st) {
-            $sid = (int) ($st['id'] ?? 0);
-            if ($sid > 0) {
-                $storeCodeMap[$sid] = (string) ($st['code'] ?? '');
-            }
-        }
-
-        $storeIds = array_keys($storeCodeMap);
-
-        $breakdown = bingo_fetch_operator_detailed_commissions_breakdown($operatorId, [
-            'date_from' => $dateFrom,
-            'date_to'   => $dateTo,
-            'store_id'  => 'all',
-            'rate_type' => 'all',
-        ]);
-
         $headers = [
-            'Fecha',
-            'Punto de Venta',
-            'Codigo',
-            'Tipo',
-            'Referencia',
-            'Total apostado',
-            'Total premios',
-            'Monto operacion / GGR',
-            'Tasa PV (%)',
-            'Comision PV',
+            'Nombre del negocio',
+            'Código',
+            'Total Recargas',
+            'Comisión Recargas',
+            'Total Retiros',
+            'Comisión Retiros',
+            'Total Ap Afiliados',
+            'Total Premios Afiliados',
+            'GGR',
+            'Comisión GGR',
+            'TOTAL COMISIÓN',
         ];
 
         $rows = [];
-        $storeGgrStakeSum = [];
-        $storeGgrPayoutSum = [];
-
-        foreach ($breakdown['items'] ?? [] as $item) {
-            $stId = (int) ($item['store_id'] ?? 0);
-            if ($stId <= 0 || $stId === $operatorId || ! in_array($stId, $storeIds, true)) {
-                continue;
-            }
-
-            $stCommission = round((float) ($item['store_commission'] ?? 0), 2);
-            $baseAmount = round((float) ($item['base_amount'] ?? 0), 2);
-            $isGgr = (string) ($item['rate_type'] ?? '') === 'ggr';
-            $totalStake = $isGgr ? round((float) ($item['total_stake'] ?? 0), 2) : '';
-            $totalPayout = $isGgr ? round((float) ($item['total_payout'] ?? 0), 2) : '';
-
-            if ($isGgr) {
-                $storeGgrStakeSum[$stId] = ($storeGgrStakeSum[$stId] ?? 0) + (float) ($item['total_stake'] ?? 0);
-                $storeGgrPayoutSum[$stId] = ($storeGgrPayoutSum[$stId] ?? 0) + (float) ($item['total_payout'] ?? 0);
-            }
-
-            if ($stCommission <= 0 && $baseAmount <= 0) {
-                continue;
-            }
-
-            $datetime = (string) ($item['datetime'] ?? '');
-            if ($datetime !== '' && strtotime($datetime) !== false) {
-                $datetime = date('d/m/Y H:i:s', strtotime($datetime));
-            }
-
-            $rows[] = [
-                $datetime,
-                (string) ($item['store_name'] ?? '-'),
-                $storeCodeMap[$stId] ?? '',
-                (string) ($item['rate_type_label'] ?? ''),
-                (string) ($item['ref_code'] ?? ''),
-                $totalStake,
-                $totalPayout,
-                $baseAmount,
-                number_format(((float) ($item['store_rate'] ?? 0)) * 100, 2) . '%',
-                $stCommission,
-            ];
-        }
-
-        usort($rows, static function (array $a, array $b): int {
-            $cmp = strcmp((string) ($a[1] ?? ''), (string) ($b[1] ?? ''));
-            if ($cmp !== 0) {
-                return $cmp;
-            }
-
-            return strcmp((string) ($b[0] ?? ''), (string) ($a[0] ?? ''));
-        });
-
-        $rows[] = ['', '', '', '', '', '', '', '', '', ''];
-        $rows[] = ['', 'RESUMEN POR PUNTO DE VENTA', '', '', '', '', '', '', '', ''];
-
-        $sumRec = 0.0;
-        $sumRet = 0.0;
-        $sumGgr = 0.0;
-        $sumTotal = 0.0;
-        $sumStake = 0.0;
-        $sumPayout = 0.0;
+        $totRecargasBase = 0.0;
+        $totRecargasComision = 0.0;
+        $totRetirosBase = 0.0;
+        $totRetirosComision = 0.0;
+        $totApuestasAfiliados = 0.0;
+        $totPremiosAfiliados = 0.0;
+        $totGgrBase = 0.0;
+        $totGgrComision = 0.0;
+        $totGranTotalComision = 0.0;
 
         foreach ($storesCommissions['stores'] ?? [] as $storeRow) {
             $name = (string) ($storeRow['name'] ?? '-');
             $code = (string) ($storeRow['code'] ?? '');
-            $sid = (int) ($storeRow['id'] ?? 0);
-            $rec = round((float) ($storeRow['recharge_store'] ?? 0), 2);
-            $ret = round((float) ($storeRow['withdraw_store'] ?? 0), 2);
-            $ggr = round((float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0), 2);
-            $total = round($rec + $ret + $ggr, 2);
-            $stakeSum = round((float) ($storeGgrStakeSum[$sid] ?? 0), 2);
-            $payoutSum = round((float) ($storeGgrPayoutSum[$sid] ?? 0), 2);
+            $recBase = round((float) ($storeRow['recharge_base'] ?? 0), 2);
+            $recCom  = round((float) ($storeRow['recharge_store'] ?? 0), 2);
+            $retBase = round((float) ($storeRow['withdraw_base'] ?? 0), 2);
+            $retCom  = round((float) ($storeRow['withdraw_store'] ?? 0), 2);
+            $apAf    = round((float) ($storeRow['affiliate_stakes'] ?? 0), 2);
+            $prAf    = round((float) ($storeRow['affiliate_payouts'] ?? 0), 2);
+            $ggrBase = round((float) ($storeRow['ggr_base'] ?? $storeRow['total_ggr'] ?? 0), 2);
+            $ggrCom  = round((float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0), 2);
+            $totalCom = round((float) ($storeRow['total_commission'] ?? ($recCom + $retCom + $ggrCom)), 2);
 
-            $sumRec += $rec;
-            $sumRet += $ret;
-            $sumGgr += $ggr;
-            $sumTotal += $total;
-            $sumStake += $stakeSum;
-            $sumPayout += $payoutSum;
+            $totRecargasBase += $recBase;
+            $totRecargasComision += $recCom;
+            $totRetirosBase += $retBase;
+            $totRetirosComision += $retCom;
+            $totApuestasAfiliados += $apAf;
+            $totPremiosAfiliados += $prAf;
+            $totGgrBase += $ggrBase;
+            $totGgrComision += $ggrCom;
+            $totGranTotalComision += $totalCom;
 
-            $rows[] = ['', $name, $code, 'Total Recargas', '', '', '', '', '', $rec];
-            $rows[] = ['', $name, $code, 'Total Retiros', '', '', '', '', '', $ret];
-            $rows[] = ['', $name, $code, 'Total GGR', '', $stakeSum, $payoutSum, '', '', $ggr];
-            $rows[] = ['', $name, $code, 'Total comisiones', '', '', '', '', '', $total];
+            $rows[] = [
+                $name,
+                $code,
+                $recBase,
+                $recCom,
+                $retBase,
+                $retCom,
+                $apAf,
+                $prAf,
+                $ggrBase,
+                $ggrCom,
+                $totalCom,
+            ];
         }
 
-        $rows[] = ['', '', '', '', '', '', '', '', '', ''];
-        $rows[] = ['', 'TOTALES GENERAL', '', 'Total Recargas', '', '', '', '', '', round($sumRec, 2)];
-        $rows[] = ['', 'TOTALES GENERAL', '', 'Total Retiros', '', '', '', '', '', round($sumRet, 2)];
-        $rows[] = ['', 'TOTALES GENERAL', '', 'Total GGR', '', round($sumStake, 2), round($sumPayout, 2), '', '', round($sumGgr, 2)];
-        $rows[] = ['', 'TOTALES GENERAL', '', 'Total comisiones', '', '', '', '', '', round($sumTotal, 2)];
+        $rows[] = [
+            'TOTALES',
+            '',
+            round($totRecargasBase, 2),
+            round($totRecargasComision, 2),
+            round($totRetirosBase, 2),
+            round($totRetirosComision, 2),
+            round($totApuestasAfiliados, 2),
+            round($totPremiosAfiliados, 2),
+            round($totGgrBase, 2),
+            round($totGgrComision, 2),
+            round($totGranTotalComision, 2),
+        ];
 
         $periodLabel = ($dateFrom !== '' || $dateTo !== '')
             ? ' (' . ($dateFrom !== '' ? $dateFrom : '…') . ' a ' . ($dateTo !== '' ? $dateTo : '…') . ')'
             : '';
 
-        $filename = 'comisiones_puntos_venta_detalle_' . date('Y-m-d_His') . '.xls';
+        $filename = 'comisiones_puntos_venta_' . date('Y-m-d_His') . '.xls';
 
         return (new ExcelExport())->downloadResponse(
             $headers,
@@ -1091,8 +1045,8 @@ class Operator extends Controller
             $filename,
             [
                 'sheet_name' => 'Comisiones PV',
-                'title' => 'Rey Bingo - Detalle comisiones Puntos de venta' . $periodLabel,
-                'numeric_columns' => [5, 6, 7, 9],
+                'title' => 'Rey Bingo - Comisiones de Puntos de Venta' . $periodLabel,
+                'numeric_columns' => [3, 4, 5, 6, 7, 8, 9, 10, 11],
             ]
         );
     }

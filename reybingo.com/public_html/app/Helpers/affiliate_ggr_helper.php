@@ -1579,28 +1579,61 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
                 }
                 if (! isset($perStoreThree[$sid])) {
                     $perStoreThree[$sid] = [
-                        'recharge_store' => 0.0,
+                        'recharge_base'     => 0.0,
+                        'recharge_store'    => 0.0,
                         'recharge_operator' => 0.0,
-                        'withdraw_store' => 0.0,
+                        'withdraw_base'     => 0.0,
+                        'withdraw_store'    => 0.0,
                         'withdraw_operator' => 0.0,
-                        'ggr_store' => 0.0,
-                        'ggr_operator' => 0.0,
+                        'affiliate_stakes'  => 0.0,
+                        'affiliate_payouts' => 0.0,
+                        'ggr_base'          => 0.0,
+                        'ggr_store'         => 0.0,
+                        'ggr_operator'      => 0.0,
                     ];
                 }
-                $perStoreThree[$sid][$type . '_store'] += (float) ($item['store_commission'] ?? 0);
-                $perStoreThree[$sid][$type . '_operator'] += (float) ($item['operator_profit'] ?? 0);
+                if ($type === 'recharge') {
+                    $perStoreThree[$sid]['recharge_base'] += (float) ($item['base_amount'] ?? 0);
+                    $perStoreThree[$sid]['recharge_store'] += (float) ($item['store_commission'] ?? 0);
+                    $perStoreThree[$sid]['recharge_operator'] += (float) ($item['operator_profit'] ?? 0);
+                } elseif ($type === 'withdraw') {
+                    $perStoreThree[$sid]['withdraw_base'] += (float) ($item['base_amount'] ?? 0);
+                    $perStoreThree[$sid]['withdraw_store'] += (float) ($item['store_commission'] ?? 0);
+                    $perStoreThree[$sid]['withdraw_operator'] += (float) ($item['operator_profit'] ?? 0);
+                } elseif ($type === 'ggr') {
+                    $perStoreThree[$sid]['affiliate_stakes'] += (float) ($item['total_stake'] ?? 0);
+                    $perStoreThree[$sid]['affiliate_payouts'] += (float) ($item['total_payout'] ?? 0);
+                    $perStoreThree[$sid]['ggr_base'] += (float) ($item['base_amount'] ?? 0);
+                    $perStoreThree[$sid]['ggr_store'] += (float) ($item['store_commission'] ?? 0);
+                    $perStoreThree[$sid]['ggr_operator'] += (float) ($item['operator_profit'] ?? 0);
+                }
             }
         }
+
+        $totRecargasBase = 0.0;
+        $totRecargasComision = 0.0;
+        $totRetirosBase = 0.0;
+        $totRetirosComision = 0.0;
+        $totApuestasAfiliados = 0.0;
+        $totPremiosAfiliados = 0.0;
+        $totGgrBase = 0.0;
+        $totGgrComision = 0.0;
+        $totGranTotalComision = 0.0;
 
         foreach ($breakdown as &$row) {
             $sid = (int) ($row['id'] ?? 0);
             $extra = $perStoreThree[$sid] ?? [
-                'recharge_store' => 0.0,
+                'recharge_base'     => 0.0,
+                'recharge_store'    => 0.0,
                 'recharge_operator' => 0.0,
-                'withdraw_store' => 0.0,
+                'withdraw_base'     => 0.0,
+                'withdraw_store'    => 0.0,
                 'withdraw_operator' => 0.0,
-                'ggr_store' => (float) ($row['ggr_commissions'] ?? 0),
-                'ggr_operator' => 0.0,
+                'affiliate_stakes'  => 0.0,
+                'affiliate_payouts' => 0.0,
+                'ggr_base'          => (float) ($row['total_ggr'] ?? 0),
+                'ggr_store'         => (float) ($row['ggr_commissions'] ?? 0),
+                'ggr_operator'      => 0.0,
             ];
             foreach ($extra as $ek => $ev) {
                 $extra[$ek] = round((float) $ev, 2);
@@ -1610,25 +1643,45 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
                 $extra['recharge_store'] + $extra['withdraw_store'] + $extra['ggr_store'],
                 2
             );
+            $row['total_commission'] = $row['three_total_store'];
             $row['three_total_operator'] = round(
                 $extra['recharge_operator'] + $extra['withdraw_operator'] + $extra['ggr_operator'],
                 2
             );
+
+            $totRecargasBase += (float) $row['recharge_base'];
+            $totRecargasComision += (float) $row['recharge_store'];
+            $totRetirosBase += (float) $row['withdraw_base'];
+            $totRetirosComision += (float) $row['withdraw_store'];
+            $totApuestasAfiliados += (float) $row['affiliate_stakes'];
+            $totPremiosAfiliados += (float) $row['affiliate_payouts'];
+            $totGgrBase += (float) $row['ggr_base'];
+            $totGgrComision += (float) $row['ggr_store'];
+            $totGranTotalComision += (float) $row['total_commission'];
         }
         unset($row);
 
         return [
-            'store_count'           => count($breakdown),
-            'total_commission'      => round($totalAffiliate + $totalGgrCommission, 2),
-            'affiliate_commissions' => round($totalAffiliate, 2),
-            'ggr_commissions'       => round($totalGgrCommission, 2),
-            'pending_commission'    => round($totalPending, 2),
-            'total_ggr'             => round($totalGgr, 2),
-            'commission_stats'      => $commissionStats,
-            'stores'                => $breakdown,
-            'chart'                 => array_values($chartMap),
-            'date_from'             => $dateFrom,
-            'date_to'               => $dateTo,
+            'store_count'              => count($breakdown),
+            'total_recargas_base'      => round($totRecargasBase, 2),
+            'total_recargas_comision'  => round($totRecargasComision, 2),
+            'total_retiros_base'       => round($totRetirosBase, 2),
+            'total_retiros_comision'   => round($totRetirosComision, 2),
+            'total_apuestas_afiliados' => round($totApuestasAfiliados, 2),
+            'total_premios_afiliados'  => round($totPremiosAfiliados, 2),
+            'total_ggr_base'           => round($totGgrBase, 2),
+            'total_ggr_comision'       => round($totGgrComision, 2),
+            'grand_total_comision'     => round($totGranTotalComision, 2),
+            'total_commission'         => round($totGranTotalComision, 2),
+            'affiliate_commissions'    => round($totRecargasComision + $totRetirosComision, 2),
+            'ggr_commissions'          => round($totGgrComision, 2),
+            'pending_commission'       => round($totalPending, 2),
+            'total_ggr'                => round($totGgrBase, 2),
+            'commission_stats'         => $commissionStats,
+            'stores'                   => $breakdown,
+            'chart'                    => array_values($chartMap),
+            'date_from'                => $dateFrom,
+            'date_to'                  => $dateTo,
         ];
     }
 }
