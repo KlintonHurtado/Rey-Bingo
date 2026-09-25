@@ -854,8 +854,6 @@ class Operator extends Controller
             'Total apostado',
             'Total premios',
             'Monto Base / GGR',
-            'Tasa PV (%)',
-            'Comision PV',
             'Tasa Operador (%)',
             'Margen Operador (%)',
             'Ganancia Operador',
@@ -882,8 +880,6 @@ class Operator extends Controller
                 $totalStake,
                 $totalPayout,
                 round((float) ($it['base_amount'] ?? 0), 2),
-                number_format(((float) ($it['store_rate'] ?? 0)) * 100, 2) . '%',
-                round((float) ($it['store_commission'] ?? 0), 2),
                 number_format(((float) ($it['operator_rate'] ?? 0)) * 100, 2) . '%',
                 number_format(((float) ($it['operator_spread'] ?? 0)) * 100, 2) . '%',
                 round((float) ($it['operator_profit'] ?? 0), 2),
@@ -901,7 +897,7 @@ class Operator extends Controller
             [
                 'sheet_name' => 'Comisiones',
                 'title' => 'Rey Bingo - Comisiones del Operador',
-                'numeric_columns' => [4, 5, 6, 8, 11],
+                'numeric_columns' => [5, 6, 7, 10],
             ]
         );
     }

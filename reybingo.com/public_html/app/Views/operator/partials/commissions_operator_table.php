@@ -5,13 +5,10 @@ $items = $items ?? [];
 ?>
 <div class="table-responsive" id="operator-commissions-table-wrapper"
      data-ggr-base="<?= esc(number_format((float)($stats['ggr']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-ggr-stores="<?= esc(bingo_format_exact_amount((float)($stats['ggr']['stores_earned'] ?? 0))); ?>"
      data-ggr-operator="<?= esc(bingo_format_exact_amount((float)($stats['ggr']['operator_earned'] ?? 0))); ?>"
      data-rec-base="<?= esc(number_format((float)($stats['recharge']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-rec-stores="<?= esc(bingo_format_exact_amount((float)($stats['recharge']['stores_earned'] ?? 0))); ?>"
      data-rec-operator="<?= esc(bingo_format_exact_amount((float)($stats['recharge']['operator_earned'] ?? 0))); ?>"
      data-with-base="<?= esc(number_format((float)($stats['withdraw']['total_base'] ?? 0), 2, '.', '')); ?>"
-     data-with-stores="<?= esc(bingo_format_exact_amount((float)($stats['withdraw']['stores_earned'] ?? 0))); ?>"
      data-with-operator="<?= esc(bingo_format_exact_amount((float)($stats['withdraw']['operator_earned'] ?? 0))); ?>"
      data-total-profit="<?= esc(bingo_format_exact_amount((float)($stats['total_operator_profit'] ?? 0))); ?>">
 
@@ -24,8 +21,6 @@ $items = $items ?? [];
                 <th class="text-end">Total apostado</th>
                 <th class="text-end">Total premios</th>
                 <th class="text-end">Monto Base / GGR</th>
-                <th class="text-center">Tasa PV (%)</th>
-                <th class="text-end">Comisión PV</th>
                 <th class="text-center">Tasa Operador (%)</th>
                 <th class="text-center text-primary fw-bold">Margen / Dif. (%)</th>
                 <th class="text-end text-success fw-bold" style="min-width: 120px;">Ganancia Operador</th>
@@ -38,9 +33,7 @@ $items = $items ?? [];
                 <?php foreach ($items as $it) : ?>
                     <?php
                     $baseAmt = (float) ($it['base_amount'] ?? 0);
-                    $stCommission = (float) ($it['store_commission'] ?? 0);
                     $opProfit = (float) ($it['operator_profit'] ?? 0);
-                    $stRate = ((float) ($it['store_rate'] ?? 0)) * 100;
                     $opRate = ((float) ($it['operator_rate'] ?? 0)) * 100;
                     $opSpread = ((float) ($it['operator_spread'] ?? 0)) * 100;
                     $badgeClass = $it['badge_class'] ?? 'bg-secondary text-white';
@@ -78,12 +71,6 @@ $items = $items ?? [];
                             <?= esc($currency); ?> <?= number_format($baseAmt, 2); ?>
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-light text-dark border"><?= number_format($stRate, 2); ?>%</span>
-                        </td>
-                        <td class="text-end <?= $stCommission < 0 ? 'text-danger' : 'text-muted'; ?>">
-                            <?= esc($currency); ?> <?= bingo_format_exact_amount($stCommission); ?>
-                        </td>
-                        <td class="text-center">
                             <span class="badge bg-light text-dark border"><?= number_format($opRate, 2); ?>%</span>
                         </td>
                         <td class="text-center">
@@ -115,7 +102,7 @@ $items = $items ?? [];
                 <?php endforeach; ?>
             <?php else : ?>
                 <tr>
-                    <td colspan="13" class="text-center py-5 text-muted">
+                    <td colspan="11" class="text-center py-5 text-muted">
                         <i class="fa-duotone fa-solid fa-chart-line-down fs-1 d-block mb-2 text-secondary"></i>
                         No se encontraron registros de comisiones para este criterio de búsqueda.
                     </td>
