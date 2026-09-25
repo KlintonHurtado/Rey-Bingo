@@ -6,6 +6,20 @@
  * Puede ser negativo (ej. apostó 6 y ganó 6.72 → GGR = -0.72).
  */
 
+if (! function_exists('bingo_commission_totals_sum')) {
+    /**
+     * Suma de comisiones con regla de GGR:
+     * - Si GGR es positivo: suma GGR + Recargas + Retiros
+     * - Si GGR es negativo o cero: suma únicamente Recargas + Retiros (el GGR negativo no resta)
+     */
+    function bingo_commission_totals_sum(float $ggr, float $recharge, float $withdraw = 0.0): float
+    {
+        $ggrPart = $ggr > 0 ? $ggr : 0.0;
+
+        return $ggrPart + $recharge + $withdraw;
+    }
+}
+
 if (! function_exists('bingo_ensure_affiliate_ggr_schema')) {
     function bingo_ensure_affiliate_ggr_schema(): void
     {
@@ -1640,12 +1654,20 @@ if (! function_exists('bingo_fetch_operator_stores_commissions_summary')) {
             }
             $row = array_merge($row, $extra);
             $row['three_total_store'] = round(
-                $extra['recharge_store'] + $extra['withdraw_store'] + $extra['ggr_store'],
+                bingo_commission_totals_sum(
+                    (float) ($extra['ggr_store'] ?? 0),
+                    (float) ($extra['recharge_store'] ?? 0),
+                    (float) ($extra['withdraw_store'] ?? 0)
+                ),
                 2
             );
             $row['total_commission'] = $row['three_total_store'];
             $row['three_total_operator'] = round(
-                $extra['recharge_operator'] + $extra['withdraw_operator'] + $extra['ggr_operator'],
+                bingo_commission_totals_sum(
+                    (float) ($extra['ggr_operator'] ?? 0),
+                    (float) ($extra['recharge_operator'] ?? 0),
+                    (float) ($extra['withdraw_operator'] ?? 0)
+                ),
                 2
             );
 

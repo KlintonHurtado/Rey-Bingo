@@ -24,7 +24,7 @@ if ($totRecargasBase <= 0 && $totRecargasComision <= 0 && $totRetirosBase <= 0 &
         $totPremiosAfiliados += (float) ($row['affiliate_payouts'] ?? 0);
         $totGgrBase += (float) ($row['ggr_base'] ?? $row['total_ggr'] ?? 0);
         $totGgrComision += (float) ($row['ggr_store'] ?? $row['ggr_commissions'] ?? 0);
-        $totGranTotalComision += (float) ($row['total_commission'] ?? 0);
+        $totGranTotalComision += (float) ($row['total_commission'] ?? bingo_commission_totals_sum((float) ($row['ggr_store'] ?? $row['ggr_commissions'] ?? 0), (float) ($row['recharge_store'] ?? 0), (float) ($row['withdraw_store'] ?? 0)));
     }
 }
 ?>
@@ -92,7 +92,7 @@ if ($totRecargasBase <= 0 && $totRecargasComision <= 0 && $totRetirosBase <= 0 &
                         $prAf    = (float) ($storeRow['affiliate_payouts'] ?? 0);
                         $ggrBase = (float) ($storeRow['ggr_base'] ?? $storeRow['total_ggr'] ?? 0);
                         $ggrCom  = (float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0);
-                        $rowTotal = (float) ($storeRow['total_commission'] ?? ($recCom + $retCom + $ggrCom));
+                        $rowTotal = (float) ($storeRow['total_commission'] ?? bingo_commission_totals_sum($ggrCom, $recCom, $retCom));
                         ?>
                     <tr>
                         <td>

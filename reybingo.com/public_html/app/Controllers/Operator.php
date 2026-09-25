@@ -988,7 +988,7 @@ class Operator extends Controller
             $prAf    = round((float) ($storeRow['affiliate_payouts'] ?? 0), 2);
             $ggrBase = round((float) ($storeRow['ggr_base'] ?? $storeRow['total_ggr'] ?? 0), 2);
             $ggrCom  = round((float) ($storeRow['ggr_store'] ?? $storeRow['ggr_commissions'] ?? 0), 2);
-            $totalCom = round((float) ($storeRow['total_commission'] ?? ($recCom + $retCom + $ggrCom)), 2);
+            $totalCom = round((float) ($storeRow['total_commission'] ?? bingo_commission_totals_sum($ggrCom, $recCom, $retCom)), 2);
 
             $totRecargasBase += $recBase;
             $totRecargasComision += $recCom;
