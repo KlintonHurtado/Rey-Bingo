@@ -72,9 +72,10 @@ class ExcelExport
 
         $xml .= '</Table>' . "\n";
         $xml .= '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">' . "\n";
-        $xml .= '<FreezePanes/><FrozenNoSplit/><SplitHorizontal>' . ($title !== '' ? 4 : 1) . '</SplitHorizontal>' . "\n";
-        $xml .= '<TopRowBottomPane>' . ($title !== '' ? 4 : 1) . '</TopRowBottomPane>' . "\n";
-        $xml .= '<ActivePane>2</ActivePane>' . "\n";
+        $xml .= '<Selected/>' . "\n";
+        $xml .= '<DoNotDisplayGridlines>False</DoNotDisplayGridlines>' . "\n";
+        $xml .= '<ProtectObjects>False</ProtectObjects>' . "\n";
+        $xml .= '<ProtectScenarios>False</ProtectScenarios>' . "\n";
         $xml .= '</WorksheetOptions>' . "\n";
         $xml .= '</Worksheet>' . "\n";
         $xml .= '</Workbook>';
@@ -115,6 +116,8 @@ class ExcelExport
 
         foreach ($headers as $colIndex => $header) {
             $maxLen = mb_strlen((string) $header);
+            $isNum = $this->isColumnNumeric($colIndex, $numericColumns);
+            $isInt = $this->isColumnInteger($colIndex, $integerColumns);
 
             foreach ($rows as $row) {
                 $value = $row[$colIndex] ?? '';
@@ -122,10 +125,8 @@ class ExcelExport
                     continue;
                 }
 
-                if (in_array($colIndex, $numericColumns, true) || in_array($colIndex, $integerColumns, true)) {
-                    $text = is_numeric($value)
-                        ? number_format((float) $value, in_array($colIndex, $integerColumns, true) ? 0 : 2, '.', ',')
-                        : (string) $value;
+                if (($isNum || $isInt) && is_numeric($value)) {
+                    $text = number_format((float) $value, $isInt ? 0 : 2, '.', ',');
                 } else {
                     $text = (string) $value;
                 }
@@ -134,22 +135,32 @@ class ExcelExport
             }
 
             // Anchos pensados para Excel: fechas, montos, detalle, etc.
-            if (in_array($colIndex, $numericColumns, true)) {
-                $width = max(90, min(130, $maxLen * 8 + 28));
-            } elseif (in_array($colIndex, $integerColumns, true)) {
-                $width = max(70, min(110, $maxLen * 8 + 24));
+            if ($isNum) {
+                $width = max(100, min(140, $maxLen * 8 + 32));
+            } elseif ($isInt) {
+                $width = max(75, min(110, $maxLen * 8 + 24));
             } elseif ($maxLen > 80) {
                 $width = 360; // Detalle / textos largos visibles
             } elseif ($maxLen > 40) {
                 $width = max(180, min(280, $maxLen * 7 + 30));
             } else {
-                $width = max(85, min(200, $maxLen * 8 + 28));
+                $width = max(95, min(220, $maxLen * 8 + 30));
             }
 
             $widths[] = (int) round($width);
         }
 
         return $widths;
+    }
+
+    private function isColumnNumeric(int $colIndex, array $numericColumns): bool
+    {
+        return in_array($colIndex, $numericColumns, true) || in_array($colIndex + 1, $numericColumns, true);
+    }
+
+    private function isColumnInteger(int $colIndex, array $integerColumns): bool
+    {
+        return in_array($colIndex, $integerColumns, true) || in_array($colIndex + 1, $integerColumns, true);
     }
 
     private function buildStyles(): string
@@ -223,7 +234,6 @@ class ExcelExport
         </Borders>
     </Style>
 </Styles>
-
 XML;
     }
 
@@ -237,7 +247,7 @@ XML;
             return '<Cell><Data ss:Type="String"></Data></Cell>' . "\n";
         }
 
-        if (in_array($colIndex, $integerColumns, true) && is_numeric($value)) {
+        if ($this->isColumnInteger($colIndex, $integerColumns) && is_numeric($value)) {
             $style = $zebra ? 'IntegerZebra' : 'Integer';
 
             return '<Cell ss:StyleID="' . $style . '"><Data ss:Type="Number">'
@@ -245,7 +255,7 @@ XML;
                 . '</Data></Cell>' . "\n";
         }
 
-        if (in_array($colIndex, $numericColumns, true) && is_numeric($value)) {
+        if ($this->isColumnNumeric($colIndex, $numericColumns) && is_numeric($value)) {
             $style = $zebra ? 'MoneyZebra' : 'Money';
 
             return '<Cell ss:StyleID="' . $style . '"><Data ss:Type="Number">'
