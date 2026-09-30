@@ -27,5 +27,12 @@ for ENV_FILE in "/var/www/html/reybingo.com/public_html/.env" "/var/www/html/rey
     fi
 done
 
+# Ensure bingo-runner daemon targets local Apache inside the container
+RUNNER_ENV="/var/www/html/reybingo.com/public_html/bingo-runner/.env"
+if [ -f "$RUNNER_ENV" ]; then
+    sed -i "s|^APP_URL=.*|APP_URL=http://127.0.0.1|g" "$RUNNER_ENV"
+    sed -i "s|^CRON_TOKEN=.*|CRON_TOKEN=reybingo_cron_secret_key_2026|g" "$RUNNER_ENV"
+fi
+
 # Execute CMD (supervisord)
 exec "$@"
