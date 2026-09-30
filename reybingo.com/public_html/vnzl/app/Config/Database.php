@@ -50,27 +50,6 @@ class Database extends Config
         ],
     ];
 
-    public function __construct()
-    {
-        parent::__construct();
-
-        if ($host = getenv('database.default.hostname') ?: getenv('DB_HOST')) {
-            $this->default['hostname'] = $host;
-        }
-        if ($db = getenv('database.default.database') ?: getenv('DB_DATABASE')) {
-            $this->default['database'] = $db;
-        }
-        if ($user = getenv('database.default.username') ?: getenv('DB_USERNAME')) {
-            $this->default['username'] = $user;
-        }
-        if ($pass = getenv('database.default.password') ?: getenv('DB_PASSWORD')) {
-            $this->default['password'] = $pass;
-        }
-        if ($port = getenv('database.default.port') ?: getenv('DB_PORT')) {
-            $this->default['port'] = (int) $port;
-        }
-    }
-
     //    /**
     //     * Sample database connection for SQLite3.
     //     *
@@ -211,6 +190,22 @@ class Database extends Config
     public function __construct()
     {
         parent::__construct();
+
+        if ($host = getenv('database.default.hostname') ?: getenv('DB_HOST')) {
+            $this->default['hostname'] = $host;
+        }
+        if ($db = getenv('database.default.database') ?: getenv('DB_DATABASE')) {
+            $this->default['database'] = $db;
+        }
+        if ($user = getenv('database.default.username') ?: getenv('DB_USERNAME')) {
+            $this->default['username'] = $user;
+        }
+        if ($pass = getenv('database.default.password') ?: getenv('DB_PASSWORD')) {
+            $this->default['password'] = $pass;
+        }
+        if ($port = getenv('database.default.port') ?: getenv('DB_PORT')) {
+            $this->default['port'] = (int) $port;
+        }
 
         // Ensure that we always set the database group to 'tests' if
         // we are currently running an automated test suite, so that
