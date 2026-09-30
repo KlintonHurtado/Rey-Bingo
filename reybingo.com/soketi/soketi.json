@@ -1,18 +1,6 @@
-# ─────────────────────────────────────────────────────────────────────
-# soketi.json - Configuracion de Soketi self-hosted para Rey Bingo
-# ─────────────────────────────────────────────────────────────────────
-# Archivo ubicacion en VPS: /etc/soketi/soketi.json
-# O arrancarlo con: soketi start --config=/ruta/soketi.json
-#
-# IMPORTANTE: los valores de app_key, app_secret y app_id DEBEN
-# coincidir exactamente con los de .env de CodeIgniter:
-#   SOKETI_KEY    = mismo que "key" abajo
-#   SOKETI_SECRET = mismo que "secret" abajo
-#   SOKETI_APP_ID = mismo que "id" abajo
-# ─────────────────────────────────────────────────────────────────────
 {
     "debug": false,
-    "host": "127.0.0.1",
+    "host": "0.0.0.0",
     "port": 6001,
     "appManager.driver": "array",
     "appManager.array.apps": [
