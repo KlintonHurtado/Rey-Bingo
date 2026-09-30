@@ -590,7 +590,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h6 class="modal-title ps-2">
-          <i class="fa-duotone fa-solid fa-triangle-exclamation"></i> <?= translate('Warning!'); ?>
+          <?= translate('Warning!'); ?>
         </h6>
         <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal">
           <i class="fa-duotone fa-solid fa-xmark"></i>
