@@ -26,7 +26,7 @@ class Database extends Config
      */
     public array $default = [
         'DSN'          => '',
-        'hostname'     => 'localhost',
+        'hostname'     => 'rey-bingo-database-ko9tep',
         'username'     => 'mysql',
         'password'     => '',
         'database'     => 'reybingo',
@@ -192,19 +192,24 @@ class Database extends Config
         parent::__construct();
 
         // Asegurar que las variables de entorno de Dokploy tengan prioridad absoluta
-        if ($host = getenv('database.default.hostname') ?: getenv('DB_HOST')) {
+        $host = env('database.default.hostname') ?: getenv('DB_HOST') ?: getenv('database.default.hostname') ?: ($_ENV['database.default.hostname'] ?? null);
+        if ($host) {
             $this->default['hostname'] = $host;
         }
-        if ($db = getenv('database.default.database') ?: getenv('DB_DATABASE')) {
+        $db = env('database.default.database') ?: getenv('DB_DATABASE') ?: getenv('database.default.database') ?: ($_ENV['database.default.database'] ?? null);
+        if ($db) {
             $this->default['database'] = $db;
         }
-        if ($user = getenv('database.default.username') ?: getenv('DB_USERNAME')) {
+        $user = env('database.default.username') ?: getenv('DB_USERNAME') ?: getenv('database.default.username') ?: ($_ENV['database.default.username'] ?? null);
+        if ($user) {
             $this->default['username'] = $user;
         }
-        if ($pass = getenv('database.default.password') ?: getenv('DB_PASSWORD')) {
+        $pass = env('database.default.password') ?: getenv('DB_PASSWORD') ?: getenv('database.default.password') ?: ($_ENV['database.default.password'] ?? null);
+        if ($pass !== null && $pass !== '') {
             $this->default['password'] = $pass;
         }
-        if ($port = getenv('database.default.port') ?: getenv('DB_PORT')) {
+        $port = env('database.default.port') ?: getenv('DB_PORT') ?: getenv('database.default.port') ?: ($_ENV['database.default.port'] ?? null);
+        if ($port) {
             $this->default['port'] = (int) $port;
         }
 
