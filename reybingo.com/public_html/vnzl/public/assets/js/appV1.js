@@ -79,51 +79,42 @@ var App = function() {
             });
         }
     
-        let soundtrack;  // Variable para el audio de fondo
-        let audioStarted = false;  // Para evitar que el soundtrack se reproduzca más de una vez
-    
-        // Función para iniciar el soundtrack
-        function startSoundtrack() {
-            if (!audioStarted) {
-                if (!soundtrack) soundtrack = new Audio();
-                soundtrack.src = audioPath + 'gamemusic.mp3';
-                soundtrack.volume = 1;
-                soundtrack.loop = true;  // Hacer que el audio se repita
-                soundtrack.play().catch(error => {
-                    console.log("Autoplay prevented. User interaction needed.");
-                });
-                audioStarted = true;
-            }
+        let soundtrack = null;
+        let audioStarted = false;
+
+        // Función para detener y limpiar cualquier música de fondo
+        function stopBingoSoundtrack() {
+            try {
+                if (soundtrack) {
+                    soundtrack.pause();
+                    soundtrack.currentTime = 0;
+                    soundtrack.src = '';
+                    soundtrack = null;
+                }
+            } catch (e) { /* ignore */ }
         }
+        stopBingoSoundtrack();
+
+        // Función para iniciar el soundtrack (deshabilitada)
+        function startSoundtrack() {
+            stopBingoSoundtrack();
+            return;
+        }
+        window.startBingoSoundtrack = function() {};
     
         // Función para activar/desactivar el soundtrack
         $('.btn-volume').click(function() {
-            if (soundtrack && !soundtrack.paused) {
-                soundtrack.pause();
-                $(this).html('<i class="fa-duotone fa-solid fa-volume-slash"></i>');
-            } else {
-                if (!soundtrack) {
-                    startSoundtrack();
-                } else {
-                    soundtrack.play();
-                }
-                $(this).html('<i class="fa-duotone fa-solid fa-volume"></i>');
-            }
+            stopBingoSoundtrack();
+            $(this).html('<i class="fa-duotone fa-solid fa-volume-slash"></i>');
         });
     
-        // Reproduce el soundtrack automáticamente cuando se hace clic en la página
+        // Música de fondo deshabilitada: no auto-reproducir al hacer clic en la página
         function playSound() {
-            startSoundtrack();
+            stopBingoSoundtrack();
             document.removeEventListener('click', playSound);
-            $('.volume').html('<i class="fa-duotone fa-solid fa-volume"></i>');
         }
     
-        // Añadir el event listener para reproducir el soundtrack al hacer clic en la página
-        const userSoundsAuto = document.querySelector(`#sounds`);
-
-        if (userSoundsAuto.value == 1) {
-            document.addEventListener('click', playSound);
-        }
+        // Música de fondo desactivada permanentemente: no escuchar clic para reproducir
     });
     
     var linkPage = function () {

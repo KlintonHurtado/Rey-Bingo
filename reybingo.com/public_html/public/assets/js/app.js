@@ -137,58 +137,53 @@ var App = function() {
             });
         }
     
-        let soundtrack;  // Variable para el audio de fondo
-        let audioStarted = false;  // Para evitar que el soundtrack se reproduzca más de una vez
+        let soundtrack = null;  // Variable para el audio de fondo (deshabilitado)
+        let audioStarted = false;
         window.__bingoSoundtrack = null;
     
-        // Función para iniciar el soundtrack
-        function startSoundtrack() {
-            if (!audioStarted) {
-                if (!soundtrack) soundtrack = new Audio();
-                soundtrack.src = audioPath + 'gamemusic.mp3';
-                soundtrack.volume = 0.5;
-                soundtrack.loop = true;  // Hacer que el audio se repita
-                soundtrack.play().catch(error => {
-                    console.log("Autoplay prevented. User interaction needed.");
-                });
-                audioStarted = true;
-                window.__bingoSoundtrack = soundtrack;
-            }
+        // Función para detener y limpiar cualquier música de fondo
+        function stopBingoSoundtrack() {
+            try {
+                if (window.__bingoSoundtrack) {
+                    window.__bingoSoundtrack.pause();
+                    window.__bingoSoundtrack.currentTime = 0;
+                    window.__bingoSoundtrack.src = '';
+                    window.__bingoSoundtrack = null;
+                }
+                if (soundtrack) {
+                    soundtrack.pause();
+                    soundtrack.currentTime = 0;
+                    soundtrack.src = '';
+                    soundtrack = null;
+                }
+            } catch (e) { /* ignore */ }
         }
-        window.startBingoSoundtrack = startSoundtrack;
+        window.stopBingoSoundtrack = stopBingoSoundtrack;
+        stopBingoSoundtrack();
+
+        // Función para iniciar el soundtrack (deshabilitada para que no suene canción de fondo)
+        function startSoundtrack() {
+            stopBingoSoundtrack();
+            return;
+        }
+        window.startBingoSoundtrack = function() {};
     
         // Función para activar/desactivar el soundtrack (icono + AJAX en RemoveVolume)
         // No enlazar click aquí: el botón usa onclick="RemoveVolume()" para evitar doble toggle.
     
-        // Reproduce el soundtrack automáticamente cuando se hace clic en la página
+        // Música de fondo deshabilitada: no auto-reproducir al hacer clic en la página
         function playSound() {
-            startSoundtrack();
+            stopBingoSoundtrack();
             document.removeEventListener('click', playSound);
-            $('.volume').html('<i class="fa-duotone fa-solid fa-volume"></i>');
         }
     
-        // Añadir el event listener para reproducir el soundtrack al hacer clic en la página
-        const userSoundsAuto = document.querySelector(`#sounds`);
-        const noMusicRole = document.body && document.body.classList.contains('bingo-no-music');
-
-        if (!noMusicRole && userSoundsAuto && userSoundsAuto.value == 1) {
-            document.addEventListener('click', playSound);
-        }
+        // Música de fondo desactivada permanentemente: no escuchar clic para reproducir
     });
 
     // Preferencias globales: silencio (volumen) y narración de balotas (micrófono)
     window.RemoveVolume = function RemoveVolume() {
-        if (document.body && document.body.classList.contains('bingo-no-music')) {
-            const soundsInput = document.getElementById('sounds');
-            if (soundsInput) {
-                soundsInput.value = '0';
-            }
-            try {
-                if (window.__bingoSoundtrack) {
-                    window.__bingoSoundtrack.pause();
-                }
-            } catch (e) { /* ignore */ }
-            return;
+        if (typeof window.stopBingoSoundtrack === 'function') {
+            window.stopBingoSoundtrack();
         }
 
         const soundsInput = document.getElementById('sounds');
@@ -209,14 +204,10 @@ var App = function() {
         }
 
         try {
-            if (nextOn) {
-                if (window.__bingoSoundtrack) {
-                    window.__bingoSoundtrack.play().catch(() => {});
-                } else if (typeof window.startBingoSoundtrack === 'function') {
-                    window.startBingoSoundtrack();
-                }
-            } else if (window.__bingoSoundtrack) {
+            if (window.__bingoSoundtrack) {
                 window.__bingoSoundtrack.pause();
+                window.__bingoSoundtrack.src = '';
+                window.__bingoSoundtrack = null;
             }
         } catch (e) { /* ignore */ }
 

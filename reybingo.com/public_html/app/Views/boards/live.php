@@ -665,6 +665,18 @@
     const PUSHER_KEY     = SOKETI_KEY || '<?= env("PUSHER_KEY") ?>';
     const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
     const USER_ID        = '<?= session()->get('id') ?>';
+    try {
+        if (window.__bingoSoundtrack) {
+            window.__bingoSoundtrack.pause();
+            window.__bingoSoundtrack.currentTime = 0;
+            window.__bingoSoundtrack.src = '';
+            window.__bingoSoundtrack = null;
+        }
+        window.startBingoSoundtrack = function() {};
+        if (typeof window.stopBingoSoundtrack === 'function') {
+            window.stopBingoSoundtrack();
+        }
+    } catch (e) {}
 </script>
 <script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 

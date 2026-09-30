@@ -68,6 +68,20 @@ if (typeof $ !== 'undefined' && !window.__bingoAjaxWafHook) {
 // ==========================================
 // VARIABLES GLOBALES
 // ==========================================
+// Silenciar y detener de inmediato cualquier música de fondo al jugar
+try {
+    if (window.__bingoSoundtrack) {
+        window.__bingoSoundtrack.pause();
+        window.__bingoSoundtrack.currentTime = 0;
+        window.__bingoSoundtrack.src = '';
+        window.__bingoSoundtrack = null;
+    }
+    window.startBingoSoundtrack = function() {};
+    if (typeof window.stopBingoSoundtrack === 'function') {
+        window.stopBingoSoundtrack();
+    }
+} catch (e) { /* ignore */ }
+
 let numbersgenerated = [];
 let lastNumbers = fiveNumbers || [];
 let narrationAudio;
@@ -2204,17 +2218,13 @@ function RemoveVolume() {
     }
     updateVolumeButtonIcon(nextOn);
 
-    // Pausar/reanudar música de fondo si existe
+    // Música de fondo deshabilitada permanentemente
     try {
-        const track = window.__bingoSoundtrack;
-        if (track) {
-            if (nextOn) {
-                track.play().catch(() => {});
-            } else {
-                track.pause();
-            }
-        } else if (nextOn && typeof window.startBingoSoundtrack === 'function') {
-            window.startBingoSoundtrack();
+        if (window.__bingoSoundtrack) {
+            window.__bingoSoundtrack.pause();
+            window.__bingoSoundtrack.currentTime = 0;
+            window.__bingoSoundtrack.src = '';
+            window.__bingoSoundtrack = null;
         }
     } catch (e) { /* ignore */ }
 

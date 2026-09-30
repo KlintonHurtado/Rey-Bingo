@@ -328,6 +328,19 @@
 </div>
 
 <script type="text/javascript">
+    try {
+        if (window.__bingoSoundtrack) {
+            window.__bingoSoundtrack.pause();
+            window.__bingoSoundtrack.currentTime = 0;
+            window.__bingoSoundtrack.src = '';
+            window.__bingoSoundtrack = null;
+        }
+        window.startBingoSoundtrack = function() {};
+        if (typeof window.stopBingoSoundtrack === 'function') {
+            window.stopBingoSoundtrack();
+        }
+    } catch (e) {}
+
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     window.timeBallLast = singBall.split('-')[1];

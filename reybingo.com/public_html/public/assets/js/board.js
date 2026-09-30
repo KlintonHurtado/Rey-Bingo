@@ -20,6 +20,20 @@ const CONFIG = {
     BALL_WAF_BACKOFF_MS: 2000
 };
 
+// Silenciar y detener de inmediato cualquier música de fondo al jugar
+try {
+    if (window.__bingoSoundtrack) {
+        window.__bingoSoundtrack.pause();
+        window.__bingoSoundtrack.currentTime = 0;
+        window.__bingoSoundtrack.src = '';
+        window.__bingoSoundtrack = null;
+    }
+    window.startBingoSoundtrack = function() {};
+    if (typeof window.stopBingoSoundtrack === 'function') {
+        window.stopBingoSoundtrack();
+    }
+} catch (e) { /* ignore */ }
+
 // Cooldown secundario (chat/status). Auto-canto/bolas usan backoff corto.
 window.__bingoWafCooldownUntil = window.__bingoWafCooldownUntil || 0;
 window.__bingoBallBackoffUntil = window.__bingoBallBackoffUntil || 0;
@@ -1663,16 +1677,13 @@ function RemoveVolume() {
     }
     updateVolumeButtonIcon(nextOn);
 
+    // Música de fondo deshabilitada permanentemente
     try {
-        const track = window.__bingoSoundtrack;
-        if (track) {
-            if (nextOn) {
-                track.play().catch(() => {});
-            } else {
-                track.pause();
-            }
-        } else if (nextOn && typeof window.startBingoSoundtrack === 'function') {
-            window.startBingoSoundtrack();
+        if (window.__bingoSoundtrack) {
+            window.__bingoSoundtrack.pause();
+            window.__bingoSoundtrack.currentTime = 0;
+            window.__bingoSoundtrack.src = '';
+            window.__bingoSoundtrack = null;
         }
     } catch (e) { /* ignore */ }
 

@@ -137,17 +137,14 @@ class AudioManager {
     }
     
     async startSoundtrack(src) {
-        if (this.audioStarted || !this.isEnabled) return;
-        
-        try {
-            const soundtrack = this.createSoundtrack(src);
-            await soundtrack.play();
-            this.audioStarted = true;
-            return true;
-        } catch (error) {
-            console.log("Autoplay prevented. User interaction needed.");
-            return false;
+        if (this.soundtrack) {
+            try {
+                this.soundtrack.pause();
+                this.soundtrack.currentTime = 0;
+                this.soundtrack = null;
+            } catch (e) {}
         }
+        return false;
     }
     
     toggleSoundtrack() {
@@ -671,24 +668,8 @@ class OptimizedApp {
     }
     
     setupAutoSoundtrack() {
-        const userSoundsAuto = domCache.get('#sounds');
-        if (!userSoundsAuto || userSoundsAuto.value !== '1') return;
-        
-        this.boundSoundtrackStarter = () => {
-            if (typeof audioPath !== 'undefined') {
-                audioManager.startSoundtrack(audioPath + 'gamemusic.mp3').then(success => {
-                    if (success) {
-                        const volumeBtn = domCache.$get('.volume');
-                        if (volumeBtn && volumeBtn.length) {
-                            volumeBtn.html('<i class="fa-duotone fa-solid fa-volume"></i>');
-                        }
-                    }
-                });
-            }
-            document.removeEventListener('click', this.boundSoundtrackStarter);
-        };
-        
-        document.addEventListener('click', this.boundSoundtrackStarter);
+        // Música de fondo deshabilitada
+        return;
     }
     
     setupGlobalEvents() {

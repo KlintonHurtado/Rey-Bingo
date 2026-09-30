@@ -335,6 +335,20 @@
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 
 <script type="text/javascript">
+    // Silenciar y detener de inmediato cualquier canción de fondo en la partida
+    try {
+        if (window.__bingoSoundtrack) {
+            window.__bingoSoundtrack.pause();
+            window.__bingoSoundtrack.currentTime = 0;
+            window.__bingoSoundtrack.src = '';
+            window.__bingoSoundtrack = null;
+        }
+        window.startBingoSoundtrack = function() {};
+        if (typeof window.stopBingoSoundtrack === 'function') {
+            window.stopBingoSoundtrack();
+        }
+    } catch (e) {}
+
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     //window.timeBallLast = singBall.split('-')[1];
