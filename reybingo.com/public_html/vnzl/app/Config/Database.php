@@ -27,9 +27,9 @@ class Database extends Config
     public array $default = [
         'DSN'          => '',
         'hostname'     => 'localhost',
-        'username'     => 'u154283797_reybingo',
-        'password'     => 'Reybingo2025**',
-        'database'     => 'u154283797_reybingo',
+        'username'     => 'mysql',
+        'password'     => '',
+        'database'     => 'reybingo',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
         'pConnect'     => false,
@@ -49,6 +49,27 @@ class Database extends Config
             'time'     => 'H:i:s',
         ],
     ];
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        if ($host = getenv('database.default.hostname') ?: getenv('DB_HOST')) {
+            $this->default['hostname'] = $host;
+        }
+        if ($db = getenv('database.default.database') ?: getenv('DB_DATABASE')) {
+            $this->default['database'] = $db;
+        }
+        if ($user = getenv('database.default.username') ?: getenv('DB_USERNAME')) {
+            $this->default['username'] = $user;
+        }
+        if ($pass = getenv('database.default.password') ?: getenv('DB_PASSWORD')) {
+            $this->default['password'] = $pass;
+        }
+        if ($port = getenv('database.default.port') ?: getenv('DB_PORT')) {
+            $this->default['port'] = (int) $port;
+        }
+    }
 
     //    /**
     //     * Sample database connection for SQLite3.
