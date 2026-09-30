@@ -774,13 +774,22 @@
     });
 </script>
 
+<!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
+<script src="<?= site_url('assets/js/pusher.min.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 <script>
-    window.PUSHER_KEY = '<?= esc(env("PUSHER_KEY") ?? '', 'js') ?>';
-    window.PUSHER_CLUSTER = '<?= esc(env("PUSHER_CLUSTER") ?? 'us2', 'js') ?>';
-    window.GAME_ID = '<?= (int) ($game['id'] ?? 0) ?>';
-    window.USER_ID = <?= (int) session()->get('id') ?>;
+    const GAME_ID        = '<?= (int) ($game['id'] ?? 0) ?>';
+    const AUTH_URL       = '<?= site_url("pusher/auth") ?>';
+    const SOKETI_KEY     = '<?= env("SOKETI_KEY") ?>';
+    const SOKETI_HOST    = '<?= env("SOKETI_HOST") ?>';
+    const SOKETI_PORT    = '<?= env("SOKETI_PORT", 443) ?>';
+    const PUSHER_KEY     = SOKETI_KEY || '<?= env("PUSHER_KEY") ?>';
+    const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
+    const USER_ID        = '<?= session()->get('id') ?>';
+    window.PUSHER_KEY    = PUSHER_KEY;
+    window.PUSHER_CLUSTER = PUSHER_CLUSTER;
+    window.GAME_ID       = GAME_ID;
+    window.USER_ID       = USER_ID;
 </script>
-<script src="https://js.pusher.com/8.2/pusher.min.js"></script>
 <script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
 <script src="<?= site_url('assets/js/app.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
 <script src="<?= site_url('assets/js/board.js'); ?>?<?= md5(date('YmdHis')) ?>"></script>

@@ -1,0 +1,17 @@
+# Variables para Soketi self-hosted en VPS
+# Copiar estas lineas al .env de CodeIgniter (public_html/.env)
+# y reemplazar los valores con los que usaste en soketi.json
+
+# ─────── SOKETI (VPS self-hosted) ───────
+SOKETI_KEY     = reybingo-key
+SOKETI_SECRET  = reybingo-secret-muy-largo-y-seguro
+SOKETI_APP_ID  = reybingo-app-id
+SOKETI_HOST    = bingo.reybingo.com
+SOKETI_PORT    = 443
+SOKETI_USETLS  = false
+
+# ─────── PUSHER CLOUD (dejar vacios si usas Soketi) ───────
+# PUSHER_KEY     =
+# PUSHER_SECRET  =
+# PUSHER_APP_ID  =
+# PUSHER_CLUSTER =

@@ -1,12 +1,13 @@
 {
   "name": "bingo-runner",
-  "version": "1.0.0",
-  "description": "Microservicio asíncrono runner para controlar el ritmo de bingo automáticos sin bloquear workers PHP",
+  "version": "2.0.0",
+  "description": "Runner daemon para balotas automaticas - WebSocket Edition (Soketi self-hosted)",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node --watch index.js"
   },
-  "keywords": ["bingo", "runner", "realtime", "pusher"],
+  "keywords": ["bingo", "runner", "realtime", "soketi", "websocket"],
   "author": "Rey Bingo",
   "license": "ISC"
 }

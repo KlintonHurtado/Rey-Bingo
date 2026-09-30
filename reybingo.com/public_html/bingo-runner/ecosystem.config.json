@@ -1,0 +1,19 @@
+{
+    "id": "bingo-runner",
+    "name": "bingo-runner",
+    "script": "index.js",
+    "cwd": "/var/www/reybingo.com/public_html/bingo-runner",
+    "instances": 1,
+    "exec_mode": "fork",
+    "watch": false,
+    "max_memory_restart": "100M",
+    "restart_delay": 3000,
+    "max_restarts": 20,
+    "env": {
+        "NODE_ENV": "production"
+    },
+    "log_date_format": "YYYY-MM-DD HH:mm:ss",
+    "error_file": "/var/log/pm2/bingo-runner-error.log",
+    "out_file": "/var/log/pm2/bingo-runner-out.log",
+    "merge_logs": true
+}

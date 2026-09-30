@@ -2344,24 +2344,45 @@ function initBoardPusherRealtime() {
         window.__boardPusherInitialized = true;
 
         const authUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'pusher/auth';
-        const pusher = new Pusher(key, {
-            cluster: cluster,
-            forceTLS: true,
-            authEndpoint: authUrl,
-            auth: {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        var pusherConfig = {
+            channelAuthorization: {
+                endpoint: authUrl,
+                transport: 'ajax'
             }
-        });
+        };
+        var soketiHost = (typeof SOKETI_HOST !== 'undefined' && SOKETI_HOST) ? SOKETI_HOST : null;
+        if (soketiHost) {
+            pusherConfig.wsHost = soketiHost;
+            pusherConfig.wsPort = parseInt((typeof SOKETI_PORT !== 'undefined' && SOKETI_PORT) ? SOKETI_PORT : 443, 10);
+            pusherConfig.wssPort = pusherConfig.wsPort;
+            pusherConfig.forceTLS = true;
+            pusherConfig.enabledTransports = ['ws', 'wss'];
+            pusherConfig.disableStats = true;
+            pusherConfig.cluster = '';
+        } else {
+            pusherConfig.cluster = cluster;
+            pusherConfig.forceTLS = true;
+        }
+
+        const pusher = new Pusher(key, pusherConfig);
 
         const channelName = 'private-game-' + gameId;
         const channel = pusher.subscribe(channelName);
 
         channel.bind('pusher:subscription_succeeded', function () {
-            console.log('Γ£à Admin board suscrito a', channelName);
+            console.log('✅ Admin board suscrito a', channelName);
+            if (typeof messagePoller !== 'undefined' && messagePoller) {
+                messagePoller.baseInterval = 30000;
+                messagePoller.currentInterval = 30000;
+            }
         });
 
         channel.bind('pusher:subscription_error', function (err) {
-            console.warn('Γ¥î Error suscripci├│n Pusher admin board:', err);
+            console.warn('❌ Error suscripción Pusher admin board:', err);
+            if (typeof messagePoller !== 'undefined' && messagePoller) {
+                messagePoller.baseInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
+                messagePoller.currentInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
+            }
         });
 
         channel.bind('game:number_drawn', function (data) {
@@ -2371,7 +2392,7 @@ function initBoardPusherRealtime() {
                 ? data.totalNumbersGenerated
                 : (Array.isArray(drawn) ? drawn.length : undefined);
 
-            // Si el auto AJAX ya pint├│ esta bola, no re-animar (evita doble flash)
+            // Si el auto AJAX ya pintó esta bola, no re-animar (evita doble flash)
             const parsed = parseBallNumber(number);
             const alreadyShown = parsed && Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed);
 
@@ -2396,6 +2417,54 @@ function initBoardPusherRealtime() {
             if ($('#start-button').is(':visible')) {
                 $('#start-button').hide();
                 $('#stop-button, #next-number-button').show();
+            }
+        });
+
+        // Chat en tiempo real vía WebSocket
+        function handleBoardChatMessage(data) {
+            if (!data) return;
+            const msgId = parseInt(data.id, 10);
+            const text = getMessageText(data);
+            if (!text) return;
+
+            const currentUserId = getCurrentUserId();
+            const senderId = parseInt(data.userId || data.user, 10);
+            const isOwn = !Number.isNaN(senderId) && senderId > 0 ? senderId === currentUserId : false;
+
+            if (!Number.isNaN(msgId) && msgId > 0) {
+                if (messagesDisplayed.includes(msgId)) {
+                    return;
+                }
+                if (pendingOutgoingMessageIds.has(msgId)) {
+                    pendingOutgoingMessageIds.delete(msgId);
+                    registerChatMessageId(msgId);
+                    return;
+                }
+                registerChatMessageId(msgId);
+            }
+
+            displayMessage(
+                { message: text, id: Number.isNaN(msgId) || msgId <= 0 ? undefined : msgId },
+                data.profile_pic || data.image || imagePath,
+                isOwn
+            );
+        }
+
+        channel.bind('game:chat_message', handleBoardChatMessage);
+        channel.bind('game:message', handleBoardChatMessage);
+
+        // Reclamos de bingo en tiempo real
+        channel.bind('game:bingo_claimed', function (data) {
+            console.log('Admin board WS: bingo_claimed', data);
+            if (data && data.player && data.modality) {
+                showCountdown(data);
+            }
+        });
+
+        channel.bind('game:bingo_accepted', function (data) {
+            console.log('Admin board WS: bingo_accepted', data);
+            if (data && data.player && data.modality) {
+                showCountdown(data);
             }
         });
 

@@ -1612,15 +1612,20 @@
     <?php endif; ?>
 </script>
 
-<!-- Añadir al final del archivo, antes de los scripts existentes -->
-<script src="https://js.pusher.com/8.2/pusher.min.js"></script>
+<!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
+<script src="<?= site_url('assets/js/pusher.min.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 <script>
-    // Configuración de Pusher
-    const GAME_ID = '<?= $game["id"] ?>';
-    const AUTH_URL = '<?= site_url("pusher/auth") ?>';
-    const PUSHER_KEY = '<?= env("PUSHER_KEY") ?>';
+    // Configuracion de WebSocket (Soketi self-hosted o Pusher Cloud)
+    const GAME_ID        = '<?= $game["id"] ?>';
+    const AUTH_URL       = '<?= site_url("pusher/auth") ?>';
+    // Soketi (VPS): definir SOKETI_KEY en .env de CI4
+    const SOKETI_KEY     = '<?= env("SOKETI_KEY") ?>';
+    const SOKETI_HOST    = '<?= env("SOKETI_HOST") ?>';
+    const SOKETI_PORT    = '<?= env("SOKETI_PORT", 443) ?>';
+    // Pusher Cloud: usados si SOKETI_KEY esta vacio
+    const PUSHER_KEY     = SOKETI_KEY || '<?= env("PUSHER_KEY") ?>';
     const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
-    const USER_ID = '<?= session()->get('id') ?>';
+    const USER_ID        = '<?= session()->get('id') ?>';
 </script>
 <script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 

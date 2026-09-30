@@ -126,9 +126,38 @@ if (!function_exists('bingo_count_drawn_numbers')) {
     }
 }
 
+if (!function_exists('bingo_get_broadcast_client')) {
+    /**
+     * Devuelve el cliente de broadcast correcto:
+     * - SoketiFactory si SOKETI_KEY está configurado (VPS con Soketi self-hosted)
+     * - PusherFactory como fallback (hosting compartido con Pusher Cloud)
+     * Lanza excepción si ninguno está disponible.
+     */
+    function bingo_get_broadcast_client()
+    {
+        if (!class_exists(\Pusher\Pusher::class)) {
+            throw new \RuntimeException('Pusher PHP SDK no instalado.');
+        }
+
+        // Usar Soketi si SOKETI_KEY está definido (VPS)
+        $soketiKey = trim((string) env('SOKETI_KEY', ''));
+        if ($soketiKey !== '' && class_exists(\App\Libraries\SoketiFactory::class)) {
+            return \App\Libraries\SoketiFactory::make();
+        }
+
+        // Fallback: Pusher Cloud (hosting compartido)
+        if (class_exists(\App\Libraries\PusherFactory::class)) {
+            return \App\Libraries\PusherFactory::make();
+        }
+
+        throw new \RuntimeException('No hay cliente de broadcast configurado (ni Soketi ni Pusher).');
+    }
+}
+
 if (!function_exists('bingo_broadcast_number_drawn')) {
     /**
      * Notifica en tiempo real a jugadores/admin la bola cantada.
+     * Usa Soketi (VPS) o Pusher Cloud (hosting compartido) de forma automática.
      */
     function bingo_broadcast_number_drawn(int $gameId, int $number, ?array $drawnNumbers = null, ?int $totalNumbersGenerated = null): void
     {
@@ -137,29 +166,28 @@ if (!function_exists('bingo_broadcast_number_drawn')) {
         }
 
         try {
-            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
-                return;
-            }
+            $client = bingo_get_broadcast_client();
 
             $drawn = $drawnNumbers ?? bingo_get_ordered_drawn_numbers($gameId);
             $total = $totalNumbersGenerated ?? count($drawn);
 
-            \App\Libraries\PusherFactory::make()->trigger('private-game-' . $gameId, 'game:number_drawn', [
-                'n' => $number,
-                'number' => $number,
-                'drawn' => $drawn,
-                'drawnNumbers' => $drawn,
+            $client->trigger('private-game-' . $gameId, 'game:number_drawn', [
+                'n'                     => $number,
+                'number'                => $number,
+                'drawn'                 => $drawn,
+                'drawnNumbers'          => $drawn,
                 'totalNumbersGenerated' => $total,
             ]);
         } catch (\Throwable $e) {
-            log_message('error', 'Error al notificar bola por Pusher: ' . $e->getMessage());
+            log_message('error', 'bingo_broadcast_number_drawn error: ' . $e->getMessage());
         }
     }
 }
 
 if (!function_exists('bingo_broadcast_sing_accepted')) {
     /**
-     * Notifica en tiempo real a los jugadores por Pusher cuando se canta/acepta un Bingo.
+     * Notifica en tiempo real cuando se canta/acepta un Bingo.
+     * Usa Soketi (VPS) o Pusher Cloud (hosting compartido) de forma automática.
      */
     function bingo_broadcast_sing_accepted(int $gameId, array $payload): void
     {
@@ -168,34 +196,29 @@ if (!function_exists('bingo_broadcast_sing_accepted')) {
         }
 
         try {
-            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
-                return;
-            }
-
-            $pusher = \App\Libraries\PusherFactory::make();
+            $client  = bingo_get_broadcast_client();
             $channel = 'private-game-' . $gameId;
 
-            // Emitir evento bingo_claimed
-            $pusher->trigger($channel, 'game:bingo_claimed', array_merge([
+            $client->trigger($channel, 'game:bingo_claimed', array_merge([
                 'gameId' => $gameId,
-                'at' => date('c'),
+                'at'     => date('c'),
             ], $payload));
 
-            // Emitir evento bingo_accepted
-            $pusher->trigger($channel, 'game:bingo_accepted', array_merge([
-                'gameId' => $gameId,
+            $client->trigger($channel, 'game:bingo_accepted', array_merge([
+                'gameId'  => $gameId,
                 'stopped' => true,
-                'at' => date('c'),
+                'at'      => date('c'),
             ], $payload));
         } catch (\Throwable $e) {
-            log_message('error', 'Error al notificar Bingo por Pusher: ' . $e->getMessage());
+            log_message('error', 'bingo_broadcast_sing_accepted error: ' . $e->getMessage());
         }
     }
 }
 
 if (!function_exists('bingo_broadcast_game_status')) {
     /**
-     * Notifica en tiempo real a los jugadores por Pusher cambios de estado del juego (inicio, fin, posposición).
+     * Notifica en tiempo real cambios de estado del juego (inicio, fin, posposición).
+     * Usa Soketi (VPS) o Pusher Cloud (hosting compartido) de forma automática.
      */
     function bingo_broadcast_game_status(int $gameId, string $statusEvent, array $extraData = []): void
     {
@@ -204,19 +227,15 @@ if (!function_exists('bingo_broadcast_game_status')) {
         }
 
         try {
-            if (!class_exists(\App\Libraries\PusherFactory::class) || !class_exists(\Pusher\Pusher::class)) {
-                return;
-            }
-
-            $pusher = \App\Libraries\PusherFactory::make();
+            $client  = bingo_get_broadcast_client();
             $channel = 'private-game-' . $gameId;
 
-            $pusher->trigger($channel, $statusEvent, array_merge([
-                'gameId' => $gameId,
+            $client->trigger($channel, $statusEvent, array_merge([
+                'gameId'    => $gameId,
                 'timestamp' => date('c'),
             ], $extraData));
         } catch (\Throwable $e) {
-            log_message('error', 'Error al notificar cambio de estado por Pusher: ' . $e->getMessage());
+            log_message('error', 'bingo_broadcast_game_status error: ' . $e->getMessage());
         }
     }
 }

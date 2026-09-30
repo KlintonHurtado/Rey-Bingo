@@ -686,23 +686,35 @@ function displayMessage(messageData, imageUrl) {
     setTimeout(() => removeMessageWithFade(bubble), CONFIG.MESSAGE_LIFETIME);
 }
 
+let pendingOutgoingMessageIds = new Set();
+
+function getCurrentUserId() {
+    if (typeof USER_ID !== 'undefined' && USER_ID !== null && USER_ID !== '') {
+        return parseInt(USER_ID, 10) || 0;
+    }
+    return 0;
+}
+
 // Función mejorada para enviar mensajes
 function sendMessage(content, id) {
     if (!content || !content.trim()) return;
     
     const trimmedContent = content.trim();
     
-    // Mostrar mensaje inmediatamente en la interfaz sin ID local
-    // para evitar contaminar el array messagesDisplayed.
+    const inputField = $('#message-send-new');
+    if (inputField.length) {
+        inputField.val('');
+    }
+
     displayMessage({ message: trimmedContent }, imagePath);
     
-    // Enviar al servidor
     $.post(site_url + 'playings/messageSubmit', { message: trimmedContent })
         .done((data) => {
-            if (data.status === 'success') {
-                const inputField = $('#message-send-new');
-                if (inputField.length) {
-                    inputField.val('');
+            if (data.status === 'success' && data.id) {
+                const msgId = parseInt(data.id, 10);
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    pendingOutgoingMessageIds.add(msgId);
+                    messagesDisplayed.push(msgId);
                 }
             }
         })
@@ -1969,6 +1981,100 @@ function initializeApp() {
     // Limpiar mensajes antiguos periódicamente
     intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
     
+    // Inicializar WebSocket (Soketi self-hosted o Pusher Cloud)
+    if (typeof PusherClient !== 'undefined' && typeof PUSHER_KEY !== 'undefined' && PUSHER_KEY) {
+        try {
+            console.log('LIVE: Iniciando cliente WebSocket...');
+            const pusherHelper = new PusherClient(GAME_ID, USER_ID);
+            window.__bingoPusherHelper = pusherHelper;
+
+            var soketiHost = (typeof SOKETI_HOST !== 'undefined' && SOKETI_HOST) ? SOKETI_HOST : null;
+            var soketiPort = (typeof SOKETI_PORT !== 'undefined' && SOKETI_PORT) ? SOKETI_PORT : 443;
+
+            pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL, soketiHost, soketiPort);
+
+            pusherHelper.on('connection:success', function() {
+                console.log('LIVE: WebSocket conectado con éxito');
+                window.__bingoPusherRealtime = true;
+                if (messagePoller) {
+                    messagePoller.baseInterval = 30000;
+                    messagePoller.currentInterval = 30000;
+                }
+            });
+            pusherHelper.on('connection:failed', function() {
+                console.warn('LIVE: WebSocket desconectado, activando polling rápido');
+                window.__bingoPusherRealtime = false;
+                if (messagePoller) {
+                    messagePoller.baseInterval = CONFIG.BASE_POLL_INTERVAL || 3500;
+                    messagePoller.currentInterval = CONFIG.BASE_POLL_INTERVAL || 3500;
+                }
+            });
+            pusherHelper.on('connection:error', function() {
+                window.__bingoPusherRealtime = false;
+            });
+
+            // Chat en tiempo real vía WebSocket
+            function handleIncomingChatMessage(data) {
+                if (!data) return;
+                const msgId = parseInt(data.id, 10);
+                const text = data.message || data.text || '';
+                if (!text) return;
+
+                const currentUserId = getCurrentUserId();
+                const senderId = parseInt(data.userId || data.user, 10);
+
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    if (messagesDisplayed.includes(msgId)) {
+                        return;
+                    }
+                    if (pendingOutgoingMessageIds.has(msgId)) {
+                        pendingOutgoingMessageIds.delete(msgId);
+                        messagesDisplayed.push(msgId);
+                        return;
+                    }
+                    messagesDisplayed.push(msgId);
+                } else if (senderId && currentUserId && senderId === currentUserId) {
+                    return;
+                }
+
+                displayMessage(
+                    { id: msgId > 0 ? msgId : undefined, message: text },
+                    data.profile_pic || data.image || imagePath
+                );
+            }
+
+            pusherHelper.on('game:chat_message', handleIncomingChatMessage);
+            pusherHelper.on('game:message', handleIncomingChatMessage);
+
+            // Bingos cantados y aceptados en vivo
+            pusherHelper.on('game:bingo_accepted', function(data) {
+                console.log('LIVE WS: bingo_accepted recibido', data);
+                if (!data) return;
+                if (data.player && data.modality) {
+                    showCountdown(data, startAutomaticLast);
+                }
+            });
+
+            pusherHelper.on('game:bingo_claimed', function(data) {
+                console.log('LIVE WS: bingo_claimed recibido', data);
+                if (!data) return;
+                if (data.player && data.modality) {
+                    showCountdown(data, startAutomaticLast);
+                }
+            });
+
+            // Fin de partida
+            pusherHelper.on('game:game_finished', function(data) {
+                console.log('LIVE WS: game_finished recibido', data);
+                if (!isGameFinishedShown) {
+                    showGameFinalized();
+                }
+            });
+        } catch (pe) {
+            console.warn('Error inicializando PusherClient en LIVE:', pe);
+        }
+    }
+
     console.log('Bingo App with Enhanced Chat initialized successfully');
 }
 

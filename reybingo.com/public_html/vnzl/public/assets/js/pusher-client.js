@@ -85,7 +85,10 @@ class PusherClient {
             'game:completed',
             'game:player_joined',
             'player:number_marked',
-            'game:message'
+            'game:message',
+            'game:chat_message',
+            'game:postponed',
+            'game:started'
         ];
         
         gameEvents.forEach(eventName => {

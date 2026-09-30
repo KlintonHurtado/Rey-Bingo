@@ -2786,13 +2786,20 @@ class Playings extends Controller
         $insertId = $modelMessages->insert($data, true);
 
         try {
-            if (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
+            $client = null;
+            if (function_exists('bingo_get_broadcast_client')) {
+                $client = bingo_get_broadcast_client();
+            } elseif (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
+                $client = \App\Libraries\PusherFactory::make();
+            }
+
+            if ($client) {
                 $modelUsers = new UsersModel();
                 $sender = $modelUsers->find(session()->get('id'));
                 $senderName = $sender ? trim(($sender['firstname'] ?? '') . ' ' . ($sender['lastname'] ?? '')) : ('Jugador #' . session()->get('id'));
                 $imagePath = !empty($sender['image']) ? site_url('uploads/users/' . $sender['image']) : site_url('assets/img/avatar.jpg');
 
-                \App\Libraries\PusherFactory::make()->trigger('private-game-' . $game['id'], 'game:chat_message', [
+                $payload = [
                     'id'          => $insertId,
                     'user'        => session()->get('id'),
                     'userId'      => session()->get('id'),
@@ -2800,10 +2807,14 @@ class Playings extends Controller
                     'message'     => $message,
                     'profile_pic' => $imagePath,
                     'timestamp'   => date('c'),
-                ]);
+                ];
+
+                $channel = 'private-game-' . $game['id'];
+                $client->trigger($channel, 'game:chat_message', $payload);
+                $client->trigger($channel, 'game:message', $payload);
             }
         } catch (\Throwable $pe) {
-            log_message('error', 'Error al notificar mensaje por Pusher: ' . $pe->getMessage());
+            log_message('error', 'Error al notificar mensaje por WebSocket: ' . $pe->getMessage());
         }
 
         return $this->response->setJSON([

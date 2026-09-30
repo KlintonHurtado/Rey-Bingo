@@ -2,7 +2,7 @@
 // CONFIGURACIÓN Y CONSTANTES
 // ==========================================
 const CONFIG = {
-    MAX_MESSAGES: 50,        // Aumentado para el nuevo sistema
+    MAX_MESSAGES: 50,
     MAX_CONFETTI: 100,
     BASE_POLL_INTERVAL: 3500,
     CHAT_POLL_INTERVAL: 3500,
@@ -17,10 +17,10 @@ const CONFIG = {
     MESSAGE_POOL_SIZE: 15,
     WINNER_SLIDER_INTERVAL: 5000,
     COUNTDOWN_INTERVAL: 1000,
-    // Poll de bolas siempre rápido (no ralentizar por Pusher)
-    BALL_POLL_FAST_MS: 1800,
-    BALL_POLL_PUSHER_MS: 1800,
-    // Cooldown corto solo para chat/status. Las bolas NO se pausan 45s.
+    // Con WebSocket (Soketi/Pusher) las balotas llegan por push.
+    // Este poll es solo de RECUPERACION: se activa si WS falla.
+    BALL_POLL_FALLBACK_MS: 30000,
+    // Cooldown corto para chat/status.
     WAF_COOLDOWN_MS: 10000,
     BALL_WAF_BACKOFF_MS: 2000
 };
@@ -1823,21 +1823,46 @@ function startAutomaticLast() {
         return;
     }
 
+    // Primer sync inmediato (para cargar estado al entrar)
     lastNumberGet();
 
-    // Siempre poll rápido: el juego no debe atrasarse respecto al admin
-    const fastMs = CONFIG.BALL_POLL_FAST_MS || 1800;
-    const configured = parseInt(timeBallLast, 10) || fastMs;
-    const pollMs = Math.max(fastMs, Math.min(configured, 2000));
+    // Con WebSocket activo: poll de recuperacion muy espaciado (30s)
+    // Sin WebSocket: poll rapido como fallback
+    var wsActive = window.__bingoPusherRealtime === true;
+    var fallbackMs = wsActive
+        ? (CONFIG.BALL_POLL_FALLBACK_MS || 30000)
+        : Math.max(2000, parseInt(timeBallLast, 10) || 3000);
 
-    intervalManager.set('lastNumber', lastNumberGet, pollMs);
+    intervalManager.set('lastNumber', lastNumberGet, fallbackMs);
 }
 
 function setBingoPusherRealtime(enabled) {
-    // No ralentizar el poll aunque Pusher conecte
-    window.__bingoPusherRealtime = false;
-    if (typeof timeBallLast !== 'undefined' && !window.gameIsFinished && !isGameFinishedShown) {
-        startAutomaticLast();
+    var wasEnabled = window.__bingoPusherRealtime;
+    window.__bingoPusherRealtime = enabled;
+
+    if (window.gameIsFinished || isGameFinishedShown) {
+        return;
+    }
+
+    if (enabled && !wasEnabled) {
+        // WebSocket conectado: cambiar a poll de recuperacion lento (30s)
+        console.log('WS conectado: cambiando a poll de recuperacion (30s)');
+        intervalManager.clear('lastNumber');
+        intervalManager.set('lastNumber', lastNumberGet, CONFIG.BALL_POLL_FALLBACK_MS || 30000);
+        if (typeof messagePoller !== 'undefined' && messagePoller) {
+            messagePoller.baseInterval = 30000;
+            messagePoller.currentInterval = 30000;
+        }
+    } else if (!enabled && wasEnabled) {
+        // WebSocket caido: volver al poll rapido de respaldo
+        console.warn('WS desconectado: activando poll rapido de respaldo');
+        if (typeof timeBallLast !== 'undefined') {
+            startAutomaticLast();
+        }
+        if (typeof messagePoller !== 'undefined' && messagePoller) {
+            messagePoller.baseInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
+            messagePoller.currentInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
+        }
     }
 }
 
@@ -2999,13 +3024,19 @@ function initializeApp() {
         pollGameStatusBeforeStart();
     }
 
-    // Inicializar Pusher si está definido
+    // Inicializar WebSocket (Soketi self-hosted o Pusher Cloud)
     if (typeof PusherClient !== 'undefined' && typeof PUSHER_KEY !== 'undefined' && PUSHER_KEY) {
         try {
-            console.log('Instanciando PusherClient en el juego...');
+            console.log('Iniciando cliente WebSocket...');
             const pusherHelper = new PusherClient(GAME_ID, USER_ID);
             window.__bingoPusherHelper = pusherHelper;
-            pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL);
+
+            // Si hay SOKETI_HOST definido, conectar a Soketi self-hosted en VPS
+            // Si no, usar Pusher Cloud con el cluster configurado
+            var soketiHost = (typeof SOKETI_HOST !== 'undefined' && SOKETI_HOST) ? SOKETI_HOST : null;
+            var soketiPort = (typeof SOKETI_PORT !== 'undefined' && SOKETI_PORT) ? SOKETI_PORT : 443;
+
+            pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL, soketiHost, soketiPort);
 
             pusherHelper.on('connection:success', function() {
                 setBingoPusherRealtime(true);
@@ -3040,6 +3071,107 @@ function initializeApp() {
                 } else if (number) {
                     handleNewNumber(number, total, drawn);
                 }
+            });
+
+            // Chat en tiempo real via WebSocket
+            function handleIncomingChatMessage(data) {
+                if (!data) return;
+                const msgId = parseInt(data.id, 10);
+                const text = getMessageText(data);
+                if (!text) return;
+
+                const currentUserId = getCurrentUserId();
+                const senderId = parseInt(data.userId || data.user, 10);
+                const isOwn = !Number.isNaN(senderId) && senderId > 0 ? senderId === currentUserId : false;
+
+                if (!Number.isNaN(msgId) && msgId > 0) {
+                    if (messagesDisplayed.includes(msgId)) {
+                        return;
+                    }
+                    if (pendingOutgoingMessageIds.has(msgId)) {
+                        pendingOutgoingMessageIds.delete(msgId);
+                        registerChatMessageId(msgId);
+                        return;
+                    }
+                    registerChatMessageId(msgId);
+                }
+
+                displayMessage(
+                    { message: text, id: Number.isNaN(msgId) || msgId <= 0 ? undefined : msgId },
+                    data.profile_pic || data.image || imagePath,
+                    isOwn
+                );
+            }
+
+            pusherHelper.on('game:chat_message', handleIncomingChatMessage);
+            pusherHelper.on('game:message', handleIncomingChatMessage);
+
+            // Bingos cantados y aceptados en tiempo real
+            pusherHelper.on('game:bingo_accepted', function(data) {
+                console.log('WS game:bingo_accepted received', data);
+                if (!data || window.gameIsFinished || isGameFinishedShown) return;
+                if (Array.isArray(data.winners)) {
+                    mergeWinnersFromServer(data.winners);
+                }
+                if (data.player && data.modality) {
+                    if (isOwnBingoEvent(data)) {
+                        if (!bingoInProgress) {
+                            bingoInProgress = true;
+                            intervalManager.clear('lastNumber');
+                            showCountdown({
+                                player: data.player,
+                                modality: data.modality,
+                                modalityId: data.modalityId,
+                                image: data.image,
+                                isOwnBingo: true,
+                                winnerUserId: data.winnerUserId
+                            }, function() {
+                                if (data.gameCompleted || data.stopped) {
+                                    showGameFinalized();
+                                    return;
+                                }
+                                startAutomaticLast();
+                            });
+                        }
+                    } else if (!isGameFinishedShown) {
+                        showOtherPlayerBingoNotice(data);
+                    }
+                }
+            });
+
+            pusherHelper.on('game:bingo_claimed', function(data) {
+                console.log('WS game:bingo_claimed received', data);
+                if (!data || window.gameIsFinished || isGameFinishedShown) return;
+                if (Array.isArray(data.winners)) {
+                    mergeWinnersFromServer(data.winners);
+                }
+            });
+
+            // Inicio de partida en tiempo real
+            pusherHelper.on('game:started', function(data) {
+                console.log('WS game:started received', data);
+                markGameAsStartedFromServer((data && data.drawnCount) || 1);
+            });
+
+            // Fin de partida en tiempo real
+            pusherHelper.on('game:game_finished', function(data) {
+                console.log('WS game:game_finished received', data);
+                if (!isGameFinishedShown) {
+                    showGameFinalized();
+                }
+            });
+
+            pusherHelper.on('game:completed', function(data) {
+                console.log('WS game:completed received', data);
+                if (!isGameFinishedShown) {
+                    showGameFinalized();
+                }
+            });
+
+            // Reinicio de partida
+            pusherHelper.on('game:game_reset', function() {
+                console.log('WS game:game_reset received');
+                location.reload();
             });
         } catch (pe) {
             console.warn('Error inicializando PusherClient en juego:', pe);
