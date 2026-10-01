@@ -1144,7 +1144,11 @@
                 while (container.children.length >= notificationConfig.maxNotifications) {
                     const oldestNotification = container.firstChild;
                     if (oldestNotification) {
-                        hideNotification(oldestNotification);
+                        if (oldestNotification._autoHideTimer) {
+                            clearTimeout(oldestNotification._autoHideTimer);
+                            oldestNotification._autoHideTimer = null;
+                        }
+                        oldestNotification.remove();
                     } else {
                         break;
                     }

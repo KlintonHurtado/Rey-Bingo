@@ -3558,8 +3558,22 @@ class Users extends Controller {
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
         } else {
-            $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->findAll();
+            $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->limit(15)->findAll();
         }
+
+        // Deduplicar notificaciones repetidas en memoria y marcar duplicados en BD como leídos
+        $uniqueNotifications = [];
+        $seenKeys = [];
+        foreach ($notifications as $n) {
+            $dedupKey = ($n['type'] ?? '') . '_' . ($n['game'] ?? 0) . '_' . ($n['modality'] ?? 0) . '_' . ($n['type_id'] ?? 0);
+            if ($dedupKey !== '___0' && isset($seenKeys[$dedupKey])) {
+                $modelNotifications->update($n['id'], ['status' => 1]);
+                continue;
+            }
+            $seenKeys[$dedupKey] = true;
+            $uniqueNotifications[] = $n;
+        }
+        $notifications = $uniqueNotifications;
 
         foreach ($notifications as &$notification) { 
             if (in_array($notification['type'], ['deposit', 'retire', 'transfer', 'payment', 'referred']) && $notification['type_id'] > 0) {

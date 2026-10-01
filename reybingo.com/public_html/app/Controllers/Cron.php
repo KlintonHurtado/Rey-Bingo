@@ -499,8 +499,8 @@ class Cron extends Controller
                     continue;
                 }
 
-                // 2.3) Pausa por sing reciente
-                if ($this->hasRecentSingPause($gameId, 10)) {
+                // 2.3) Pausa breve por sing reciente (máximo 2s para mostrar toast)
+                if ($this->hasRecentSingPause($gameId, 2)) {
                     log_message('info', "Juego {$gameId} - pausa por sing reciente");
                     continue;
                 }
@@ -607,6 +607,17 @@ class Cron extends Controller
         foreach ($gamesToStart as $gameToStart) {
             if (! bingo_game_is_due($gameToStart)) {
                 continue;
+            }
+
+            // Si es juego automático y aún no tiene cartones, auto-asignar 500 bots para que juegue
+            $gameCartons = bingo_count_game_cartons((int) $gameToStart['id']);
+            if ($gameCartons === 0 && (int) ($gameToStart['type'] ?? 0) === 1) {
+                try {
+                    $botManager = new \App\Libraries\BotManager();
+                    $botManager->assignBotsToGame((int) $gameToStart['id'], 500, 2);
+                } catch (\Throwable $e) {
+                    log_message('error', "Error asignando bots al arrancar juego {$gameToStart['id']}: " . $e->getMessage());
+                }
             }
 
             $postpone = bingo_postpone_game($gameToStart);
@@ -1087,10 +1098,13 @@ class Cron extends Controller
             $totalPrize = ($awardType === 2) ? $awardValue : 100;
             $this->createGameAwards($gameId, $gameData['modalities'], $totalPrize);
 
-            // Generar cartones si está configurado
-            /*if (systemGet('generateCartons') >= 1) {
-                $this->generateGameCartons($gameId);
-            }*/
+            // Asignar 500 bots automáticamente para que jueguen desde el inicio
+            try {
+                $botManager = new \App\Libraries\BotManager();
+                $botManager->assignBotsToGame((int) $gameId, 500, 2);
+            } catch (\Throwable $e) {
+                log_message('error', "Error asignando bots al crear juego automático {$gameId}: " . $e->getMessage());
+            }
 
             // Enviar notificaciones
             $this->sendGameNotifications($gameId, $gameData);
@@ -1551,22 +1565,15 @@ class Cron extends Controller
             return false;
         }
 
-        // Solo pausar si hay cantes pendientes de resolución/pago (status 0 o 1)
-        $pendingSings = $db->table('sings')
-            ->where('game', $gameId)
-            ->whereIn('status', [0, 1])
-            ->countAllResults();
-
-        if ($pendingSings > 0) {
-            return true;
-        }
-
-        // Si ya fue resuelto (status 2), solo pausar brevemente si ocurrió en los últimos 2 segundos
+        // Pausa breve (máximo 2 segundos) para permitir que los jugadores vean la notificación toast
         $effectivePause = min(2, max(1, $pauseSeconds));
+        $pauseSince = date('Y-m-d H:i:s', time() - $effectivePause);
+
+        // Solo pausar si hubo un cante en los últimos $effectivePause segundos (evita congelar por cantes viejos)
         $recentSings = $db->table('sings')
             ->where('game', $gameId)
-            ->where('status', 2)
-            ->where('created_at >=', date('Y-m-d H:i:s', time() - $effectivePause))
+            ->whereIn('status', [0, 1, 2])
+            ->where('created_at >=', $pauseSince)
             ->countAllResults();
 
         return $recentSings > 0;
@@ -1967,7 +1974,7 @@ class Cron extends Controller
             ]);
         }
 
-        if ($this->hasRecentSingPause($gameId, 10)) {
+        if ($this->hasRecentSingPause($gameId, 2)) {
             return $this->response->setJSON([
                 'ok' => true,
                 'paused' => true,

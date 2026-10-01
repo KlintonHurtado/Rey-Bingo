@@ -702,7 +702,8 @@ class Boards extends Controller {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
         }
     
-        $lastSings = $modelSings->where('game', $game['id'])->findAll();
+        helper('bingo');
+        $lastSings = bingo_get_official_sings_for_game((int) $game['id'], true);
     
         if (empty($lastSings)) {
             return $this->response->setJSON([
@@ -719,9 +720,9 @@ class Boards extends Controller {
             $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
     
             $winners[] = [
-                'player' => $user['firstname'] . ' ' . $user['lastname'],
-                'modality' => translate($modality['name']),
-                'modalityId' => $modality['id'],
+                'player' => $user ? trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')) : ('Jugador #' . $sing['user']),
+                'modality' => $modality ? translate($modality['name'] ?? '') : 'Bingo',
+                'modalityId' => (int) ($sing['modality'] ?? 0),
                 'image' => $imagePath
             ];
         }

@@ -617,78 +617,25 @@ $isNoMusicRole = session()->get('logged_in') && (
                 return soundnotify;
             }
 
-            // Función mejorada para reproducir audio con compatibilidad iOS/Android
-            async function playNotificationSound(type) {
-                if (hasPlayedSound) return; // Si ya se reprodujo, no reproducir de nuevo
-                
-                try {
-                    let audioSrc;
-                    if (type === 'sing') {
-                        audioSrc = audioPath + 'winner.mp3';
-                    } else {
-                        audioSrc = audioPath + 'success.mp3';
-                    }
-                    
-                    const audio = initializeAudio(audioSrc);
-                    
-                    // Para iOS: crear una promesa que maneje el play
-                    const playPromise = audio.play();
-                    
-                    if (playPromise !== undefined) {
-                        await playPromise;
-                        hasPlayedSound = true; // Marcar que ya se reprodujo
-                        
-                        // Resetear el flag después de un tiempo
-                        setTimeout(() => {
-                            hasPlayedSound = false;
-                        }, 2000);
-                        
-                        console.log('Audio played successfully');
-                    }
-                } catch (error) {
-                    console.log("Audio play failed:", error);
-                    
-                    // Fallback para iOS: intentar con Web Audio API
-                    if (window.AudioContext || window.webkitAudioContext) {
-                        try {
-                            await playWithWebAudio(type);
-                        } catch (webAudioError) {
-                            console.log("Web Audio API also failed:", webAudioError);
-                        }
-                    }
-                }
-            }
+            // Función ligera y no bloqueante para reproducir audio con compatibilidad iOS/Android
+            function playNotificationSound(type) {
+                if (hasPlayedSound) return;
+                hasPlayedSound = true;
+                setTimeout(() => {
+                    hasPlayedSound = false;
+                }, 2000);
 
-            // Fallback con Web Audio API para iOS
-            async function playWithWebAudio(type) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const audioContext = new AudioContext();
-                
-                let audioSrc = type === 'sing' ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
-                
                 try {
-                    const response = await fetch(audioSrc);
-                    const arrayBuffer = await response.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    
-                    const source = audioContext.createBufferSource();
-                    const gainNode = audioContext.createGain();
-                    
-                    source.buffer = audioBuffer;
-                    gainNode.gain.value = 0.7;
-                    
-                    source.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    
-                    source.start(0);
-                    hasPlayedSound = true;
-                    
-                    setTimeout(() => {
-                        hasPlayedSound = false;
-                    }, 2000);
-                    
+                    let audioSrc = type === 'sing' ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
+                    const audio = initializeAudio(audioSrc);
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch((err) => {
+                            // Autoplay bloqueado por el navegador sin interacción previa: ignorar silenciosamente
+                        });
+                    }
                 } catch (error) {
-                    console.error('Web Audio API error:', error);
+                    console.warn("Audio play failed:", error);
                 }
             }
 
@@ -724,10 +671,11 @@ $isNoMusicRole = session()->get('logged_in') && (
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
                         if (limitedNotifications.length > 0) {
-                            await playNotificationSound(soundType);
+                            playNotificationSound(soundType);
                         }
 
                         // Procesar cada notificación
+                        let hasPlayedConfetti = false;
                         limitedNotifications.forEach(notification => {
                             showNotification(notification);
                             markAsRead(notification.id);
@@ -736,9 +684,12 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 addPaymentRowToModal(notification.transaction);
                             }
 
-                            // Efectos especiales solo para tipo 'sing'
-                            if (notification.type === 'sing') {
-                                AppcreateConfetti();
+                            // Efectos especiales solo para tipo 'sing' (máximo 1 vez por batch)
+                            if (notification.type === 'sing' && !hasPlayedConfetti) {
+                                hasPlayedConfetti = true;
+                                if (typeof AppcreateConfetti === 'function') {
+                                    AppcreateConfetti();
+                                }
                             } else if (notification.type === 'game') {
                                 <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
                                     gameslistGet();
@@ -788,7 +739,11 @@ $isNoMusicRole = session()->get('logged_in') && (
                 while (container.children.length >= notificationConfig.maxNotifications) {
                     const oldestNotification = container.firstChild;
                     if (oldestNotification) {
-                        hideNotification(oldestNotification);
+                        if (oldestNotification._autoHideTimer) {
+                            clearTimeout(oldestNotification._autoHideTimer);
+                            oldestNotification._autoHideTimer = null;
+                        }
+                        oldestNotification.remove();
                     } else {
                         break;
                     }
@@ -1552,11 +1507,13 @@ $isNoMusicRole = session()->get('logged_in') && (
 
             // Función para formatear la hora
             function formatTime(dateString) {
-                // Asegura compatibilidad reemplazando espacio por 'T'
-                const isoString = dateString.replace(' ', 'T');
+                if (!dateString) return 'Ahora';
+                const str = String(dateString);
+                const isoString = str.includes('T') ? str : str.replace(' ', 'T');
                 const date = new Date(isoString);
-                const now = new Date();
+                if (isNaN(date.getTime())) return 'Ahora';
 
+                const now = new Date();
                 const diffMs = now - date;
                 const diffMins = Math.floor(diffMs / 60000);
                 const diffHours = Math.floor(diffMins / 60);
@@ -1568,7 +1525,6 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (diffDays === 1) return 'Hace 1 día';
                 if (diffDays < 7) return `Hace ${diffDays} días`;
 
-                // Si ya pasó más de una semana, muestra la fecha
                 return date.toLocaleDateString('es-ES', {
                     day: '2-digit',
                     month: 'short',
@@ -2370,12 +2326,19 @@ $isNoMusicRole = session()->get('logged_in') && (
         let confettiContainer;
         let activeConfetti = [];
         let confettiTimeout; // Variable para controlar el timeout
+        let lastConfettiTime = 0;
 
         function isMobile() {
             return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
         function AppcreateConfetti(count = null) {
+            const now = Date.now();
+            if (now - lastConfettiTime < 2500) {
+                return;
+            }
+            lastConfettiTime = now;
+
             if (!confettiContainer) {
                 confettiContainer = document.getElementById('confetti-container');
             }

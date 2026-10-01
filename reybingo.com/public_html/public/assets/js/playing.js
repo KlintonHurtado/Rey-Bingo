@@ -76,7 +76,7 @@ try {
         window.__bingoSoundtrack.src = '';
         window.__bingoSoundtrack = null;
     }
-    window.startBingoSoundtrack = function() {};
+    window.startBingoSoundtrack = function () { };
     if (typeof window.stopBingoSoundtrack === 'function') {
         window.stopBingoSoundtrack();
     }
@@ -109,19 +109,19 @@ class IntervalManager {
     constructor() {
         this.intervals = new Map();
     }
-    
+
     set(name, callback, delay) {
         this.clear(name);
         this.intervals.set(name, setInterval(callback, delay));
     }
-    
+
     clear(name) {
         if (this.intervals.has(name)) {
             clearInterval(this.intervals.get(name));
             this.intervals.delete(name);
         }
     }
-    
+
     clearAll() {
         this.intervals.forEach(interval => clearInterval(interval));
         this.intervals.clear();
@@ -133,7 +133,7 @@ class DOMCache {
     constructor() {
         this.cache = new Map();
     }
-    
+
     get(id) {
         if (!this.cache.has(id)) {
             const element = document.getElementById(id);
@@ -143,7 +143,7 @@ class DOMCache {
         }
         return this.cache.get(id);
     }
-    
+
     clear() {
         this.cache.clear();
     }
@@ -155,14 +155,14 @@ class MessagePool {
         this.pool = [];
         this.maxSize = maxSize;
     }
-    
+
     get() {
         if (this.pool.length > 0) {
             return this.pool.pop();
         }
         return this.createNew();
     }
-    
+
     release(element) {
         if (this.pool.length < this.maxSize) {
             element.className = 'message-bubble';
@@ -171,7 +171,7 @@ class MessagePool {
             this.pool.push(element);
         }
     }
-    
+
     createNew() {
         const bubble = document.createElement("div");
         bubble.classList.add("message-bubble");
@@ -186,17 +186,17 @@ class AudioManager {
         this.preloadedAudios = new Set();
         this.audioPool = [];
     }
-    
+
     preload(src) {
         if (this.preloadedAudios.has(src)) return;
-        
+
         const audio = new Audio();
         audio.preload = 'auto';
         audio.src = src;
         this.audioCache.set(src, audio);
         this.preloadedAudios.add(src);
     }
-    
+
     play(src) {
         let audio = this.audioCache.get(src);
         if (!audio) {
@@ -204,14 +204,14 @@ class AudioManager {
             audio.src = src;
             this.audioCache.set(src, audio);
         }
-        
+
         // Clone para permitir múltiples reproducciones simultáneas
         const audioClone = audio.cloneNode();
         audioClone.play().catch(e => console.warn('Audio play failed:', e));
-        
+
         return audioClone;
     }
-    
+
     preloadNumberAudios() {
         // Precargar audios de números 1-75
         for (let i = 1; i <= 75; i++) {
@@ -231,19 +231,19 @@ class SmartPoller {
         this.isActive = true;
         this.timeoutId = null;
     }
-    
+
     async poll(callback) {
         if (!this.isActive) return;
-        
+
         try {
             const result = await callback();
-            
+
             // Reset interval on success or empty poll
             if (result && (result.status === 'success' || result.status === 'empty')) {
                 this.currentInterval = this.baseInterval;
                 this.consecutiveErrors = 0;
             }
-            
+
         } catch (error) {
             this.consecutiveErrors++;
             // Exponential backoff on errors
@@ -253,10 +253,10 @@ class SmartPoller {
             );
             console.warn('Polling error:', error);
         }
-        
+
         this.timeoutId = setTimeout(() => this.poll(callback), this.currentInterval);
     }
-    
+
     stop() {
         this.isActive = false;
         if (this.timeoutId) {
@@ -264,7 +264,7 @@ class SmartPoller {
             this.timeoutId = null;
         }
     }
-    
+
     restart() {
         this.stop();
         this.isActive = true;
@@ -281,20 +281,20 @@ class CanvasConfetti {
         this.isActive = false;
         this.activeElements = new Set();
     }
-    
+
     createParticles() {
         const emojis = ['🎉', '🎊', '✨', '🌟', '🥳', '🍾', '💥', '🔥', '💫', '🍬', '🎈'];
         this.particles = [];
-        
+
         // Limpiar partículas anteriores si existen
         this.cleanup();
-        
+
         for (let i = 0; i < CONFIG.MAX_CONFETTI; i++) {
             // Crear elemento DOM para cada partícula
             const confetti = document.createElement('div');
             confetti.className = 'confetti';
             confetti.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-            
+
             // Propiedades mejoradas basadas en tu función preferida
             const particle = {
                 element: confetti,
@@ -311,7 +311,7 @@ class CanvasConfetti {
                 animationDuration: Math.random() * 6 + 4, // animación más lenta
                 animationDelay: Math.random()
             };
-            
+
             // Aplicar estilos CSS mejorados
             confetti.style.cssText = `
                 position: fixed;
@@ -328,11 +328,11 @@ class CanvasConfetti {
                 transform: rotate(${particle.rotation}deg);
                 user-select: none;
             `;
-            
+
             // Agregar al DOM
             document.body.appendChild(confetti);
             this.activeElements.add(confetti);
-            
+
             // Auto-eliminar cuando termine la animación
             const handleAnimationEnd = () => {
                 if (confetti.parentNode) {
@@ -341,13 +341,13 @@ class CanvasConfetti {
                 this.activeElements.delete(confetti);
                 confetti.removeEventListener('animationend', handleAnimationEnd);
             };
-            
+
             confetti.addEventListener('animationend', handleAnimationEnd);
-            
+
             this.particles.push(particle);
         }
     }
-    
+
     cleanup() {
         // Limpiar elementos activos
         this.activeElements.forEach(element => {
@@ -358,29 +358,29 @@ class CanvasConfetti {
         this.activeElements.clear();
         this.particles = [];
     }
-    
+
     start() {
         if (this.isActive) return;
-        
+
         this.isActive = true;
         this.createParticles();
-        
+
         // Auto-stop después de la duración máxima de animación
         setTimeout(() => {
             this.stop();
         }, 6000); // 5s max duration + 1s buffer
     }
-    
+
     stop() {
         this.isActive = false;
         // Los elementos se limpiarán automáticamente cuando termine su animación
     }
-    
+
     forceStop() {
         this.isActive = false;
         this.cleanup();
     }
-    
+
     resize() {
         // Método para manejar cambios de tamaño
         if (this.isActive) {
@@ -421,7 +421,7 @@ function debounce(func, wait) {
 // Throttle function
 function throttle(func, limit) {
     let inThrottle;
-    return function() {
+    return function () {
         const args = arguments;
         const context = this;
         if (!inThrottle) {
@@ -438,20 +438,20 @@ function throttle(func, limit) {
 function setupCartonLayout() {
     const container = document.querySelector('.content-cartons');
     const cartons = document.querySelectorAll('.bingo-carton');
-    
+
     if (!container || !cartons.length) return;
-    
+
     // Limpiar clases previas
     container.classList.remove('one-carton', 'two-cartons', 'three-cartons', 'four-cartons');
-    
+
     // Aplicar clase según cantidad de cartones
     const classMap = {
         1: 'one-carton',
-        2: 'two-cartons', 
+        2: 'two-cartons',
         3: 'three-cartons',
         4: 'four-cartons'
     };
-    
+
     const className = classMap[cartons.length];
     if (className) {
         container.classList.add(className);
@@ -466,14 +466,14 @@ function setupCartonLayout() {
 function createMessageBubble(content, profilePicUrl, isOwn = false) {
     const bubble = messagePool.get();
     bubble.style.display = "flex";
-    
+
     // Configurar alineación
     if (isOwn) {
         bubble.classList.add("own-message");
     } else {
         bubble.classList.remove("own-message");
     }
-    
+
     // Reutilizar o crear imagen de perfil
     let img = bubble.querySelector('.profile-pic');
     if (!img) {
@@ -482,17 +482,17 @@ function createMessageBubble(content, profilePicUrl, isOwn = false) {
         bubble.appendChild(img);
     }
     img.src = profilePicUrl || 'default-avatar.png';
-    
+
     // Reutilizar o crear span para el contenido
     let span = bubble.querySelector('span');
     if (!span) {
         span = document.createElement("span");
         bubble.appendChild(span);
     }
-    
+
     span.textContent = content;
     span.style.fontSize = '';
-    
+
     // Check if the content is only emojis (no alphanumeric or standard punctuation characters)
     const trimmed = content.trim();
     const isOnlyEmoji = !/[\p{L}\p{N}¡!¿?.,;]/u.test(trimmed) && trimmed.length <= 8;
@@ -517,7 +517,7 @@ function removeMessageWithFade(el) {
 function limitMessages() {
     const display = $id("message-display");
     if (!display) return;
-    
+
     const bubbles = display.getElementsByClassName("message-bubble");
     while (bubbles.length >= CONFIG.MAX_MESSAGES) {
         removeMessageWithFade(bubbles[0]);
@@ -646,7 +646,7 @@ function processIncomingChatMessages(data) {
 function displayMessage(messageData, imageUrl, isOwn = false) {
     const display = $id("message-display");
     if (!display) return;
-    
+
     limitMessages();
 
     const bubble = createMessageBubble(
@@ -654,17 +654,17 @@ function displayMessage(messageData, imageUrl, isOwn = false) {
         imageUrl || imagePath || 'default-avatar.png',
         isOwn
     );
-    
+
     // Insertar al principio para que aparezca abajo (ya que usamos column-reverse)
     display.insertBefore(bubble, display.firstChild);
-    
+
     if (messageData.id) {
         const msgId = parseInt(messageData.id, 10);
         if (!Number.isNaN(msgId) && msgId > 0) {
             registerChatMessageId(msgId);
         }
     }
-    
+
     // Programar eliminación automática
     setTimeout(() => removeMessageWithFade(bubble), CONFIG.MESSAGE_LIFETIME);
 }
@@ -818,7 +818,7 @@ function buildWinnersFinalText() {
         return `${finishedLabel}<br><br><strong>🎉 ${winners[0].player}</strong><br>${winners[0].modality}`;
     }
 
-    const lines = winners.map(function(w) {
+    const lines = winners.map(function (w) {
         return `🎉 ${w.player} — ${w.modality}`;
     }).join('<br>');
 
@@ -827,12 +827,12 @@ function buildWinnersFinalText() {
 
 function fetchWinnersBeforeFinalize(callback) {
     $.get(site_url + 'playings/winnersGet')
-        .done(function(data) {
+        .done(function (data) {
             if (data && data.status === 'success' && Array.isArray(data.winners)) {
                 mergeWinnersFromServer(data.winners);
             }
         })
-        .always(function() {
+        .always(function () {
             if (typeof callback === 'function') {
                 callback();
             }
@@ -848,7 +848,7 @@ function handleBingoSuccess(data, resumeCallback) {
 
     // Encolar bingos extras del mismo request (varios cartones / modalidades)
     if (Array.isArray(data.sings) && data.sings.length > 1) {
-        data.sings.slice(1).forEach(function(extra) {
+        data.sings.slice(1).forEach(function (extra) {
             simultaneousBingos.push(extra);
         });
     }
@@ -866,7 +866,7 @@ function handleBingoSuccess(data, resumeCallback) {
         sendEmoji('🥳', 21);
     }
 
-    const highlightSing = function(singData) {
+    const highlightSing = function (singData) {
         const cartonElement = document.getElementById(`carton-${singData.carton}`);
         if (cartonElement && Array.isArray(singData.numbers)) {
             singData.numbers.forEach((num) => {
@@ -883,7 +883,7 @@ function handleBingoSuccess(data, resumeCallback) {
         data.sings.forEach(highlightSing);
     }
 
-    const afterCountdown = function() {
+    const afterCountdown = function () {
         if (data.gameCompleted) {
             showGameFinalized();
             return;
@@ -913,7 +913,9 @@ function mergeWinnersFromServer(serverWinners) {
         return;
     }
 
-    serverWinners.forEach(function(winner) {
+    const limit = parseInt(window.numberSingsLimit, 10) || 1;
+
+    serverWinners.forEach(function (winner) {
         const player = winner.player || '';
         const modality = winner.modality || '';
 
@@ -921,9 +923,15 @@ function mergeWinnersFromServer(serverWinners) {
             return;
         }
 
-        if (!winners.some(function(existing) {
-            return existing.player === player && existing.modality === modality;
-        })) {
+        const currentModalityWinners = winners.filter(function (existing) {
+            return existing.modality === modality;
+        });
+
+        const alreadyExists = currentModalityWinners.some(function (existing) {
+            return existing.player === player;
+        });
+
+        if (!alreadyExists && currentModalityWinners.length < limit) {
             winners.push({ player: player, modality: modality });
         }
 
@@ -962,7 +970,7 @@ function scheduleAutoSingCheck(delay) {
         clearTimeout(autoSingCheckTimer);
     }
 
-    autoSingCheckTimer = setTimeout(function() {
+    autoSingCheckTimer = setTimeout(function () {
         autoSingCheckTimer = null;
         autoSingIfComplete();
     }, typeof delay === 'number' ? delay : 450);
@@ -1053,7 +1061,7 @@ function pollMessagesOptimized() {
 
 // Ejecutar auto-sing periódicamente (sin spamear)
 setInterval(() => {
-    try { autoSingIfComplete(); } catch (e) {}
+    try { autoSingIfComplete(); } catch (e) { }
 }, 1500);
 
 // ==========================================
@@ -1077,7 +1085,7 @@ function disableManualClickForNumber(number) {
         return;
     }
 
-    $(".number-" + number).each(function() {
+    $(".number-" + number).each(function () {
         this.removeAttribute('onclick');
     });
 }
@@ -1179,7 +1187,7 @@ function renderBallHistory() {
         : ordered.slice(Math.max(0, ordered.length - historyLimit));
 
     container.empty();
-    history.slice(-historyLimit).forEach(function(num) {
+    history.slice(-historyLimit).forEach(function (num) {
         container.append(`<div class="bingo-ball ${getColumnClass(num)} ${getHistoryBallSizeClass()}"><span>${num}</span></div>`);
     });
 }
@@ -1216,7 +1224,7 @@ function registerDrawnNumber(newNumber) {
 
 function seedAutoMarkedNumbers() {
     autoMarkedNumbers.clear();
-    $('.bingo-carton-number.marked').each(function() {
+    $('.bingo-carton-number.marked').each(function () {
         const match = (this.className || '').match(/\bnumber-(\d+)\b/);
         if (match) {
             autoMarkedNumbers.add(parseInt(match[1], 10));
@@ -1334,7 +1342,7 @@ function scheduleLatestBallMarks(latestNumber, options) {
     const opts = options || {};
     const shouldDelayMarks = opts.animate !== false && !bingoInProgress;
 
-    const runMarks = function() {
+    const runMarks = function () {
         pendingMarkNumber = null;
         pendingMarkSequence = 0;
         applyMarksForNumber(parsed);
@@ -1361,14 +1369,14 @@ function scheduleLatestBallMarks(latestNumber, options) {
     pendingMarkSequence = sequence;
     const ballDelay = getBallDisplayDelay();
 
-    ballRevealTimer = setTimeout(function() {
+    ballRevealTimer = setTimeout(function () {
         if (pendingMarkSequence !== sequence || pendingMarkNumber !== parsed) {
             return;
         }
 
         runMarks();
 
-        ballRevealAfterTimer = setTimeout(function() {
+        ballRevealAfterTimer = setTimeout(function () {
             const lastNumberEl = $('#last-number');
             if (lastNumberEl.length) {
                 lastNumberEl.removeClass('move-number');
@@ -1394,7 +1402,7 @@ function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
 function uniqueOrderedBalls(numbers) {
     const ordered = [];
     const seen = {};
-    (numbers || []).forEach(function(value) {
+    (numbers || []).forEach(function (value) {
         const parsed = parseBallNumber(value);
         if (!parsed || seen[parsed]) {
             return;
@@ -1422,7 +1430,7 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         : serverTotal;
 
     const previous = numbersgenerated.slice();
-    const missing = ordered.filter(function(num) {
+    const missing = ordered.filter(function (num) {
         return !previous.includes(num);
     });
 
@@ -1439,7 +1447,7 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     if (isAutoMarkEnabled()) {
         // Una sola bola nueva: marcar con el delay de revelado (sync con la animación)
         if (opts.animate !== false && missing.length === 1 && !bingoInProgress) {
-            const alreadySynced = ordered.filter(function(num) {
+            const alreadySynced = ordered.filter(function (num) {
                 return num !== missing[0];
             });
             if (alreadySynced.length) {
@@ -1462,9 +1470,9 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         const lastNumberEl = $('#last-number');
         if (lastNumberEl.length) {
             lastNumberEl.addClass('move-number');
-            setTimeout(function() {
+            setTimeout(function () {
                 lastNumberEl.removeClass('move-number');
-            }, getBallDisplayDelay());
+            }, 500);
         }
     }
 
@@ -1474,8 +1482,9 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
 }
 
 function getBallDisplayDelay() {
-    const parsed = parseInt(window.timeBallGet, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1500;
+    // Retardo visual breve para sincronizar con la llegada de la balota al cabezal.
+    // NUNCA usar timeBallGet aquí, ya que timeBallGet es el intervalo completo entre bolas (4000ms).
+    return 200;
 }
 
 function applyMarksForDrawnNumber(number) {
@@ -1502,7 +1511,7 @@ function markCartonNumberLocally(number, animate) {
         return;
     }
 
-    elementsNumber.each(function() {
+    elementsNumber.each(function () {
         const elementNumber = $(this);
 
         if (elementNumber.hasClass('marked')) {
@@ -1513,7 +1522,7 @@ function markCartonNumberLocally(number, animate) {
             const originalContent = elementNumber.text();
             elementNumber.text('⭐️').addClass('explosive-effect');
 
-            setTimeout(function() {
+            setTimeout(function () {
                 elementNumber.text(originalContent);
                 elementNumber.removeClass('explosive-effect');
                 elementNumber.addClass('marked');
@@ -1537,7 +1546,7 @@ function syncAutoMarkedNumbers(drawnNumbers, options) {
     const numbers = Array.isArray(drawnNumbers) ? drawnNumbers : (window.drawnNumbers || []);
     const animate = opts.animate === true;
 
-    numbers.forEach(function(number) {
+    numbers.forEach(function (number) {
         const parsed = parseInt(number, 10);
         if (!parsed) {
             return;
@@ -1625,13 +1634,6 @@ function showCountdown(data, callback) {
         });
     }
 
-    // Forzar carga inmediata de la notificación toast (sin círculo)
-    if (typeof window.loadNotifications === 'function') {
-        setTimeout(function () {
-            window.loadNotifications();
-        }, 300);
-    }
-
     setTimeout(() => {
         if (simultaneousBingos.length > 0) {
             const nextBingo = simultaneousBingos.shift();
@@ -1643,13 +1645,27 @@ function showCountdown(data, callback) {
     }, 1200);
 }
 
+window.seenBingoNotices = window.seenBingoNotices || new Set();
+
 function showOtherPlayerBingoNotice(data, callback) {
     if (!data) {
         return;
     }
 
+    const noticeKey = (data.singId ? 'sing_' + data.singId : '') ||
+                      (data.cartonId ? 'carton_' + data.cartonId + '_' + (data.modalityId || '') : '') ||
+                      ((data.player || '') + '_' + (data.modality || ''));
+
+    if (window.seenBingoNotices.has(noticeKey)) {
+        if (typeof callback === 'function') {
+            callback();
+        }
+        return;
+    }
+    window.seenBingoNotices.add(noticeKey);
+
     window.gameHasWinner = true;
-    intervalManager.clear('lastNumber');
+    // No limpiar lastNumber aquí para no congelar la pantalla de los demás jugadores
 
     if (Array.isArray(data.winners)) {
         mergeWinnersFromServer(data.winners);
@@ -1691,10 +1707,11 @@ function showOtherPlayerBingoNotice(data, callback) {
         console.warn('Error al reproducir audio de ganador:', e);
     }
 
-    // 2. Disparar notificación toast visual del sistema
+    // 2. Disparar notificación toast visual del sistema con ID único para no duplicar
     if (typeof window.showNotification === 'function') {
         const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
         window.showNotification({
+            id: noticeKey,
             type: 'sing',
             title: '🎉 ¡BINGO CANTADO!',
             message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
@@ -1711,7 +1728,7 @@ function showOtherPlayerBingoNotice(data, callback) {
         data.isOwnBingo = false;
     }
     showCountdown(data, function () {
-        if (data.gameCompleted || window.gameIsFinished) {
+        if (data.gameCompleted === true) {
             setTimeout(showGameFinalized, 400);
             return;
         }
@@ -1730,7 +1747,7 @@ function updateBallsCounter(totalNumbersGenerated) {
     const drawn = parseInt(totalNumbersGenerated, 10) || 0;
     window.totalNumbersGenerated = drawn;
     const remaining = totalBalls - drawn;
-    
+
     const counter = $('#balls-counter');
     if (counter.length) {
         counter.text(`${drawn} - ${remaining}`);
@@ -1800,7 +1817,7 @@ function processNumberGetResponse(data) {
                         image: data.image,
                         isOwnBingo: true,
                         winnerUserId: data.winnerUserId
-                    }, function() {
+                    }, function () {
                         if (data.gameCompleted) {
                             showGameFinalized();
                             return;
@@ -1875,16 +1892,19 @@ function startAutomaticLast() {
         return;
     }
 
-    // Primer sync inmediato (para cargar estado al entrar)
+    bingoInProgress = false;
+    flushPendingMark();
+
+    // Primer sync inmediato (para cargar estado al entrar o tras celebrar)
     lastNumberGet();
 
     var effMs = getEffectiveBallIntervalMs();
     var wsActive = window.__bingoPusherRealtime === true;
-    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 10s para no dejar huecos)
-    // Si no está activo, usar intervalo ágil de respaldo (2-5s)
+    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 5s para no dejar huecos)
+    // Si no está activo, usar intervalo ágil de respaldo (2-4s)
     var fallbackMs = wsActive
-        ? Math.max(3000, Math.min(10000, effMs))
-        : Math.max(2000, Math.min(5000, effMs));
+        ? Math.max(2500, Math.min(5000, effMs))
+        : Math.max(2000, Math.min(4000, effMs));
 
     intervalManager.set('lastNumber', lastNumberGet, fallbackMs);
 }
@@ -1928,7 +1948,7 @@ function showGameFinalized() {
         return;
     }
 
-    fetchWinnersBeforeFinalize(function() {
+    fetchWinnersBeforeFinalize(function () {
         if (isGameFinishedShown) {
             return;
         }
@@ -1955,7 +1975,7 @@ function showGameFinalized() {
             container.style.display = 'block';
             text.innerHTML = buildWinnersFinalText();
 
-            setTimeout(function() {
+            setTimeout(function () {
                 if (typeof awardsGet === 'function') {
                     awardsGet();
                 }
@@ -1974,7 +1994,7 @@ function showGameFinalized() {
 
                     const btnVolver = document.getElementById('btnVolverInicio');
                     if (btnVolver) {
-                        btnVolver.addEventListener('click', function() {
+                        btnVolver.addEventListener('click', function () {
                             bsModal.hide();
                             window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
                         }, { once: true });
@@ -2095,9 +2115,9 @@ function dialNumber(number) {
         url: site_url + 'playings/dialNumber',
         method: 'POST',
         data: { number: number },
-        success: function(data) {
+        success: function (data) {
             if (data.status === 'success') {
-                elementsNumber.each(function() {
+                elementsNumber.each(function () {
                     const elementNumber = $(this);
 
                     if (elementNumber.hasClass('marked')) {
@@ -2113,7 +2133,7 @@ function dialNumber(number) {
                     const originalContent = elementNumber.text();
                     elementNumber.text('⭐️').addClass('explosive-effect');
 
-                    setTimeout(function() {
+                    setTimeout(function () {
                         elementNumber.text(originalContent);
                         elementNumber.removeClass('explosive-effect');
                         elementNumber.addClass('marked');
@@ -2128,7 +2148,7 @@ function dialNumber(number) {
                 console.warn("Respuesta no exitosa:", data.message || data);
             }
         },
-        error: function(xhr, status, error) {
+        error: function (xhr, status, error) {
             autoMarkedNumbers.delete(number);
             console.error("Error en AJAX al marcar número:", number, error);
         }
@@ -2138,7 +2158,7 @@ function dialNumber(number) {
 // Función optimizada para marcar números
 function autoDialNumber(number) {
     const elementsNumber = $(".number-" + number);
-    elementsNumber.each(function() {
+    elementsNumber.each(function () {
         const elementNumber = $(this);
 
         if (elementNumber.hasClass('marked')) return;
@@ -2146,10 +2166,10 @@ function autoDialNumber(number) {
         const originalContent = elementNumber.text();
         elementNumber.text('⭐️').addClass('explosive-effect');
 
-        setTimeout(function() {
-            elementNumber.text(originalContent); 
+        setTimeout(function () {
+            elementNumber.text(originalContent);
             elementNumber.removeClass('explosive-effect');
-            elementNumber.addClass('marked'); 
+            elementNumber.addClass('marked');
         }, 1000);
     });
 
@@ -2174,13 +2194,13 @@ function singBingo() {
         messageElement.innerHTML = '<strong>Sistema:</strong> ' + (__['please wait until the current bingo is verified'] || 'Por favor espera mientras se verifica el bingo actual');
         messageElement.style.display = 'block';
         messageElement.style.opacity = '1';
-        
+
         const messagesContainer = document.querySelector('.messages-container');
         if (messagesContainer) {
             messagesContainer.appendChild(messageElement);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
-        
+
         // Programar eliminación del mensaje
         setTimeout(() => {
             messageElement.style.opacity = '0';
@@ -2188,10 +2208,10 @@ function singBingo() {
                 messagePool.release(messageElement);
             }, CONFIG.FADE_OUT_TIME);
         }, CONFIG.MESSAGE_LIFETIME);
-        
+
         return;
     }
-    
+
     const bingoButton = document.querySelector('.btn-bingooo');
     if (bingoButton) {
         bingoButton.classList.remove('animate-click');
@@ -2202,7 +2222,7 @@ function singBingo() {
     $.ajax({
         url: site_url + 'playings/singBingo',
         method: 'POST',
-        success: function(data) {
+        success: function (data) {
             if (data.status === 'success') {
                 const lastBall = getLastBoardNumber();
                 if (lastBall) {
@@ -2214,7 +2234,7 @@ function singBingo() {
                 window.gameHasWinner = true;
             }
         },
-        error: function(xhr, status, error) {
+        error: function (xhr, status, error) {
             console.error("Error al cantar bingo:", error);
         }
     });
@@ -2270,7 +2290,7 @@ function RemoveVolume() {
     $.ajax({
         url: site_url + 'playings/volumeSubmit',
         method: 'POST',
-        error: function() {
+        error: function () {
             console.warn('Error disabling sound');
         }
     });
@@ -2286,7 +2306,7 @@ function RemoveMicrophone() {
     $.ajax({
         url: site_url + 'playings/microphoneSubmit',
         method: 'POST',
-        error: function() {
+        error: function () {
             console.warn('Error disabling narrator');
         }
     });
@@ -2296,7 +2316,7 @@ function RemoveCheck() {
     $.ajax({
         url: site_url + 'playings/checkSubmit',
         method: 'POST',
-        success: function(data) {
+        success: function (data) {
             if (data.status === 'success') {
                 window.autoMarkEnabled = parseInt(data.autodial, 10) === 1;
 
@@ -2315,7 +2335,7 @@ function RemoveCheck() {
                     }
                     syncAutoMarkedNumbers(window.drawnNumbers, { animate: true, persist: false });
                     seedAutoMarkedNumbers();
-                    $(".bingo-carton-number[id^='number-']").each(function() {
+                    $(".bingo-carton-number[id^='number-']").each(function () {
                         this.removeAttribute('onclick');
                     });
                 } else {
@@ -2327,7 +2347,7 @@ function RemoveCheck() {
                 console.log("error sending request");
             }
         },
-        error: function(error) {
+        error: function (error) {
             console.log("error in the request");
         }
     });
@@ -2350,7 +2370,7 @@ function setupEvents() {
     });
 
     // Eventos para emojis (si tienes botones de emoji)
-    $('.emoji-button').on('click', function() {
+    $('.emoji-button').on('click', function () {
         const emoji = $(this).data('emoji') || $(this).text();
         sendEmoji(emoji);
     });
@@ -2358,7 +2378,7 @@ function setupEvents() {
     // Click en números del cartón (solo en modo manual)
     // Nota: silencio/micrófono se manejan solo vía onclick (RemoveVolume/RemoveMicrophone)
     // para evitar doble toggle.
-    $(".bingo-carton-number").on('click', function() {
+    $(".bingo-carton-number").on('click', function () {
         if (!isAutoMarkEnabled()) {
             const number = $(this).data('number') || parseInt($(this).attr('id')?.replace('number-', ''), 10);
             if (number) {
@@ -2368,12 +2388,12 @@ function setupEvents() {
     });
 
     // Gestión de modales
-    $('.modal').on("hidden.bs.modal", function(e) {
+    $('.modal').on("hidden.bs.modal", function (e) {
         if ($('.modal:visible').length) {
             $('.modal-backdrop').first().css('z-index', parseInt($('.modal:visible').last().css('z-index')) - 10);
             $('body').addClass('modal-open');
         }
-    }).on("show.bs.modal", function(e) {
+    }).on("show.bs.modal", function (e) {
         if ($('.modal:visible').length) {
             $('.modal-backdrop.in').first().css('z-index', parseInt($('.modal:visible').last().css('z-index')) + 10);
             $(this).css('z-index', parseInt($('.modal-backdrop.in').first().css('z-index')) + 10);
@@ -2438,7 +2458,7 @@ function setupEvents() {
 
     const modalitiesToggleBtn = $id("toggle-modalities-btn");
     if (modalitiesToggleBtn) {
-        modalitiesToggleBtn.addEventListener("click", function(event) {
+        modalitiesToggleBtn.addEventListener("click", function (event) {
             setModalitiesPanelOpen(!isModalitiesPanelOpen());
             event.stopPropagation();
         });
@@ -2446,7 +2466,7 @@ function setupEvents() {
 
     const closeModalitiesBtn = $id("modalities-panel-close");
     if (closeModalitiesBtn) {
-        closeModalitiesBtn.addEventListener("click", function(event) {
+        closeModalitiesBtn.addEventListener("click", function (event) {
             setModalitiesPanelOpen(false);
             event.stopPropagation();
         });
@@ -2454,7 +2474,7 @@ function setupEvents() {
 
     const toggleBtn = $id("toggle-messages-btn");
     if (toggleBtn) {
-        toggleBtn.addEventListener("click", function(event) {
+        toggleBtn.addEventListener("click", function (event) {
             setChatPanelOpen(!isChatPanelOpen());
             event.stopPropagation();
         });
@@ -2462,13 +2482,13 @@ function setupEvents() {
 
     const closeChatBtn = $id("message-display-close");
     if (closeChatBtn) {
-        closeChatBtn.addEventListener("click", function(event) {
+        closeChatBtn.addEventListener("click", function (event) {
             setChatPanelOpen(false);
             event.stopPropagation();
         });
     }
 
-    document.addEventListener("click", function(event) {
+    document.addEventListener("click", function (event) {
         const messageContainer = $id("message-display-container");
         const toggleButton = $id("toggle-messages-btn");
         const closeButton = $id("message-display-close");
@@ -2571,10 +2591,10 @@ function setupScrollMask() {
         container.style.webkitMaskImage = maskValue;
     }, 50);
 
-    if (cartons.length > 4) { 
+    if (cartons.length > 4) {
         container.addEventListener("scroll", updateMask);
         window.addEventListener("resize", updateMask);
-        updateMask(); 
+        updateMask();
     }
 }
 
@@ -2593,7 +2613,7 @@ function pollGameStatusBeforeStart() {
 
     if (gameStatusPollInterval) return;
 
-    gameStatusPollInterval = setInterval(function() {
+    gameStatusPollInterval = setInterval(function () {
         if (hasGameStarted()) {
             clearInterval(gameStatusPollInterval);
             gameStatusPollInterval = null;
@@ -2601,19 +2621,19 @@ function pollGameStatusBeforeStart() {
         }
 
         $.get(site_url + 'playings/getGameStatus')
-            .done(function(data) {
+            .done(function (data) {
                 if (data && data.status === 'success') {
                     // Si la hora/fecha del juego cambió (pospuesta)
                     const serverTimeStr = data.date + ' ' + data.time;
                     const localTargetStr = typeof window.gameDate !== 'undefined' ? window.gameDate : '';
-                    
+
                     if (localTargetStr && serverTimeStr !== localTargetStr) {
                         const message = `La partida se ha pospuesto 5 minutos (nueva hora de inicio: ${data.time.substring(0, 5)}).`;
                         handleGamePostponed(serverTimeStr, message);
                     }
                 }
             })
-            .fail(function(err) {
+            .fail(function (err) {
                 console.warn("Error polling game status:", err);
             });
     }, 10000); // Cada 10 segundos
@@ -2621,7 +2641,7 @@ function pollGameStatusBeforeStart() {
 
 function handleGamePostponed(newTimeStr, messageText) {
     console.log("Game postponed received:", newTimeStr);
-    
+
     // Evitar notificar múltiples veces para el mismo horario
     if (lastPostponedTime === newTimeStr) return;
     lastPostponedTime = newTimeStr;
@@ -2632,7 +2652,7 @@ function handleGamePostponed(newTimeStr, messageText) {
         normalized = normalized.replace(' ', 'T');
     }
     window.gameDate = normalized;
-    
+
     // Si la función de actualizar el countdown existe, reiniciarla con la nueva fecha
     if (typeof setupGameCountdown === 'function') {
         setupGameCountdown();
@@ -2736,16 +2756,16 @@ class ResourceManager {
 
         // Limpiar intervalos
         intervalManager.clearAll();
-        
+
         // Detener polling
         messagePoller.stop();
-        
+
         // Limpiar timeouts
         if (winnerSliderTimeout) {
             clearTimeout(winnerSliderTimeout);
             winnerSliderTimeout = null;
         }
-        
+
         if (intervalNextGame) {
             clearInterval(intervalNextGame);
             intervalNextGame = null;
@@ -2753,29 +2773,29 @@ class ResourceManager {
 
         // Detener confetti
         confettiManager.stop();
-        
+
         // Limpiar cache DOM
         domCache.clear();
-        
+
         // Limpiar arrays
         messagesDisplayed.length = 0;
         lastChatPollId = 0;
         pendingOutgoingMessageIds.clear();
         winners.length = 0;
-        
+
         console.log('Resource cleanup completed');
     }
 
     initialize() {
         this.isCleaningUp = false;
-        
+
         // Precargar recursos de audio
         audioManager.preloadNumberAudios();
-        
+
         // Configurar eventos de limpieza
         window.addEventListener('beforeunload', () => this.cleanup());
         window.addEventListener('unload', () => this.cleanup());
-        
+
         // Limpiar recursos cuando la página pierde el foco por mucho tiempo
         let pageHiddenTime = 0;
         document.addEventListener('visibilitychange', () => {
@@ -2793,12 +2813,12 @@ class ResourceManager {
 
     softReset() {
         console.log('Performing soft reset...');
-        
+
         // Reiniciar polling si está detenido
         if (!messagePoller.isActive) {
             messagePoller.restart();
         }
-        
+
         // Limpiar mensajes antiguos
         const display = $id("message-display");
         if (display) {
@@ -2808,7 +2828,7 @@ class ResourceManager {
                 bubble.remove();
             });
         }
-        
+
         // Resetear arrays de mensajes mostrados
         messagesDisplayed.length = 0;
         lastChatPollId = 0;
@@ -2824,7 +2844,7 @@ class ResourceManager {
 // Función para manejar errores de red de forma elegante
 function handleNetworkError(error, context = '') {
     console.warn(`Network error in ${context}:`, error);
-    
+
     // Mostrar notificación discreta al usuario
     const notification = document.createElement('div');
     notification.className = 'network-error-notification';
@@ -2843,15 +2863,15 @@ function handleNetworkError(error, context = '') {
         opacity: 0;
         transition: opacity 0.3s ease;
     `;
-    
+
     //document.body.appendChild(notification);
-    
+
     // Fade in
     setTimeout(() => {
         notification.style.display = 'block';
         notification.style.opacity = '1';
     }, 100);
-    
+
     // Fade out y remover después de 3 segundos
     setTimeout(() => {
         notification.style.opacity = '0';
@@ -2870,7 +2890,7 @@ function isLowEndDevice() {
     const isSlowConnection = connection && (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g');
     const isLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
     const isOldDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4;
-    
+
     return isSlowConnection || isLowMemory || isOldDevice;
 }
 
@@ -2878,17 +2898,17 @@ function isLowEndDevice() {
 function adjustConfigForDevice() {
     if (isLowEndDevice()) {
         console.log('Low-end device detected, adjusting configuration...');
-        
+
         CONFIG.BASE_POLL_INTERVAL = 5000;
         CONFIG.CHAT_POLL_INTERVAL = 5000;
         CONFIG.LIVE_STATUS_INTERVAL = 15000;
         CONFIG.USER_COUNT_INTERVAL = 15000;
         CONFIG.ACCUMULATED_COUNT_INTERVAL = 15000;
-        
+
         // Reducir efectos visuales
         CONFIG.MAX_CONFETTI = 15;
         CONFIG.MESSAGE_LIFETIME = 20000; // 20 segundos en lugar de 30
-        
+
         // Reducir tamaños de pool
         CONFIG.MESSAGE_POOL_SIZE = 8;
         CONFIG.AUDIO_POOL_SIZE = 5;
@@ -2904,10 +2924,10 @@ function adjustConfigForDevice() {
 function cleanupOldMessages() {
     const display = $id("message-display");
     if (!display) return;
-    
+
     const bubbles = Array.from(display.getElementsByClassName("message-bubble"));
     const now = Date.now();
-    
+
     bubbles.forEach(bubble => {
         const timestamp = parseInt(bubble.dataset.timestamp || '0');
         if (now - timestamp > CONFIG.MESSAGE_LIFETIME) {
@@ -2920,11 +2940,11 @@ function cleanupOldMessages() {
 function formatMessageContent(content) {
     // Detectar menciones (@usuario)
     content = content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
-    
+
     // Detectar URLs simples
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     content = content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    
+
     return content;
 }
 
@@ -2932,9 +2952,9 @@ function formatMessageContent(content) {
 function showTypingIndicator(show = true) {
     const display = $id("message-display");
     if (!display) return;
-    
+
     let indicator = display.querySelector('.typing-indicator');
-    
+
     if (show && !indicator) {
         indicator = document.createElement('div');
         indicator.className = 'typing-indicator message-bubble';
@@ -2957,23 +2977,23 @@ function validateMessage(content) {
     if (!content || !content.trim()) {
         return { valid: false, error: 'El mensaje no puede estar vacío' };
     }
-    
+
     if (content.length > 500) {
         return { valid: false, error: 'El mensaje es demasiado largo (máximo 500 caracteres)' };
     }
-    
+
     // Filtro básico de spam
     const spamPatterns = [
         /(.)\1{10,}/, // Caracteres repetidos
         /^[A-Z\s!]{20,}$/, // Solo mayúsculas y espacios
     ];
-    
+
     for (const pattern of spamPatterns) {
         if (pattern.test(content)) {
             return { valid: false, error: 'El mensaje parece spam' };
         }
     }
-    
+
     return { valid: true };
 }
 
@@ -2985,22 +3005,22 @@ const resourceManager = new ResourceManager();
 // Función de inicialización principal
 function initializeApp() {
     console.log('Initializing Bingo App...');
-    
+
     // Ajustar configuración según el dispositivo
     adjustConfigForDevice();
-    
+
     // Inicializar gestor de recursos
     resourceManager.initialize();
-    
+
     // Configurar eventos
     setupEvents();
-    
+
     // Configurar scroll mask
     setupScrollMask();
-    
+
     // Configurar countdown del juego
     setupGameCountdown();
-    
+
     // Iniciar polling de mensajes solo cuando el panel de chat existe (transmisiones en vivo)
     const hasChatPanel = !!$id("message-display-container");
     if (hasChatPanel) {
@@ -3009,7 +3029,7 @@ function initializeApp() {
     } else {
         messagePoller.stop();
     }
-    
+
     // Iniciar contador de usuarios
     /*intervalManager.set('userCount', updateUserCount, CONFIG.USER_COUNT_INTERVAL);
     updateUserCount();*/
@@ -3021,7 +3041,7 @@ function initializeApp() {
     if (window.totalNumbersGenerated !== undefined) {
         updateBallsCounter(window.totalNumbersGenerated);
     }
-    
+
     if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length) {
         numbersgenerated = window.drawnNumbers
             .map(parseBallNumber)
@@ -3044,7 +3064,7 @@ function initializeApp() {
 
     if (isAutoMarkEnabled()) {
         syncAutoMarkedNumbers(window.drawnNumbers, { animate: false, persist: false });
-        $(".bingo-carton-number[id^='number-']").each(function() {
+        $(".bingo-carton-number[id^='number-']").each(function () {
             if (isAutoMarkEnabled()) {
                 this.removeAttribute('onclick');
             }
@@ -3064,10 +3084,10 @@ function initializeApp() {
         // no ven las balotas que el admin ya cantó.
         startAutomaticLast();
     }
-    
+
     // Limpiar mensajes antiguos periódicamente
     intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
-    
+
     // Iniciar el poller de estado si el juego no ha empezado
     if (!hasGameStarted()) {
         pollGameStatusBeforeStart();
@@ -3087,24 +3107,24 @@ function initializeApp() {
 
             pusherHelper.init(PUSHER_KEY, PUSHER_CLUSTER, AUTH_URL, soketiHost, soketiPort);
 
-            pusherHelper.on('connection:success', function() {
+            pusherHelper.on('connection:success', function () {
                 setBingoPusherRealtime(true);
             });
-            pusherHelper.on('connection:failed', function() {
+            pusherHelper.on('connection:failed', function () {
                 setBingoPusherRealtime(false);
             });
-            pusherHelper.on('connection:error', function() {
+            pusherHelper.on('connection:error', function () {
                 setBingoPusherRealtime(false);
             });
 
-            pusherHelper.on('game:postponed', function(data) {
+            pusherHelper.on('game:postponed', function (data) {
                 console.log('Pusher game:postponed received', data);
                 if (data && data.new_time) {
                     handleGamePostponed(data.new_time, data.message);
                 }
             });
-            pusherHelper.on('game:number_drawn', function(data) {
-                if (!data || bingoInProgress || window.gameIsFinished || isGameFinishedShown) {
+            pusherHelper.on('game:number_drawn', function (data) {
+                if (!data || window.gameIsFinished || isGameFinishedShown) {
                     return;
                 }
 
@@ -3116,7 +3136,7 @@ function initializeApp() {
                 const total = data.totalNumbersGenerated;
 
                 if (Array.isArray(drawn) && drawn.length) {
-                    syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, { animate: false });
+                    syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, { animate: !bingoInProgress });
                 } else if (number) {
                     handleNewNumber(number, total, drawn);
                 }
@@ -3156,7 +3176,7 @@ function initializeApp() {
             pusherHelper.on('game:message', handleIncomingChatMessage);
 
             // Bingos cantados y aceptados en tiempo real
-            pusherHelper.on('game:bingo_accepted', function(data) {
+            pusherHelper.on('game:bingo_accepted', function (data) {
                 console.log('WS game:bingo_accepted received', data);
                 if (!data || window.gameIsFinished || isGameFinishedShown) return;
                 if (Array.isArray(data.winners)) {
@@ -3174,7 +3194,7 @@ function initializeApp() {
                                 image: data.image,
                                 isOwnBingo: true,
                                 winnerUserId: data.winnerUserId
-                            }, function() {
+                            }, function () {
                                 if (data.gameCompleted || data.stopped) {
                                     showGameFinalized();
                                     return;
@@ -3188,7 +3208,7 @@ function initializeApp() {
                 }
             });
 
-            pusherHelper.on('game:bingo_claimed', function(data) {
+            pusherHelper.on('game:bingo_claimed', function (data) {
                 console.log('WS game:bingo_claimed received', data);
                 if (!data || window.gameIsFinished || isGameFinishedShown) return;
                 if (Array.isArray(data.winners)) {
@@ -3197,20 +3217,20 @@ function initializeApp() {
             });
 
             // Inicio de partida en tiempo real
-            pusherHelper.on('game:started', function(data) {
+            pusherHelper.on('game:started', function (data) {
                 console.log('WS game:started received', data);
                 markGameAsStartedFromServer((data && data.drawnCount) || 1);
             });
 
             // Fin de partida en tiempo real
-            pusherHelper.on('game:game_finished', function(data) {
+            pusherHelper.on('game:game_finished', function (data) {
                 console.log('WS game:game_finished received', data);
                 if (!isGameFinishedShown) {
                     showGameFinalized();
                 }
             });
 
-            pusherHelper.on('game:completed', function(data) {
+            pusherHelper.on('game:completed', function (data) {
                 console.log('WS game:completed received', data);
                 if (!isGameFinishedShown) {
                     showGameFinalized();
@@ -3218,7 +3238,7 @@ function initializeApp() {
             });
 
             // Reinicio de partida
-            pusherHelper.on('game:game_reset', function() {
+            pusherHelper.on('game:game_reset', function () {
                 console.log('WS game:game_reset received');
                 location.reload();
             });
@@ -3260,7 +3280,7 @@ window.addEventListener('unhandledrejection', (event) => {
 window.addEventListener('orientationchange', debounce(() => {
     // Recalcular elementos que dependen del viewport
     confettiManager.resize();
-    
+
     // Forzar recálculo de máscaras de scroll
     setTimeout(() => {
         const container = document.querySelector(".board-section");
@@ -3274,7 +3294,7 @@ window.addEventListener('orientationchange', debounce(() => {
 window.addEventListener('resize', debounce(() => {
     // Limpiar cache de elementos que pueden haber cambiado
     domCache.clear();
-    
+
     // Recalcular confetti canvas
     confettiManager.resize();
 }, 250));
@@ -3299,18 +3319,18 @@ window.BingoApp = {
     formatMessageContent,
     showTypingIndicator,
     cleanupOldMessages,
-    
+
     // Gestores
     intervalManager,
     audioManager,
     resourceManager,
     confettiManager,
     messagePool,
-    
+
     // Utilidades
     handleNetworkError,
     isLowEndDevice,
-    
+
     // Estado
     get winners() { return winners; },
     get numbersGenerated() { return numbersgenerated; },
@@ -3337,12 +3357,12 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
                 isGameFinished: isGameFinishedShown
             };
         },
-        
+
         // Forzar limpieza de recursos
         forceCleanup() {
             resourceManager.cleanup();
         },
-        
+
         // Simular error de red
         simulateNetworkError() {
             handleNetworkError(new Error('Simulated network error'), 'debug');
@@ -3365,7 +3385,7 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
             }
             messagesDisplayed.length = 0;
         },
-        
+
         // Información de rendimiento
         getPerformanceInfo() {
             return {
@@ -3380,7 +3400,7 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
             };
         }
     };
-    
+
     console.log('Bingo Debug tools available in window.BingoDebug');
 }
 

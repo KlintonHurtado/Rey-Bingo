@@ -1335,7 +1335,11 @@
                 while (container.children.length >= notificationConfig.maxNotifications) {
                     const oldestNotification = container.firstChild;
                     if (oldestNotification) {
-                        hideNotification(oldestNotification);
+                        if (oldestNotification._autoHideTimer) {
+                            clearTimeout(oldestNotification._autoHideTimer);
+                            oldestNotification._autoHideTimer = null;
+                        }
+                        oldestNotification.remove();
                     } else {
                         break;
                     }
@@ -2650,12 +2654,19 @@
         let confettiContainer;
         let activeConfetti = [];
         let confettiTimeout; // Variable para controlar el timeout
+        let lastConfettiTime = 0;
 
         function isMobile() {
             return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
 
         function AppcreateConfetti(count = null) {
+            const now = Date.now();
+            if (now - lastConfettiTime < 2500) {
+                return;
+            }
+            lastConfettiTime = now;
+
             if (!confettiContainer) {
                 confettiContainer = document.getElementById('confetti-container');
             }

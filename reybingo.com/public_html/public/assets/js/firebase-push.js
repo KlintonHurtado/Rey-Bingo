@@ -65,11 +65,18 @@ if (typeof firebase !== 'undefined') {
     // Manejar mensajes cuando la aplicación está en primer plano
     messaging.onMessage((payload) => {
         console.log('Mensaje recibido (App abierta): ', payload);
-        // Opcional: mostrar una alerta o toast con la notificación
-        if(typeof toastr !== 'undefined') {
-            toastr.info(payload.notification.body, payload.notification.title);
-        } else {
-            alert(payload.notification.title + "\n" + payload.notification.body);
+        const title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || 'Notificación';
+        const body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || '';
+
+        if (typeof window.showNotification === 'function') {
+            window.showNotification({
+                title: title,
+                message: body,
+                type: (payload.data && payload.data.type) || 'info',
+                created_at: new Date().toISOString()
+            });
+        } else if (typeof toastr !== 'undefined' && toastr.info) {
+            toastr.info(body, title);
         }
     });
 

@@ -1156,13 +1156,22 @@ class Playings extends Controller
 
         $singsUser = $modelSings->where('user', session()->get('id'))->where('game', $game['id'])->findAll();
 
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
-        foreach ($winners as &$winner) {
-            $user = $modelUsers->find($winner['user']);
-            $wmodality = $modelModalities->find($winner['modality']);
+        $officialSings = bingo_get_official_sings_for_game((int) $game['id'], true);
+        $winners = [];
+        foreach ($officialSings as $officialSing) {
+            $user = $modelUsers->find($officialSing['user']);
+            $wmodality = $modelModalities->find($officialSing['modality']);
 
-            $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
-            $winner['modality'] = translate($wmodality['name']);
+            $winners[] = [
+                'id'            => (int) ($officialSing['id'] ?? 0),
+                'user'          => (int) $officialSing['user'],
+                'game'          => (int) $officialSing['game'],
+                'carton'        => (int) $officialSing['carton'],
+                'modality'      => (int) $officialSing['modality'],
+                'player'        => $user ? trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')) : ('Jugador #' . $officialSing['user']),
+                'modality_name' => $wmodality ? translate($wmodality['name'] ?? '') : 'Bingo',
+                'image'         => !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg'),
+            ];
         }
 
         $getClass = function ($number) {
@@ -2128,6 +2137,9 @@ class Playings extends Controller
             $game = $modelGames->find($game['id']);
             $gameCompleted = (int) ($game['status'] ?? 0) === 0;
 
+            $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
+            $modalityName = $modality ? translate($modality['name'] ?? '') : 'Bingo';
+
             return $this->response->setJSON([
                 'status' => 'pause',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -2137,9 +2149,9 @@ class Playings extends Controller
                 'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
                 'iscron' => $lastNumber['isCRON'],
                 'number' => $lastNumber['number'],
-                'player' => $singUser['firstname'] . ' ' . $singUser['lastname'],
-                'modality' => translate($modality['name']),
-                'modalityId' => $modality['id'],
+                'player' => $userName,
+                'modality' => $modalityName,
+                'modalityId' => (int) ($modality['id'] ?? $sing['modality']),
                 'image' => $imagePath,
                 'isOwnBingo' => false,
                 'winnerUserId' => (int) $sing['user'],
@@ -2427,45 +2439,8 @@ class Playings extends Controller
                         continue;
                     }
 
-                    $modelNotifications = new NotificationsModel();
-
                     $currentUserId = session()->get('id');
                     $modalitySing = $modelModalities->find($modality['id']);
-
-                    // Notificación al propio ganador (toast "¡HAS CANTADO BINGO!")
-                    $modelNotifications->insert([
-                        'user' => $currentUserId,
-                        'from' => 1,
-                        'type' => 'sing',
-                        'game' => $game['id'],
-                        'modality' => $modality['id'],
-                        'title' => '🎉 ¡HAS CANTADO BINGO!',
-                        'message' => '¡Felicidades ' . $userSing['firstname'] . ' ' . $userSing['lastname'] . '! Tu bingo ha sido registrado en la modalidad ' . translate($modalitySing['name'] ?? '') . '.',
-                    ]);
-
-                    $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->where('user !=', $currentUserId)->groupBy('user')->findAll();
-
-                    $cartonUserIds = array_column($usersFromCartons, 'user');
-
-                    $admins = $modelUsers->select('id')->where('group', 1)->findAll();
-
-                    $adminIds = array_column($admins, 'id');
-
-                    $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
-
-                    foreach ($allUserIds as $userId) {
-                        $notificationData = [
-                            'user' => $userId,
-                            'from' => $currentUserId,
-                            'type' => 'sing',
-                            'game' => $game['id'],
-                            'modality' => $modality['id'],
-                            'title' => '🎉 ¡BINGO CANTADO!',
-                            'message' => $userSing['firstname'] . ' ' . $userSing['lastname'] . ' ha cantado ¡BINGO! en la modalidad ' . translate($modalitySing['name']) . '.',
-                        ];
-
-                        $modelNotifications->insert($notificationData);
-                    }
 
                     $bingoAchieved = true;
                     $registeredSings[] = [

@@ -1497,6 +1497,7 @@
     window.totalNumbersGenerated = <?= (int) ($totalNumbersGenerated ?? 0); ?>;
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
+    window.numberSingsLimit = <?= (int) (function_exists('bingo_get_number_sings_limit') ? bingo_get_number_sings_limit() : 1) ?>;
     window.gameDate = '<?= esc(function_exists('bingo_game_start_iso') ? bingo_game_start_iso($game) : ($game['date'] . 'T' . $game['time']), 'js') ?>';
     window.gameStatus = <?= (int) ($game['status'] ?? 0) ?>;
     window.gameIsFinished = <?= !empty($gameIsFinished) ? 'true' : 'false' ?>;

@@ -206,7 +206,7 @@ if (!function_exists('bingo_broadcast_sing_accepted')) {
 
             $client->trigger($channel, 'game:bingo_accepted', array_merge([
                 'gameId'  => $gameId,
-                'stopped' => true,
+                'stopped' => !empty($payload['gameCompleted']),
                 'at'      => date('c'),
             ], $payload));
         } catch (\Throwable $e) {
@@ -433,38 +433,35 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
         $db->transStart();
 
-        $userAlreadySang = $modelSings
-            ->where('game', $gameId)
-            ->where('modality', $modality['id'])
-            ->where('carton', $cartonId)
-            ->countAllResults(false);
+        // 1. Candado FOR UPDATE para serializar cantes y evitar que dos procesos o empates superen el límite
+        $lockedSings = $db->query(
+            "SELECT id, user, carton FROM sings WHERE game = ? AND modality = ? AND status IN (0, 1, 2) FOR UPDATE",
+            [$gameId, (int) $modality['id']]
+        )->getResultArray();
 
-        if ($userAlreadySang > 0) {
+        // 2. Si ya se alcanzó el límite exacto de ganadores por modalidad, abortar inmediatamente
+        if (count($lockedSings) >= $numberSingsLimit) {
             $db->transRollback();
-
             return false;
         }
 
-        $existingSings = $modelSings
-            ->where('game', $gameId)
-            ->where('modality', $modality['id'])
-            ->countAllResults(false);
-
-        if ($existingSings >= $numberSingsLimit) {
-            $db->transRollback();
-
-            return false;
+        // 3. Evitar que el mismo jugador o el mismo cartón gane dos veces la misma modalidad en el mismo juego
+        foreach ($lockedSings as $ls) {
+            if ((int) $ls['user'] === $userId || (int) $ls['carton'] === $cartonId) {
+                $db->transRollback();
+                return false;
+            }
         }
 
         $inserted = $modelSings->insert([
-            'user' => $userId,
-            'game' => $gameId,
-            'carton' => $cartonId,
-            'modality' => $modality['id'],
-            'numbers' => implode(',', $winningNumbers),
+            'user'       => $userId,
+            'game'       => $gameId,
+            'carton'     => $cartonId,
+            'modality'   => (int) $modality['id'],
+            'numbers'    => implode(',', $winningNumbers),
             'lastnumber' => $lastBallNumber,
-            'notified' => json_encode([]),
-            'status' => $finalize ? 1 : 0,
+            'notified'   => json_encode([]),
+            'status'     => $finalize ? 1 : 0,
         ]);
 
         $db->transComplete();
@@ -500,7 +497,7 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                     'isOwnBingo'    => false,
                 ]);
 
-                // Notificar de inmediato al ganador, a todos los jugadores humanos de la partida y al operador
+                // Notificar de inmediato a jugadores humanos reales de la partida y al operador
                 bingo_notify_sing_to_all_players($gameId, [
                     'singId'     => $singId,
                     'userId'     => $userId,
@@ -520,8 +517,8 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
 if (!function_exists('bingo_notify_sing_to_all_players')) {
     /**
-     * Inserta notificaciones tanto para el ganador como para todos los jugadores de la partida y el admin.
-     * Soporta bots y jugadores humanos sin duplicados.
+     * Inserta notificaciones tanto para el ganador (si es humano) como para todos los jugadores humanos reales de la partida y el admin.
+     * EXCLUYE BOTS para evitar miles de inserciones y sobrecarga de BD. Usa insertBatch para máxima velocidad.
      */
     function bingo_notify_sing_to_all_players(int $gameId, array $data): void
     {
@@ -540,33 +537,49 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
             $gameCreatorId = (int) ($game['user'] ?? 1);
             $now = date('Y-m-d H:i:s');
 
-            // 1. Notificación al ganador
-            if ($winnerUserId > 0) {
-                $existingWinner = $modelNotifications
-                    ->where('user', $winnerUserId)
-                    ->where('game', $gameId)
-                    ->where('modality', $modalityId)
-                    ->where('type_id', $singId)
-                    ->first();
-
-                if (!$existingWinner) {
-                    $modelNotifications->insert([
-                        'user'       => $winnerUserId,
-                        'from'       => $gameCreatorId,
-                        'type'       => 'sing',
-                        'type_id'    => $singId,
-                        'game'       => $gameId,
-                        'carton'     => $cartonId,
-                        'modality'   => $modalityId,
-                        'title'      => '🎉 ¡HAS CANTADO BINGO!',
-                        'message'    => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . $modalityName . '.',
-                        'status'     => 0,
-                        'created_at' => $now,
-                    ]);
-                }
+            $modelUsers = new \App\Models\UsersModel();
+            $winnerUser = $winnerUserId > 0 ? $modelUsers->find($winnerUserId) : null;
+            $winnerIsBot = false;
+            if ($winnerUser) {
+                $winnerIsBot = str_starts_with($winnerUser['code'] ?? '', 'BOT-')
+                    || str_contains($winnerUser['email'] ?? '', '@reybingo.local')
+                    || str_contains($winnerUser['email'] ?? '', '@reybingo.internal')
+                    || str_starts_with($winnerUser['username'] ?? '', 'bot_');
             }
 
-            // 2. Notificación a TODOS los demás jugadores humanos con cartones en la partida
+            // Pre-cargar notificaciones existentes para esta jugada para no duplicar (1 query)
+            $existingNotifs = $modelNotifications
+                ->select('user')
+                ->where('game', $gameId)
+                ->where('modality', $modalityId)
+                ->where('type_id', $singId)
+                ->findAll();
+            $alreadyNotified = [];
+            foreach ($existingNotifs as $en) {
+                $alreadyNotified[(int) $en['user']] = true;
+            }
+
+            $batchInsert = [];
+
+            // 1. Notificación al ganador (SOLO si es jugador humano, los bots no tienen sesión)
+            if ($winnerUserId > 0 && !$winnerIsBot && !isset($alreadyNotified[$winnerUserId])) {
+                $batchInsert[] = [
+                    'user'       => $winnerUserId,
+                    'from'       => $gameCreatorId,
+                    'type'       => 'sing',
+                    'type_id'    => $singId,
+                    'game'       => $gameId,
+                    'carton'     => $cartonId,
+                    'modality'   => $modalityId,
+                    'title'      => '🎉 ¡HAS CANTADO BINGO!',
+                    'message'    => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . $modalityName . '.',
+                    'status'     => 0,
+                    'created_at' => $now,
+                ];
+                $alreadyNotified[$winnerUserId] = true;
+            }
+
+            // 2. Notificación a TODOS los demás jugadores HUMANOS con cartones en la partida (excluyendo bots)
             $humanPlayers = $db->table('cartons')
                 ->select('cartons.user')
                 ->join('users', 'users.id = cartons.user')
@@ -574,22 +587,18 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 ->where('cartons.user !=', $winnerUserId)
                 ->where('cartons.user >', 0)
                 ->where('users.group', 0)
+                ->notLike('users.code', 'BOT-')
+                ->notLike('users.email', '@reybingo.local')
                 ->notLike('users.email', '@reybingo.internal')
+                ->notLike('users.username', 'bot_')
                 ->groupBy('cartons.user')
                 ->get()
                 ->getResultArray();
 
             foreach ($humanPlayers as $hp) {
                 $hUserId = (int) $hp['user'];
-                $existingOther = $modelNotifications
-                    ->where('user', $hUserId)
-                    ->where('game', $gameId)
-                    ->where('modality', $modalityId)
-                    ->where('type_id', $singId)
-                    ->first();
-
-                if (!$existingOther) {
-                    $modelNotifications->insert([
+                if ($hUserId > 0 && !isset($alreadyNotified[$hUserId])) {
+                    $batchInsert[] = [
                         'user'       => $hUserId,
                         'from'       => $gameCreatorId,
                         'type'       => 'sing',
@@ -601,34 +610,32 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                         'message'    => 'El jugador ' . $userName . ' ha cantado Bingo en ' . $modalityName . ' (Cartón #' . $cartonId . ').',
                         'status'     => 0,
                         'created_at' => $now,
-                    ]);
+                    ];
+                    $alreadyNotified[$hUserId] = true;
                 }
             }
 
             // 3. Notificación al administrador / operador dueño de la partida si no es el ganador
-            if ($gameCreatorId > 0 && $gameCreatorId !== $winnerUserId) {
-                $existingAdmin = $modelNotifications
-                    ->where('user', $gameCreatorId)
-                    ->where('game', $gameId)
-                    ->where('modality', $modalityId)
-                    ->where('type_id', $singId)
-                    ->first();
+            if ($gameCreatorId > 0 && $gameCreatorId !== $winnerUserId && !isset($alreadyNotified[$gameCreatorId])) {
+                $batchInsert[] = [
+                    'user'       => $gameCreatorId,
+                    'from'       => 1,
+                    'type'       => 'sing',
+                    'type_id'    => $singId,
+                    'game'       => $gameId,
+                    'carton'     => $cartonId,
+                    'modality'   => $modalityId,
+                    'title'      => '🎉 ¡BINGO CANTADO EN PARTIDA #' . $gameId . '!',
+                    'message'    => 'El jugador ' . $userName . ' cantó ' . $modalityName . ' con el cartón #' . $cartonId . '.',
+                    'status'     => 0,
+                    'created_at' => $now,
+                ];
+                $alreadyNotified[$gameCreatorId] = true;
+            }
 
-                if (!$existingAdmin) {
-                    $modelNotifications->insert([
-                        'user'       => $gameCreatorId,
-                        'from'       => 1,
-                        'type'       => 'sing',
-                        'type_id'    => $singId,
-                        'game'       => $gameId,
-                        'carton'     => $cartonId,
-                        'modality'   => $modalityId,
-                        'title'      => '🎉 ¡BINGO CANTADO EN PARTIDA #' . $gameId . '!',
-                        'message'    => 'El jugador ' . $userName . ' cantó ' . $modalityName . ' con el cartón #' . $cartonId . '.',
-                        'status'     => 0,
-                        'created_at' => $now,
-                    ]);
-                }
+            // Inserción en lote súper eficiente en un solo query
+            if (!empty($batchInsert)) {
+                $modelNotifications->insertBatch($batchInsert);
             }
         } catch (\Throwable $te) {
             log_message('error', 'Error in bingo_notify_sing_to_all_players: ' . $te->getMessage());
@@ -803,14 +810,17 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
         }
 
         // 5. Pre-cargar sings existentes para conteo y verificación instantánea (1 solo query)
-        $existingSings = $modelSings->where('game', $gameId)->findAll();
+        $existingSings = $modelSings->where('game', $gameId)->whereIn('status', [0, 1, 2])->findAll();
         $singsCountByModality = [];
         $singByCartonModality = [];
+        $singByUserModality = [];
         foreach ($existingSings as $s) {
             $mId = (int) $s['modality'];
             $cId = (int) $s['carton'];
+            $uId = (int) $s['user'];
             $singsCountByModality[$mId] = ($singsCountByModality[$mId] ?? 0) + 1;
             $singByCartonModality[$cId . '_' . $mId] = true;
+            $singByUserModality[$uId . '_' . $mId] = true;
         }
 
         $numberSingsLimit = bingo_get_number_sings_limit();
@@ -835,8 +845,8 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
                 $userId = (int) $carton['user'];
                 $cartonId = (int) $carton['id'];
 
-                // Saltar si este cartón ya cantó esta modalidad
-                if (!empty($singByCartonModality[$cartonId . '_' . $modalityId])) {
+                // Saltar si este cartón o este usuario ya cantó esta modalidad en este juego
+                if (!empty($singByCartonModality[$cartonId . '_' . $modalityId]) || !empty($singByUserModality[$userId . '_' . $modalityId])) {
                     continue;
                 }
 
@@ -844,7 +854,10 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
                 $isBot = false;
                 $hasAutodial = false;
                 if ($userObj) {
-                    $isBot = (str_starts_with($userObj['email'] ?? '', 'bot_') && str_ends_with($userObj['email'] ?? '', '@reybingo.internal')) 
+                    $isBot = str_starts_with($userObj['code'] ?? '', 'BOT-')
+                          || str_contains($userObj['email'] ?? '', '@reybingo.local')
+                          || str_contains($userObj['email'] ?? '', '@reybingo.internal')
+                          || str_starts_with($userObj['username'] ?? '', 'bot_')
                           || ((int) ($userObj['group'] ?? -1) === 0 && str_contains($userObj['email'] ?? '', 'bot_'));
                     $hasAutodial = ((int) ($userObj['autodial'] ?? 0)) === 1;
                 }
@@ -886,6 +899,7 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
                     $currentModalitySings++;
                     $singsCountByModality[$modalityId] = $currentModalitySings;
                     $singByCartonModality[$cartonId . '_' . $modalityId] = true;
+                    $singByUserModality[$userId . '_' . $modalityId] = true;
                 }
             }
         }
@@ -1838,6 +1852,11 @@ if (!function_exists('bingo_can_start_game')) {
 
         if ($cartonCount === null) {
             $cartonCount = bingo_count_game_cartons((int) $game['id']);
+        }
+
+        // Si es partida automática (type 1) y tiene cartones o bots asignados, siempre puede iniciar
+        if ((int) ($game['type'] ?? 0) === 1 && $cartonCount > 0) {
+            return true;
         }
 
         return $playerCount >= bingo_get_min_players($game)
