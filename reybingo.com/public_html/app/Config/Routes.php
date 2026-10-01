@@ -127,6 +127,10 @@ $routes->get('games/exportActiveUsers/(:segment)', 'Games::exportActiveUsers/$1'
 $routes->get('games/financialAudit', 'Games::financialAudit');
 $routes->get('games/financialAuditGet', 'Games::financialAuditGet');
 $routes->get('games/exportFinancialAudit', 'Games::exportFinancialAudit');
+$routes->post('games/assignBots', 'Games::assignBots');
+$routes->get('games/assignBots/(:num)', 'Games::assignBots/$1');
+$routes->post('games/clearBots', 'Games::clearBots');
+$routes->get('games/clearBots/(:num)', 'Games::clearBots/$1');
 
 $routes->get('playings', 'Playings::index');
 $routes->get('play', 'Playings::play');

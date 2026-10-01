@@ -234,6 +234,126 @@
         });
     }
 
+    function assignBotsPrompt(gameId) {
+        if (!gameId) return;
+        if (typeof Swal === 'undefined') {
+            if (confirm('¿Deseas inyectar 500 bots con 2 cartones cada uno (1,000 cartones) a la partida #' + gameId + '?')) {
+                window.location.href = '<?= site_url('games/assignBots') ?>/' + gameId;
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: '¿Inyectar 500 Bots?',
+            text: 'Se asignarán 500 usuarios bots con 2 cartones cada uno (1,000 cartones en total) a la partida #' + gameId + ' para que jueguen y canten bingo automáticamente.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-robot me-1"></i> Sí, inyectar 500 bots',
+            cancelButtonText: 'Cancelar',
+            showDenyButton: true,
+            denyButtonText: '<i class="fa-solid fa-trash me-1"></i> Limpiar bots',
+            customClass: {
+                confirmButton: 'btn btn-primary me-2',
+                cancelButton: 'btn btn-secondary',
+                denyButton: 'btn btn-danger me-2'
+            },
+            buttonsStyling: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Inyectando bots...',
+                    text: 'Generando 1,000 cartones de bingo, por favor espere unos segundos...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                $.ajax({
+                    url: '<?= site_url('games/assignBots') ?>',
+                    method: 'POST',
+                    data: {
+                        game_id: gameId,
+                        bots: 500,
+                        cartons: 2,
+                        '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        Swal.close();
+                        if (res.status === 'success' || res.status === 'info') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: '¡Listo!',
+                                text: res.message || '500 bots asignados con éxito.'
+                            });
+                            if (typeof gameslistGet === 'function') {
+                                setTimeout(gameslistGet, 600);
+                            }
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: res.message || 'No se pudieron asignar los bots.'
+                            });
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.close();
+                        let errorMsg = 'Error al comunicarse con el servidor.';
+                        try {
+                            const errObj = JSON.parse(xhr.responseText);
+                            if (errObj && errObj.message) errorMsg = errObj.message;
+                        } catch(e) {}
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMsg
+                        });
+                    }
+                });
+            } else if (result.isDenied) {
+                Swal.fire({
+                    title: 'Limpiando bots...',
+                    text: 'Eliminando cartones de bots de la partida...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                $.ajax({
+                    url: '<?= site_url('games/clearBots') ?>',
+                    method: 'POST',
+                    data: {
+                        game_id: gameId,
+                        '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        Swal.close();
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Limpio',
+                            text: res.message || 'Cartones de bots eliminados.'
+                        });
+                        if (typeof gameslistGet === 'function') {
+                            setTimeout(gameslistGet, 600);
+                        }
+                    },
+                    error: function() {
+                        Swal.close();
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error al limpiar los bots de la partida.'
+                        });
+                    }
+                });
+            }
+        });
+    }
+
     function awardsGet(id) {
         $("#modalAwards").load('<?= site_url('games/awardsGet') ?>/' + id);
         $('#modalAwards').modal('show');

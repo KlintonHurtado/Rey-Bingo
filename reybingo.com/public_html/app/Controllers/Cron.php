@@ -1492,11 +1492,11 @@ class Cron extends Controller
             return true;
         }
 
-        // Verificar si todos los premios han sido cantados
+        // Verificar si todos los premios han sido cantados y confirmados/pagados
         $SingsCount = $db->table('sings')
             ->select('modality')
             ->where('game', $gameId)
-            ->where('status', 1) // Solo sings confirmados
+            ->whereIn('status', [1, 2]) // Solo sings confirmados o pagados
             ->groupBy('modality')
             ->countAllResults();
 
@@ -1508,7 +1508,7 @@ class Cron extends Controller
         $isCompleted = $AwardsCount > 0 && $SingsCount >= $AwardsCount;
         
         if ($isCompleted) {
-            log_message('info', "Juego {$gameId} completado: Todos los premios cantados ({$SingsCount}/{$AwardsCount}). Pendientes de pago manual.");
+            log_message('info', "Juego {$gameId} completado: Todos los premios cantados ({$SingsCount}/{$AwardsCount}).");
         }
 
         return $isCompleted;
@@ -1516,66 +1516,8 @@ class Cron extends Controller
 
     private function payAwards(int $gameId): bool
     {
-        $modelSings = new SingsModel();
-        $modelAwards = new AwardsModel();
-        $modelUsers = new UsersModel();
-        $modelGames = new GamesModel();
-        $modelPayments = new PaymentsModel();
-        $modelCartons = new CartonsModel();
-        $modelModalities = new ModalitiesModel();
-        $modelNotifications = new NotificationsModel();
-
-        $sings = $modelSings->where('game', $gameId)->where('status', 1)->findAll();
-
-        $game = $modelGames->find($gameId);
-
-        $cartons = $modelCartons->where('game', $game['id'])->countAllResults();
-        $accumulated = $cartons * $game['price'];
-        $total_award = $accumulated - ($accumulated * systemGet('rateEarnings'));
-
-        foreach ($sings as &$sing) {
-            $award = $modelAwards->where('game', $sing['game'])->where('modality', $sing['modality'])->first();
-            $singsCount = $modelSings->where('game', $sing['game'])->where('modality', $sing['modality'])->countAllResults();
-            $user = $modelUsers->find($sing['user']);
-
-            if ($game['award'] == 2) {
-                $awardPerSing = $award['amount'] / $singsCount;
-            } else {
-                $awardPerSing = ($total_award * $award['amount'] / 100) / $singsCount;
-            }
-
-            if ($sing['status'] == '1') {
-                wallet_credit_recharge((int) $user['id'], (float) $awardPerSing);
-            }
-            $modelSings->update($sing['id'], ['status' => 2]);
-
-            $dataPayment = [
-                'user' => $user['id'],
-                'type' => 'award',
-                'type_id' => $sing['id'],
-                'amount' => $awardPerSing,
-                'status' => 2
-            ];
-
-            $modelPayments->insert($dataPayment);
-            $paymentId = $modelPayments->insertID();
-
-            $modalitySing = $modelModalities->find($sing['modality']);
-
-            $notificationData = [
-                'user' => $user['id'],
-                'from' => $game['user'],
-                'game' => $game['id'],
-                'modality' => $sing['modality'],
-                'type' => 'payment',
-                'type_id' => $paymentId,
-                'title' => '💵 PAGO ACREDITADO',
-                'message' => 'Se ha acreditado en su billetera la suma de ' . systemGet('currency') . ' ' . number_format($awardPerSing, 2) . ' como pago por el 🏆 premio ganado en la partida "' . $game['description'] . '" modalidad ' . translate($modalitySing['name']) . '.',
-            ];
-
-            $modelNotifications->insert($notificationData);
-        }
-
+        helper(['bingo', 'wallet']);
+        bingo_pay_pending_awards_for_game($gameId);
         return true;
     }
 
@@ -1588,17 +1530,15 @@ class Cron extends Controller
 
         $lastBallTime = strtotime($lastBall['created_at']);
 
-        // Sings con status 0 (pendientes) en los últimos pauseSeconds
-        $lastSings = $db->table('sings')->where('game', $gameId)->where('status', 0)->get()->getResultArray();
+        // Sings en los últimos pauseSeconds o desde la última bola
+        $lastSings = $db->table('sings')
+            ->where('game', $gameId)
+            ->whereIn('status', [0, 1, 2])
+            ->where('created_at >=', date('Y-m-d H:i:s', time() - $pauseSeconds))
+            ->get()
+            ->getResultArray();
 
-        foreach ($lastSings as $sing) {
-            $lastSingTime = strtotime($sing['created_at']);
-            $timeDifference = $lastSingTime - $lastBallTime;
-            if ($timeDifference <= $pauseSeconds && $timeDifference >= 0) {
-                return true;
-            }
-        }
-        return false;
+        return !empty($lastSings);
     }
 
     /*ANTERIORprivate function generateUniqueNumber($gameId)
@@ -1758,159 +1698,96 @@ class Cron extends Controller
         return true;
     }
 
-    // Función para cantar bingo automáticamente en el cron
+    // Función para cantar bingo automáticamente en el cron usando la misma lógica que Live
     public function singBingo($gameId) {
-        $modelUsers = new UsersModel();
-        $modelBoards = new BoardsModel();
+        helper(['bingo', 'wallet']);
+
         $modelGames = new GamesModel();
-        $modelCartons = new CartonsModel();
-        $modelNumbersCartons = new NumbersCartonsModel();
-        $modelModalities = new ModalitiesModel();
         $modelSings = new SingsModel();
+        $modelBoards = new BoardsModel();
+        $modelModalities = new ModalitiesModel();
+        $modelUsers = new UsersModel();
+        $modelCartons = new CartonsModel();
         $modelNotifications = new NotificationsModel();
 
         $game = $modelGames->find($gameId);
+        if (!$game) {
+            return false;
+        }
 
-        $modalities = $modelModalities->getModalitiesByIds(explode(',', $game['modalities']));
+        // 1. Resolver cartones ganadores de la bola actual usando la misma lógica de Live
+        // (soporta posición 13 espacio libre, bolas sorteadas ordenadas por id, límite numberSings)
+        $resolvedCount = bingo_resolve_missed_bingos_for_game((int) $gameId, false);
 
-        $lastBall = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
+        // 2. Obtener los nuevos cantes con status 0 registrados en esta bola
+        $newSings = $modelSings->where('game', $gameId)->where('status', 0)->findAll();
 
-        $drawnNumbers = $modelBoards->getNumbersByBoard($game['id']);
-        $drawnNumbersArray = array_column($drawnNumbers, 'number');
-        $lastValidNumber = end($drawnNumbersArray);
+        if (!empty($newSings)) {
+            // Confirmar los nuevos cantes a status 1
+            $modelSings->where('game', $gameId)->where('status', 0)->set(['status' => 1])->update();
 
-        $singBingoOnlyLastBall = systemGet('singBingoOnlyLastBall');
+            // 3. Pagar los premios pendientes con la lógica exacta de Live:
+            // - Calcula premio exacto por cante y jugador (bingo_calculate_award_per_sing)
+            // - Acredita billetera según origen de compra (bingo_credit_award_by_purchase_source)
+            // - Maneja débito y comisión de tienda si aplica
+            // - Actualiza sing.status = 2 (PAGADO)
+            // - Registra pago en tabla payments
+            // - Envía notificación '🎉 ¡GANASTE! Premio acreditado'
+            // - Liquida GGR y comisiones de afiliados
+            bingo_pay_pending_awards_for_game((int) $gameId, (int) ($game['user'] ?? 1));
 
-        // Verificar bingos para todos los usuarios
-        $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->findAll();
+            // 4. Notificar por Pusher/Soketi a todos los clientes en tiempo real
+            $lastBall = $modelBoards->where('game', $gameId)->orderBy('id', 'DESC')->first();
+            $gameCompleted = bingo_finalize_game_when_complete((int) $gameId);
+            $officialWinners = bingo_get_official_sings_for_game((int) $gameId, true);
 
-        foreach ($cartons as $carton) {
-            $singUser = $modelUsers->find($carton['user']);
-            foreach ($modalities as $modality) {
-                $requiredPositions = explode(',', $modality['positions']);
-                $matches = 0;
-                $winningNumbers = [];
+            foreach ($newSings as $sing) {
+                $singUser = $modelUsers->find($sing['user']);
+                $modalitySing = $modelModalities->find($sing['modality']);
+                $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
+                $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
 
-                if ($singBingoOnlyLastBall == 1) {
-                    $singLastNumber = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->first();
-                    if ($singLastNumber) {
-                        if ($singLastNumber['lastnumber'] != $lastBall['number']) {
-                            continue; 
-                        }
-                    }
-                }
+                bingo_broadcast_sing_accepted((int) $gameId, [
+                    'singId'        => (int) $sing['id'],
+                    'userId'        => (int) $sing['user'],
+                    'winnerUserId'  => (int) $sing['user'],
+                    'playerId'      => (string) $sing['user'],
+                    'player'        => $userName,
+                    'playerName'    => $userName,
+                    'modality'      => translate($modalitySing['name'] ?? ''),
+                    'modalityId'    => (int) $sing['modality'],
+                    'modalityName'  => translate($modalitySing['name'] ?? ''),
+                    'cartonId'      => (int) $sing['carton'],
+                    'lastNumber'    => (int) ($lastBall['number'] ?? 0),
+                    'image'         => $imagePath,
+                    'isOwnBingo'    => true,
+                    'gameCompleted' => $gameCompleted,
+                    'winners'       => $officialWinners,
+                ]);
 
-                $userAlreadySang = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->where('user', $singUser['id'])->countAllResults();
-
-                if ($userAlreadySang > 0) {
-                    continue; 
-                }
-
-                $markedNumbers = $modelNumbersCartons->getMarkedNumbersByCarton($carton['id']);
-                $markedNumbersArray = array_column($markedNumbers, 'number');
-
-                foreach ($markedNumbers as $markedNumber) {
-                    if (in_array($markedNumber['position'], $requiredPositions) && in_array($markedNumber['number'], $drawnNumbersArray)) {
-                        $matches++;
-                        $winningNumbers[] = $markedNumber['number'];
-                    }
-                }
-
-                if ($matches == count($requiredPositions)) {
-                    if ($singBingoOnlyLastBall == 1) {
-                        if (!in_array($lastValidNumber, $winningNumbers)) {
-                            continue; 
-                        }
-                    }
-
-                    $existingsings = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->countAllResults();
-
-                    if ($existingsings < systemGet('numberSings')) { 
-                        $data = [
-                            'user' => $singUser['id'],
-                            'game' => $game['id'],
-                            'carton' => $carton['id'],
-                            'modality' => $modality['id'],
-                            'numbers' => implode(',', array_unique($winningNumbers)),
-                            'lastnumber' => $lastBall['number'],
-                            'status' => 1
-                        ];
-
-                        $modelSings->insert($data);
-                        $id = $modelSings->insertID();
-
-                        // Pagar los premios AUTOMÁTICAMENTE para todos los ganadores pendientes
-                        try {
-                            bingo_pay_pending_awards_for_game((int) $game['id']);
-                        } catch (\Throwable $pe) {
-                            log_message('error', 'Error al pagar premio automático en Cron::singBingo: ' . $pe->getMessage());
-                        }
-
-                        // Notificar el bingo cantado en tiempo real a todos los clientes por Pusher
-                        bingo_broadcast_sing_accepted((int) $game['id'], [
-                            'singId'       => $id,
-                            'userId'       => (int) $singUser['id'],
-                            'playerId'     => (string) $singUser['id'],
-                            'player'       => trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')),
-                            'playerName'   => trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')),
-                            'modality'     => translate($modality['name'] ?? ''),
-                            'modalityId'   => (int) $modality['id'],
-                            'modalityName' => translate($modality['name'] ?? ''),
-                            'cartonId'     => (int) $carton['id'],
-                            'lastNumber'   => (int) ($lastBall['number'] ?? 0),
-                        ]);
-
-                        $usersFromCartons = $modelCartons->select('user')->where('game', $game['id'])->groupBy('user')->findAll();
-
-                        $cartonUserIds = array_column($usersFromCartons, 'user');
-
-                        $admins = $modelUsers->select('id')->where('group', 1)->findAll();
-
-                        $adminIds = array_column($admins, 'id');
-
-                        $allUserIds = array_unique(array_merge($cartonUserIds, $adminIds));
-
-                        $sings = $modelSings->where('game', $game['id'])->findAll();
-
-                        $modalitySing = $modelModalities->find($modality['id']);
-
-                        $singsByModality = [];
-                        foreach ($sings as $sing) {
-                            $singsByModality[$sing['modality']][] = $sing;
-                        }
-
-                        foreach ($allUserIds as $userId) {
-                            if ($userId == $singUser['id']) {
-                                $notificationDataSelf = [
-                                    'user'     => $singUser['id'],
-                                    'from'     => 1,
-                                    'type'     => 'sing',
-                                    'game'     => $game['id'],
-                                    'modality' => $data['modality'],
-                                    'title'    => '🎉 ¡HAS CANTADO BINGO!',
-                                    'message'  => '¡Felicidades ' . $singUser['firstname'] . ' ' . $singUser['lastname'] . '! Tu bingo ha sido registrado en la modalidad ' . translate($modalitySing['name']) . '.',
-                                ];
-
-                                $modelNotifications->insert($notificationDataSelf);
-                                continue;
-                            }
-
-                            $notificationData = [
-                                'user'     => $userId,
-                                'from'     => 1,
-                                'type'     => 'sing',
-                                'game'     => $game['id'],
-                                'modality' => $data['modality'],
-                                'title'    => '🎉 ¡BINGO CANTADO!',
-                                'message'  => $singUser['firstname'] . ' ' . $singUser['lastname'] . ' ha cantado ¡BINGO! en la modalidad ' . translate($modalitySing['name']) . '.',
-                            ];
-
-                            $modelNotifications->insert($notificationData);
-                        }
-                    }
+                // Notificación toast de felicitación al ganador
+                if ($singUser) {
+                    $modelNotifications->insert([
+                        'user'     => (int) $sing['user'],
+                        'from'     => (int) ($game['user'] ?? 1),
+                        'type'     => 'sing',
+                        'game'     => $gameId,
+                        'modality' => (int) $sing['modality'],
+                        'title'    => '🎉 ¡HAS CANTADO BINGO!',
+                        'message'  => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . translate($modalitySing['name'] ?? '') . '.',
+                    ]);
                 }
             }
+        } else {
+            // Verificar si quedó algún cante pendiente de pago (status 1)
+            $pendingCount = $modelSings->where('game', $gameId)->where('status', 1)->countAllResults();
+            if ($pendingCount > 0) {
+                bingo_pay_pending_awards_for_game((int) $gameId, (int) ($game['user'] ?? 1));
+            }
         }
+
+        // 5. Finalizar el juego si todas las modalidades fueron premiadas
+        bingo_finalize_game_when_complete((int) $gameId);
 
         return true;
     }

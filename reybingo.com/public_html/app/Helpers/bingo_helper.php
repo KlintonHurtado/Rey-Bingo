@@ -482,18 +482,22 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                 $modelUsers = new \App\Models\UsersModel();
                 $userSing = $modelUsers->find($userId);
                 $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : ('Jugador #' . $userId);
+                $imagePath = !empty($userSing['image']) ? site_url('uploads/users/' . $userSing['image']) : site_url('assets/img/avatar.jpg');
 
                 bingo_broadcast_sing_accepted($gameId, [
-                    'singId'       => $singId,
-                    'userId'       => $userId,
-                    'playerId'     => (string) $userId,
-                    'player'       => $userName,
-                    'playerName'   => $userName,
-                    'modality'     => translate($modality['name'] ?? ''),
-                    'modalityId'   => (int) $modality['id'],
-                    'modalityName' => translate($modality['name'] ?? ''),
-                    'cartonId'     => $cartonId,
-                    'lastNumber'   => $lastBallNumber,
+                    'singId'        => $singId,
+                    'userId'        => $userId,
+                    'winnerUserId'  => $userId,
+                    'playerId'      => (string) $userId,
+                    'player'        => $userName,
+                    'playerName'    => $userName,
+                    'modality'      => translate($modality['name'] ?? ''),
+                    'modalityId'    => (int) $modality['id'],
+                    'modalityName'  => translate($modality['name'] ?? ''),
+                    'cartonId'      => $cartonId,
+                    'lastNumber'    => $lastBallNumber,
+                    'image'         => $imagePath,
+                    'isOwnBingo'    => true,
                 ]);
             } catch (\Throwable $pe) {
                 log_message('error', 'Error broadcasting/paying sing in bingo_register_sing_if_missing: ' . $pe->getMessage());

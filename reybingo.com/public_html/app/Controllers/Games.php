@@ -3655,13 +3655,17 @@ class Games extends Controller {
                 // No bloquear en el cliente con conteos viejos del listado: siempre validar en /game
                 $playButtonAction = "gameGet('" . $game['id'] . "');";
 
+                $botButton = ! $canView
+                    ? '<button type="button" class="btn btn-modal btn-warning btn-sm" onclick="assignBotsPrompt(\'' . $game['id'] . '\');" title="Inyectar 500 Bots (2 cartones)" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-robot"></i></button>'
+                    : '';
+
                 if ($game['type'] != 3 && $game['type'] != 4) {
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a>' . $botButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
                     // LIVE: misma regla — validación fresca en servidor
                     $liveButtonAction = "liveGet('" . $game['id'] . "');";
                     $liveButtonClass = $canView ? 'primary' : ($canStart ? 'primary' : 'secondary');
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a><button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a>' . $botButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
             } else {
                 if ($canView) {
@@ -4033,5 +4037,61 @@ class Games extends Controller {
         }
 
         return $this->response->setJSON($payload);
+    }
+
+    /**
+     * Endpoint AJAX para inyectar bots en una partida (exclusivo Admin).
+     */
+    public function assignBots($gameId = null)
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'No autorizado'
+            ]);
+        }
+
+        $gameId = (int) ($gameId ?: ($this->request->getPost('game_id') ?: $this->request->getGet('game_id')));
+        $bots = (int) ($this->request->getPost('bots') ?: ($this->request->getGet('bots') ?: 500));
+        $cartons = (int) ($this->request->getPost('cartons') ?: ($this->request->getGet('cartons') ?: 2));
+        $clean = (bool) ($this->request->getPost('clean') ?: $this->request->getGet('clean'));
+
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'ID de partida no válido'
+            ]);
+        }
+
+        $botManager = new \App\Libraries\BotManager();
+        $result = $botManager->assignBotsToGame($gameId, $bots, $cartons, $clean);
+
+        return $this->response->setJSON($result);
+    }
+
+    /**
+     * Endpoint AJAX para limpiar bots de una partida (exclusivo Admin).
+     */
+    public function clearBots($gameId = null)
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'No autorizado'
+            ]);
+        }
+
+        $gameId = (int) ($gameId ?: ($this->request->getPost('game_id') ?: $this->request->getGet('game_id')));
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'ID de partida no válido'
+            ]);
+        }
+
+        $botManager = new \App\Libraries\BotManager();
+        $result = $botManager->clearBotsFromGame($gameId);
+
+        return $this->response->setJSON($result);
     }
 }
