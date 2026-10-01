@@ -856,6 +856,20 @@ function showCountdown(data, callback) {
         });
     }
 
+    if (typeof window.showNotification === 'function' && data && data.player && data.modality) {
+        const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
+        window.showNotification({
+            type: 'sing',
+            title: '🎉 ¡BINGO CANTADO!',
+            message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
+            created_at: new Date().toISOString()
+        });
+    }
+
+    if (typeof window.AppcreateConfetti === 'function') {
+        window.AppcreateConfetti();
+    }
+
     if (typeof window.loadNotifications === 'function') {
         setTimeout(function () {
             window.loadNotifications();

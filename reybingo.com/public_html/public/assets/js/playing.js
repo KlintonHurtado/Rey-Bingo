@@ -18,8 +18,8 @@ const CONFIG = {
     WINNER_SLIDER_INTERVAL: 5000,
     COUNTDOWN_INTERVAL: 1000,
     // Con WebSocket (Soketi/Pusher) las balotas llegan por push.
-    // Este poll es solo de RECUPERACION: se activa si WS falla.
-    BALL_POLL_FALLBACK_MS: 30000,
+    // Este poll es de sincronización y recuperación al ritmo configurado.
+    BALL_POLL_FALLBACK_MS: 10000,
     // Cooldown corto para chat/status.
     WAF_COOLDOWN_MS: 10000,
     BALL_WAF_BACKOFF_MS: 2000
@@ -560,14 +560,14 @@ function isOwnBingoEvent(data) {
         return false;
     }
 
-    if (data.isOwnBingo === true) {
-        return true;
-    }
-
-    const winnerUserId = parseInt(data.winnerUserId, 10);
+    const winnerUserId = parseInt(data.winnerUserId || data.userId || data.playerId, 10);
     const currentUserId = getCurrentUserId();
 
-    return winnerUserId > 0 && currentUserId > 0 && winnerUserId === currentUserId;
+    if (winnerUserId > 0 && currentUserId > 0) {
+        return winnerUserId === currentUserId;
+    }
+
+    return data.isOwnBingo === true;
 }
 
 function applyNumberGetMeta(data) {
@@ -1680,7 +1680,33 @@ function showOtherPlayerBingoNotice(data, callback) {
         });
     }
 
-    // Sin overlay: solo la notificación toast del sistema
+    // 1. Reproducir sonido de victoria inmediatamente
+    try {
+        if (typeof audioManager !== 'undefined' && audioManager.play) {
+            audioManager.play(audioPath + 'winner.mp3');
+        } else if (typeof playNotificationSound === 'function') {
+            playNotificationSound('sing');
+        }
+    } catch (e) {
+        console.warn('Error al reproducir audio de ganador:', e);
+    }
+
+    // 2. Disparar notificación toast visual del sistema
+    if (typeof window.showNotification === 'function') {
+        const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
+        window.showNotification({
+            type: 'sing',
+            title: '🎉 ¡BINGO CANTADO!',
+            message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
+            created_at: new Date().toISOString()
+        });
+    }
+
+    // 3. Efectos visuales de confeti
+    if (typeof window.AppcreateConfetti === 'function') {
+        window.AppcreateConfetti();
+    }
+
     if (data && data.isOwnBingo !== true) {
         data.isOwnBingo = false;
     }
@@ -1831,21 +1857,34 @@ function lastNumberGet() {
         });
 }
 
+function getEffectiveBallIntervalMs() {
+    var raw = parseInt(window.timeBallGet, 10);
+    if (Number.isFinite(raw) && raw >= 1000) {
+        return raw;
+    }
+    var rawLast = (typeof timeBallLast !== 'undefined') ? parseInt(timeBallLast, 10) : 0;
+    if (Number.isFinite(rawLast) && rawLast >= 1000) {
+        return rawLast;
+    }
+    return 10000;
+}
+
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
-    if (typeof timeBallLast === 'undefined') {
+    if (typeof timeBallLast === 'undefined' && typeof window.timeBallGet === 'undefined') {
         return;
     }
 
     // Primer sync inmediato (para cargar estado al entrar)
     lastNumberGet();
 
-    // Con WebSocket activo: poll de recuperacion muy espaciado (30s)
-    // Sin WebSocket: poll rapido como fallback
+    var effMs = getEffectiveBallIntervalMs();
     var wsActive = window.__bingoPusherRealtime === true;
+    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 10s para no dejar huecos)
+    // Si no está activo, usar intervalo ágil de respaldo (2-5s)
     var fallbackMs = wsActive
-        ? (CONFIG.BALL_POLL_FALLBACK_MS || 30000)
-        : Math.max(2000, parseInt(timeBallLast, 10) || 3000);
+        ? Math.max(3000, Math.min(10000, effMs))
+        : Math.max(2000, Math.min(5000, effMs));
 
     intervalManager.set('lastNumber', lastNumberGet, fallbackMs);
 }
@@ -1859,20 +1898,20 @@ function setBingoPusherRealtime(enabled) {
     }
 
     if (enabled && !wasEnabled) {
-        // WebSocket conectado: cambiar a poll de recuperacion lento (30s)
-        console.log('WS conectado: cambiando a poll de recuperacion (30s)');
+        // WebSocket conectado: sincronizar poll de respaldo según intervalo configurado (respetando timeBallGet)
+        var effMs = getEffectiveBallIntervalMs();
+        var pollMs = Math.max(3000, Math.min(10000, effMs));
+        console.log('WS conectado: sincronizando poll de respaldo (' + (pollMs / 1000) + 's)');
         intervalManager.clear('lastNumber');
-        intervalManager.set('lastNumber', lastNumberGet, CONFIG.BALL_POLL_FALLBACK_MS || 30000);
+        intervalManager.set('lastNumber', lastNumberGet, pollMs);
         if (typeof messagePoller !== 'undefined' && messagePoller) {
-            messagePoller.baseInterval = 30000;
-            messagePoller.currentInterval = 30000;
+            messagePoller.baseInterval = 15000;
+            messagePoller.currentInterval = 15000;
         }
     } else if (!enabled && wasEnabled) {
-        // WebSocket caido: volver al poll rapido de respaldo
-        console.warn('WS desconectado: activando poll rapido de respaldo');
-        if (typeof timeBallLast !== 'undefined') {
-            startAutomaticLast();
-        }
+        // WebSocket caído: volver al poll rápido de respaldo
+        console.warn('WS desconectado: activando poll rápido de respaldo');
+        startAutomaticLast();
         if (typeof messagePoller !== 'undefined' && messagePoller) {
             messagePoller.baseInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
             messagePoller.currentInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;

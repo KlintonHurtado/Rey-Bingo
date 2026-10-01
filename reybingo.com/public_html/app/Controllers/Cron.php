@@ -699,7 +699,7 @@ class Cron extends Controller
                     break;
                 }
 
-                if ($this->hasRecentSingPause($gameId, 10)) {
+                if ($this->hasRecentSingPause($gameId, 2)) {
                     log_message('info', "Juego {$gameId} - pausa por sing reciente");
                     break;
                 }
@@ -712,8 +712,8 @@ class Cron extends Controller
                 }
 
                 try {
-                    // Revalidar intervalo justo antes de cantar
-                    if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
+                    // Revalidar intervalo justo antes de cantar (solo si no viene de ballSequence)
+                    if (! $fromSequence && ! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
                         log_message('info', "Juego {$gameId} - bola omitida (intervalo o ya cantada por otro proceso)");
                         break;
                     }
@@ -825,7 +825,8 @@ class Cron extends Controller
             return true;
         }
 
-        return $this->diffMs($lastBall['created_at'], $now) >= $timeBallGet;
+        // Tolerancia de 1.5s para evitar que truncamiento de segundos de strtotime rechace balotas
+        return $this->diffMs($lastBall['created_at'], $now) >= max(0, $timeBallGet - 1500);
     }
 
     private function acquireCronLock(string $name, int $ttlSeconds): bool
@@ -932,7 +933,17 @@ class Cron extends Controller
             return $this->response->setJSON(['ok' => false, 'message' => 'Cron desactivado']);
         }
 
-        if (! $this->acquireCronLock('auto_games', 65)) {
+        // Si run-auto-games inició en el mismo segundo :00, esperar brevemente a que termine (<150ms)
+        $lockAcquired = false;
+        for ($retry = 0; $retry < 15; $retry++) {
+            if ($this->acquireCronLock('auto_games', 65)) {
+                $lockAcquired = true;
+                break;
+            }
+            usleep(200000); // 200ms
+        }
+
+        if (! $lockAcquired) {
             return $this->response->setJSON(['ok' => true, 'skipped' => true, 'message' => 'Cron ya en ejecución']);
         }
 
@@ -942,35 +953,44 @@ class Cron extends Controller
             $timeBallGet = max(1000, (int) ($parts[0] ?? 15000));
 
             $secondsBetweenBalls = max(1, (int) round($timeBallGet / 1000));
-            $maxBalls = (int) floor(55 / $secondsBetweenBalls);
-            if ($maxBalls < 1) {
-                $maxBalls = 1;
-            }
-            if ($maxBalls > 12) {
-                $maxBalls = 12;
-            }
 
-            log_message('info', "Iniciando secuencia de bolas: {$maxBalls} bolas cada {$secondsBetweenBalls} segundos");
+            log_message('info', "Iniciando secuencia de bolas cada {$secondsBetweenBalls}s (timeBallGet: {$timeBallGet}ms)");
 
             $results = [];
             $totalBallsCanted = 0;
             $activeGamesAtStart = $this->getActiveGamesCount();
+            $startTime = microtime(true);
+            $modelGames = new GamesModel();
 
-            for ($i = 0; $i < $maxBalls; $i++) {
-                // Sin lock interno: ya tenemos auto_games
+            // Ciclo continuo dentro del minuto respetando el intervalo configurado
+            while ((microtime(true) - $startTime) < 55) {
+                $iterationStart = microtime(true);
+
+                // Cantar una bola (o iniciar juego si estaba programado)
                 $data = $this->processAutoGames(true, false);
                 $results[] = $data;
                 $totalBallsCanted += (int) ($data['balls_canted'] ?? 0);
 
-                $currentActiveGames = $this->getActiveGamesCount();
-                if ($currentActiveGames == 0 && $i > 0) {
-                    log_message('info', 'Secuencia detenida: No hay juegos activos');
+                // Verificar si quedan juegos activos o pendientes de iniciar
+                $activeCount = $this->getActiveGamesCount();
+                $pendingCount = $modelGames->where('type', 1)->where('status', 2)->countAllResults();
+
+                if ($activeCount === 0 && $pendingCount === 0 && count($results) > 1) {
+                    log_message('info', 'Secuencia detenida: No hay juegos activos ni pendientes');
                     break;
                 }
 
-                if ($i < $maxBalls - 1) {
-                    sleep($secondsBetweenBalls);
+                // Si la siguiente espera excederá los 58 segundos, salir limpiamente
+                // para que el cron del próximo minuto tome el relevo de inmediato
+                $elapsedSoFar = microtime(true) - $startTime;
+                if ($elapsedSoFar + $secondsBetweenBalls > 58) {
+                    break;
                 }
+
+                // Dormir compensando el tiempo de procesamiento para mantener ritmo exacto
+                $iterationElapsed = microtime(true) - $iterationStart;
+                $sleepSeconds = max(0.5, $secondsBetweenBalls - $iterationElapsed);
+                usleep((int) ($sleepSeconds * 1000000));
             }
 
             return $this->response->setJSON([
@@ -982,6 +1002,7 @@ class Cron extends Controller
                 'active_games_end' => $this->getActiveGamesCount(),
                 'interval_ms' => $timeBallGet,
                 'interval_seconds' => $secondsBetweenBalls,
+                'iterations' => count($results),
                 'timestamp' => date('Y-m-d H:i:s'),
             ]);
         } finally {
@@ -1521,24 +1542,34 @@ class Cron extends Controller
         return true;
     }
 
-    private function hasRecentSingPause(int $gameId, int $pauseSeconds): bool
+    private function hasRecentSingPause(int $gameId, int $pauseSeconds = 2): bool
     {
         $db = \Config\Database::connect();
 
         $lastBall = $this->getLastBall($gameId);
-        if (!$lastBall) return false;
+        if (!$lastBall) {
+            return false;
+        }
 
-        $lastBallTime = strtotime($lastBall['created_at']);
-
-        // Sings en los últimos pauseSeconds o desde la última bola
-        $lastSings = $db->table('sings')
+        // Solo pausar si hay cantes pendientes de resolución/pago (status 0 o 1)
+        $pendingSings = $db->table('sings')
             ->where('game', $gameId)
-            ->whereIn('status', [0, 1, 2])
-            ->where('created_at >=', date('Y-m-d H:i:s', time() - $pauseSeconds))
-            ->get()
-            ->getResultArray();
+            ->whereIn('status', [0, 1])
+            ->countAllResults();
 
-        return !empty($lastSings);
+        if ($pendingSings > 0) {
+            return true;
+        }
+
+        // Si ya fue resuelto (status 2), solo pausar brevemente si ocurrió en los últimos 2 segundos
+        $effectivePause = min(2, max(1, $pauseSeconds));
+        $recentSings = $db->table('sings')
+            ->where('game', $gameId)
+            ->where('status', 2)
+            ->where('created_at >=', date('Y-m-d H:i:s', time() - $effectivePause))
+            ->countAllResults();
+
+        return $recentSings > 0;
     }
 
     /*ANTERIORprivate function generateUniqueNumber($gameId)
@@ -1760,23 +1791,20 @@ class Cron extends Controller
                     'cartonId'      => (int) $sing['carton'],
                     'lastNumber'    => (int) ($lastBall['number'] ?? 0),
                     'image'         => $imagePath,
-                    'isOwnBingo'    => true,
+                    'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompleted,
                     'winners'       => $officialWinners,
                 ]);
 
-                // Notificación toast de felicitación al ganador
-                if ($singUser) {
-                    $modelNotifications->insert([
-                        'user'     => (int) $sing['user'],
-                        'from'     => (int) ($game['user'] ?? 1),
-                        'type'     => 'sing',
-                        'game'     => $gameId,
-                        'modality' => (int) $sing['modality'],
-                        'title'    => '🎉 ¡HAS CANTADO BINGO!',
-                        'message'  => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . translate($modalitySing['name'] ?? '') . '.',
-                    ]);
-                }
+                // Notificar al ganador, a todos los jugadores de la partida y al operador
+                bingo_notify_sing_to_all_players((int) $gameId, [
+                    'singId'     => (int) $sing['id'],
+                    'userId'     => (int) $sing['user'],
+                    'userName'   => $userName,
+                    'modalityId' => (int) $sing['modality'],
+                    'modality'   => translate($modalitySing['name'] ?? ''),
+                    'cartonId'   => (int) $sing['carton'],
+                ]);
             }
         } else {
             // Verificar si quedó algún cante pendiente de pago (status 1)
