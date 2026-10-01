@@ -209,13 +209,23 @@ class AudioManager {
         // Si ya terminó o está pausado, reutilizar directamente la instancia
         if (audio.paused || audio.ended) {
             audio.currentTime = 0;
-            audio.play().catch(e => console.warn('Audio play failed:', e));
+            audio.play().catch(e => {
+                console.warn('Audio play failed:', e);
+                if (e.name === 'NotAllowedError') {
+                    window.pendingBallAudioSrc = src;
+                }
+            });
             return audio;
         }
 
         // Clone ligero con limpieza de memoria automática al terminar
         const audioClone = audio.cloneNode();
-        audioClone.play().catch(e => console.warn('Audio play failed:', e));
+        audioClone.play().catch(e => {
+            console.warn('Audio play failed:', e);
+            if (e.name === 'NotAllowedError') {
+                window.pendingBallAudioSrc = src;
+            }
+        });
         audioClone.onended = function () {
             audioClone.src = '';
             audioClone.onended = null;
@@ -236,6 +246,21 @@ class AudioManager {
         this.preload(audioPath + 'winner.mp3');
     }
 }
+
+// Desbloqueo proactivo de audio en el primer clic o toque en cualquier parte de la pantalla
+window.pendingBallAudioSrc = null;
+function unlockUserAudioGesture() {
+    if (window.pendingBallAudioSrc && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        const pendingSrc = window.pendingBallAudioSrc;
+        window.pendingBallAudioSrc = null;
+        if (typeof audioManager !== 'undefined' && audioManager.play) {
+            audioManager.play(pendingSrc);
+        }
+    }
+}
+['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(function (eventName) {
+    document.addEventListener(eventName, unlockUserAudioGesture, { capture: true, passive: true });
+});
 
 // Polling inteligente con backoff exponencial
 class SmartPoller {
@@ -1219,9 +1244,11 @@ function reconcileBallDisplay(orderedNumbers) {
     }
 
     window.drawnNumbers = ordered.slice();
-    lastNumbers = ordered.slice(-5);
-    updateMainBall(ordered[ordered.length - 1]);
-    renderBallHistory();
+    if (!isBallPlaybackActive && !ballPlaybackQueue.length) {
+        lastNumbers = ordered.slice(-5);
+        updateMainBall(ordered[ordered.length - 1]);
+        renderBallHistory();
+    }
     ordered.forEach(markBoardNumber);
 }
 
@@ -1352,24 +1379,36 @@ function applyMarksForNumber(newNumber) {
     }
 }
 
-function scheduleLatestBallMarks(latestNumber, options) {
-    const parsed = parseBallNumber(latestNumber);
-    if (!parsed) {
+// ─────────────────────────────────────────
+// Cola secuencial de reproducción de balotas
+// Garantiza que cada balota se cante, se anime y se marque en orden sin solaparse
+// ─────────────────────────────────────────
+let ballPlaybackQueue = [];
+let isBallPlaybackActive = false;
+
+function enqueueBallsForPlayback(balls) {
+    if (!Array.isArray(balls) || !balls.length) return;
+
+    balls.forEach(function (b) {
+        const parsed = parseBallNumber(b);
+        if (parsed && !ballPlaybackQueue.includes(parsed)) {
+            ballPlaybackQueue.push(parsed);
+        }
+    });
+
+    playNextBallInQueue();
+}
+
+function playNextBallInQueue() {
+    if (isBallPlaybackActive || !ballPlaybackQueue.length || bingoInProgress) {
         return;
     }
 
-    flushPendingMark();
-    clearBallRevealTimers(false);
+    isBallPlaybackActive = true;
+    const currentNumber = ballPlaybackQueue.shift();
 
-    // Reproducir narración inmediatamente al cantar la balota
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + parsed + '.mp3');
-    }
-
-    // Marcar en cartón y tablero DE INMEDIATO (0ms de retraso)
-    applyMarksForNumber(parsed);
-
-    // Animación visual de la balota en el cabezal (en paralelo, sin bloquear marcas)
+    // 1. Mostrar la balota en el cabezal con animación visual
+    updateMainBall(currentNumber);
     const lastNumberEl = $('#last-number');
     if (lastNumberEl.length) {
         lastNumberEl.addClass('move-number');
@@ -1382,9 +1421,43 @@ function scheduleLatestBallMarks(latestNumber, options) {
         }, 500);
     }
 
-    if (isAutoMarkEnabled()) {
-        scheduleAutoSingCheck(150);
+    // 2. Cantar el audio de la balota inmediatamente si la narración está activa
+    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+        audioManager.play(audioPath + currentNumber + '.mp3');
     }
+
+    // 3. Sincronizar el marcado del cartón y tablero con la voz de la balota (delay suave de 250ms)
+    setTimeout(function () {
+        applyMarksForNumber(currentNumber);
+
+        // Actualizar el carrusel de últimas 5 balotas ordenadas hasta esta balota
+        if (Array.isArray(window.drawnNumbers)) {
+            const idx = window.drawnNumbers.indexOf(currentNumber);
+            if (idx !== -1) {
+                lastNumbers = window.drawnNumbers.slice(0, idx + 1).slice(-5);
+                renderBallHistory();
+            }
+        }
+    }, 250);
+
+    // 4. Si hay más balotas esperando en la cola (por ejemplo, llegaron 2 balotas juntas por latencia),
+    // esperar 2400ms (duración completa de la locución) antes de cantar la siguiente.
+    // Si no hay más en cola, liberar el candado en 600ms.
+    const waitMs = ballPlaybackQueue.length > 0 ? 2400 : 600;
+    setTimeout(function () {
+        isBallPlaybackActive = false;
+        if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
+            playNextBallInQueue();
+        }
+    }, waitMs);
+}
+
+function scheduleLatestBallMarks(latestNumber, options) {
+    const parsed = parseBallNumber(latestNumber);
+    if (!parsed) {
+        return;
+    }
+    enqueueBallsForPlayback([parsed]);
 }
 
 function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
@@ -1440,46 +1513,23 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     window.drawnNumbers = ordered.slice();
 
     updateBallsCounter(ballsCount);
-    reconcileBallDisplay(ordered);
     markGameAsStartedFromServer(ballsCount);
 
     flushPendingMark();
     clearBallRevealTimers(false);
 
-    if (isAutoMarkEnabled()) {
-        // Una sola bola nueva: marcar con el delay de revelado (sync con la animación)
-        if (opts.animate !== false && missing.length === 1 && !bingoInProgress) {
-            const alreadySynced = ordered.filter(function (num) {
-                return num !== missing[0];
-            });
-            if (alreadySynced.length) {
-                syncAutoMarkedNumbers(alreadySynced, { animate: false, persist: false });
-            }
-            scheduleLatestBallMarks(missing[0], { animate: true });
-        } else {
+    // Si es la primera carga inicial o reconexión masiva (> 3 bolas perdidas) o animate es false:
+    if (previous.length === 0 || missing.length > 3 || opts.animate === false) {
+        reconcileBallDisplay(ordered);
+        if (isAutoMarkEnabled()) {
             syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
         }
+        return;
     }
 
-    if (missing.length && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        // Si ya se programa audio en scheduleLatestBallMarks, no duplicar
-        if (!(opts.animate !== false && missing.length === 1 && !bingoInProgress && isAutoMarkEnabled())) {
-            audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
-        }
-    }
-
-    if (opts.animate !== false && missing.length === 1 && !bingoInProgress) {
-        const lastNumberEl = $('#last-number');
-        if (lastNumberEl.length) {
-            lastNumberEl.addClass('move-number');
-            setTimeout(function () {
-                lastNumberEl.removeClass('move-number');
-            }, 500);
-        }
-    }
-
-    if (isAutoMarkEnabled() && !(opts.animate !== false && missing.length === 1 && !bingoInProgress)) {
-        scheduleAutoSingCheck(missing.length ? 300 : 200);
+    // Partida en vivo: si hay bolas nuevas, reproducirlas secuencialmente en cola
+    if (missing.length > 0 && !bingoInProgress) {
+        enqueueBallsForPlayback(missing);
     }
 }
 
@@ -1791,9 +1841,9 @@ function processNumberGetResponse(data) {
     if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
         const prevLen = numbersgenerated.length;
         const nextLen = uniqueOrderedBalls(data.drawnNumbers).length;
-        // Animar solo cuando llega exactamente una bola nueva (live en tiempo real)
-        const animateOne = !bingoInProgress && nextLen === prevLen + 1;
-        syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: animateOne });
+        // Animar siempre que haya entre 1 y 3 bolas nuevas (para que ninguna quede sin cantar)
+        const animateBalls = !bingoInProgress && prevLen > 0 && nextLen > prevLen && (nextLen - prevLen) <= 3;
+        syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: animateBalls });
     } else if (data.number) {
         handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
     }

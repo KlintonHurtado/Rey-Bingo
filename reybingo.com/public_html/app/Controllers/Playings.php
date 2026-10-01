@@ -1136,19 +1136,19 @@ class Playings extends Controller
             $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersOrdered);
         }
 
-        $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->first();
+        $lastNumber = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->first();
 
         // En LIVE no hay bola principal en header: el historial lateral incluye la actual (máx. 4).
         // En juego normal: historial = últimas previas (sin la principal).
         $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
         $historyFetchLimit = $isLiveGame ? 4 : 5;
-        $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit($historyFetchLimit)->findAll();
+        $fourNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->limit($historyFetchLimit)->findAll();
         if (!$isLiveGame) {
             array_shift($fourNumbers);
         }
         $fourNumbers = array_reverse(array_column($fourNumbers, 'number'));
 
-        $fiveNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
+        $fiveNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->limit(5)->findAll();
         $fiveNumbers = array_reverse(array_column($fiveNumbers, 'number'));
 
         $singsModalities = $modelSings->where('game', $game['id'])->findAll();
@@ -2065,7 +2065,7 @@ class Playings extends Controller
             }
         }
 
-        $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
+        $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->first();
 
         if (!$lastNumber) {
             return $this->response->setJSON([

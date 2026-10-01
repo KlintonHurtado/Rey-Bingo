@@ -676,9 +676,12 @@ $isNoMusicRole = session()->get('logged_in') && (
 
                         // Procesar cada notificación
                         let hasPlayedConfetti = false;
+                        const notifIdsToMark = [];
                         limitedNotifications.forEach(notification => {
                             showNotification(notification);
-                            markAsRead(notification.id);
+                            if (notification.id) {
+                                notifIdsToMark.push(notification.id);
+                            }
 
                             if (notification.transaction && isPaymentsModalOpen()) {
                                 addPaymentRowToModal(notification.transaction);
@@ -696,6 +699,11 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 <?php endif; ?>
                             }
                         });
+
+                        // Marcar todas las notificaciones recibidas en una sola petición tipo array
+                        if (notifIdsToMark.length > 0) {
+                            markAsRead(notifIdsToMark);
+                        }
                     } else {
                         hideNotificationIndicator();
                     }
@@ -1475,16 +1483,19 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }, 300);
             }
 
-            // Función para marcar notificación como leída
-            async function markAsRead(notificationId) {
+            // Función para marcar notificación(es) como leída(s) (acepta array de IDs o ID individual)
+            async function markAsRead(notificationIds) {
                 try {
+                    const ids = Array.isArray(notificationIds) ? notificationIds : [notificationIds];
+                    if (ids.length === 0) return;
+
                     const response = await fetch(notificationConfig.markReadUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
                         },
-                        body: JSON.stringify({ id: notificationId })
+                        body: JSON.stringify({ ids: ids, id: ids[0] })
                     });
                     
                     if (!response.ok) {

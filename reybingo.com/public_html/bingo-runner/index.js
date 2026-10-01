@@ -131,14 +131,15 @@ async function tickGame(gameId) {
                 console.log(tag + ' | Partida finalizada');
                 stopGameTimer(gameId);
             }
-            // d.paused = pausa por bingo reciente, es normal, no logear
+            // d.paused = pausa por bingo reciente, es normal
+            // d.waiting = esperando intervalo entre balotas, es normal
         } else {
-            // ok:false con HTTP 200 = juego ya no activo
-            if (res.statusCode === 200) {
+            // Solo detener si explícitamente el juego está inactivo o completado
+            if (d.inactive || d.completed) {
                 console.log(tag + ' | Juego inactivo (' + (d.message || 'sin detalle') + '). Deteniendo.');
                 stopGameTimer(gameId);
             } else {
-                console.warn(tag + ' | HTTP ' + res.statusCode + ': ' + (d.message || JSON.stringify(d)));
+                console.warn(tag + ' | ' + (d.message || JSON.stringify(d)));
             }
         }
     } catch (err) {
@@ -161,7 +162,7 @@ function startGameTimer(gameId, intervalMs) {
         console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': iniciando (cada ' + safeInterval + 'ms)');
     }
 
-    tickGame(gameId); // Primer tick inmediato
+    // Esperar al intervalo regular (sin tick inmediato a 0ms para evitar balotas adelantadas)
     var timerId = setInterval(function() { tickGame(gameId); }, safeInterval);
     activeTimers.set(gameId, { timerId: timerId, intervalMs: safeInterval });
 }

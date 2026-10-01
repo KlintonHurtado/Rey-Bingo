@@ -3050,6 +3050,7 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
+            $batchNotifications = [];
             foreach ($users as $user) {
                 $userGroup = (int) ($user['group'] ?? 0);
                 if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
@@ -3067,7 +3068,7 @@ class Games extends Controller {
                     'message' => $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText,
                 ];
 
-                $modelNotifications->insert($notificationData);
+                $batchNotifications[] = $notificationData;
 
                 $pushPayload = [
                     'title' => $notificationData['title'],
@@ -3086,6 +3087,10 @@ class Games extends Controller {
                         }
                     }
                 }
+            }
+
+            if (!empty($batchNotifications)) {
+                $modelNotifications->insertBatch($batchNotifications);
             }
         }
 
@@ -3486,6 +3491,7 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
+            $batchNotifications = [];
             foreach ($users as $user) {
                 $userGroup = (int) ($user['group'] ?? 0);
                 if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
@@ -3503,7 +3509,7 @@ class Games extends Controller {
                     'message' => $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText,
                 ];
 
-                $modelNotifications->insert($notificationData);
+                $batchNotifications[] = $notificationData;
 
                 $pushPayload = [
                     'title' => $notificationData['title'],
@@ -3515,11 +3521,17 @@ class Games extends Controller {
                 $results = $pushService->sendToUser($user['id'], $pushPayload);
                 
                 // Log de resultados para debugging
-                foreach ($results as $result) {
-                    if (!$result['success']) {
-                        log_message('error', 'Push notification failed: ' . json_encode($result));
+                if (is_array($results)) {
+                    foreach ($results as $result) {
+                        if (is_array($result) && empty($result['success'])) {
+                            log_message('error', 'Push notification failed: ' . json_encode($result));
+                        }
                     }
                 }
+            }
+
+            if (!empty($batchNotifications)) {
+                $modelNotifications->insertBatch($batchNotifications);
             }
         }
 

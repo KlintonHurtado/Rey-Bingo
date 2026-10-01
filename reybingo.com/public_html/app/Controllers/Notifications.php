@@ -229,27 +229,36 @@ class Notifications extends Controller {
             ]);
         }
 
-        if ($id === null) {
+        $json = $this->request->getJSON();
+        $ids = [];
+        if ($json && !empty($json->ids) && is_array($json->ids)) {
+            $ids = array_map('intval', $json->ids);
+        } elseif ($json && !empty($json->id)) {
+            $ids = [(int) $json->id];
+        } elseif ($id !== null) {
+            $ids = [(int) $id];
+        }
+
+        $ids = array_values(array_filter($ids, fn($v) => $v > 0));
+
+        if (empty($ids)) {
             return $this->response->setJSON([
                 'success' => false, 
-                'message' => 'ID de notificación no proporcionado'
+                'message' => 'ID(s) de notificación no proporcionado(s)'
             ]);
         }
 
-        $notification = $this->notificationsModel->find($id);
-        
-        if (!$notification || ($notification['user'] != $userId && $notification['user'] != 0)) {
-            return $this->response->setJSON([
-                'success' => false, 
-                'message' => 'Notificación no encontrada o no pertenece al usuario'
-            ]);
-        }
-
-        $this->notificationsModel->markAsRead($id);
+        $this->notificationsModel->whereIn('id', $ids)
+            ->groupStart()
+                ->where('user', $userId)
+                ->orWhere('user', 0)
+            ->groupEnd()
+            ->set(['status' => 1])
+            ->update();
         
         return $this->response->setJSON([
             'success' => true,
-            'message' => 'Notificación marcada como leída'
+            'message' => 'Notificación(es) marcada(s) como leída(s)'
         ]);
     }
     

@@ -3564,14 +3564,18 @@ class Users extends Controller {
         // Deduplicar notificaciones repetidas en memoria y marcar duplicados en BD como leídos
         $uniqueNotifications = [];
         $seenKeys = [];
+        $duplicateIds = [];
         foreach ($notifications as $n) {
             $dedupKey = ($n['type'] ?? '') . '_' . ($n['game'] ?? 0) . '_' . ($n['modality'] ?? 0) . '_' . ($n['type_id'] ?? 0);
             if ($dedupKey !== '___0' && isset($seenKeys[$dedupKey])) {
-                $modelNotifications->update($n['id'], ['status' => 1]);
+                $duplicateIds[] = (int) $n['id'];
                 continue;
             }
             $seenKeys[$dedupKey] = true;
             $uniqueNotifications[] = $n;
+        }
+        if (!empty($duplicateIds)) {
+            $modelNotifications->whereIn('id', $duplicateIds)->set(['status' => 1])->update();
         }
         $notifications = $uniqueNotifications;
 
@@ -3898,7 +3902,7 @@ class Users extends Controller {
         return $this->response->setJSON(['ok' => true, 'id' => $id]);
     }
 
-    // Método para marcar notificación como leída
+    // Método para marcar notificación(es) como leída(s) (soporta array 'ids' o individual 'id')
     public function markNotificationRead() {
         $modelNotifications = new NotificationsModel();
 
@@ -3908,27 +3912,30 @@ class Users extends Controller {
         }
 
         // Verificar si el usuario está autenticado
-        if (!session()->get('logged_in')) {
+        $userId = (int) session()->get('id');
+        if (!session()->get('logged_in') || !$userId) {
             return $this->response->setJSON(['error' => 'Usuario no autenticado']);
         }
 
-        $notificationId = $this->request->getJSON()->id ?? null;
-        
-        if (!$notificationId) {
-            return $this->response->setJSON(['error' => 'ID de notificación no proporcionado']);
+        $json = $this->request->getJSON();
+        $ids = [];
+        if (!empty($json->ids) && is_array($json->ids)) {
+            $ids = array_map('intval', $json->ids);
+        } elseif (!empty($json->id)) {
+            $ids = [(int) $json->id];
         }
 
-        // Verificar que la notificación pertenezca al usuario actual
-        $notification = $modelNotifications->where('id', $notificationId)->where('user', session()->get('id'))->first();
+        $ids = array_values(array_filter($ids, fn($id) => $id > 0));
 
-        if (!$notification) {
-            return $this->response->setJSON(['error' => 'Notificación no encontrada']);
+        if (empty($ids)) {
+            return $this->response->setJSON(['error' => 'ID(s) de notificación no proporcionado(s)']);
         }
 
-        // Marcar como leída
-        $modelNotifications->update($notificationId, ['status' => 1]);
-
-        $modelNotifications->where('user', session()->get('id'))->where('status', 0)->set(['status' => 1])->update();
+        // Marcar todas las notificaciones recibidas en una sola consulta por lotes (whereIn)
+        $modelNotifications->whereIn('id', $ids)
+                            ->where('user', $userId)
+                            ->set(['status' => 1])
+                            ->update();
 
         return $this->response->setJSON(['success' => true]);
     }
