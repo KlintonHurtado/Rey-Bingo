@@ -18,6 +18,35 @@ class NotificationsModel extends Model
     protected $useTimestamps = true;
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
+
+    protected $afterInsert = ['broadcastViaWebSocket'];
+
+    protected function broadcastViaWebSocket(array $data)
+    {
+        if (empty($data['id'])) {
+            return $data;
+        }
+
+        try {
+            $notification = $this->find($data['id']);
+            if ($notification && !empty($notification['user'])) {
+                helper('bingo');
+                if (function_exists('bingo_broadcast_user_notification')) {
+                    bingo_broadcast_user_notification((int) $notification['user'], [
+                        'id'         => (int) $notification['id'],
+                        'title'      => $notification['title'] ?? 'Notificación',
+                        'message'    => $notification['message'] ?? '',
+                        'type'       => $notification['type'] ?? 'default',
+                        'created_at' => $notification['created_at'] ?? date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'broadcastViaWebSocket error: ' . $e->getMessage());
+        }
+
+        return $data;
+    }
     
     /**
      * Get notifications for a user

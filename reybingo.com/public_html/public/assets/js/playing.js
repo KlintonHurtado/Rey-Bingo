@@ -202,12 +202,28 @@ class AudioManager {
         if (!audio) {
             audio = new Audio();
             audio.src = src;
+            audio.preload = 'auto';
             this.audioCache.set(src, audio);
         }
 
-        // Clone para permitir múltiples reproducciones simultáneas
+        // Si ya terminó o está pausado, reutilizar directamente la instancia
+        if (audio.paused || audio.ended) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.warn('Audio play failed:', e));
+            return audio;
+        }
+
+        // Clone ligero con limpieza de memoria automática al terminar
         const audioClone = audio.cloneNode();
         audioClone.play().catch(e => console.warn('Audio play failed:', e));
+        audioClone.onended = function () {
+            audioClone.src = '';
+            audioClone.onended = null;
+        };
+        audioClone.onerror = function () {
+            audioClone.src = '';
+            audioClone.onerror = null;
+        };
 
         return audioClone;
     }
@@ -594,6 +610,9 @@ function registerChatMessageId(messageId) {
 
     if (!messagesDisplayed.includes(parsed)) {
         messagesDisplayed.push(parsed);
+        if (messagesDisplayed.length > 200) {
+            messagesDisplayed.splice(0, messagesDisplayed.length - 200);
+        }
     }
 }
 
@@ -1325,11 +1344,11 @@ function applyMarksForNumber(newNumber) {
     markBoardNumber(parsed);
 
     if (isAutoMarkEnabled()) {
-        // Marca local: el servidor ya sincroniza en playings/numberGet (syncAutoDialMarks).
-        // Evita 1 POST dialNumber por bola → menos 403 del WAF y menos desfase.
-        markCartonNumberLocally(parsed, false);
+        // Marca local inmediata: el servidor ya sincroniza marcas en cron/numberGet.
+        // Evita 1 POST dialNumber por bola → menos 403 del WAF y sin desfase.
+        markCartonNumberLocally(parsed, true);
         autoMarkedNumbers.add(parsed);
-        scheduleAutoSingCheck();
+        scheduleAutoSingCheck(150);
     }
 }
 
@@ -1339,50 +1358,33 @@ function scheduleLatestBallMarks(latestNumber, options) {
         return;
     }
 
-    const opts = options || {};
-    const shouldDelayMarks = opts.animate !== false && !bingoInProgress;
-
-    const runMarks = function () {
-        pendingMarkNumber = null;
-        pendingMarkSequence = 0;
-        applyMarksForNumber(parsed);
-
-        if (isAutoMarkEnabled()) {
-            scheduleAutoSingCheck();
-        }
-    };
-
     flushPendingMark();
     clearBallRevealTimers(false);
 
-    if (!shouldDelayMarks) {
-        runMarks();
-        return;
-    }
-
+    // Reproducir narración inmediatamente al cantar la balota
     if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
         audioManager.play(audioPath + parsed + '.mp3');
     }
 
-    const sequence = ++ballRevealSequence;
-    pendingMarkNumber = parsed;
-    pendingMarkSequence = sequence;
-    const ballDelay = getBallDisplayDelay();
+    // Marcar en cartón y tablero DE INMEDIATO (0ms de retraso)
+    applyMarksForNumber(parsed);
 
-    ballRevealTimer = setTimeout(function () {
-        if (pendingMarkSequence !== sequence || pendingMarkNumber !== parsed) {
-            return;
+    // Animación visual de la balota en el cabezal (en paralelo, sin bloquear marcas)
+    const lastNumberEl = $('#last-number');
+    if (lastNumberEl.length) {
+        lastNumberEl.addClass('move-number');
+        if (ballRevealAfterTimer) {
+            clearTimeout(ballRevealAfterTimer);
         }
-
-        runMarks();
-
         ballRevealAfterTimer = setTimeout(function () {
-            const lastNumberEl = $('#last-number');
-            if (lastNumberEl.length) {
-                lastNumberEl.removeClass('move-number');
-            }
-        }, 300);
-    }, ballDelay);
+            lastNumberEl.removeClass('move-number');
+            ballRevealAfterTimer = null;
+        }, 500);
+    }
+
+    if (isAutoMarkEnabled()) {
+        scheduleAutoSingCheck(150);
+    }
 }
 
 function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
@@ -1482,9 +1484,8 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
 }
 
 function getBallDisplayDelay() {
-    // Retardo visual breve para sincronizar con la llegada de la balota al cabezal.
-    // NUNCA usar timeBallGet aquí, ya que timeBallGet es el intervalo completo entre bolas (4000ms).
-    return 200;
+    // Sin retardo: marcado instantáneo (0ms) al cantar la balota
+    return 0;
 }
 
 function applyMarksForDrawnNumber(number) {
@@ -1518,17 +1519,14 @@ function markCartonNumberLocally(number, animate) {
             return;
         }
 
-        if (animate) {
-            const originalContent = elementNumber.text();
-            elementNumber.text('⭐️').addClass('explosive-effect');
+        // Marcar de inmediato en el cartón (0ms de retraso)
+        elementNumber.addClass('marked');
 
+        if (animate) {
+            elementNumber.addClass('explosive-effect');
             setTimeout(function () {
-                elementNumber.text(originalContent);
                 elementNumber.removeClass('explosive-effect');
-                elementNumber.addClass('marked');
             }, 300);
-        } else {
-            elementNumber.addClass('marked');
         }
 
         if (isAutoMarkEnabled()) {
@@ -2102,7 +2100,7 @@ function stopUpdateGameAccumulated() {
     stopUpdateLiveStatus();
 }
 
-// Función optimizada para marcar números
+// Función optimizada para marcar números (modo manual)
 function dialNumber(number) {
     const elementsNumber = $(".number-" + number);
 
@@ -2111,44 +2109,38 @@ function dialNumber(number) {
         return;
     }
 
+    // Marcado optimista inmediato: marcar en la UI al instante sin esperar la red ni animaciones bloqueantes
+    elementsNumber.each(function () {
+        const elementNumber = $(this);
+
+        if (elementNumber.hasClass('marked')) {
+            return;
+        }
+
+        elementNumber.addClass('marked explosive-effect');
+        setTimeout(function () {
+            elementNumber.removeClass('explosive-effect');
+        }, 300);
+    });
+
     $.ajax({
         url: site_url + 'playings/dialNumber',
         method: 'POST',
         data: { number: number },
         success: function (data) {
             if (data.status === 'success') {
-                elementsNumber.each(function () {
-                    const elementNumber = $(this);
-
-                    if (elementNumber.hasClass('marked')) {
-                        return;
-                    }
-
-                    if (isAutoMarkEnabled()) {
-                        elementNumber.addClass('marked');
-                        elementNumber.removeAttr('onclick');
-                        return;
-                    }
-
-                    const originalContent = elementNumber.text();
-                    elementNumber.text('⭐️').addClass('explosive-effect');
-
-                    setTimeout(function () {
-                        elementNumber.text(originalContent);
-                        elementNumber.removeClass('explosive-effect');
-                        elementNumber.addClass('marked');
-                    }, 1000);
-                });
-
                 if (isAutoMarkEnabled()) {
-                    scheduleAutoSingCheck();
+                    scheduleAutoSingCheck(100);
                 }
             } else {
+                // Revertir marca si el servidor la rechaza
+                elementsNumber.removeClass('marked');
                 autoMarkedNumbers.delete(number);
-                console.warn("Respuesta no exitosa:", data.message || data);
+                console.warn("Respuesta no exitosa al marcar número:", data.message || data);
             }
         },
         error: function (xhr, status, error) {
+            elementsNumber.removeClass('marked');
             autoMarkedNumbers.delete(number);
             console.error("Error en AJAX al marcar número:", number, error);
         }
@@ -2163,14 +2155,10 @@ function autoDialNumber(number) {
 
         if (elementNumber.hasClass('marked')) return;
 
-        const originalContent = elementNumber.text();
-        elementNumber.text('⭐️').addClass('explosive-effect');
-
+        elementNumber.addClass('marked explosive-effect');
         setTimeout(function () {
-            elementNumber.text(originalContent);
             elementNumber.removeClass('explosive-effect');
-            elementNumber.addClass('marked');
-        }, 1000);
+        }, 300);
     });
 
     const numberEl = $("#board-number-" + number);

@@ -46,7 +46,11 @@ class PusherAuth extends ResourceController
             );
         }
 
-        if (strpos($channelName, 'private-game-') !== 0) {
+        $userId = (int) session()->get('id');
+        $isGameChannel = strpos($channelName, 'private-game-') === 0;
+        $isUserChannel = $userId > 0 && ($channelName === 'private-user-' . $userId);
+
+        if (!$isGameChannel && !$isUserChannel) {
             log_message('error', 'PusherAuth: canal no permitido ' . $channelName);
             return $this->respond(
                 ['message' => 'Canal no permitido'],

@@ -736,16 +736,16 @@ $isNoMusicRole = session()->get('logged_in') && (
                     return;
                 }
                 
-                while (container.children.length >= notificationConfig.maxNotifications) {
-                    const oldestNotification = container.firstChild;
-                    if (oldestNotification) {
-                        if (oldestNotification._autoHideTimer) {
-                            clearTimeout(oldestNotification._autoHideTimer);
-                            oldestNotification._autoHideTimer = null;
+                const existingNotifs = container.querySelectorAll('.notification');
+                if (existingNotifs.length >= notificationConfig.maxNotifications) {
+                    const removeCount = existingNotifs.length - notificationConfig.maxNotifications + 1;
+                    for (let i = 0; i < removeCount && i < existingNotifs.length; i++) {
+                        const oldItem = existingNotifs[i];
+                        if (oldItem._autoHideTimer) {
+                            clearTimeout(oldItem._autoHideTimer);
+                            oldItem._autoHideTimer = null;
                         }
-                        oldestNotification.remove();
-                    } else {
-                        break;
+                        oldItem.remove();
                     }
                 }
                 
@@ -1538,8 +1538,13 @@ $isNoMusicRole = session()->get('logged_in') && (
                 document.addEventListener('touchstart', enableAudioForIOS, { once: true });
                 document.addEventListener('click', enableAudioForIOS, { once: true });
                 
+                // En pantallas de juego (/playing), las notificaciones llegan por WebSocket
+                // Cargar una vez al inicio y evitar el polling continuo que satura teléfonos y causa Out of Memory
+                var isPlayingScreen = window.location.pathname.indexOf('/playing') !== -1;
                 loadNotifications();
-                setInterval(loadNotifications, notificationConfig.checkInterval);
+                if (!isPlayingScreen) {
+                    setInterval(loadNotifications, notificationConfig.checkInterval);
+                }
             });
         <?php endif; ?>
 

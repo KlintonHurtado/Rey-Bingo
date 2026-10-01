@@ -89,6 +89,30 @@ class PusherClient {
             var channelName = 'private-game-' + this.gameId;
             this.channel    = this.pusher.subscribe(channelName);
 
+            // Suscribirse también al canal privado del usuario para notificaciones personales en tiempo real
+            if (this.userId && parseInt(this.userId, 10) > 0) {
+                var userChannelName = 'private-user-' + this.userId;
+                this.userChannel = this.pusher.subscribe(userChannelName);
+                this.userChannel.bind('notification:new', (data) => {
+                    console.log('WS Notificación personal recibida:', data);
+                    if (typeof window.showNotification === 'function') {
+                        window.showNotification(data);
+                    }
+                });
+            }
+
+            // Escuchar notificaciones de la partida
+            this.channel.bind('game:notification', (data) => {
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(data);
+                }
+            });
+            this.channel.bind('notification:new', (data) => {
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(data);
+                }
+            });
+
             this.channel.bind('pusher:subscription_succeeded', () => {
                 console.log('WS suscripcion exitosa al canal: ' + channelName);
                 this.isConnected       = true;
@@ -209,6 +233,7 @@ class PusherClient {
             this.isConnected = false;
             this.pusher      = null;
             this.channel     = null;
+            this.userChannel = null;
         }
     }
 }

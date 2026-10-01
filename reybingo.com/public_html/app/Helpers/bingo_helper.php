@@ -240,6 +240,26 @@ if (!function_exists('bingo_broadcast_game_status')) {
     }
 }
 
+if (!function_exists('bingo_broadcast_user_notification')) {
+    /**
+     * Emite una notificación en tiempo real a un usuario mediante WebSocket (Soketi/Pusher).
+     */
+    function bingo_broadcast_user_notification(int $userId, array $notificationData): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        try {
+            $client  = bingo_get_broadcast_client();
+            $channel = 'private-user-' . $userId;
+            $client->trigger($channel, 'notification:new', $notificationData);
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_broadcast_user_notification error: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('bingo_sync_drawn_marks_for_user')) {
     function bingo_sync_drawn_marks_for_user(int $userId, int $gameId, array $drawnNumbers): void
     {
