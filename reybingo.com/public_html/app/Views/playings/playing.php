@@ -1508,6 +1508,12 @@
     window.currentUserId = <?= (int) session()->get('id') ?>;
     window.allowGameUnload = window.gameIsFinished;
     window.playerGroup = 0;
+    window.audioPath = "<?= site_url('assets/sounds/'); ?>";
+    window.narrationPlaying = <?= (isset($user['narration']) && $user['narration'] == 1) ? 'true' : 'false' ?>;
+    window.soundPlaying = <?= (isset($user['sounds']) && $user['sounds'] == 1) ? 'true' : 'false' ?>;
+    var audioPath = window.audioPath;
+    var narrationPlaying = window.narrationPlaying;
+    var soundPlaying = window.soundPlaying;
 
     function canLeaveGameWithoutWarning() {
         return window.allowGameUnload === true

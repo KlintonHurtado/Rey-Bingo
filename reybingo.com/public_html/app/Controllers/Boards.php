@@ -322,26 +322,34 @@ class Boards extends Controller {
         $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
+            $modelGames->where('id', $game['id'])->set(['status' => 0, 'updated_at' => date('Y-m-d H:i:s')])->update();
+            if (function_exists('bingo_on_game_finished')) {
+                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            }
+            bingo_broadcast_game_status((int) $game['id'], 'game:game_finished', ['status' => 0]);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
-                'number' => $lastBall['number'] ?? null
+                'number' => null
             ]);
         }
 
-        $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
+        $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->whereIn('status', [1, 2])->groupBy('modality')->countAllResults();
 
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
         if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
+            $modelGames->where('id', $game['id'])->set(['status' => 0, 'updated_at' => date('Y-m-d H:i:s')])->update();
+            if (function_exists('bingo_on_game_finished')) {
+                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            }
+            bingo_broadcast_game_status((int) $game['id'], 'game:game_finished', ['status' => 0]);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => $lastBall['number'] ?? null
+                'number' => null
             ]);
         }
 

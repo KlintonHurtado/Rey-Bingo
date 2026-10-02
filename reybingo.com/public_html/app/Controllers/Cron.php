@@ -718,6 +718,18 @@ class Cron extends Controller
             }
 
             try {
+                if ($this->isGameCompleted($gameId)) {
+                    $modelGames->update($gameId, [
+                        'status' => 0,
+                        'updated_at' => $now,
+                    ]);
+                    bingo_on_game_finished($gameId);
+                    bingo_broadcast_game_status((int) $gameId, 'game:game_finished', ['status' => 0]);
+                    $gamesCompleted[] = $gameId;
+                    log_message('info', "Juego {$gameId} finalizado dentro del candado - completado");
+                    continue;
+                }
+
                 // Revalidar intervalo justo antes de cantar
                 if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
                     log_message('info', "Juego {$gameId} - bola omitida (intervalo o ya cantada por otro proceso)");
@@ -1501,6 +1513,12 @@ class Cron extends Controller
     {
         $db = \Config\Database::connect();
 
+        // 0. Si el juego ya fue marcado como finalizado (status 0), está completado
+        $gameRow = $db->table('games')->select('status')->where('id', $gameId)->get()->getRowArray();
+        if ($gameRow && (int) $gameRow['status'] === 0) {
+            return true;
+        }
+
         // Verificar si ya salieron las 75 bolas
         $totalNumbersGenerated = $db->table('boards')
             ->where('game', $gameId)
@@ -1985,6 +2003,20 @@ class Cron extends Controller
         }
 
         try {
+            if ($this->isGameCompleted($gameId)) {
+                $modelGames->update($gameId, [
+                    'status' => 0,
+                    'updated_at' => $now,
+                ]);
+                bingo_on_game_finished($gameId);
+                bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+                return $this->response->setJSON([
+                    'ok' => true,
+                    'completed' => true,
+                    'message' => 'Partida finalizada',
+                ]);
+            }
+
             if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
                 return $this->response->setJSON([
                     'ok' => true,

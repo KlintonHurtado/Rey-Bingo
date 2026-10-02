@@ -127,7 +127,8 @@ async function tickGame(gameId) {
         if (d.ok) {
             if (d.number) {
                 console.log(tag + ' | Balota: ' + d.number);
-            } else if (d.completed) {
+            }
+            if (d.completed) {
                 console.log(tag + ' | Partida finalizada');
                 stopGameTimer(gameId);
             }
@@ -136,7 +137,7 @@ async function tickGame(gameId) {
         } else {
             // Solo detener si explícitamente el juego está inactivo o completado
             if (d.inactive || d.completed) {
-                console.log(tag + ' | Juego inactivo (' + (d.message || 'sin detalle') + '). Deteniendo.');
+                console.log(tag + ' | Juego inactivo o completado (' + (d.message || 'sin detalle') + '). Deteniendo.');
                 stopGameTimer(gameId);
             } else {
                 console.warn(tag + ' | ' + (d.message || JSON.stringify(d)));

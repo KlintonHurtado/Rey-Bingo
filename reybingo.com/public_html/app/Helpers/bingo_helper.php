@@ -423,6 +423,7 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
         $singsCount = $modelSings
             ->select('modality')
             ->where('game', $gameId)
+            ->whereIn('status', [1, 2])
             ->groupBy('modality')
             ->countAllResults();
 
@@ -431,7 +432,15 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
         }
 
         bingo_ensure_winners_registered($gameId);
-        $modelGames->where('id', $gameId)->where('status', 1)->set(['status' => 0])->update();
+        $modelGames->where('id', $gameId)->where('status', 1)->set([
+            'status' => 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ])->update();
+
+        if (function_exists('bingo_on_game_finished')) {
+            bingo_on_game_finished($gameId);
+        }
+        bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
 
         return true;
     }
@@ -481,7 +490,7 @@ if (!function_exists('bingo_register_sing_if_missing')) {
             'numbers'    => implode(',', $winningNumbers),
             'lastnumber' => $lastBallNumber,
             'notified'   => json_encode([]),
-            'status'     => $finalize ? 1 : 0,
+            'status'     => 1,
         ]);
 
         $db->transComplete();
@@ -491,10 +500,11 @@ if (!function_exists('bingo_register_sing_if_missing')) {
             try {
                 $singId = $modelSings->insertID();
 
-                // Pagar los premios AUTOMÁTICAMENTE para todos los ganadores pendientes del juego
-                if ($finalize) {
-                    bingo_pay_pending_awards_for_game($gameId);
-                }
+                // Pagar los premios AUTOMÁTICAMENTE de inmediato al momento que gana (no al finalizar)
+                bingo_pay_pending_awards_for_game($gameId);
+
+                // Comprobar y finalizar si con este cante se completaron los premios
+                $gameCompleted = bingo_finalize_game_when_complete($gameId);
 
                 $modelUsers = new \App\Models\UsersModel();
                 $userSing = $modelUsers->find($userId);
@@ -515,6 +525,7 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                     'lastNumber'    => $lastBallNumber,
                     'image'         => $imagePath,
                     'isOwnBingo'    => false,
+                    'gameCompleted' => $gameCompleted,
                 ]);
 
                 // Notificar de inmediato a jugadores humanos reales de la partida y al operador
@@ -537,8 +548,9 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
 if (!function_exists('bingo_notify_sing_to_all_players')) {
     /**
-     * Inserta notificaciones tanto para el ganador (si es humano) como para todos los jugadores humanos reales de la partida y el admin.
-     * EXCLUYE BOTS para evitar miles de inserciones y sobrecarga de BD. Usa insertBatch para máxima velocidad.
+     * Inserta notificaciones tanto para el ganador (si es humano) como para todos los jugadores humanos reales de la partida y admins/operadores.
+     * EXCLUYE BOTS para evitar miles de inserciones y sobrecarga de BD.
+     * Emite eventos WebSocket a cada usuario y al canal de la partida de forma instantánea (<50ms).
      */
     function bingo_notify_sing_to_all_players(int $gameId, array $data): void
     {
@@ -564,7 +576,8 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 $winnerIsBot = str_starts_with($winnerUser['code'] ?? '', 'BOT-')
                     || str_contains($winnerUser['email'] ?? '', '@reybingo.local')
                     || str_contains($winnerUser['email'] ?? '', '@reybingo.internal')
-                    || str_starts_with($winnerUser['username'] ?? '', 'bot_');
+                    || str_starts_with($winnerUser['username'] ?? '', 'bot_')
+                    || ((int) ($winnerUser['group'] ?? -1) === 0 && str_contains($winnerUser['email'] ?? '', 'bot_'));
             }
 
             // Pre-cargar notificaciones existentes para esta jugada para no duplicar (1 query)
@@ -585,28 +598,28 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
             if ($winnerUserId > 0 && !$winnerIsBot && !isset($alreadyNotified[$winnerUserId])) {
                 $batchInsert[] = [
                     'user'       => $winnerUserId,
-                    'from'       => $gameCreatorId,
+                    'from'       => $gameCreatorId > 0 ? $gameCreatorId : 1,
                     'type'       => 'sing',
                     'type_id'    => $singId,
                     'game'       => $gameId,
                     'carton'     => $cartonId,
                     'modality'   => $modalityId,
                     'title'      => '🎉 ¡HAS CANTADO BINGO!',
-                    'message'    => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . $modalityName . '.',
+                    'message'    => '¡Felicidades ' . $userName . '! Tu bingo ha sido registrado en la modalidad ' . $modalityName . ' (Cartón #' . $cartonId . ').',
                     'status'     => 0,
                     'created_at' => $now,
                 ];
                 $alreadyNotified[$winnerUserId] = true;
             }
 
-            // 2. Notificación a TODOS los demás jugadores HUMANOS con cartones en la partida (excluyendo bots)
-            $humanPlayers = $db->table('cartons')
+            // 2. Notificación a TODOS los demás jugadores HUMANOS con cartones en la partida (tanto cartons como temp_cartons)
+            $humanUserIds = [];
+            $cartonsUsers = $db->table('cartons')
                 ->select('cartons.user')
                 ->join('users', 'users.id = cartons.user')
                 ->where('cartons.game', $gameId)
                 ->where('cartons.user !=', $winnerUserId)
                 ->where('cartons.user >', 0)
-                ->where('users.group', 0)
                 ->notLike('users.code', 'BOT-')
                 ->notLike('users.email', '@reybingo.local')
                 ->notLike('users.email', '@reybingo.internal')
@@ -614,13 +627,32 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 ->groupBy('cartons.user')
                 ->get()
                 ->getResultArray();
+            foreach ($cartonsUsers as $cu) {
+                $humanUserIds[(int) $cu['user']] = true;
+            }
 
-            foreach ($humanPlayers as $hp) {
-                $hUserId = (int) $hp['user'];
+            $tempCartonsUsers = $db->table('temp_cartons')
+                ->select('temp_cartons.user')
+                ->join('users', 'users.id = temp_cartons.user')
+                ->where('temp_cartons.game', $gameId)
+                ->where('temp_cartons.user !=', $winnerUserId)
+                ->where('temp_cartons.user >', 0)
+                ->notLike('users.code', 'BOT-')
+                ->notLike('users.email', '@reybingo.local')
+                ->notLike('users.email', '@reybingo.internal')
+                ->notLike('users.username', 'bot_')
+                ->groupBy('temp_cartons.user')
+                ->get()
+                ->getResultArray();
+            foreach ($tempCartonsUsers as $tcu) {
+                $humanUserIds[(int) $tcu['user']] = true;
+            }
+
+            foreach (array_keys($humanUserIds) as $hUserId) {
                 if ($hUserId > 0 && !isset($alreadyNotified[$hUserId])) {
                     $batchInsert[] = [
                         'user'       => $hUserId,
-                        'from'       => $gameCreatorId,
+                        'from'       => $gameCreatorId > 0 ? $gameCreatorId : 1,
                         'type'       => 'sing',
                         'type_id'    => $singId,
                         'game'       => $gameId,
@@ -635,27 +667,86 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 }
             }
 
-            // 3. Notificación al administrador / operador dueño de la partida si no es el ganador
-            if ($gameCreatorId > 0 && $gameCreatorId !== $winnerUserId && !isset($alreadyNotified[$gameCreatorId])) {
-                $batchInsert[] = [
-                    'user'       => $gameCreatorId,
-                    'from'       => 1,
-                    'type'       => 'sing',
-                    'type_id'    => $singId,
-                    'game'       => $gameId,
-                    'carton'     => $cartonId,
-                    'modality'   => $modalityId,
-                    'title'      => '🎉 ¡BINGO CANTADO EN PARTIDA #' . $gameId . '!',
-                    'message'    => 'El jugador ' . $userName . ' cantó ' . $modalityName . ' con el cartón #' . $cartonId . '.',
-                    'status'     => 0,
-                    'created_at' => $now,
-                ];
-                $alreadyNotified[$gameCreatorId] = true;
+            // 3. Notificación a TODOS los administradores (group 1) y operadores (group 3) y al creador del juego
+            $staffUsers = $db->table('users')
+                ->select('id')
+                ->whereIn('group', [1, 3])
+                ->where('status', 1)
+                ->where('deleted', 0)
+                ->get()
+                ->getResultArray();
+            $staffIds = [];
+            foreach ($staffUsers as $su) {
+                $staffIds[(int) $su['id']] = true;
+            }
+            if ($gameCreatorId > 0) {
+                $staffIds[$gameCreatorId] = true;
             }
 
-            // Inserción en lote súper eficiente en un solo query
+            foreach (array_keys($staffIds) as $staffId) {
+                if ($staffId > 0 && $staffId !== $winnerUserId && !isset($alreadyNotified[$staffId])) {
+                    $batchInsert[] = [
+                        'user'       => $staffId,
+                        'from'       => 1,
+                        'type'       => 'sing',
+                        'type_id'    => $singId,
+                        'game'       => $gameId,
+                        'carton'     => $cartonId,
+                        'modality'   => $modalityId,
+                        'title'      => '🎉 ¡BINGO CANTADO EN JUEGO #' . $gameId . '!',
+                        'message'    => 'El jugador ' . $userName . ' cantó ' . $modalityName . ' con el cartón #' . $cartonId . '.',
+                        'status'     => 0,
+                        'created_at' => $now,
+                    ];
+                    $alreadyNotified[$staffId] = true;
+                }
+            }
+
+            // Inserción en base de datos
             if (!empty($batchInsert)) {
                 $modelNotifications->insertBatch($batchInsert);
+
+                // EMISIÓN WEBSOCKET INMEDIATA por canal personal de cada usuario (<15ms)
+                foreach ($batchInsert as $item) {
+                    $targetUserId = (int) ($item['user'] ?? 0);
+                    if ($targetUserId > 0) {
+                        bingo_broadcast_user_notification($targetUserId, [
+                            'title'      => $item['title'],
+                            'message'    => $item['message'],
+                            'type'       => 'sing',
+                            'game'       => $gameId,
+                            'modality'   => $modalityId,
+                            'carton'     => $cartonId,
+                            'created_at' => $now,
+                        ]);
+                    }
+                }
+            }
+
+            // EMISIÓN WEBSOCKET AL CANAL GENERAL DE LA PARTIDA (private-game-{gameId})
+            // pusher-client.js se suscribe a este canal y escucha 'game:notification'
+            try {
+                $client = bingo_get_broadcast_client();
+                $gameChannel = 'private-game-' . $gameId;
+                $gamePayload = [
+                    'type'         => 'sing',
+                    'title'        => '🎉 ¡BINGO CANTADO!',
+                    'message'      => 'El jugador ' . $userName . ' ha cantado Bingo en ' . $modalityName . ' (Cartón #' . $cartonId . ').',
+                    'game'         => $gameId,
+                    'gameId'       => $gameId,
+                    'modality'     => $modalityName,
+                    'modalityId'   => $modalityId,
+                    'carton'       => $cartonId,
+                    'cartonId'     => $cartonId,
+                    'userName'     => $userName,
+                    'player'       => $userName,
+                    'winnerUserId' => $winnerUserId,
+                    'created_at'   => $now,
+                ];
+                $client->trigger($gameChannel, 'game:notification', $gamePayload);
+                $client->trigger($gameChannel, 'notification:new', $gamePayload);
+            } catch (\Throwable $be) {
+                log_message('error', 'Error broadcasting game:notification to room: ' . $be->getMessage());
             }
         } catch (\Throwable $te) {
             log_message('error', 'Error in bingo_notify_sing_to_all_players: ' . $te->getMessage());

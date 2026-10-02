@@ -2120,19 +2120,14 @@ class Playings extends Controller
                 continue;
             }
 
-            // El ganador ya vio su BINGO al cantar; solo marcarlo como notificado
-            if ((int) $sing['user'] === $currentUser) {
-                $notified[] = $currentUser;
-                $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
-                continue;
-            }
+            // Notificar tanto al ganador como a los rivales
+            $isOwn = ((int) $sing['user'] === $currentUser);
+            $notified[] = $currentUser;
+            $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
 
             $singUser = $modelUsers->find($sing['user']);
             $modality = $modelModalities->find($sing['modality']);
             $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
-
-            $notified[] = $currentUser;
-            $modelSings->update($sing['id'], ['notified' => json_encode(array_values($notified))]);
 
             $game = $modelGames->find($game['id']);
             $gameCompleted = (int) ($game['status'] ?? 0) === 0;
@@ -2146,14 +2141,14 @@ class Playings extends Controller
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $this->getWinnersForGame((int) $game['id'], true),
                 'autodial' => (int) ($user['autodial'] ?? 0),
-                'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
+                'message' => $isOwn ? translate('Congratulations! You have called Bingo!') : translate('a bingo has been called, pausing the game for 10 seconds'),
                 'iscron' => $lastNumber['isCRON'],
                 'number' => $lastNumber['number'],
                 'player' => $userName,
                 'modality' => $modalityName,
                 'modalityId' => (int) ($modality['id'] ?? $sing['modality']),
                 'image' => $imagePath,
-                'isOwnBingo' => false,
+                'isOwnBingo' => $isOwn,
                 'winnerUserId' => (int) $sing['user'],
                 'gameHasWinner' => true,
                 'gameCompleted' => $gameCompleted,
@@ -2529,6 +2524,45 @@ class Playings extends Controller
             }
 
             $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+
+            // Notificar a todos los jugadores en tiempo real (WebSocket + Notificaciones BD)
+            foreach ($registeredSings as $item) {
+                $singRow = $item['sing'];
+                $modalitySing = $item['modality'];
+                $singId = (int) ($singRow['id'] ?? 0);
+                if ($singId < 1) {
+                    continue;
+                }
+
+                $modName = translate($modalitySing['name'] ?? '');
+                $playerName = trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? ''));
+
+                bingo_broadcast_sing_accepted((int) $game['id'], [
+                    'singId'        => $singId,
+                    'userId'        => $currentUserId,
+                    'winnerUserId'  => $currentUserId,
+                    'playerId'      => (string) $currentUserId,
+                    'player'        => $playerName,
+                    'playerName'    => $playerName,
+                    'modality'      => $modName,
+                    'modalityId'    => (int) $singRow['modality'],
+                    'modalityName'  => $modName,
+                    'cartonId'      => (int) $singRow['carton'],
+                    'lastNumber'    => (int) ($lastBall['number'] ?? 0),
+                    'image'         => $imagePath,
+                    'isOwnBingo'    => false,
+                    'gameCompleted' => $gameCompleted,
+                ]);
+
+                bingo_notify_sing_to_all_players((int) $game['id'], [
+                    'singId'     => $singId,
+                    'userId'     => $currentUserId,
+                    'userName'   => $playerName,
+                    'modalityId' => (int) $singRow['modality'],
+                    'modality'   => $modName,
+                    'cartonId'   => (int) $singRow['carton'],
+                ]);
+            }
 
             if ($singsPayload === []) {
                 return $this->response->setJSON([

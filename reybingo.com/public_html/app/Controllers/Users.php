@@ -3529,16 +3529,12 @@ class Users extends Controller {
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
         if ($isOperatorOrStore) {
-            // Operadores y Puntos de venta no deben recibir notificaciones de nuevas partidas
+            // Operadores y Puntos de venta no deben recibir notificaciones de nuevas partidas (type='game')
+            // Pero SÍ deben recibir notificaciones de bingo cantado (type='sing'), premios (type='payment') y del sistema.
             $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
-                ->groupStart()
-                    ->where('type', 'game')
-                    ->orWhere('game >', 0)
-                    ->orLike('title', 'PARTIDA')
-                    ->orLike('message', 'PARTIDA')
-                ->groupEnd()
+                ->where('type', 'game')
                 ->set(['status' => 1])
                 ->update();
 
@@ -3549,12 +3545,6 @@ class Users extends Controller {
                     ->where('type !=', 'game')
                     ->orWhere('type IS NULL', null, false)
                 ->groupEnd()
-                ->groupStart()
-                    ->where('game', 0)
-                    ->orWhere('game IS NULL', null, false)
-                ->groupEnd()
-                ->notLike('title', 'PARTIDA')
-                ->notLike('message', 'PARTIDA')
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
         } else {

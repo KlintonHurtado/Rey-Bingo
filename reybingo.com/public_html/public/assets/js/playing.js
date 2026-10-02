@@ -83,7 +83,10 @@ try {
 } catch (e) { /* ignore */ }
 
 let numbersgenerated = [];
-let lastNumbers = fiveNumbers || [];
+let lastNumbers = (typeof fiveNumbers !== 'undefined' && Array.isArray(fiveNumbers)) ? fiveNumbers : (Array.isArray(window.fiveNumbers) ? window.fiveNumbers : []);
+var narrationPlaying = (typeof window.narrationPlaying !== 'undefined') ? window.narrationPlaying : (typeof narrationPlaying !== 'undefined' ? narrationPlaying : true);
+var soundPlaying = (typeof window.soundPlaying !== 'undefined') ? window.soundPlaying : (typeof soundPlaying !== 'undefined' ? soundPlaying : true);
+var audioPath = (typeof window.audioPath !== 'undefined' && window.audioPath) ? window.audioPath : (typeof audioPath !== 'undefined' && audioPath ? audioPath : '/assets/sounds/');
 let narrationAudio;
 let soundWinner;
 let isGameFinishedShown = false;
@@ -185,6 +188,20 @@ class AudioManager {
         this.audioCache = new Map();
         this.preloadedAudios = new Set();
         this.audioPool = [];
+        this._unlocked = false;
+    }
+
+    unlockAudio() {
+        if (this._unlocked) return;
+        try {
+            const silent = new Audio();
+            silent.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuJ0fPTgjMGHm7A7+OZURE';
+            silent.volume = 0.01;
+            const p = silent.play();
+            if (p && typeof p.then === 'function') {
+                p.then(() => { this._unlocked = true; }).catch(() => {});
+            }
+        } catch (e) {}
     }
 
     preload(src) {
@@ -238,19 +255,36 @@ class AudioManager {
         return audioClone;
     }
 
+    stopAll() {
+        try {
+            this.audioCache.forEach(audio => {
+                if (audio && !audio.paused) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
+            });
+            window.pendingBallAudioSrc = null;
+        } catch (e) {}
+    }
+
     preloadNumberAudios() {
+        const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
         // Precargar audios de números 1-75
         for (let i = 1; i <= 75; i++) {
-            this.preload(audioPath + i + '.mp3');
+            this.preload(basePath + i + '.mp3');
         }
-        this.preload(audioPath + 'winner.mp3');
+        this.preload(basePath + 'winner.mp3');
     }
 }
 
 // Desbloqueo proactivo de audio en el primer clic o toque en cualquier parte de la pantalla
 window.pendingBallAudioSrc = null;
 function unlockUserAudioGesture() {
-    if (window.pendingBallAudioSrc && typeof narrationPlaying !== 'undefined' && narrationPlaying) {
+    if (typeof audioManager !== 'undefined' && audioManager.unlockAudio) {
+        audioManager.unlockAudio();
+    }
+    const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
+    if (window.pendingBallAudioSrc && isNarrationOn) {
         const pendingSrc = window.pendingBallAudioSrc;
         window.pendingBallAudioSrc = null;
         if (typeof audioManager !== 'undefined' && audioManager.play) {
@@ -1387,6 +1421,10 @@ let ballPlaybackQueue = [];
 let isBallPlaybackActive = false;
 
 function enqueueBallsForPlayback(balls) {
+    if (window.gameIsFinished || isGameFinishedShown) {
+        ballPlaybackQueue = [];
+        return;
+    }
     if (!Array.isArray(balls) || !balls.length) return;
 
     balls.forEach(function (b) {
@@ -1400,6 +1438,12 @@ function enqueueBallsForPlayback(balls) {
 }
 
 function playNextBallInQueue() {
+    if (window.gameIsFinished || isGameFinishedShown) {
+        ballPlaybackQueue = [];
+        isBallPlaybackActive = false;
+        return;
+    }
+
     if (isBallPlaybackActive || !ballPlaybackQueue.length || bingoInProgress) {
         return;
     }
@@ -1422,8 +1466,10 @@ function playNextBallInQueue() {
     }
 
     // 2. Cantar el audio de la balota inmediatamente si la narración está activa
-    if (typeof narrationPlaying !== 'undefined' && narrationPlaying) {
-        audioManager.play(audioPath + currentNumber + '.mp3');
+    const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
+    if (isNarrationOn && !window.gameIsFinished && !isGameFinishedShown) {
+        const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
+        audioManager.play(basePath + currentNumber + '.mp3');
     }
 
     // 3. Sincronizar el marcado del cartón y tablero con la voz de la balota (delay suave de 250ms)
@@ -1446,6 +1492,10 @@ function playNextBallInQueue() {
     const waitMs = ballPlaybackQueue.length > 0 ? 2400 : 600;
     setTimeout(function () {
         isBallPlaybackActive = false;
+        if (window.gameIsFinished || isGameFinishedShown) {
+            ballPlaybackQueue = [];
+            return;
+        }
         if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
             playNextBallInQueue();
         }
@@ -1518,8 +1568,9 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     flushPendingMark();
     clearBallRevealTimers(false);
 
-    // Si es la primera carga inicial o reconexión masiva (> 3 bolas perdidas) o animate es false:
-    if (previous.length === 0 || missing.length > 3 || opts.animate === false) {
+    // Si animate es false, o si es reconexión masiva (> 3 bolas perdidas) o si es carga tardía en partida avanzada:
+    const isLateMassiveJoin = previous.length === 0 && ordered.length > 3;
+    if (isLateMassiveJoin || missing.length > 3 || opts.animate === false) {
         reconcileBallDisplay(ordered);
         if (isAutoMarkEnabled()) {
             syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
@@ -1527,7 +1578,7 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         return;
     }
 
-    // Partida en vivo: si hay bolas nuevas, reproducirlas secuencialmente en cola
+    // Partida en vivo o inicio de partida: si hay bolas nuevas, reproducirlas secuencialmente en cola
     if (missing.length > 0 && !bingoInProgress) {
         enqueueBallsForPlayback(missing);
     }
@@ -1776,7 +1827,7 @@ function showOtherPlayerBingoNotice(data, callback) {
         data.isOwnBingo = false;
     }
     showCountdown(data, function () {
-        if (data.gameCompleted === true) {
+        if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
             setTimeout(showGameFinalized, 400);
             return;
         }
@@ -1821,6 +1872,39 @@ function processNumberGetResponse(data) {
         return;
     }
 
+    // Partida finalizada: detener inmediatamente intervalos, vaciar cola de balotas y detener audio
+    if (window.gameIsFinished || isGameFinishedShown || data.status === 'completed' || data.gameCompleted === true) {
+        window.gameIsFinished = true;
+        window.allowGameUnload = true;
+        ballPlaybackQueue = [];
+        isBallPlaybackActive = false;
+        intervalManager.clear('lastNumber');
+
+        if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+            audioManager.stopAll();
+        }
+
+        applyNumberGetMeta(data);
+        applyAutoMarkPreferenceFromServer(data.autodial);
+
+        if (Array.isArray(data.winners)) {
+            mergeWinnersFromServer(data.winners);
+        }
+
+        if (data.player && data.modality) {
+            registerWinner(data.player, data.modality);
+        }
+
+        // Sincronizar números en el tablero de forma estática sin animar ni cantar balota
+        if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
+            syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: false });
+        }
+
+        window.gameHasWinner = true;
+        showGameFinalized();
+        return;
+    }
+
     // Partida aún no inicia: mantener contador, no marcar como iniciada
     if (data.status === 'waiting') {
         if (data.postponed && data.new_time && typeof handleGamePostponed === 'function') {
@@ -1841,8 +1925,10 @@ function processNumberGetResponse(data) {
     if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
         const prevLen = numbersgenerated.length;
         const nextLen = uniqueOrderedBalls(data.drawnNumbers).length;
-        // Animar siempre que haya entre 1 y 3 bolas nuevas (para que ninguna quede sin cantar)
-        const animateBalls = !bingoInProgress && prevLen > 0 && nextLen > prevLen && (nextLen - prevLen) <= 3;
+        // Animar siempre que haya entre 1 y 3 bolas nuevas, incluyendo el inicio de la partida (prevLen === 0)
+        const isGameStart = prevLen === 0 && nextLen <= 3;
+        const isLiveFlow = prevLen > 0 && nextLen > prevLen && (nextLen - prevLen) <= 3;
+        const animateBalls = !bingoInProgress && (isGameStart || isLiveFlow);
         syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: animateBalls });
     } else if (data.number) {
         handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
@@ -1866,7 +1952,7 @@ function processNumberGetResponse(data) {
                         isOwnBingo: true,
                         winnerUserId: data.winnerUserId
                     }, function () {
-                        if (data.gameCompleted) {
+                        if (data.gameCompleted || window.gameIsFinished || isGameFinishedShown) {
                             showGameFinalized();
                             return;
                         }
@@ -1877,17 +1963,6 @@ function processNumberGetResponse(data) {
                 showOtherPlayerBingoNotice(data);
             }
         }
-    } else if (data.status === 'completed') {
-        if (Array.isArray(data.winners)) {
-            mergeWinnersFromServer(data.winners);
-        }
-
-        if (data.player && data.modality) {
-            registerWinner(data.player, data.modality);
-        }
-
-        window.gameHasWinner = true;
-        setTimeout(showGameFinalized, typeof timeBallGet !== 'undefined' ? timeBallGet : 1000);
     }
 }
 
@@ -1936,6 +2011,9 @@ function getEffectiveBallIntervalMs() {
 
 function startAutomaticLast() {
     intervalManager.clear('lastNumber');
+    if (window.gameIsFinished || isGameFinishedShown) {
+        return;
+    }
     if (typeof timeBallLast === 'undefined' && typeof window.timeBallGet === 'undefined') {
         return;
     }
@@ -1992,20 +2070,24 @@ function stopAutomaticLast() {
 }
 
 function showGameFinalized() {
+    window.gameIsFinished = true;
+    window.allowGameUnload = true;
+    ballPlaybackQueue = [];
+    isBallPlaybackActive = false;
+    intervalManager.clear('lastNumber');
+
+    if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+        audioManager.stopAll();
+    }
+
     if (isGameFinishedShown) {
         return;
     }
 
+    isGameFinishedShown = true;
+    bingoInProgress = false;
+
     fetchWinnersBeforeFinalize(function () {
-        if (isGameFinishedShown) {
-            return;
-        }
-
-        isGameFinishedShown = true;
-        window.gameIsFinished = true;
-        window.allowGameUnload = true;
-        bingoInProgress = false;
-
         const countdownContainer = $id('countdown-container');
         if (countdownContainer) {
             countdownContainer.style.display = 'none';
@@ -2336,9 +2418,10 @@ function RemoveVolume() {
 
 function RemoveMicrophone() {
     if (typeof narrationPlaying === 'undefined') {
-        window.narrationPlaying = true;
+        narrationPlaying = true;
     }
     narrationPlaying = !narrationPlaying;
+    window.narrationPlaying = narrationPlaying;
     updateMicrophoneButtonIcon(narrationPlaying);
 
     $.ajax({
@@ -3081,13 +3164,18 @@ function initializeApp() {
     }
 
     if (Array.isArray(window.drawnNumbers) && window.drawnNumbers.length) {
-        numbersgenerated = window.drawnNumbers
+        const initialDrawn = window.drawnNumbers
             .map(parseBallNumber)
             .filter(Boolean);
-        lastNumbers = numbersgenerated.slice(-5);
-        reconcileBallDisplay(numbersgenerated);
-        markGameAsStartedFromServer(numbersgenerated.length);
-        updateBallsCounter(numbersgenerated.length);
+        if (initialDrawn.length === 1 && !bingoInProgress) {
+            syncDrawnNumbersFromServer(initialDrawn, window.totalNumbersGenerated || 1, { animate: true });
+        } else {
+            numbersgenerated = initialDrawn.slice();
+            lastNumbers = numbersgenerated.slice(-5);
+            reconcileBallDisplay(numbersgenerated);
+            markGameAsStartedFromServer(numbersgenerated.length);
+            updateBallsCounter(numbersgenerated.length);
+        }
     } else if (Array.isArray(window.fiveNumbers) && window.fiveNumbers.length) {
         lastNumbers = window.fiveNumbers
             .map(parseBallNumber)
@@ -3233,7 +3321,7 @@ function initializeApp() {
                                 isOwnBingo: true,
                                 winnerUserId: data.winnerUserId
                             }, function () {
-                                if (data.gameCompleted || data.stopped) {
+                                if (data.gameCompleted || data.stopped || window.gameIsFinished || isGameFinishedShown) {
                                     showGameFinalized();
                                     return;
                                 }
@@ -3263,16 +3351,26 @@ function initializeApp() {
             // Fin de partida en tiempo real
             pusherHelper.on('game:game_finished', function (data) {
                 console.log('WS game:game_finished received', data);
-                if (!isGameFinishedShown) {
-                    showGameFinalized();
+                window.gameIsFinished = true;
+                ballPlaybackQueue = [];
+                isBallPlaybackActive = false;
+                intervalManager.clear('lastNumber');
+                if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+                    audioManager.stopAll();
                 }
+                showGameFinalized();
             });
 
             pusherHelper.on('game:completed', function (data) {
                 console.log('WS game:completed received', data);
-                if (!isGameFinishedShown) {
-                    showGameFinalized();
+                window.gameIsFinished = true;
+                ballPlaybackQueue = [];
+                isBallPlaybackActive = false;
+                intervalManager.clear('lastNumber');
+                if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+                    audioManager.stopAll();
                 }
+                showGameFinalized();
             });
 
             // Reinicio de partida
