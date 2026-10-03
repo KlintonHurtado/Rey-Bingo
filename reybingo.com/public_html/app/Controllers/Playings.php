@@ -2507,21 +2507,7 @@ class Playings extends Controller
             }
 
             // Pagar a TODOS los ganadores oficiales de esas modalidades (reparto correcto)
-            if ($modalityIds !== []) {
-                $pendingToPay = bingo_filter_first_sing_per_modality(
-                    $modelSings
-                        ->where('game', $game['id'])
-                        ->whereIn('modality', $modalityIds)
-                        ->where('status', 1)
-                        ->orderBy('created_at', 'ASC')
-                        ->orderBy('id', 'ASC')
-                        ->findAll()
-                );
-
-                foreach ($pendingToPay as $singToPay) {
-                    bingo_pay_sing_award((int) $singToPay['id'], $currentUserId);
-                }
-            }
+            // Los premios se liquidan al finalizar la partida vía bingo_finalize_game_when_complete / bingo_on_game_finished
 
             $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
 
@@ -2621,9 +2607,7 @@ class Playings extends Controller
                     ]);
                 }
 
-                if ($ownStatus !== 2) {
-                    bingo_pay_sing_award((int) $ownSing['id'], $currentUserId);
-                }
+                // El pago se liquida al finalizar la partida oficialmente
 
                 return $this->response->setJSON([
                     'status' => 'success',

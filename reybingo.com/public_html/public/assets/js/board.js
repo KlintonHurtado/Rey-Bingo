@@ -184,11 +184,12 @@ class MessagePool {
     }
 }
 
-// Gestor inteligente de audio
+// Gestor inteligente de audio optimizado
 class AudioManager {
     constructor() {
         this.audioCache = new Map();
         this.preloadedAudios = new Set();
+        this.voiceAudio = null;
         this.audioPool = [];
     }
     
@@ -201,8 +202,31 @@ class AudioManager {
         this.audioCache.set(src, audio);
         this.preloadedAudios.add(src);
     }
+
+    playVoice(src) {
+        try {
+            if (!this.voiceAudio) {
+                this.voiceAudio = new Audio();
+                this.voiceAudio.preload = 'auto';
+            }
+            this.voiceAudio.src = src;
+            this.voiceAudio.currentTime = 0;
+            this.voiceAudio.volume = 1.0;
+            const p = this.voiceAudio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(e => console.warn('Voice play failed:', e));
+            }
+            return this.voiceAudio;
+        } catch (e) {
+            console.warn('Voice play failed:', e);
+        }
+    }
     
     play(src) {
+        if (/\/\d+\.mp3/i.test(src)) {
+            return this.playVoice(src);
+        }
+
         let audio = this.audioCache.get(src);
         if (!audio) {
             audio = new Audio();
@@ -210,18 +234,23 @@ class AudioManager {
             this.audioCache.set(src, audio);
         }
         
-        // Clone para permitir m├║ltiples reproducciones simult├íneas
+        if (audio.paused || audio.ended) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.warn('Audio play failed:', e));
+            return audio;
+        }
+
         const audioClone = audio.cloneNode();
         audioClone.play().catch(e => console.warn('Audio play failed:', e));
-        
+        audioClone.onended = function () {
+            audioClone.src = '';
+            audioClone.onended = null;
+        };
         return audioClone;
     }
     
     preloadNumberAudios() {
-        // Precargar audios de n├║meros 1-75
-        for (let i = 1; i <= 75; i++) {
-            this.preload(audioPath + i + '.mp3');
-        }
+        // Precargar solo el audio de ganador para no congestionar conexiones de red
         this.preload(audioPath + 'winner.mp3');
     }
 }

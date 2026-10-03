@@ -500,8 +500,7 @@ if (!function_exists('bingo_register_sing_if_missing')) {
             try {
                 $singId = $modelSings->insertID();
 
-                // Pagar los premios AUTOMÁTICAMENTE de inmediato al momento que gana (no al finalizar)
-                bingo_pay_pending_awards_for_game($gameId);
+                // Los premios se liquidan al finalizar la partida vía bingo_finalize_game_when_complete -> bingo_on_game_finished
 
                 // Comprobar y finalizar si con este cante se completaron los premios
                 $gameCompleted = bingo_finalize_game_when_complete($gameId);

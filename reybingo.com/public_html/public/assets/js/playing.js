@@ -182,12 +182,13 @@ class MessagePool {
     }
 }
 
-// Gestor inteligente de audio
+// Gestor inteligente de audio optimizado para móviles
 class AudioManager {
     constructor() {
         this.audioCache = new Map();
         this.preloadedAudios = new Set();
-        this.audioPool = [];
+        this.voiceAudio = null;
+        this.effectAudio = null;
         this._unlocked = false;
     }
 
@@ -214,7 +215,53 @@ class AudioManager {
         this.preloadedAudios.add(src);
     }
 
+    playVoice(src) {
+        try {
+            if (!this.voiceAudio) {
+                this.voiceAudio = new Audio();
+                this.voiceAudio.preload = 'auto';
+            }
+            this.voiceAudio.src = src;
+            this.voiceAudio.currentTime = 0;
+            this.voiceAudio.volume = 1.0;
+            const p = this.voiceAudio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(e => {
+                    if (e.name === 'NotAllowedError') {
+                        window.pendingBallAudioSrc = src;
+                    }
+                });
+            }
+            return this.voiceAudio;
+        } catch (e) {
+            console.warn('Voice play failed:', e);
+        }
+    }
+
+    playSoft(src) {
+        try {
+            if (!this.effectAudio) {
+                this.effectAudio = new Audio();
+            }
+            this.effectAudio.src = src;
+            this.effectAudio.currentTime = 0;
+            this.effectAudio.volume = 0.35; // Volumen suave
+            const p = this.effectAudio.play();
+            if (p && typeof p.catch === 'function') {
+                p.catch(() => {});
+            }
+            return this.effectAudio;
+        } catch (e) {
+            console.warn('Soft audio play failed:', e);
+        }
+    }
+
     play(src) {
+        // Para balotas cantadas (/assets/sounds/XX.mp3), usar reproductor de voz dedicado
+        if (/\/\d+\.mp3/i.test(src)) {
+            return this.playVoice(src);
+        }
+
         let audio = this.audioCache.get(src);
         if (!audio) {
             audio = new Audio();
@@ -223,11 +270,9 @@ class AudioManager {
             this.audioCache.set(src, audio);
         }
 
-        // Si ya terminó o está pausado, reutilizar directamente la instancia
         if (audio.paused || audio.ended) {
             audio.currentTime = 0;
             audio.play().catch(e => {
-                console.warn('Audio play failed:', e);
                 if (e.name === 'NotAllowedError') {
                     window.pendingBallAudioSrc = src;
                 }
@@ -235,14 +280,8 @@ class AudioManager {
             return audio;
         }
 
-        // Clone ligero con limpieza de memoria automática al terminar
         const audioClone = audio.cloneNode();
-        audioClone.play().catch(e => {
-            console.warn('Audio play failed:', e);
-            if (e.name === 'NotAllowedError') {
-                window.pendingBallAudioSrc = src;
-            }
-        });
+        audioClone.play().catch(() => {});
         audioClone.onended = function () {
             audioClone.src = '';
             audioClone.onended = null;
@@ -257,6 +296,14 @@ class AudioManager {
 
     stopAll() {
         try {
+            if (this.voiceAudio && !this.voiceAudio.paused) {
+                this.voiceAudio.pause();
+                this.voiceAudio.currentTime = 0;
+            }
+            if (this.effectAudio && !this.effectAudio.paused) {
+                this.effectAudio.pause();
+                this.effectAudio.currentTime = 0;
+            }
             this.audioCache.forEach(audio => {
                 if (audio && !audio.paused) {
                     audio.pause();
@@ -269,11 +316,9 @@ class AudioManager {
 
     preloadNumberAudios() {
         const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
-        // Precargar audios de números 1-75
-        for (let i = 1; i <= 75; i++) {
-            this.preload(basePath + i + '.mp3');
-        }
+        // Precargar solo los 2 efectos de sonido principales para no ahogar la conexión en teléfonos
         this.preload(basePath + 'winner.mp3');
+        this.preload(basePath + 'success.mp3');
     }
 }
 
@@ -940,6 +985,38 @@ function handleBingoSuccess(data, resumeCallback) {
     bingoInProgress = true;
     intervalManager.clear('lastNumber');
 
+    // 1. Reproducir sonido de ganador a todo volumen para el jugador ganador
+    try {
+        if (typeof audioManager !== 'undefined' && audioManager.play) {
+            audioManager.play(audioPath + 'winner.mp3');
+        } else if (typeof playNotificationSound === 'function') {
+            playNotificationSound('sing', true);
+        }
+    } catch (e) {
+        console.warn('Error al reproducir audio de ganador:', e);
+    }
+
+    // 2. Efecto de confeti para el ganador
+    if (typeof window.AppcreateConfetti === 'function') {
+        window.AppcreateConfetti();
+    }
+
+    // 3. Notificación toast visual de victoria propia agrupada por modalidad
+    if (typeof window.showNotification === 'function') {
+        const cartonText = data.carton ? ` (Cartón #${data.carton})` : '';
+        window.showNotification({
+            id: 'own_sing_' + (data.singId || (data.carton || '') + '_' + (data.modalityId || Date.now())),
+            type: 'own_sing',
+            modalityId: data.modalityId,
+            modality: data.modality,
+            player: data.player || 'Tú',
+            cartonId: data.carton,
+            title: '🎉 ¡HAS CANTADO BINGO!',
+            message: `¡Felicidades! Has cantado <strong>${data.modality || 'Bingo'}</strong>${cartonText}.`,
+            created_at: new Date().toISOString()
+        });
+    }
+
     if (typeof sendEmoji === 'function') {
         sendEmoji('🥳', 21);
     }
@@ -974,6 +1051,11 @@ function handleBingoSuccess(data, resumeCallback) {
             resumeCallback();
         } else {
             startAutomaticLast();
+        }
+
+        // Si quedaron balotas en cola durante el cante, reanudar de inmediato
+        if (ballPlaybackQueue.length > 0 && !isBallPlaybackActive) {
+            playNextBallInQueue();
         }
     };
 
@@ -1137,10 +1219,10 @@ function pollMessagesOptimized() {
     });
 }
 
-// Ejecutar auto-sing periódicamente (sin spamear)
+// Ejecutar auto-sing periódicamente (sin spamear la CPU en móviles)
 setInterval(() => {
     try { autoSingIfComplete(); } catch (e) { }
-}, 1500);
+}, 4000);
 
 // ==========================================
 // FUNCIONES PRINCIPALES (mantenidas del código original)
@@ -1472,24 +1554,33 @@ function playNextBallInQueue() {
         audioManager.play(basePath + currentNumber + '.mp3');
     }
 
-    // 3. Sincronizar el marcado del cartón y tablero con la voz de la balota (delay suave de 250ms)
-    setTimeout(function () {
-        applyMarksForNumber(currentNumber);
+    // 3. Marcado INMEDIATO (0ms) en cartón y tablero al salir la balota
+    applyMarksForNumber(currentNumber);
 
-        // Actualizar el carrusel de últimas 5 balotas ordenadas hasta esta balota
-        if (Array.isArray(window.drawnNumbers)) {
-            const idx = window.drawnNumbers.indexOf(currentNumber);
-            if (idx !== -1) {
-                lastNumbers = window.drawnNumbers.slice(0, idx + 1).slice(-5);
-                renderBallHistory();
+    // Actualizar el carrusel de últimas 5 balotas ordenadas hasta esta balota
+    if (Array.isArray(window.drawnNumbers)) {
+        const idx = window.drawnNumbers.indexOf(currentNumber);
+        if (idx !== -1) {
+            lastNumbers = window.drawnNumbers.slice(0, idx + 1).slice(-5);
+            renderBallHistory();
+        }
+    }
+
+    // 4. Watchdog de seguridad (3.2s) para garantizar que la locución NUNCA quede congelada
+    if (window.__ballPlaybackWatchdog) {
+        clearTimeout(window.__ballPlaybackWatchdog);
+    }
+    window.__ballPlaybackWatchdog = setTimeout(function () {
+        if (isBallPlaybackActive) {
+            isBallPlaybackActive = false;
+            if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
+                playNextBallInQueue();
             }
         }
-    }, 250);
+    }, 3200);
 
-    // 4. Si hay más balotas esperando en la cola (por ejemplo, llegaron 2 balotas juntas por latencia),
-    // esperar 2400ms (duración completa de la locución) antes de cantar la siguiente.
-    // Si no hay más en cola, liberar el candado en 600ms.
-    const waitMs = ballPlaybackQueue.length > 0 ? 2400 : 600;
+    // 5. Cadencia entre balotas: 1800ms si hay balotas acumuladas en cola, o 400ms si no hay más
+    const waitMs = ballPlaybackQueue.length > 0 ? 1800 : 400;
     setTimeout(function () {
         isBallPlaybackActive = false;
         if (window.gameIsFinished || isGameFinishedShown) {
@@ -1578,8 +1669,13 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         return;
     }
 
-    // Partida en vivo o inicio de partida: si hay bolas nuevas, reproducirlas secuencialmente en cola
+    // Partida en vivo o inicio de partida: si hay bolas nuevas, marcar inmediatamente en 0ms y reproducir en cola
     if (missing.length > 0 && !bingoInProgress) {
+        if (isAutoMarkEnabled()) {
+            missing.forEach(function (num) {
+                applyMarksForNumber(num);
+            });
+        }
         enqueueBallsForPlayback(missing);
     }
 }
@@ -1740,6 +1836,9 @@ function showCountdown(data, callback) {
         } else {
             bingoInProgress = false;
             if (callback) callback();
+            if (ballPlaybackQueue.length > 0 && !isBallPlaybackActive) {
+                playNextBallInQueue();
+            }
         }
     }, 1200);
 }
@@ -1795,24 +1894,28 @@ function showOtherPlayerBingoNotice(data, callback) {
         });
     }
 
-    // 1. Reproducir sonido de victoria inmediatamente
+    // 1. Reproducir sonido suave para ganador ajeno (NO el sonido estruendoso de ganador)
     try {
-        if (typeof audioManager !== 'undefined' && audioManager.play) {
-            audioManager.play(audioPath + 'winner.mp3');
-        } else if (typeof playNotificationSound === 'function') {
-            playNotificationSound('sing');
+        if (typeof playNotificationSound === 'function') {
+            playNotificationSound('soft', false);
+        } else if (typeof audioManager !== 'undefined' && audioManager.playSoft) {
+            audioManager.playSoft(audioPath + 'success.mp3');
         }
     } catch (e) {
-        console.warn('Error al reproducir audio de ganador:', e);
+        console.warn('Error al reproducir audio suave de notificación:', e);
     }
 
-    // 2. Disparar notificación toast visual del sistema con ID único para no duplicar
+    // 2. Disparar notificación toast visual del sistema unificada por modalidad
     if (typeof window.showNotification === 'function') {
         const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
         window.showNotification({
             id: noticeKey,
             type: 'sing',
-            title: '🎉 ¡BINGO CANTADO!',
+            modalityId: data.modalityId,
+            modality: data.modality,
+            player: data.player,
+            cartonId: data.cartonId,
+            title: '🎉 ¡BINGO! — ' + (data.modality || 'Línea'),
             message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
             created_at: new Date().toISOString()
         });
@@ -2020,6 +2123,10 @@ function startAutomaticLast() {
 
     bingoInProgress = false;
     flushPendingMark();
+
+    if (ballPlaybackQueue.length > 0 && !isBallPlaybackActive) {
+        playNextBallInQueue();
+    }
 
     // Primer sync inmediato (para cargar estado al entrar o tras celebrar)
     lastNumberGet();

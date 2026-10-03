@@ -1768,15 +1768,7 @@ class Cron extends Controller
             // Confirmar los nuevos cantes a status 1
             $modelSings->where('game', $gameId)->where('status', 0)->set(['status' => 1])->update();
 
-            // 3. Pagar los premios pendientes con la lógica exacta de Live:
-            // - Calcula premio exacto por cante y jugador (bingo_calculate_award_per_sing)
-            // - Acredita billetera según origen de compra (bingo_credit_award_by_purchase_source)
-            // - Maneja débito y comisión de tienda si aplica
-            // - Actualiza sing.status = 2 (PAGADO)
-            // - Registra pago en tabla payments
-            // - Envía notificación '🎉 ¡GANASTE! Premio acreditado'
-            // - Liquida GGR y comisiones de afiliados
-            bingo_pay_pending_awards_for_game((int) $gameId, (int) ($game['user'] ?? 1));
+            // 3. Los premios se liquidan de forma oficial al finalizar la partida vía bingo_finalize_game_when_complete
 
             // 4. Notificar por Pusher/Soketi a todos los clientes en tiempo real
             $lastBall = $modelBoards->where('game', $gameId)->orderBy('id', 'DESC')->first();
@@ -1816,12 +1808,6 @@ class Cron extends Controller
                     'modality'   => translate($modalitySing['name'] ?? ''),
                     'cartonId'   => (int) $sing['carton'],
                 ]);
-            }
-        } else {
-            // Verificar si quedó algún cante pendiente de pago (status 1)
-            $pendingCount = $modelSings->where('game', $gameId)->where('status', 1)->countAllResults();
-            if ($pendingCount > 0) {
-                bingo_pay_pending_awards_for_game((int) $gameId, (int) ($game['user'] ?? 1));
             }
         }
 

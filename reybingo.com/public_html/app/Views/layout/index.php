@@ -618,16 +618,18 @@ $isNoMusicRole = session()->get('logged_in') && (
             }
 
             // Función ligera y no bloqueante para reproducir audio con compatibilidad iOS/Android
-            function playNotificationSound(type) {
+            function playNotificationSound(type, isWinner = false) {
                 if (hasPlayedSound) return;
                 hasPlayedSound = true;
                 setTimeout(() => {
                     hasPlayedSound = false;
-                }, 2000);
+                }, 1500);
 
                 try {
-                    let audioSrc = type === 'sing' ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
+                    const playWinnerAudio = isWinner === true || type === 'winner' || type === 'own_sing';
+                    let audioSrc = playWinnerAudio ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
                     const audio = initializeAudio(audioSrc);
+                    audio.volume = playWinnerAudio ? 0.8 : 0.35; // Sonido suave para otros jugadores
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch((err) => {
@@ -658,20 +660,31 @@ $isNoMusicRole = session()->get('logged_in') && (
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Determinar el tipo de sonido a reproducir (priorizar 'sing')
+                        // Determinar el tipo de sonido a reproducir
                         let soundType = 'default';
-                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing');
+                        let isWinnerSound = false;
+                        const hasOwnWinNotification = limitedNotifications.some(n => 
+                            n.type === 'own_sing' || 
+                            (n.type === 'sing' && (n.title || '').toLowerCase().includes('has cantado')) ||
+                            (n.type === 'payment' && (n.title || '').toLowerCase().includes('ganaste'))
+                        );
+                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing' || n.type === 'own_sing');
                         const hasGameNotification = limitedNotifications.some(n => n.type === 'game');
                         
-                        if (hasSingNotification) {
-                            soundType = 'sing';
+                        if (hasOwnWinNotification) {
+                            soundType = 'winner';
+                            isWinnerSound = true;
+                        } else if (hasSingNotification) {
+                            soundType = 'soft'; // Suave para otros ganadores
+                            isWinnerSound = false;
                         } else if (hasGameNotification) {
                             soundType = 'game';
+                            isWinnerSound = false;
                         }
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
                         if (limitedNotifications.length > 0) {
-                            playNotificationSound(soundType);
+                            playNotificationSound(soundType, isWinnerSound);
                         }
 
                         // Procesar cada notificación
@@ -687,8 +700,8 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 addPaymentRowToModal(notification.transaction);
                             }
 
-                            // Efectos especiales solo para tipo 'sing' (máximo 1 vez por batch)
-                            if (notification.type === 'sing' && !hasPlayedConfetti) {
+                            // Efectos de confeti para cualquier bingo (ganador propio o ajeno)
+                            if ((notification.type === 'sing' || notification.type === 'own_sing') && !hasPlayedConfetti) {
                                 hasPlayedConfetti = true;
                                 if (typeof AppcreateConfetti === 'function') {
                                     AppcreateConfetti();
@@ -740,6 +753,108 @@ $isNoMusicRole = session()->get('logged_in') && (
                     return;
                 }
 
+                // UNIFICACIÓN POR MODALIDAD:
+                // Si es una notificación de bingo (sing/own_sing), agrupar por modalidad
+                const isSingType = notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality;
+                if (isSingType) {
+                    const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                    const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
+
+                    // Extraer nombre del jugador y cartón
+                    let playerName = notification.player || notification.userName || '';
+                    let cartonNumber = notification.cartonId || notification.carton || '';
+                    if (!playerName && notification.message) {
+                        const matchPlayer = notification.message.match(/El jugador\s+<strong>(.*?)<\/strong>/i) || notification.message.match(/¡Felicidades\s+(.*?)!/i);
+                        if (matchPlayer) {
+                            playerName = matchPlayer[1].replace(/<[^>]+>/g, '').trim();
+                        }
+                    }
+                    if (!cartonNumber && notification.message) {
+                        const matchCarton = notification.message.match(/Cartón\s*#?(\d+)/i);
+                        if (matchCarton) {
+                            cartonNumber = matchCarton[1];
+                        }
+                    }
+
+                    const modalityName = notification.modality || notification.modalityName || 'Bingo';
+
+                    if (existingModalityEl) {
+                        // Ya existe una notificación en pantalla para esta modalidad: AÑADIR ganador
+                        existingModalityEl._winners = existingModalityEl._winners || [];
+                        if (playerName) {
+                            const alreadyListed = existingModalityEl._winners.some(w => w.player === playerName && (!cartonNumber || w.carton === cartonNumber));
+                            if (!alreadyListed) {
+                                existingModalityEl._winners.push({ player: playerName, carton: cartonNumber });
+                            }
+                        }
+
+                        // Reconstruir mensaje agrupado
+                        const winnersFormatted = existingModalityEl._winners.length > 0
+                            ? existingModalityEl._winners.map(w => `<strong>${escapeHtml(w.player)}</strong>${w.carton ? ' (Cartón #' + w.carton + ')' : ''}`).join(', ')
+                            : (playerName ? `<strong>${escapeHtml(playerName)}</strong>` : notification.message);
+
+                        const msgContainer = existingModalityEl.querySelector('.notification-message');
+                        if (msgContainer) {
+                            msgContainer.innerHTML = `<strong>${escapeHtml(modalityName)}</strong><br>Ganador(es): ${winnersFormatted}`;
+                        }
+
+                        // Renovar temporizador de autocierre para que no desaparezca de inmediato al sumar ganadores
+                        if (existingModalityEl._autoHideTimer) {
+                            clearTimeout(existingModalityEl._autoHideTimer);
+                        }
+                        existingModalityEl._autoHideTimer = setTimeout(() => {
+                            hideNotification(existingModalityEl);
+                        }, notificationConfig.displayTime);
+
+                        // Efecto visual de actualización suave
+                        existingModalityEl.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+                        existingModalityEl.style.transform = 'scale(1.02)';
+                        setTimeout(() => {
+                            existingModalityEl.style.transform = '';
+                        }, 250);
+
+                        return;
+                    }
+
+                    // Crear primer tarjeta para esta modalidad
+                    const notificationEl = document.createElement('div');
+                    notificationEl.className = `notification notification-${notification.type || 'sing'}`;
+                    notificationEl.dataset.modalityKey = modalityKey;
+                    if (notification.id) {
+                        notificationEl.dataset.notificationId = notification.id;
+                    }
+                    notificationEl._winners = playerName ? [{ player: playerName, carton: cartonNumber }] : [];
+
+                    const initialWinners = playerName 
+                        ? `<strong>${escapeHtml(playerName)}</strong>${cartonNumber ? ' (Cartón #' + cartonNumber + ')' : ''}`
+                        : notification.message;
+
+                    notificationEl.innerHTML = `
+                        <div class="notification-header">
+                            <h6 class="notification-title">${notification.title || ('🎉 ¡BINGO! — ' + modalityName)}</h6>
+                        </div>
+                        <div class="notification-message"><strong>${escapeHtml(modalityName)}</strong><br>Ganador(es): ${initialWinners}</div>
+                        <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                        <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
+                    `;
+
+                    container.appendChild(notificationEl);
+                    setTimeout(() => {
+                        notificationEl.classList.add('show');
+                    }, 100);
+
+                    if (typeof attachNotificationSwipeDismiss === 'function') {
+                        attachNotificationSwipeDismiss(notificationEl, hideNotification);
+                    }
+
+                    notificationEl._autoHideTimer = setTimeout(() => {
+                        hideNotification(notificationEl);
+                    }, notificationConfig.displayTime);
+
+                    return;
+                }
+
+                // Notificaciones regulares (no-sing)
                 if (notification.id && container.querySelector(`[data-notification-id="${notification.id}"]`)) {
                     return;
                 }
