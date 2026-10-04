@@ -1132,6 +1132,13 @@ class Playings extends Controller
             $user['autodial'] = 1;
         }
 
+        if (!isset($user['narration']) || $user['narration'] === null || $user['narration'] === '') {
+            $user['narration'] = 1;
+        }
+        if (!isset($user['sounds']) || $user['sounds'] === null || $user['sounds'] === '') {
+            $user['sounds'] = 1;
+        }
+
         if (!empty($drawnNumbersOrdered)) {
             $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbersOrdered);
         }

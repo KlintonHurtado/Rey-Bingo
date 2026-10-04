@@ -776,26 +776,41 @@ $isNoMusicRole = session()->get('logged_in') && (
                         }
                     }
 
-                    const modalityName = notification.modality || notification.modalityName || 'Bingo';
+                    let rawModality = notification.modality || notification.modalityName || '';
+                    if (!rawModality && notification.message) {
+                        const matchMod = notification.message.match(/ha cantado Bingo en\s+([^(\n<]+)/i)
+                                      || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i)
+                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i);
+                        if (matchMod) {
+                            rawModality = matchMod[1].trim();
+                        }
+                    }
+                    const modalityName = rawModality || 'Bingo';
+                    const modalityClean = escapeHtml(String(modalityName).replace(/^la\s+/i, '').trim());
+                    let modalityLabel = `Ganadores de la ${modalityClean}`;
+                    if (/^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)) {
+                        modalityLabel = `Ganadores de la modalidad ${modalityClean}`;
+                    }
 
                     if (existingModalityEl) {
                         // Ya existe una notificación en pantalla para esta modalidad: AÑADIR ganador
                         existingModalityEl._winners = existingModalityEl._winners || [];
                         if (playerName) {
-                            const alreadyListed = existingModalityEl._winners.some(w => w.player === playerName && (!cartonNumber || w.carton === cartonNumber));
+                            const alreadyListed = existingModalityEl._winners.some(w => w.player.toLowerCase() === playerName.toLowerCase());
                             if (!alreadyListed) {
                                 existingModalityEl._winners.push({ player: playerName, carton: cartonNumber });
                             }
                         }
 
-                        // Reconstruir mensaje agrupado
+                        // Reconstruir mensaje agrupado según formato solicitado:
+                        // Ganadores de la "modalidad": "jugador" + "jugador"
                         const winnersFormatted = existingModalityEl._winners.length > 0
-                            ? existingModalityEl._winners.map(w => `<strong>${escapeHtml(w.player)}</strong>${w.carton ? ' (Cartón #' + w.carton + ')' : ''}`).join(', ')
+                            ? existingModalityEl._winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ')
                             : (playerName ? `<strong>${escapeHtml(playerName)}</strong>` : notification.message);
 
                         const msgContainer = existingModalityEl.querySelector('.notification-message');
                         if (msgContainer) {
-                            msgContainer.innerHTML = `<strong>${escapeHtml(modalityName)}</strong><br>Ganador(es): ${winnersFormatted}`;
+                            msgContainer.innerHTML = `${modalityLabel}: ${winnersFormatted}`;
                         }
 
                         // Renovar temporizador de autocierre para que no desaparezca de inmediato al sumar ganadores
@@ -826,14 +841,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                     notificationEl._winners = playerName ? [{ player: playerName, carton: cartonNumber }] : [];
 
                     const initialWinners = playerName 
-                        ? `<strong>${escapeHtml(playerName)}</strong>${cartonNumber ? ' (Cartón #' + cartonNumber + ')' : ''}`
+                        ? `<strong>${escapeHtml(playerName)}</strong>`
                         : notification.message;
 
                     notificationEl.innerHTML = `
                         <div class="notification-header">
-                            <h6 class="notification-title">${notification.title || ('🎉 ¡BINGO! — ' + modalityName)}</h6>
+                            <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
                         </div>
-                        <div class="notification-message"><strong>${escapeHtml(modalityName)}</strong><br>Ganador(es): ${initialWinners}</div>
+                        <div class="notification-message">${modalityLabel}: ${initialWinners}</div>
                         <span class="notification-hint">Desliza a la derecha para cerrar</span>
                         <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                     `;

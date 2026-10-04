@@ -182,27 +182,120 @@ class MessagePool {
     }
 }
 
-// Gestor inteligente de audio optimizado para móviles
+// Gestor inteligente de audio robusto para móviles y conexiones inestables
 class AudioManager {
     constructor() {
         this.audioCache = new Map();
         this.preloadedAudios = new Set();
-        this.voiceAudio = null;
+        // Doble canal de locución (ping-pong) para que balotas consecutivas no se aborten
+        this.voiceIndex = 0;
+        this.voiceAudios = [null, null];
         this.effectAudio = null;
+        this.audioCtx = null;
         this._unlocked = false;
+        this._promptShown = false;
+    }
+
+    initAudioContext() {
+        if (!this.audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                try {
+                    this.audioCtx = new AudioContext();
+                } catch (e) {}
+            }
+        }
+    }
+
+    resumeContext() {
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume().catch(() => {});
+        }
     }
 
     unlockAudio() {
         if (this._unlocked) return;
+        this.initAudioContext();
+        this.resumeContext();
+
         try {
-            const silent = new Audio();
-            silent.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTuJ0fPTgjMGHm7A7+OZURE';
-            silent.volume = 0.01;
-            const p = silent.play();
-            if (p && typeof p.then === 'function') {
-                p.then(() => { this._unlocked = true; }).catch(() => {});
+            // "Bendecir" los dos canales de voz con el gesto del usuario para evitar bloqueos en iOS y Android
+            for (let i = 0; i < 2; i++) {
+                if (!this.voiceAudios[i]) {
+                    this.voiceAudios[i] = new Audio();
+                    this.voiceAudios[i].preload = 'auto';
+                }
+                const p = this.voiceAudios[i].play();
+                if (p && typeof p.then === 'function') {
+                    p.then(() => {
+                        this.voiceAudios[i].pause();
+                        this.voiceAudios[i].currentTime = 0;
+                    }).catch(() => {});
+                }
             }
+
+            if (!this.effectAudio) {
+                this.effectAudio = new Audio();
+            }
+
+            this._unlocked = true;
+            this.hideAudioPrompt();
         } catch (e) {}
+    }
+
+    showAudioPrompt() {
+        if (this._unlocked || this._promptShown || document.getElementById('bingo-audio-unlock-prompt')) {
+            return;
+        }
+        this._promptShown = true;
+        const prompt = document.createElement('div');
+        prompt.id = 'bingo-audio-unlock-prompt';
+        prompt.setAttribute('style', [
+            'position: fixed',
+            'bottom: 24px',
+            'left: 50%',
+            'transform: translateX(-50%)',
+            'background: linear-gradient(135deg, #1e1b4b, #312e81)',
+            'border: 1px solid rgba(250, 204, 21, 0.7)',
+            'color: #fef08a',
+            'padding: 10px 22px',
+            'border-radius: 9999px',
+            'font-size: 0.95rem',
+            'font-weight: 700',
+            'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(250, 204, 21, 0.3)',
+            'z-index: 99999',
+            'cursor: pointer',
+            'display: flex',
+            'align-items: center',
+            'gap: 8px',
+            'backdrop-filter: blur(8px)',
+            'transition: all 0.3s ease',
+            'animation: promptBounce 1.6s infinite'
+        ].join('; '));
+
+        prompt.innerHTML = '<i class="fa-duotone fa-solid fa-volume-high"></i> <span>Toca aquí para activar el sonido</span>';
+        prompt.onclick = () => {
+            unlockUserAudioGesture();
+        };
+
+        if (!document.getElementById('bingo-audio-prompt-style')) {
+            const st = document.createElement('style');
+            st.id = 'bingo-audio-prompt-style';
+            st.textContent = '@keyframes promptBounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px); } }';
+            document.head.appendChild(st);
+        }
+
+        document.body.appendChild(prompt);
+    }
+
+    hideAudioPrompt() {
+        const el = document.getElementById('bingo-audio-unlock-prompt');
+        if (el) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(-50%) translateY(10px)';
+            setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+        }
+        this._promptShown = false;
     }
 
     preload(src) {
@@ -215,26 +308,114 @@ class AudioManager {
         this.preloadedAudios.add(src);
     }
 
-    playVoice(src) {
-        try {
-            if (!this.voiceAudio) {
-                this.voiceAudio = new Audio();
-                this.voiceAudio.preload = 'auto';
+    playVoice(src, ballNumber) {
+        const num = ballNumber || (src.match(/\/(\d+)\.mp3/i) ? src.match(/\/(\d+)\.mp3/i)[1] : null);
+
+        this.initAudioContext();
+        this.resumeContext();
+
+        // Alternar entre voiceAudios[0] y voiceAudios[1] para evitar AbortError si balotas se suceden rápido
+        this.voiceIndex = (this.voiceIndex + 1) % 2;
+        if (!this.voiceAudios[this.voiceIndex]) {
+            this.voiceAudios[this.voiceIndex] = new Audio();
+            this.voiceAudios[this.voiceIndex].preload = 'auto';
+        }
+
+        const audio = this.voiceAudios[this.voiceIndex];
+        let hasSpokenFallback = false;
+
+        const speakFallback = () => {
+            if (hasSpokenFallback) return;
+            hasSpokenFallback = true;
+            if (num) {
+                this.speakOfflineNumber(num);
             }
-            this.voiceAudio.src = src;
-            this.voiceAudio.currentTime = 0;
-            this.voiceAudio.volume = 1.0;
-            const p = this.voiceAudio.play();
+        };
+
+        // Watchdog de red: si el MP3 tarda más de 1200ms en cargar/empezar por internet lento,
+        // usar la voz del dispositivo para que el jugador nunca se quede sin audio.
+        const networkTimeout = setTimeout(() => {
+            if (audio.readyState < 2) {
+                speakFallback();
+            }
+        }, 1200);
+
+        audio.onended = () => {
+            clearTimeout(networkTimeout);
+            audio.onended = null;
+            audio.onerror = null;
+        };
+
+        audio.onerror = (err) => {
+            clearTimeout(networkTimeout);
+            audio.onerror = null;
+            // Fallback a voz nativa sin internet si falla la descarga
+            if (!hasSpokenFallback) {
+                try {
+                    const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
+                    const rp = retryAudio.play();
+                    if (rp && typeof rp.catch === 'function') {
+                        rp.catch(() => speakFallback());
+                    }
+                } catch (e) {
+                    speakFallback();
+                }
+            }
+        };
+
+        try {
+            audio.src = src;
+            audio.currentTime = 0;
+            audio.volume = 1.0;
+            const p = audio.play();
             if (p && typeof p.catch === 'function') {
                 p.catch(e => {
+                    clearTimeout(networkTimeout);
                     if (e.name === 'NotAllowedError') {
                         window.pendingBallAudioSrc = src;
+                        window.pendingBallNumber = num;
+                        this.showAudioPrompt();
+                    } else if (e.name !== 'AbortError') {
+                        speakFallback();
                     }
                 });
             }
-            return this.voiceAudio;
         } catch (e) {
-            console.warn('Voice play failed:', e);
+            clearTimeout(networkTimeout);
+            speakFallback();
+        }
+
+        return audio;
+    }
+
+    speakOfflineNumber(number) {
+        try {
+            if (!('speechSynthesis' in window)) return false;
+            window.speechSynthesis.cancel();
+
+            const n = parseInt(number, 10);
+            if (!n || isNaN(n)) return false;
+
+            const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
+            const textToSay = letter ? `${letter}, ${n}` : `${n}`;
+            const utterance = new SpeechSynthesisUtterance(textToSay);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.1;
+            utterance.volume = 1.0;
+
+            const voices = window.speechSynthesis.getVoices();
+            if (Array.isArray(voices)) {
+                const esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+                if (esVoice) {
+                    utterance.voice = esVoice;
+                }
+            }
+
+            window.speechSynthesis.speak(utterance);
+            return true;
+        } catch (e) {
+            console.warn('speechSynthesis fallback error:', e);
+            return false;
         }
     }
 
@@ -256,10 +437,10 @@ class AudioManager {
         }
     }
 
-    play(src) {
-        // Para balotas cantadas (/assets/sounds/XX.mp3), usar reproductor de voz dedicado
-        if (/\/\d+\.mp3/i.test(src)) {
-            return this.playVoice(src);
+    play(src, ballNumber) {
+        // Para balotas cantadas (/assets/sounds/XX.mp3), usar reproductor de voz con fallback inteligente
+        if (/\/\d+\.mp3/i.test(src) || ballNumber) {
+            return this.playVoice(src, ballNumber);
         }
 
         let audio = this.audioCache.get(src);
@@ -275,6 +456,7 @@ class AudioManager {
             audio.play().catch(e => {
                 if (e.name === 'NotAllowedError') {
                     window.pendingBallAudioSrc = src;
+                    this.showAudioPrompt();
                 }
             });
             return audio;
@@ -296,9 +478,11 @@ class AudioManager {
 
     stopAll() {
         try {
-            if (this.voiceAudio && !this.voiceAudio.paused) {
-                this.voiceAudio.pause();
-                this.voiceAudio.currentTime = 0;
+            for (let i = 0; i < 2; i++) {
+                if (this.voiceAudios[i] && !this.voiceAudios[i].paused) {
+                    this.voiceAudios[i].pause();
+                    this.voiceAudios[i].currentTime = 0;
+                }
             }
             if (this.effectAudio && !this.effectAudio.paused) {
                 this.effectAudio.pause();
@@ -311,6 +495,10 @@ class AudioManager {
                 }
             });
             window.pendingBallAudioSrc = null;
+            window.pendingBallNumber = null;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
         } catch (e) {}
     }
 
@@ -324,6 +512,7 @@ class AudioManager {
 
 // Desbloqueo proactivo de audio en el primer clic o toque en cualquier parte de la pantalla
 window.pendingBallAudioSrc = null;
+window.pendingBallNumber = null;
 function unlockUserAudioGesture() {
     if (typeof audioManager !== 'undefined' && audioManager.unlockAudio) {
         audioManager.unlockAudio();
@@ -331,14 +520,23 @@ function unlockUserAudioGesture() {
     const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
     if (window.pendingBallAudioSrc && isNarrationOn) {
         const pendingSrc = window.pendingBallAudioSrc;
+        const pendingNum = window.pendingBallNumber;
         window.pendingBallAudioSrc = null;
+        window.pendingBallNumber = null;
         if (typeof audioManager !== 'undefined' && audioManager.play) {
-            audioManager.play(pendingSrc);
+            audioManager.play(pendingSrc, pendingNum);
         }
     }
 }
 ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(function (eventName) {
     document.addEventListener(eventName, unlockUserAudioGesture, { capture: true, passive: true });
+});
+
+// Reactivación de audio al volver de pestañas en segundo plano o bloqueo de pantalla
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && typeof audioManager !== 'undefined') {
+        audioManager.resumeContext();
+    }
 });
 
 // Polling inteligente con backoff exponencial
@@ -1003,16 +1201,21 @@ function handleBingoSuccess(data, resumeCallback) {
 
     // 3. Notificación toast visual de victoria propia agrupada por modalidad
     if (typeof window.showNotification === 'function') {
-        const cartonText = data.carton ? ` (Cartón #${data.carton})` : '';
+        const modalityClean = (data.modality || 'Bingo').replace(/^la\s+/i, '').trim();
+        const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+            ? `Ganadores de la modalidad ${modalityClean}`
+            : `Ganadores de la ${modalityClean}`;
+        const pName = data.player || 'Tú';
+
         window.showNotification({
             id: 'own_sing_' + (data.singId || (data.carton || '') + '_' + (data.modalityId || Date.now())),
             type: 'own_sing',
             modalityId: data.modalityId,
             modality: data.modality,
-            player: data.player || 'Tú',
+            player: pName,
             cartonId: data.carton,
-            title: '🎉 ¡HAS CANTADO BINGO!',
-            message: `¡Felicidades! Has cantado <strong>${data.modality || 'Bingo'}</strong>${cartonText}.`,
+            title: '🎉 ¡BINGO CANTADO!',
+            message: `${modalityLabel}: ${pName}`,
             created_at: new Date().toISOString()
         });
     }
@@ -1551,7 +1754,7 @@ function playNextBallInQueue() {
     const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
     if (isNarrationOn && !window.gameIsFinished && !isGameFinishedShown) {
         const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
-        audioManager.play(basePath + currentNumber + '.mp3');
+        audioManager.play(basePath + currentNumber + '.mp3', currentNumber);
     }
 
     // 3. Marcado INMEDIATO (0ms) en cartón y tablero al salir la balota
@@ -1907,7 +2110,11 @@ function showOtherPlayerBingoNotice(data, callback) {
 
     // 2. Disparar notificación toast visual del sistema unificada por modalidad
     if (typeof window.showNotification === 'function') {
-        const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
+        const modalityClean = (data.modality || 'Bingo').replace(/^la\s+/i, '').trim();
+        const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+            ? `Ganadores de la modalidad ${modalityClean}`
+            : `Ganadores de la ${modalityClean}`;
+
         window.showNotification({
             id: noticeKey,
             type: 'sing',
@@ -1915,8 +2122,8 @@ function showOtherPlayerBingoNotice(data, callback) {
             modality: data.modality,
             player: data.player,
             cartonId: data.cartonId,
-            title: '🎉 ¡BINGO! — ' + (data.modality || 'Línea'),
-            message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
+            title: '🎉 ¡BINGO CANTADO!',
+            message: `${modalityLabel}: ${data.player}`,
             created_at: new Date().toISOString()
         });
     }

@@ -658,7 +658,7 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                         'carton'     => $cartonId,
                         'modality'   => $modalityId,
                         'title'      => '🎉 ¡BINGO CANTADO!',
-                        'message'    => 'El jugador ' . $userName . ' ha cantado Bingo en ' . $modalityName . ' (Cartón #' . $cartonId . ').',
+                        'message'    => ((preg_match('/^(bingo|pleno)/i', trim(preg_replace('/^la\s+/i', '', $modalityName)))) ? ('Ganadores de la modalidad ' . trim(preg_replace('/^la\s+/i', '', $modalityName))) : ('Ganadores de la ' . trim(preg_replace('/^la\s+/i', '', $modalityName)))) . ': ' . $userName,
                         'status'     => 0,
                         'created_at' => $now,
                     ];

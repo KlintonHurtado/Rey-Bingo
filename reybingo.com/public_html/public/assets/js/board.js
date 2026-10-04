@@ -203,18 +203,57 @@ class AudioManager {
         this.preloadedAudios.add(src);
     }
 
-    playVoice(src) {
+    playVoice(src, ballNumber) {
+        const num = ballNumber || (src.match(/\/(\d+)\.mp3/i) ? src.match(/\/(\d+)\.mp3/i)[1] : null);
         try {
             if (!this.voiceAudio) {
                 this.voiceAudio = new Audio();
                 this.voiceAudio.preload = 'auto';
             }
+
+            let fallbackTriggered = false;
+            const speakFallback = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                if (num && 'speechSynthesis' in window) {
+                    try {
+                        const n = parseInt(num, 10);
+                        const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
+                        const u = new SpeechSynthesisUtterance(letter ? `${letter}, ${n}` : `${n}`);
+                        u.lang = 'es-ES';
+                        window.speechSynthesis.speak(u);
+                    } catch (e) {}
+                }
+            };
+
+            const netTimeout = setTimeout(() => {
+                if (this.voiceAudio && this.voiceAudio.readyState < 2) {
+                    speakFallback();
+                }
+            }, 1200);
+
+            this.voiceAudio.onended = () => {
+                clearTimeout(netTimeout);
+                this.voiceAudio.onended = null;
+                this.voiceAudio.onerror = null;
+            };
+
+            this.voiceAudio.onerror = () => {
+                clearTimeout(netTimeout);
+                speakFallback();
+            };
+
             this.voiceAudio.src = src;
             this.voiceAudio.currentTime = 0;
             this.voiceAudio.volume = 1.0;
             const p = this.voiceAudio.play();
             if (p && typeof p.catch === 'function') {
-                p.catch(e => console.warn('Voice play failed:', e));
+                p.catch(e => {
+                    clearTimeout(netTimeout);
+                    if (e.name !== 'AbortError') {
+                        speakFallback();
+                    }
+                });
             }
             return this.voiceAudio;
         } catch (e) {
@@ -222,9 +261,9 @@ class AudioManager {
         }
     }
     
-    play(src) {
-        if (/\/\d+\.mp3/i.test(src)) {
-            return this.playVoice(src);
+    play(src, ballNumber) {
+        if (/\/\d+\.mp3/i.test(src) || ballNumber) {
+            return this.playVoice(src, ballNumber);
         }
 
         let audio = this.audioCache.get(src);
