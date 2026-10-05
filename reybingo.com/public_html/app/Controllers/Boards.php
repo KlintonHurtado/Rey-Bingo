@@ -918,7 +918,8 @@ class Boards extends Controller {
         $modelModalities = new ModalitiesModel(); 
         $modelAwards = new AwardsModel();
 
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
+        $game = $modelGames->find($gameId);
         $data['game'] = $game;
 
         if ($game) {

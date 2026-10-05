@@ -2005,11 +2005,13 @@ class Playings extends Controller
         $gameStatus = (int) ($game['status'] ?? 0);
 
         // status 0 = finalizada. status 2 = programada/pospuesta (sigue jugable; no marcar terminada).
-        if ($gameStatus === 0) {
+        $isFinishedByAwards = bingo_finalize_game_when_complete((int) $game['id']);
+        if ($gameStatus === 0 || $isFinishedByAwards) {
             bingo_ensure_winners_registered((int) $game['id']);
 
             return $this->response->setJSON([
                 'status' => 'completed',
+                'gameCompleted' => true,
                 'totalNumbersGenerated' => bingo_count_drawn_numbers((int) $game['id']),
                 'drawnNumbers' => $this->getOrderedDrawnNumbers((int) $game['id']),
                 'winners' => $this->getWinnersForGame((int) $game['id'], true),
@@ -2115,11 +2117,13 @@ class Playings extends Controller
 
         // Si salieron las 75 bolas, resolver bingos no cantados, pagar premios y finalizar
         if ($totalNumbersGenerated >= 75) {
+            bingo_finalize_game_when_complete((int) $game['id']);
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 
             return $this->response->setJSON([
                 'status' => 'completed',
+                'gameCompleted' => true,
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
@@ -2156,10 +2160,39 @@ class Playings extends Controller
             $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
 
             $game = $modelGames->find($game['id']);
-            $gameCompleted = (int) ($game['status'] ?? 0) === 0;
+            $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+            if (!$gameCompleted) {
+                $gameCompleted = (int) ($game['status'] ?? 0) === 0;
+            }
 
             $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
             $modalityName = $modality ? translate($modality['name'] ?? '') : 'Bingo';
+
+            if ($gameCompleted) {
+                // Marcar todos los demás sings pendientes como notificados para no demorar al cliente
+                foreach ($pendingSings as $ps) {
+                    $n = json_decode($ps['notified'] ?? '[]', true);
+                    if (!is_array($n)) $n = [];
+                    if (!in_array($currentUser, $n, true)) {
+                        $n[] = $currentUser;
+                        $modelSings->update($ps['id'], ['notified' => json_encode(array_values($n))]);
+                    }
+                }
+                bingo_ensure_winners_registered((int) $game['id']);
+
+                return $this->response->setJSON([
+                    'status' => 'completed',
+                    'gameCompleted' => true,
+                    'totalNumbersGenerated' => $totalNumbersGenerated,
+                    'drawnNumbers' => $drawnNumbers,
+                    'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                    'autodial' => (int) ($user['autodial'] ?? 0),
+                    'message' => translate('the game is over, all the prizes have been awarded'),
+                    'number' => $lastNumber['number'],
+                    'player' => $userName,
+                    'modality' => $modalityName,
+                ]);
+            }
 
             return $this->response->setJSON([
                 'status' => 'pause',
@@ -2183,15 +2216,17 @@ class Playings extends Controller
         }
 
         // Verificar si todos los premios han sido ganados
+        $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
+        if ($gameCompleted || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 
             return $this->response->setJSON([
                 'status' => 'completed',
+                'gameCompleted' => true,
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
@@ -2683,12 +2718,17 @@ class Playings extends Controller
         $modelAwards = new AwardsModel();
         $modelCartons = new CartonsModel();
 
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
+        $game = $modelGames->find($gameId);
         $data['game'] = $game;
 
         if (!$game) {
             $data['sings'] = [];
             return view('playings/awards', $data);
+        }
+
+        if (session()->get('logged_in')) {
+            session()->set('game_id', (int) $game['id']);
         }
 
         $this->ensureWinnersRegistered((int) $game['id']);

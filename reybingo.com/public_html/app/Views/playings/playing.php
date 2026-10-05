@@ -1473,6 +1473,8 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalAwards" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false"></div>
+
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?<?= md5(date("Hms")); ?>"></script>
 
 <script type="text/javascript">
@@ -1490,6 +1492,7 @@
         }
     } catch (e) {}
 
+    window.gameId = '<?= $game["id"] ?>';
     window.singBall = "<?= systemGet('singBall'); ?>";
     window.timeBallGet = singBall.split('-')[0];
     //window.timeBallLast = singBall.split('-')[1];
@@ -1508,6 +1511,25 @@
     window.currentUserId = <?= (int) session()->get('id') ?>;
     window.allowGameUnload = window.gameIsFinished;
     window.playerGroup = 0;
+    window.awardsGet = function() {
+        const gid = window.gameId || '<?= $game["id"] ?>';
+        const url = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/awardsGet?game_id=' + gid;
+        let el = document.getElementById('modalAwards');
+        if (!el) {
+            el = document.createElement('div');
+            el.className = 'modal fade';
+            el.id = 'modalAwards';
+            el.tabIndex = -1;
+            el.setAttribute('role', 'dialog');
+            el.setAttribute('data-bs-backdrop', 'static');
+            el.setAttribute('data-bs-keyboard', 'false');
+            document.body.appendChild(el);
+        }
+        $(el).load(url, function() {
+            bootstrap.Modal.getOrCreateInstance(el, { backdrop: 'static', keyboard: false }).show();
+            $('#game-finalized').hide();
+        });
+    };
     window.audioPath = "<?= site_url('assets/sounds/'); ?>";
     window.narrationPlaying = <?= (!isset($user['narration']) || (int)$user['narration'] !== 0) ? 'true' : 'false' ?>;
     window.soundPlaying = <?= (!isset($user['sounds']) || (int)$user['sounds'] !== 0) ? 'true' : 'false' ?>;

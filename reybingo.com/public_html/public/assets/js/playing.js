@@ -1271,6 +1271,19 @@ function handleBingoSuccess(data, resumeCallback) {
         data.sings.forEach(highlightSing);
     }
 
+    if (data.player && data.modality) {
+        registerWinner(data.player, data.modality);
+    }
+    if (Array.isArray(data.winners)) {
+        mergeWinnersFromServer(data.winners);
+    }
+
+    if (data.gameCompleted === true || window.gameIsFinished) {
+        window.gameIsFinished = true;
+        showGameFinalized();
+        return;
+    }
+
     const afterCountdown = function () {
         if (data.gameCompleted) {
             showGameFinalized();
@@ -2044,9 +2057,14 @@ function showCountdown(data, callback) {
         container.style.display = 'none';
     }
 
-    registerWinner(data.player, data.modality);
+    if (data && data.player) {
+        registerWinner(data.player, data.modality);
+    }
+    if (data && Array.isArray(data.winners)) {
+        mergeWinnersFromServer(data.winners);
+    }
 
-    if (data.modalityId) {
+    if (data && data.modalityId) {
         const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
         cartns.forEach(cartn => {
             cartn.classList.add('cartn-sing');
@@ -2064,6 +2082,14 @@ function showCountdown(data, callback) {
                 el.innerText = '⭐️';
             });
         });
+    }
+
+    // Si el juego finalizó, no demorar con setTimeout ni encadenar bingos
+    if ((data && data.gameCompleted === true) || window.gameIsFinished || isGameFinishedShown) {
+        simultaneousBingos = [];
+        bingoInProgress = false;
+        if (typeof callback === 'function') callback();
+        return;
     }
 
     setTimeout(() => {
@@ -2170,9 +2196,17 @@ function showOtherPlayerBingoNotice(data, callback) {
     if (data && data.isOwnBingo !== true) {
         data.isOwnBingo = false;
     }
+
+    // Si la partida terminó con este cante, saltar de inmediato al fin de juego sin esperar
+    if ((data && data.gameCompleted === true) || window.gameIsFinished || isGameFinishedShown) {
+        window.gameIsFinished = true;
+        showGameFinalized();
+        return;
+    }
+
     showCountdown(data, function () {
         if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
-            setTimeout(showGameFinalized, 100);
+            showGameFinalized();
             return;
         }
 
@@ -2374,11 +2408,11 @@ function startAutomaticLast() {
 
     var effMs = getEffectiveBallIntervalMs();
     var wsActive = window.__bingoPusherRealtime === true;
-    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 5s para no dejar huecos)
-    // Si no está activo, usar intervalo ágil de respaldo (2-4s)
+    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 2.5s para no dejar huecos)
+    // Si no está activo, usar intervalo ágil de respaldo (1.2-2s)
     var fallbackMs = wsActive
-        ? Math.max(2500, Math.min(5000, effMs))
-        : Math.max(2000, Math.min(4000, effMs));
+        ? Math.max(1500, Math.min(2500, effMs))
+        : Math.max(1200, Math.min(2000, effMs));
 
     intervalManager.set('lastNumber', lastNumberGet, fallbackMs);
 }
@@ -2392,9 +2426,9 @@ function setBingoPusherRealtime(enabled) {
     }
 
     if (enabled && !wasEnabled) {
-        // WebSocket conectado: sincronizar poll de respaldo según intervalo configurado (respetando timeBallGet)
+        // WebSocket conectado: sincronizar poll de respaldo ágil
         var effMs = getEffectiveBallIntervalMs();
-        var pollMs = Math.max(3000, Math.min(10000, effMs));
+        var pollMs = Math.max(1500, Math.min(3000, effMs));
         console.log('WS conectado: sincronizando poll de respaldo (' + (pollMs / 1000) + 's)');
         intervalManager.clear('lastNumber');
         intervalManager.set('lastNumber', lastNumberGet, pollMs);
@@ -2503,52 +2537,77 @@ function showGameFinalized() {
             exitToPlay();
         });
 
+        const gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '');
+        const queryParam = gid ? ('?game_id=' + gid) : '';
         const awardsUrl = (typeof window.playerGroup !== 'undefined' && parseInt(window.playerGroup, 10) === 0)
-            ? site_url + 'playings/awardsGet'
-            : site_url + 'boards/awardsGet';
+            ? (site_url + 'playings/awardsGet' + queryParam)
+            : (site_url + 'boards/awardsGet' + queryParam);
 
-        const modalAwardsEl = document.getElementById('modalAwards');
-        if (modalAwardsEl && typeof awardsGet === 'function') {
-            $("#modalAwards").load(awardsUrl, function () {
-                showBsModal('#modalAwards');
-                scheduleAutoExit();
-            });
-        } else {
-            const bodyEl = document.getElementById('modalGameFinalizedBody');
-            if (bodyEl) {
-                bodyEl.innerHTML = buildWinnersFinalText();
-            }
+        let modalAwardsEl = document.getElementById('modalAwards');
+        if (!modalAwardsEl) {
+            modalAwardsEl = document.createElement('div');
+            modalAwardsEl.className = 'modal fade';
+            modalAwardsEl.id = 'modalAwards';
+            modalAwardsEl.tabIndex = -1;
+            modalAwardsEl.setAttribute('role', 'dialog');
+            modalAwardsEl.setAttribute('data-bs-backdrop', 'static');
+            modalAwardsEl.setAttribute('data-bs-keyboard', 'false');
+            document.body.appendChild(modalAwardsEl);
+        }
 
-            const modalEl = document.getElementById('modalGameFinalized');
-            if (modalEl) {
-                const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-                bsModal.show();
-
-                const btnVolver = document.getElementById('btnVolverInicio');
-                if (btnVolver) {
-                    btnVolver.addEventListener('click', function () {
-                        cancelAutoExit();
-                        bsModal.hide();
-                        exitToPlay();
-                    }, { once: true });
+        $("#modalAwards").load(awardsUrl, function (response, status, xhr) {
+            if (status === 'error') {
+                console.error('Error cargando modalAwards:', xhr ? xhr.status : status);
+                const bodyEl = document.getElementById('modalGameFinalizedBody');
+                if (bodyEl) {
+                    bodyEl.innerHTML = buildWinnersFinalText();
                 }
 
+                const modalEl = document.getElementById('modalGameFinalized');
+                if (modalEl) {
+                    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+                    bsModal.show();
+
+                    const btnVolver = document.getElementById('btnVolverInicio');
+                    if (btnVolver) {
+                        btnVolver.addEventListener('click', function () {
+                            cancelAutoExit();
+                            bsModal.hide();
+                            exitToPlay();
+                        }, { once: true });
+                    }
+                }
                 scheduleAutoExit();
-            } else {
-                scheduleAutoExit();
+                return;
             }
-        }
+
+            if (container) {
+                container.style.display = 'none';
+            }
+            const countdownContainer = $id('countdown-container');
+            if (countdownContainer) {
+                countdownContainer.style.display = 'none';
+            }
+
+            const bsAwardsModal = bootstrap.Modal.getOrCreateInstance(modalAwardsEl, { backdrop: 'static', keyboard: false });
+            bsAwardsModal.show();
+
+            $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio').on('click', function () {
+                cancelAutoExit();
+                bsAwardsModal.hide();
+                exitToPlay();
+            });
+
+            scheduleAutoExit();
+        });
     };
 
     if (container && text) {
         container.style.display = 'block';
         text.innerHTML = buildWinnersFinalText();
-
-        // Pausa breve de 2 segundos en la cabecera y luego abrir el cuadro blanco de ganadores
-        setTimeout(openWinnersAwardsModal, 2000);
-    } else {
-        openWinnersAwardsModal();
     }
+    // Abrir de inmediato el cuadro blanco de ganadores (modalAwards)
+    setTimeout(openWinnersAwardsModal, 500);
 }
 
 // Contador de usuarios optimizado
@@ -3732,6 +3791,25 @@ function initializeApp() {
                 if (Array.isArray(data.winners)) {
                     mergeWinnersFromServer(data.winners);
                 }
+                if (data.player && data.modality) {
+                    registerWinner(data.player, data.modality);
+                }
+
+                if (data.gameCompleted === true || data.stopped === true) {
+                    window.gameIsFinished = true;
+                    ballPlaybackQueue = [];
+                    isBallPlaybackActive = false;
+                    intervalManager.clear('lastNumber');
+                    if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+                        audioManager.stopAll();
+                    }
+                    if (!isOwnBingoEvent(data)) {
+                        showOtherPlayerBingoNotice(data);
+                    }
+                    showGameFinalized();
+                    return;
+                }
+
                 if (data.player && data.modality) {
                     if (isOwnBingoEvent(data)) {
                         if (!bingoInProgress) {

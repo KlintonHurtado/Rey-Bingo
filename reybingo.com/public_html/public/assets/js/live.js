@@ -1273,10 +1273,10 @@ function lastNumberGet() {
                 intervalManager.clear('lastNumber');
                 if (data.player && data.player !== '') {
                     showCountdown(data, () => {
-                        setTimeout(showGameFinalized, timeBallGet);
+                        showGameFinalized();
                     });
                 } else {
-                    setTimeout(showGameFinalized, timeBallGet);
+                    showGameFinalized();
                 }
             } else if (data.status === 'iscron' || data.status === 'success') {
                 // En LIVE no tratamos iscron como "cantar sola": solo sync ya hecho arriba

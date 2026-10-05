@@ -1383,10 +1383,10 @@ function processNumberGetResponse(data) {
 
         if (data.player && data.player !== '') {
             showCountdown(data, function() {
-                setTimeout(showGameFinalized, timeBallGet);
+                showGameFinalized();
             });
         } else {
-            setTimeout(showGameFinalized, timeBallGet);
+            showGameFinalized();
         }
     }
 }
