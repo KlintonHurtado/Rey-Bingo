@@ -219,8 +219,23 @@ class AudioManager {
                     try {
                         const n = parseInt(num, 10);
                         const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
+                        const voices = window.speechSynthesis.getVoices();
+                        let esVoice = null;
+                        if (Array.isArray(voices) && voices.length > 0) {
+                            esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+                        }
+
+                        // Si no hay voz en español, NUNCA hablar en inglés
+                        if (!esVoice && Array.isArray(voices) && voices.length > 0) {
+                            return;
+                        }
+
                         const u = new SpeechSynthesisUtterance(letter ? `${letter}, ${n}` : `${n}`);
                         u.lang = 'es-ES';
+                        u.rate = 1.1;
+                        if (esVoice) {
+                            u.voice = esVoice;
+                        }
                         window.speechSynthesis.speak(u);
                     } catch (e) {}
                 }
@@ -230,7 +245,7 @@ class AudioManager {
                 if (this.voiceAudio && this.voiceAudio.readyState < 2) {
                     speakFallback();
                 }
-            }, 1200);
+            }, 3500);
 
             this.voiceAudio.onended = () => {
                 clearTimeout(netTimeout);
@@ -965,6 +980,8 @@ function startWinnerSlider() {
     showNext();
 }
 
+let countdownTimeoutId = null;
+
 function showCountdown(data, callback) {
     // Recordar si la extracción automática estaba activa antes de la pausa por bingo
     const wasAutoRunning = autoGenerationWanted || $('#stop-button').is(':visible');
@@ -975,6 +992,13 @@ function showCountdown(data, callback) {
     autoSubmitInFlight = false;
     centerAnimQueue = [];
     centerAnimBusy = false;
+
+    // Si el bingo completó la partida o ya está finalizada, detener todo de inmediato
+    if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+        window.gameIsFinished = true;
+        showGameFinalized();
+        return;
+    }
 
     const numberHe = $id('countdown');
     const container = $id('countdown-container');
@@ -1039,9 +1063,15 @@ function showCountdown(data, callback) {
         }, 300);
     }
 
+    if (countdownTimeoutId) {
+        clearTimeout(countdownTimeoutId);
+        countdownTimeoutId = null;
+    }
+
     const pauseMs = Math.max(5000, parseInt(timeBallGet, 10) || 5000);
-    setTimeout(function () {
-        if (isGameFinishedShown) {
+    countdownTimeoutId = setTimeout(function () {
+        countdownTimeoutId = null;
+        if (isGameFinishedShown || window.gameIsFinished) {
             return;
         }
         if (typeof callback === 'function' && callback !== startAutomaticGeneration && callback !== startAutomaticLast) {
@@ -1569,6 +1599,10 @@ function stopAutomaticGeneration() {
     if (generationTimeoutId) {
         clearTimeout(generationTimeoutId);
         generationTimeoutId = null;
+    }
+    if (countdownTimeoutId) {
+        clearTimeout(countdownTimeoutId);
+        countdownTimeoutId = null;
     }
 }
 
@@ -2549,6 +2583,12 @@ function initBoardPusherRealtime() {
         // Reclamos de bingo en tiempo real
         channel.bind('game:bingo_claimed', function (data) {
             console.log('Admin board WS: bingo_claimed', data);
+            if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+                stopAutomaticGeneration();
+                stopAutomaticLast();
+                showGameFinalized();
+                return;
+            }
             if (data && data.player && data.modality) {
                 showCountdown(data);
             }
@@ -2556,12 +2596,20 @@ function initBoardPusherRealtime() {
 
         channel.bind('game:bingo_accepted', function (data) {
             console.log('Admin board WS: bingo_accepted', data);
+            if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+                stopAutomaticGeneration();
+                stopAutomaticLast();
+                showGameFinalized();
+                return;
+            }
             if (data && data.player && data.modality) {
                 showCountdown(data);
             }
         });
 
         channel.bind('game:game_finished', function () {
+            stopAutomaticGeneration();
+            stopAutomaticLast();
             showGameFinalized();
         });
 

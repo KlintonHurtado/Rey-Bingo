@@ -830,6 +830,12 @@ function showCountdown(data, callback) {
     stopAutomaticGeneration();
     pendingNumberSubmits.clear();
 
+    if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+        window.gameIsFinished = true;
+        showGameFinalized();
+        return;
+    }
+
     const container = $id('countdown-container');
 
     if (data && data.player && data.modality) {
@@ -2064,6 +2070,12 @@ function initializeApp() {
             pusherHelper.on('game:bingo_accepted', function(data) {
                 console.log('LIVE WS: bingo_accepted recibido', data);
                 if (!data) return;
+                if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
+                    stopAutomaticGeneration();
+                    stopAutomaticLast();
+                    showGameFinalized();
+                    return;
+                }
                 if (data.player && data.modality) {
                     showCountdown(data, startAutomaticLast);
                 }
@@ -2072,6 +2084,12 @@ function initializeApp() {
             pusherHelper.on('game:bingo_claimed', function(data) {
                 console.log('LIVE WS: bingo_claimed recibido', data);
                 if (!data) return;
+                if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
+                    stopAutomaticGeneration();
+                    stopAutomaticLast();
+                    showGameFinalized();
+                    return;
+                }
                 if (data.player && data.modality) {
                     showCountdown(data, startAutomaticLast);
                 }
@@ -2080,6 +2098,8 @@ function initializeApp() {
             // Fin de partida
             pusherHelper.on('game:game_finished', function(data) {
                 console.log('LIVE WS: game_finished recibido', data);
+                stopAutomaticGeneration();
+                stopAutomaticLast();
                 if (!isGameFinishedShown) {
                     showGameFinalized();
                 }

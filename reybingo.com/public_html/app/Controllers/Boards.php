@@ -303,6 +303,19 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
 
+        // 1. Si la partida ya fue finalizada (status 0) o todos los premios fueron cantados, detener de inmediato
+        if ((int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards((int) $game['id'])) {
+            if ((int) ($game['status'] ?? 0) !== 0) {
+                bingo_finalize_game_when_complete((int) $game['id']);
+            }
+            return $this->response->setJSON([
+                'status' => 'completed',
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'message' => translate('the game is over, all the prizes have been awarded'),
+                'number' => null
+            ]);
+        }
+
         if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, true)) {
             $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
@@ -322,11 +335,7 @@ class Boards extends Controller {
         $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0, 'updated_at' => date('Y-m-d H:i:s')])->update();
-            if (function_exists('bingo_on_game_finished')) {
-                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
-            }
-            bingo_broadcast_game_status((int) $game['id'], 'game:game_finished', ['status' => 0]);
+            bingo_finalize_game_when_complete((int) $game['id']);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -335,16 +344,8 @@ class Boards extends Controller {
             ]);
         }
 
-        $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->whereIn('status', [1, 2])->groupBy('modality')->countAllResults();
-
-        $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-
-        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0, 'updated_at' => date('Y-m-d H:i:s')])->update();
-            if (function_exists('bingo_on_game_finished')) {
-                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
-            }
-            bingo_broadcast_game_status((int) $game['id'], 'game:game_finished', ['status' => 0]);
+        if (bingo_is_game_finished_by_awards((int) $game['id'])) {
+            bingo_finalize_game_when_complete((int) $game['id']);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -458,6 +459,18 @@ class Boards extends Controller {
 
         $totalNumbersGenerated = bingo_count_drawn_numbers((int) $game['id']);
 
+        if ((int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards((int) $game['id'])) {
+            if ((int) ($game['status'] ?? 0) !== 0) {
+                bingo_finalize_game_when_complete((int) $game['id']);
+            }
+            return $this->response->setJSON([
+                'status' => 'completed',
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'message' => translate('the game is over, all the prizes have been awarded'),
+                'number' => null,
+            ]);
+        }
+
         if ($totalNumbersGenerated === 0 && !bingo_can_start_game($game, null, null, true)) {
             $postpone = bingo_postpone_game($game);
             return $this->response->setJSON([
@@ -474,7 +487,7 @@ class Boards extends Controller {
         }
 
         if ($totalNumbersGenerated >= 75) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
+            bingo_finalize_game_when_complete((int) $game['id']);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -483,11 +496,8 @@ class Boards extends Controller {
             ]);
         }
 
-        $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
-        $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-
-        if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
-            $modelGames->where('id', $game['id'])->set(['status' => 0])->update();
+        if (bingo_is_game_finished_by_awards((int) $game['id'])) {
+            bingo_finalize_game_when_complete((int) $game['id']);
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,

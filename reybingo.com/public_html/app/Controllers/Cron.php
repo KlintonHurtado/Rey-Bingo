@@ -1532,22 +1532,17 @@ class Cron extends Controller
         }
 
         // Verificar si todos los premios han sido cantados y confirmados/pagados
-        $SingsCount = $db->table('sings')
-            ->select('modality')
-            ->where('game', $gameId)
-            ->whereIn('status', [1, 2]) // Solo sings confirmados o pagados
-            ->groupBy('modality')
-            ->countAllResults();
-
-        $AwardsCount = $db->table('awards')
-            ->where('game', $gameId)
-            ->where('status', 1)
-            ->countAllResults();
-
-        $isCompleted = $AwardsCount > 0 && $SingsCount >= $AwardsCount;
+        if (function_exists('bingo_is_game_finished_by_awards')) {
+            $isCompleted = bingo_is_game_finished_by_awards($gameId);
+        } else {
+            $row = $db->query("SELECT COUNT(DISTINCT modality) as cnt FROM sings WHERE game = ? AND status IN (1, 2)", [$gameId])->getRowArray();
+            $SingsCount = (int) ($row['cnt'] ?? 0);
+            $AwardsCount = $db->table('awards')->where('game', $gameId)->where('status', 1)->countAllResults();
+            $isCompleted = $AwardsCount > 0 && $SingsCount >= $AwardsCount;
+        }
         
         if ($isCompleted) {
-            log_message('info', "Juego {$gameId} completado: Todos los premios cantados ({$SingsCount}/{$AwardsCount}).");
+            log_message('info', "Juego {$gameId} completado: Todos los premios cantados.");
         }
 
         return $isCompleted;

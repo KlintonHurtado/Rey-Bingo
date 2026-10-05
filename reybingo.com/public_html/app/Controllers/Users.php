@@ -3549,6 +3549,42 @@ class Users extends Controller {
                 ->findAll();
         } else {
             $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->limit(15)->findAll();
+
+            // Jugadores: solo ven notificaciones de bingo ('sing') si el ganador fueron ellos.
+            // Los bingos de otros jugadores ya se mostraron en vivo dentro de la partida;
+            // se marcan como leídos para que no reaparezcan al salir de la partida.
+            if ($userGroup === 0 && !empty($notifications)) {
+                $singIds = [];
+                foreach ($notifications as $n) {
+                    if (($n['type'] ?? '') === 'sing' && (int) ($n['type_id'] ?? 0) > 0) {
+                        $singIds[] = (int) $n['type_id'];
+                    }
+                }
+
+                $singOwners = [];
+                if (!empty($singIds)) {
+                    foreach ($modelSings->select('id, user')->whereIn('id', array_unique($singIds))->findAll() as $s) {
+                        $singOwners[(int) $s['id']] = (int) $s['user'];
+                    }
+                }
+
+                $foreignIds = [];
+                $notifications = array_values(array_filter($notifications, function ($n) use ($singOwners, $userId, &$foreignIds) {
+                    if (($n['type'] ?? '') !== 'sing') {
+                        return true;
+                    }
+                    $owner = $singOwners[(int) ($n['type_id'] ?? 0)] ?? 0;
+                    if ($owner === $userId) {
+                        return true;
+                    }
+                    $foreignIds[] = (int) $n['id'];
+                    return false;
+                }));
+
+                if (!empty($foreignIds)) {
+                    $modelNotifications->whereIn('id', $foreignIds)->set(['status' => 1])->update();
+                }
+            }
         }
 
         // Deduplicar notificaciones repetidas en memoria y marcar duplicados en BD como leídos

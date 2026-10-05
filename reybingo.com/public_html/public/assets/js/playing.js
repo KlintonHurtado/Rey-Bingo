@@ -332,13 +332,13 @@ class AudioManager {
             }
         };
 
-        // Watchdog de red: si el MP3 tarda más de 1200ms en cargar/empezar por internet lento,
-        // usar la voz del dispositivo para que el jugador nunca se quede sin audio.
+        // Watchdog de red: si el MP3 tarda en descargar, solo recurrir a voz sintetizada tras 3500ms
+        // para dar prioridad absoluta a la locución grabada original del juego.
         const networkTimeout = setTimeout(() => {
             if (audio.readyState < 2) {
                 speakFallback();
             }
-        }, 1200);
+        }, 3500);
 
         audio.onended = () => {
             clearTimeout(networkTimeout);
@@ -391,24 +391,34 @@ class AudioManager {
     speakOfflineNumber(number) {
         try {
             if (!('speechSynthesis' in window)) return false;
-            window.speechSynthesis.cancel();
 
             const n = parseInt(number, 10);
             if (!n || isNaN(n)) return false;
 
             const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
             const textToSay = letter ? `${letter}, ${n}` : `${n}`;
+
+            const voices = window.speechSynthesis.getVoices();
+            // Buscar voz explícitamente en español
+            let esVoice = null;
+            if (Array.isArray(voices) && voices.length > 0) {
+                esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+            }
+
+            // Si el dispositivo NO tiene voz en español, NUNCA hablar en inglés ni con voz extraña
+            if (!esVoice && Array.isArray(voices) && voices.length > 0) {
+                console.warn('Dispositivo sin voz en español instalada. Se omite síntesis de voz en inglés.');
+                return false;
+            }
+
+            window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(textToSay);
             utterance.lang = 'es-ES';
             utterance.rate = 1.1;
             utterance.volume = 1.0;
 
-            const voices = window.speechSynthesis.getVoices();
-            if (Array.isArray(voices)) {
-                const esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
-                if (esVoice) {
-                    utterance.voice = esVoice;
-                }
+            if (esVoice) {
+                utterance.voice = esVoice;
             }
 
             window.speechSynthesis.speak(utterance);
@@ -2138,7 +2148,7 @@ function showOtherPlayerBingoNotice(data, callback) {
     }
     showCountdown(data, function () {
         if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
-            setTimeout(showGameFinalized, 400);
+            setTimeout(showGameFinalized, 100);
             return;
         }
 
@@ -2401,65 +2411,80 @@ function showGameFinalized() {
     isGameFinishedShown = true;
     bingoInProgress = false;
 
-    fetchWinnersBeforeFinalize(function () {
-        const countdownContainer = $id('countdown-container');
-        if (countdownContainer) {
-            countdownContainer.style.display = 'none';
-        }
+    stopAutomaticLast();
+    stopUpdateUserCount();
+    stopUpdateGameAccumulated();
+    messagePoller.stop();
 
-        const nextGameSpan = document.querySelector('.next-game');
-        if (nextGameSpan) {
-            nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
-        }
+    const countdownContainer = $id('countdown-container');
+    if (countdownContainer) {
+        countdownContainer.style.display = 'none';
+    }
 
-        const container = $id('game-finalized');
-        const text = $id('finalized');
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan) {
+        nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
+    }
 
-        if (container && text) {
-            container.style.display = 'block';
-            text.innerHTML = buildWinnersFinalText();
+    const controlsDiv = $id('controls');
+    if (controlsDiv) {
+        controlsDiv.remove();
+    }
 
-            setTimeout(function () {
-                if (typeof awardsGet === 'function') {
-                    awardsGet();
+    const exitToPlay = function () {
+        window.allowGameUnload = true;
+        const targetUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
+        window.location.href = targetUrl;
+    };
+
+    // Actualizar ganadores en segundo plano sin bloquear la UI
+    if (typeof fetchWinnersBeforeFinalize === 'function') {
+        fetchWinnersBeforeFinalize();
+    }
+
+    const container = $id('game-finalized');
+    const text = $id('finalized');
+
+    if (container && text) {
+        container.style.display = 'block';
+        text.innerHTML = buildWinnersFinalText();
+
+        // Breve pausa visual de 2 segundos para ver ganadores antes del modal o salida directa
+        setTimeout(function () {
+            if (typeof awardsGet === 'function') {
+                awardsGet();
+            }
+            container.style.display = 'none';
+
+            const bodyEl = document.getElementById('modalGameFinalizedBody');
+            if (bodyEl) {
+                bodyEl.innerHTML = buildWinnersFinalText();
+            }
+
+            const modalEl = document.getElementById('modalGameFinalized');
+            if (modalEl) {
+                const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+                bsModal.show();
+
+                const btnVolver = document.getElementById('btnVolverInicio');
+                if (btnVolver) {
+                    btnVolver.addEventListener('click', function () {
+                        bsModal.hide();
+                        exitToPlay();
+                    }, { once: true });
                 }
-                container.style.display = 'none';
 
-                // Mostrar modal en lugar de redirigir automáticamente
-                const bodyEl = document.getElementById('modalGameFinalizedBody');
-                if (bodyEl) {
-                    bodyEl.innerHTML = buildWinnersFinalText();
-                }
-
-                const modalEl = document.getElementById('modalGameFinalized');
-                if (modalEl) {
-                    const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-                    bsModal.show();
-
-                    const btnVolver = document.getElementById('btnVolverInicio');
-                    if (btnVolver) {
-                        btnVolver.addEventListener('click', function () {
-                            bsModal.hide();
-                            window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
-                        }, { once: true });
-                    }
-                } else {
-                    // Fallback si no existe el modal
-                    window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
-                }
-            }, 5000);
-        }
-
-        stopAutomaticLast();
-        stopUpdateUserCount();
-        stopUpdateGameAccumulated();
-        messagePoller.stop();
-
-        const controlsDiv = $id('controls');
-        if (controlsDiv) {
-            controlsDiv.remove();
-        }
-    });
+                // Salida automática tras 3.5 segundos si el jugador no hace clic
+                setTimeout(function () {
+                    exitToPlay();
+                }, 3500);
+            } else {
+                exitToPlay();
+            }
+        }, 2000);
+    } else {
+        setTimeout(exitToPlay, 1500);
+    }
 }
 
 // Contador de usuarios optimizado

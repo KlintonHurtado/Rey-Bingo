@@ -457,6 +457,42 @@ if (!function_exists('bingo_get_official_sings_for_game')) {
     }
 }
 
+if (!function_exists('bingo_count_won_modalities')) {
+    function bingo_count_won_modalities(int $gameId): int
+    {
+        if ($gameId < 1) {
+            return 0;
+        }
+
+        $db = \Config\Database::connect();
+        $row = $db->query(
+            "SELECT COUNT(DISTINCT modality) as cnt FROM sings WHERE game = ? AND status IN (1, 2)",
+            [$gameId]
+        )->getRowArray();
+
+        return (int) ($row['cnt'] ?? 0);
+    }
+}
+
+if (!function_exists('bingo_is_game_finished_by_awards')) {
+    function bingo_is_game_finished_by_awards(int $gameId): bool
+    {
+        if ($gameId < 1) {
+            return false;
+        }
+
+        $db = \Config\Database::connect();
+        $awardsCount = (int) $db->table('awards')->where('game', $gameId)->where('status', 1)->countAllResults();
+        if ($awardsCount < 1) {
+            return false;
+        }
+
+        $wonModalities = bingo_count_won_modalities($gameId);
+
+        return $wonModalities >= $awardsCount;
+    }
+}
+
 if (!function_exists('bingo_finalize_game_when_complete')) {
     function bingo_finalize_game_when_complete(int $gameId): bool
     {
@@ -464,28 +500,23 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
             return false;
         }
 
-        $modelSings = new SingsModel();
-        $modelAwards = new AwardsModel();
         $modelGames = new GamesModel();
-
-        $awardsCount = $modelAwards->where('game', $gameId)->where('status', 1)->countAllResults();
-        if ($awardsCount < 1) {
+        $game = $modelGames->find($gameId);
+        if (!$game) {
             return false;
         }
 
-        $singsCount = $modelSings
-            ->select('modality')
-            ->where('game', $gameId)
-            ->whereIn('status', [1, 2])
-            ->groupBy('modality')
-            ->countAllResults();
+        // Si ya está finalizado en BD
+        if ((int) ($game['status'] ?? 0) === 0) {
+            return true;
+        }
 
-        if ($singsCount < $awardsCount) {
+        if (!bingo_is_game_finished_by_awards($gameId)) {
             return false;
         }
 
         bingo_ensure_winners_registered($gameId);
-        $modelGames->where('id', $gameId)->where('status', 1)->set([
+        $modelGames->where('id', $gameId)->set([
             'status' => 0,
             'updated_at' => date('Y-m-d H:i:s'),
         ])->update();
@@ -665,60 +696,9 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 $alreadyNotified[$winnerUserId] = true;
             }
 
-            // 2. Notificación a TODOS los demás jugadores HUMANOS con cartones en la partida (tanto cartons como temp_cartons)
-            $humanUserIds = [];
-            $cartonsUsers = $db->table('cartons')
-                ->select('cartons.user')
-                ->join('users', 'users.id = cartons.user')
-                ->where('cartons.game', $gameId)
-                ->where('cartons.user !=', $winnerUserId)
-                ->where('cartons.user >', 0)
-                ->notLike('users.code', 'BOT-')
-                ->notLike('users.email', '@reybingo.local')
-                ->notLike('users.email', '@reybingo.internal')
-                ->notLike('users.username', 'bot_')
-                ->groupBy('cartons.user')
-                ->get()
-                ->getResultArray();
-            foreach ($cartonsUsers as $cu) {
-                $humanUserIds[(int) $cu['user']] = true;
-            }
-
-            $tempCartonsUsers = $db->table('temp_cartons')
-                ->select('temp_cartons.user')
-                ->join('users', 'users.id = temp_cartons.user')
-                ->where('temp_cartons.game', $gameId)
-                ->where('temp_cartons.user !=', $winnerUserId)
-                ->where('temp_cartons.user >', 0)
-                ->notLike('users.code', 'BOT-')
-                ->notLike('users.email', '@reybingo.local')
-                ->notLike('users.email', '@reybingo.internal')
-                ->notLike('users.username', 'bot_')
-                ->groupBy('temp_cartons.user')
-                ->get()
-                ->getResultArray();
-            foreach ($tempCartonsUsers as $tcu) {
-                $humanUserIds[(int) $tcu['user']] = true;
-            }
-
-            foreach (array_keys($humanUserIds) as $hUserId) {
-                if ($hUserId > 0 && !isset($alreadyNotified[$hUserId])) {
-                    $batchInsert[] = [
-                        'user'       => $hUserId,
-                        'from'       => $gameCreatorId > 0 ? $gameCreatorId : 1,
-                        'type'       => 'sing',
-                        'type_id'    => $singId,
-                        'game'       => $gameId,
-                        'carton'     => $cartonId,
-                        'modality'   => $modalityId,
-                        'title'      => '🎉 ¡BINGO CANTADO!',
-                        'message'    => ((preg_match('/^(bingo|pleno)/i', trim(preg_replace('/^la\s+/i', '', $modalityName)))) ? ('Ganadores de la modalidad ' . trim(preg_replace('/^la\s+/i', '', $modalityName))) : ('Ganadores de la ' . trim(preg_replace('/^la\s+/i', '', $modalityName)))) . ': ' . $userName,
-                        'status'     => 0,
-                        'created_at' => $now,
-                    ];
-                    $alreadyNotified[$hUserId] = true;
-                }
-            }
+            // 2. Los demás jugadores NO reciben notificación persistente (BD) del bingo ajeno:
+            //    ya lo ven en vivo dentro de la partida por el canal private-game-{id} (ver más abajo).
+            //    Si se guardara en BD, les volvería a aparecer al salir de la partida.
 
             // 3. Notificación a TODOS los administradores (group 1) y operadores (group 3) y al creador del juego
             $staffUsers = $db->table('users')
