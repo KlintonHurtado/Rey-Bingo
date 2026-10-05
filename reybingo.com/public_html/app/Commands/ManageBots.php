@@ -11,13 +11,13 @@ class ManageBots extends BaseCommand
 {
     protected $group       = 'Bingo';
     protected $name        = 'bingo:bots';
-    protected $description = 'Gestiona e inyecta bots (500 bots x 2 cartones) en cualquier partida de bingo';
-    protected $usage       = 'bingo:bots [--game=<id>] [--action=assign|seed|clear|status] [--bots=500] [--cartons=2] [--clean]';
+    protected $description = 'Gestiona e inyecta bots (2000 bots x 4 cartones) en cualquier partida de bingo';
+    protected $usage       = 'bingo:bots [--game=<id>] [--action=assign|seed|clear|status] [--bots=2000] [--cartons=4] [--clean]';
     protected $options     = [
         '--game'    => 'ID de la partida a la que se asignarán o limpiarán los bots',
         '--action'  => 'Acción a realizar: assign (por defecto), seed, clear, status',
-        '--bots'    => 'Cantidad de bots a utilizar (por defecto: 500)',
-        '--cartons' => 'Cantidad de cartones por cada bot (por defecto: 2)',
+        '--bots'    => 'Cantidad de bots a utilizar (por defecto: 2000)',
+        '--cartons' => 'Cantidad de cartones por cada bot (por defecto: 4)',
         '--clean'   => 'Limpia los cartones existentes de bots en la partida antes de asignar nuevos',
     ];
 
@@ -27,12 +27,12 @@ class ManageBots extends BaseCommand
 
         $action = CLI::getOption('action') ?? $params['action'] ?? 'assign';
         $gameId = (int) (CLI::getOption('game') ?? $params['game'] ?? ($params[0] ?? 0));
-        $botsCount = (int) (CLI::getOption('bots') ?? $params['bots'] ?? 500);
-        $cartonsPerBot = (int) (CLI::getOption('cartons') ?? $params['cartons'] ?? 2);
+        $botsCount = (int) (CLI::getOption('bots') ?? $params['bots'] ?? 2000);
+        $cartonsPerBot = (int) (CLI::getOption('cartons') ?? $params['cartons'] ?? 4);
         $forceClean = (bool) (CLI::getOption('clean') ?? isset($params['clean']));
 
-        if ($botsCount < 1) $botsCount = 500;
-        if ($cartonsPerBot < 1) $cartonsPerBot = 2;
+        if ($botsCount < 1) $botsCount = 2000;
+        if ($cartonsPerBot < 1) $cartonsPerBot = 4;
 
         $botManager = new BotManager();
 

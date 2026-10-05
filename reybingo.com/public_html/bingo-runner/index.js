@@ -39,7 +39,7 @@ loadEnv();
 // ─────────────────────────────────────────
 const APP_URL          = process.env.APP_URL          || 'https://bingo.reybingo.com';
 const CRON_TOKEN       = process.env.CRON_TOKEN       || 'reybingo_cron_secret_key_2026';
-const SYNC_INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || '8000', 10);
+const SYNC_INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || '3000', 10);
 const MIN_TICK_MS      = parseInt(process.env.MIN_TICK_MS      || '3000', 10);
 const STATUS_PORT      = parseInt(process.env.STATUS_PORT      || '9999', 10);
 
@@ -151,7 +151,7 @@ async function tickGame(gameId) {
 // ─────────────────────────────────────────
 // Inicia o actualiza el timer de un juego
 // ─────────────────────────────────────────
-function startGameTimer(gameId, intervalMs) {
+function startGameTimer(gameId, intervalMs, numbersDrawn) {
     var safeInterval = Math.max(MIN_TICK_MS, parseInt(intervalMs, 10) || 15000);
 
     if (activeTimers.has(gameId)) {
@@ -161,9 +161,13 @@ function startGameTimer(gameId, intervalMs) {
         console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': intervalo actualizado a ' + safeInterval + 'ms');
     } else {
         console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': iniciando (cada ' + safeInterval + 'ms)');
+        // Si el juego apenas arranca sin balotas, cantar la primera balota de inmediato
+        if (typeof numbersDrawn !== 'undefined' && numbersDrawn === 0) {
+            console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': primera balota inmediata al iniciar');
+            tickGame(gameId);
+        }
     }
 
-    // Esperar al intervalo regular (sin tick inmediato a 0ms para evitar balotas adelantadas)
     var timerId = setInterval(function() { tickGame(gameId); }, safeInterval);
     activeTimers.set(gameId, { timerId: timerId, intervalMs: safeInterval });
 }
@@ -195,7 +199,7 @@ async function syncActiveGames() {
 
         // Arrancar / actualizar juegos activos
         serverGames.forEach(function(game) {
-            startGameTimer(game.id, game.intervalMs);
+            startGameTimer(game.id, game.intervalMs, game.numbersDrawn);
         });
 
         // Detener juegos que ya no están activos

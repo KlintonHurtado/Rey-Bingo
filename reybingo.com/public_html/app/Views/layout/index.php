@@ -626,10 +626,9 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }, 1500);
 
                 try {
-                    const playWinnerAudio = isWinner === true || type === 'winner' || type === 'own_sing';
-                    let audioSrc = playWinnerAudio ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
+                    let audioSrc = audioPath + 'winner.mp3';
                     const audio = initializeAudio(audioSrc);
-                    audio.volume = playWinnerAudio ? 0.8 : 0.35; // Sonido suave para otros jugadores
+                    audio.volume = 0.8;
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch((err) => {
@@ -660,27 +659,9 @@ $isNoMusicRole = session()->get('logged_in') && (
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Determinar el tipo de sonido a reproducir
-                        let soundType = 'default';
-                        let isWinnerSound = false;
-                        const hasOwnWinNotification = limitedNotifications.some(n => 
-                            n.type === 'own_sing' || 
-                            (n.type === 'sing' && (n.title || '').toLowerCase().includes('has cantado')) ||
-                            (n.type === 'payment' && (n.title || '').toLowerCase().includes('ganaste'))
-                        );
-                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing' || n.type === 'own_sing');
-                        const hasGameNotification = limitedNotifications.some(n => n.type === 'game');
-                        
-                        if (hasOwnWinNotification) {
-                            soundType = 'winner';
-                            isWinnerSound = true;
-                        } else if (hasSingNotification) {
-                            soundType = 'soft'; // Suave para otros ganadores
-                            isWinnerSound = false;
-                        } else if (hasGameNotification) {
-                            soundType = 'game';
-                            isWinnerSound = false;
-                        }
+                        // Determinar el tipo de sonido a reproducir: siempre winner.mp3
+                        let soundType = 'winner';
+                        let isWinnerSound = true;
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
                         if (limitedNotifications.length > 0) {

@@ -1136,14 +1136,10 @@
                 if (hasPlayedSound) return; // Si ya se reprodujo, no reproducir de nuevo
                 
                 try {
-                    let audioSrc;
-                    if (type === 'sing') {
-                        audioSrc = audioPath + 'winner.mp3';
-                    } else {
-                        audioSrc = audioPath + 'success.mp3';
-                    }
+                    let audioSrc = audioPath + 'winner.mp3';
                     
                     const audio = initializeAudio(audioSrc);
+                    audio.volume = 0.8;
                     
                     // Para iOS: crear una promesa que maneje el play
                     const playPromise = audio.play();
@@ -1178,7 +1174,7 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 const audioContext = new AudioContext();
                 
-                let audioSrc = type === 'sing' ? audioPath + 'winner.mp3' : audioPath + 'success.mp3';
+                let audioSrc = audioPath + 'winner.mp3';
                 
                 try {
                     const response = await fetch(audioSrc);

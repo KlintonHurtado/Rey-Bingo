@@ -47,8 +47,11 @@ class BotManager
      * Asegura la existencia de al menos $count usuarios bots en la BD.
      * Si no existen, los crea con nombres reales, saldo y marcado automático.
      */
-    public function ensureBots(int $count = 500): array
+    public function ensureBots(int $count = 2000): array
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $modelUsers = new UsersModel();
         $db = Database::connect();
 
@@ -129,8 +132,11 @@ class BotManager
     /**
      * Asigna N bots a una partida específica, cada uno con $cartonsPerBot cartones válidos de Bingo 75.
      */
-    public function assignBotsToGame(int $gameId, int $botCount = 500, int $cartonsPerBot = 2, bool $forceCleanFirst = false): array
+    public function assignBotsToGame(int $gameId, int $botCount = 2000, int $cartonsPerBot = 4, bool $forceCleanFirst = false): array
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
         $db = Database::connect();
@@ -173,8 +179,8 @@ class BotManager
         $totalCartonsCreated = 0;
         $now = date('Y-m-d H:i:s');
 
-        // Procesar en chunks de 100 bots (200 cartones) por iteración para cuidar memoria
-        $botChunks = array_chunk($bots, 100);
+        // Procesar en chunks de 50 bots (200 cartones con 4 por bot) por iteración para cuidar memoria
+        $botChunks = array_chunk($bots, 50);
 
         foreach ($botChunks as $chunk) {
             $db->transStart();
@@ -201,8 +207,10 @@ class BotManager
             $currentCartonIds = $modelCartons->select('id')
                 ->where('game', $gameId)
                 ->whereIn('user', array_column($chunk, 'id'))
-                ->where('serial', null)
-                ->orWhere('serial', '')
+                ->groupStart()
+                    ->where('serial', null)
+                    ->orWhere('serial', '')
+                ->groupEnd()
                 ->findColumn('id') ?? [];
 
             if (empty($currentCartonIds)) {
@@ -339,6 +347,8 @@ class BotManager
      */
     public function clearBotsFromGame(int $gameId): array
     {
+        @set_time_limit(300);
+
         $modelCartons = new CartonsModel();
         $modelUsers = new UsersModel();
         $db = Database::connect();

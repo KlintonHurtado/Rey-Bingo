@@ -1004,10 +1004,8 @@ function setupEvents() {
             gameTimerInterval = setInterval(updateGameTimer, 1000);
         }
 
-        setTimeout(() => {
-            generateAutoNumber();
-            startAutomaticGeneration();
-        }, 2000);
+        generateAutoNumber();
+        startAutomaticGeneration();
     });
 
     $('#next-number-button').on('click', () => {

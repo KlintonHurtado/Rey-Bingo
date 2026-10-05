@@ -609,12 +609,12 @@ class Cron extends Controller
                 continue;
             }
 
-            // Si es juego automático y aún no tiene cartones, auto-asignar 500 bots para que juegue
+            // Si es juego automático y aún no tiene cartones, auto-asignar 2000 bots para que juegue
             $gameCartons = bingo_count_game_cartons((int) $gameToStart['id']);
             if ($gameCartons === 0 && (int) ($gameToStart['type'] ?? 0) === 1) {
                 try {
                     $botManager = new \App\Libraries\BotManager();
-                    $botManager->assignBotsToGame((int) $gameToStart['id'], 500, 2);
+                    $botManager->assignBotsToGame((int) $gameToStart['id'], 2000, 4);
                 } catch (\Throwable $e) {
                     log_message('error', "Error asignando bots al arrancar juego {$gameToStart['id']}: " . $e->getMessage());
                 }
@@ -671,20 +671,7 @@ class Cron extends Controller
                 }
             }
 
-            // Primera bola: esperar al menos 4 segundos desde la activación del juego
-            // para que los jugadores vean "¡EL JUEGO HA INICIADO!" y se preparen.
-            if ($numbersDrawn === 0) {
-                if (in_array($gameId, $startedIds, true)) {
-                    log_message('info', "Juego {$gameId} recién iniciado: primera bola en el siguiente ciclo");
-                    continue;
-                }
-                $startSec = strtotime($game['updated_at'] ?? $now);
-                $nowSec = strtotime($now);
-                if (($nowSec - $startSec) < 4) {
-                    log_message('info', "Juego {$gameId} recién activado: esperando 4s de gracia antes de la primera bola");
-                    continue;
-                }
-            }
+            // Primera bola: se canta inmediatamente en este mismo ciclo apenas inicia el juego
 
             if ($this->isGameCompleted($gameId)) {
                 $modelGames->update($gameId, [
@@ -813,17 +800,7 @@ class Cron extends Controller
     {
         $lastBall = $this->getLastBall($gameId);
         if (! $lastBall) {
-            // Primera bola de la partida: verificar que la partida lleve activa al menos 4 segundos
-            // para permitir a los jugadores ver el cartel de inicio y prepararse antes de la primera bola.
-            $modelGames = new GamesModel();
-            $game = $modelGames->find($gameId);
-            if ($game && !empty($game['updated_at'])) {
-                $startSec = strtotime($game['updated_at']);
-                $nowSec = strtotime($now);
-                if (($nowSec - $startSec) < 4) {
-                    return false;
-                }
-            }
+            // Primera bola de la partida: debe salir inmediatamente apenas inicia el juego
             return true;
         }
 
@@ -1091,10 +1068,10 @@ class Cron extends Controller
             $totalPrize = ($awardType === 2) ? $awardValue : 100;
             $this->createGameAwards($gameId, $gameData['modalities'], $totalPrize);
 
-            // Asignar 500 bots automáticamente para que jueguen desde el inicio
+            // Asignar 2000 bots automáticamente para que jueguen desde el inicio
             try {
                 $botManager = new \App\Libraries\BotManager();
-                $botManager->assignBotsToGame((int) $gameId, 500, 2);
+                $botManager->assignBotsToGame((int) $gameId, 2000, 4);
             } catch (\Throwable $e) {
                 log_message('error', "Error asignando bots al crear juego automático {$gameId}: " . $e->getMessage());
             }
@@ -1867,13 +1844,34 @@ class Cron extends Controller
         $gamesToStart = $modelGames->where('type', 1)->where('status', 2)->findAll();
         foreach ($gamesToStart as $gameToStart) {
             if (bingo_game_is_due($gameToStart)) {
+                $gameCartons = bingo_count_game_cartons((int) $gameToStart['id']);
+                if ($gameCartons === 0 && (int) ($gameToStart['type'] ?? 0) === 1) {
+                    try {
+                        $botManager = new \App\Libraries\BotManager();
+                        $botManager->assignBotsToGame((int) $gameToStart['id'], 2000, 4);
+                    } catch (\Throwable $e) {
+                        log_message('error', "Error asignando bots al arrancar juego {$gameToStart['id']}: " . $e->getMessage());
+                    }
+                }
+
                 $postpone = bingo_postpone_game($gameToStart);
                 if (!$postpone['postponed']) {
+                    $now = date('Y-m-d H:i:s');
                     $modelGames->update($gameToStart['id'], [
                         'status' => 1,
-                        'updated_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => $now,
                     ]);
                     bingo_broadcast_game_status((int) $gameToStart['id'], 'game:started', ['status' => 1]);
+
+                    // Inmediatamente cantar la primera balota al iniciar la partida
+                    $ballLock = 'ball_game_' . $gameToStart['id'];
+                    if ($this->acquireCronLock($ballLock, 8)) {
+                        try {
+                            $this->drawSingleBall((int) $gameToStart['id'], $gameToStart, $now);
+                        } finally {
+                            $this->releaseCronLock($ballLock);
+                        }
+                    }
                 }
             }
         }
@@ -2006,46 +2004,15 @@ class Cron extends Controller
                 ]);
             }
 
-            $candidate = null;
-            $inserted = false;
-            for ($attempt = 0; $attempt < 8; $attempt++) {
-                $cand = $this->generateUniqueNumber($gameId);
-                if ($cand === null || $cand === false || $cand === 0) {
-                    break;
-                }
-                $inserted = bingo_insert_drawn_number($gameId, (int) $cand, [
-                    'user'       => $game['user'] ?? 1,
-                    'isCRON'     => 1,
-                    'created_at' => $now,
-                ]);
-                if ($inserted) {
-                    $candidate = (int) $cand;
-                    break;
-                }
-            }
-
-            if (! $inserted || ! $candidate) {
+            $number = $this->drawSingleBall($gameId, $game, $now);
+            if (! $number) {
                 return $this->response->setJSON([
                     'ok' => false,
                     'message' => 'No hay números disponibles o no se pudo insertar número único',
                 ]);
             }
 
-            $number = (int) $candidate;
-            bingo_broadcast_number_drawn($gameId, $number);
-
-            $this->dialNumber($number, $gameId);
-            $this->singBingo($gameId);
-
             $completedNow = $this->isGameCompleted($gameId);
-            if ($completedNow) {
-                $modelGames->update($gameId, [
-                    'status' => 0,
-                    'updated_at' => $now,
-                ]);
-                bingo_on_game_finished($gameId);
-                bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
-            }
 
             return $this->response->setJSON([
                 'ok' => true,
@@ -2057,5 +2024,64 @@ class Cron extends Controller
         } finally {
             $this->releaseCronLock($ballLock);
         }
+    }
+
+    /**
+     * Extrae, registra, canta y difunde una sola balota para el juego especificado de forma inmediata.
+     */
+    public function drawSingleBall(int $gameId, ?array $game = null, ?string $now = null): ?int
+    {
+        helper('bingo');
+        if ($now === null) {
+            $now = date('Y-m-d H:i:s');
+        }
+        if ($game === null) {
+            $modelGames = new GamesModel();
+            $game = $modelGames->find($gameId);
+        }
+        if (!$game) {
+            return null;
+        }
+
+        $candidate = null;
+        $inserted = false;
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $cand = $this->generateUniqueNumber($gameId);
+            if ($cand === null || $cand === false || $cand === 0) {
+                break;
+            }
+            $inserted = bingo_insert_drawn_number($gameId, (int) $cand, [
+                'user'       => $game['user'] ?? 1,
+                'isCRON'     => 1,
+                'created_at' => $now,
+            ]);
+            if ($inserted) {
+                $candidate = (int) $cand;
+                break;
+            }
+        }
+
+        if (! $inserted || ! $candidate) {
+            return null;
+        }
+
+        $number = (int) $candidate;
+        bingo_broadcast_number_drawn($gameId, $number);
+
+        $this->dialNumber($number, $gameId);
+        $this->singBingo($gameId);
+
+        $completedNow = $this->isGameCompleted($gameId);
+        if ($completedNow) {
+            $modelGames = new GamesModel();
+            $modelGames->update($gameId, [
+                'status' => 0,
+                'updated_at' => $now,
+            ]);
+            bingo_on_game_finished($gameId);
+            bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+        }
+
+        return $number;
     }
 }

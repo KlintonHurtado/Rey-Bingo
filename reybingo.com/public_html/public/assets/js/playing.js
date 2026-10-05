@@ -218,13 +218,28 @@ class AudioManager {
         this.initAudioContext();
         this.resumeContext();
 
+        const silentWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
         try {
-            // "Bendecir" los dos canales de voz con el gesto del usuario para evitar bloqueos en iOS y Android
+            if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume().catch(() => {});
+            }
+            if (this.audioCtx) {
+                const buffer = this.audioCtx.createBuffer(1, 1, 22050);
+                const source = this.audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.audioCtx.destination);
+                source.start(0);
+            }
+        } catch (e) {}
+
+        try {
             for (let i = 0; i < 2; i++) {
                 if (!this.voiceAudios[i]) {
                     this.voiceAudios[i] = new Audio();
                     this.voiceAudios[i].preload = 'auto';
                 }
+                this.voiceAudios[i].src = silentWav;
                 const p = this.voiceAudios[i].play();
                 if (p && typeof p.then === 'function') {
                     p.then(() => {
@@ -237,6 +252,14 @@ class AudioManager {
             if (!this.effectAudio) {
                 this.effectAudio = new Audio();
             }
+            this.effectAudio.src = silentWav;
+            const pe = this.effectAudio.play();
+            if (pe && typeof pe.then === 'function') {
+                pe.then(() => {
+                    this.effectAudio.pause();
+                    this.effectAudio.currentTime = 0;
+                }).catch(() => {});
+            }
 
             this._unlocked = true;
             this.hideAudioPrompt();
@@ -244,7 +267,7 @@ class AudioManager {
     }
 
     showAudioPrompt() {
-        if (this._unlocked || this._promptShown || document.getElementById('bingo-audio-unlock-prompt')) {
+        if (this._unlocked || document.getElementById('bingo-audio-unlock-prompt')) {
             return;
         }
         this._promptShown = true;
@@ -252,17 +275,17 @@ class AudioManager {
         prompt.id = 'bingo-audio-unlock-prompt';
         prompt.setAttribute('style', [
             'position: fixed',
-            'bottom: 24px',
+            'top: 65px',
             'left: 50%',
             'transform: translateX(-50%)',
             'background: linear-gradient(135deg, #1e1b4b, #312e81)',
-            'border: 1px solid rgba(250, 204, 21, 0.7)',
+            'border: 2px solid #facc15',
             'color: #fef08a',
             'padding: 10px 22px',
             'border-radius: 9999px',
             'font-size: 0.95rem',
             'font-weight: 700',
-            'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(250, 204, 21, 0.3)',
+            'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 18px rgba(250, 204, 21, 0.45)',
             'z-index: 99999',
             'cursor: pointer',
             'display: flex',
@@ -273,7 +296,7 @@ class AudioManager {
             'animation: promptBounce 1.6s infinite'
         ].join('; '));
 
-        prompt.innerHTML = '<i class="fa-duotone fa-solid fa-volume-high"></i> <span>Toca aquí para activar el sonido</span>';
+        prompt.innerHTML = '<i class="fa-duotone fa-solid fa-volume-high"></i> <span>Toca la pantalla para activar el sonido</span>';
         prompt.onclick = () => {
             unlockUserAudioGesture();
         };
@@ -365,7 +388,6 @@ class AudioManager {
 
         try {
             audio.src = src;
-            audio.currentTime = 0;
             audio.volume = 1.0;
             const p = audio.play();
             if (p && typeof p.catch === 'function') {
@@ -514,9 +536,7 @@ class AudioManager {
 
     preloadNumberAudios() {
         const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
-        // Precargar solo los 2 efectos de sonido principales para no ahogar la conexión en teléfonos
         this.preload(basePath + 'winner.mp3');
-        this.preload(basePath + 'success.mp3');
     }
 }
 
@@ -538,7 +558,7 @@ function unlockUserAudioGesture() {
         }
     }
 }
-['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(function (eventName) {
+['click', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown'].forEach(function (eventName) {
     document.addEventListener(eventName, unlockUserAudioGesture, { capture: true, passive: true });
 });
 
@@ -1872,12 +1892,16 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     flushPendingMark();
     clearBallRevealTimers(false);
 
-    // Si animate es false, o si es reconexión masiva (> 3 bolas perdidas) o si es carga tardía en partida avanzada:
-    const isLateMassiveJoin = previous.length === 0 && ordered.length > 3;
-    if (isLateMassiveJoin || missing.length > 3 || opts.animate === false) {
+    // Si animate es false, o si es reconexión masiva (> 5 bolas perdidas) o si es carga tardía en partida avanzada:
+    const isLateMassiveJoin = previous.length === 0 && ordered.length > 5;
+    if (isLateMassiveJoin || missing.length > 5 || opts.animate === false) {
         reconcileBallDisplay(ordered);
         if (isAutoMarkEnabled()) {
             syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
+        }
+        // Si la partida está activa y llegaron bolas, cantar al menos la última para no quedar en silencio
+        if (opts.animate !== false && missing.length > 0 && !bingoInProgress && !window.gameIsFinished) {
+            enqueueBallsForPlayback([missing[missing.length - 1]]);
         }
         return;
     }
@@ -2107,15 +2131,15 @@ function showOtherPlayerBingoNotice(data, callback) {
         });
     }
 
-    // 1. Reproducir sonido suave para ganador ajeno (NO el sonido estruendoso de ganador)
+    // 1. Reproducir sonido de notificación con winner.mp3
     try {
         if (typeof playNotificationSound === 'function') {
-            playNotificationSound('soft', false);
-        } else if (typeof audioManager !== 'undefined' && audioManager.playSoft) {
-            audioManager.playSoft(audioPath + 'success.mp3');
+            playNotificationSound('winner', true);
+        } else if (typeof audioManager !== 'undefined') {
+            audioManager.play(audioPath + 'winner.mp3');
         }
     } catch (e) {
-        console.warn('Error al reproducir audio suave de notificación:', e);
+        console.warn('Error al reproducir audio de notificación:', e);
     }
 
     // 2. Disparar notificación toast visual del sistema unificada por modalidad
@@ -2245,10 +2269,10 @@ function processNumberGetResponse(data) {
     if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
         const prevLen = numbersgenerated.length;
         const nextLen = uniqueOrderedBalls(data.drawnNumbers).length;
-        // Animar siempre que haya entre 1 y 3 bolas nuevas, incluyendo el inicio de la partida (prevLen === 0)
-        const isGameStart = prevLen === 0 && nextLen <= 3;
-        const isLiveFlow = prevLen > 0 && nextLen > prevLen && (nextLen - prevLen) <= 3;
-        const animateBalls = !bingoInProgress && (isGameStart || isLiveFlow);
+        // Animar y cantar siempre que haya nuevas balotas al inicio (hasta 5) o en flujo en vivo
+        const isGameStart = prevLen === 0 && nextLen <= 5;
+        const isLiveFlow = prevLen > 0 && nextLen > prevLen && (nextLen - prevLen) <= 5;
+        const animateBalls = !bingoInProgress && (isGameStart || isLiveFlow || (nextLen > prevLen));
         syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { animate: animateBalls });
     } else if (data.number) {
         handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
@@ -2445,17 +2469,51 @@ function showGameFinalized() {
     const container = $id('game-finalized');
     const text = $id('finalized');
 
-    if (container && text) {
-        container.style.display = 'block';
-        text.innerHTML = buildWinnersFinalText();
-
-        // Breve pausa visual de 2 segundos para ver ganadores antes del modal o salida directa
-        setTimeout(function () {
-            if (typeof awardsGet === 'function') {
-                awardsGet();
-            }
+    const openWinnersAwardsModal = function () {
+        if (container) {
             container.style.display = 'none';
+        }
 
+        let autoExitTimer = null;
+        // Dar 60 segundos completos para revisar con calma la tabla de ganadores y pagos
+        const autoExitDuration = 60000;
+
+        const scheduleAutoExit = function () {
+            if (autoExitTimer) clearTimeout(autoExitTimer);
+            autoExitTimer = setTimeout(function () {
+                exitToPlay();
+            }, autoExitDuration);
+        };
+
+        const cancelAutoExit = function () {
+            if (autoExitTimer) {
+                clearTimeout(autoExitTimer);
+                autoExitTimer = null;
+            }
+        };
+
+        // Si el usuario interactúa con el modal o compra cartones para la siguiente partida, no expulsarlo
+        $(document).on('click', '#modalAwards, #modalGameFinalized, .continue-button-buy, .card-button-buy', function () {
+            cancelAutoExit();
+        });
+
+        // Al cerrar cualquiera de los modales, salir limpiamente a la sala principal
+        $('#modalAwards, #modalGameFinalized').on('hidden.bs.modal', function () {
+            cancelAutoExit();
+            exitToPlay();
+        });
+
+        const awardsUrl = (typeof window.playerGroup !== 'undefined' && parseInt(window.playerGroup, 10) === 0)
+            ? site_url + 'playings/awardsGet'
+            : site_url + 'boards/awardsGet';
+
+        const modalAwardsEl = document.getElementById('modalAwards');
+        if (modalAwardsEl && typeof awardsGet === 'function') {
+            $("#modalAwards").load(awardsUrl, function () {
+                showBsModal('#modalAwards');
+                scheduleAutoExit();
+            });
+        } else {
             const bodyEl = document.getElementById('modalGameFinalizedBody');
             if (bodyEl) {
                 bodyEl.innerHTML = buildWinnersFinalText();
@@ -2469,21 +2527,27 @@ function showGameFinalized() {
                 const btnVolver = document.getElementById('btnVolverInicio');
                 if (btnVolver) {
                     btnVolver.addEventListener('click', function () {
+                        cancelAutoExit();
                         bsModal.hide();
                         exitToPlay();
                     }, { once: true });
                 }
 
-                // Salida automática tras 3.5 segundos si el jugador no hace clic
-                setTimeout(function () {
-                    exitToPlay();
-                }, 3500);
+                scheduleAutoExit();
             } else {
-                exitToPlay();
+                scheduleAutoExit();
             }
-        }, 2000);
+        }
+    };
+
+    if (container && text) {
+        container.style.display = 'block';
+        text.innerHTML = buildWinnersFinalText();
+
+        // Pausa breve de 2 segundos en la cabecera y luego abrir el cuadro blanco de ganadores
+        setTimeout(openWinnersAwardsModal, 2000);
     } else {
-        setTimeout(exitToPlay, 1500);
+        openWinnersAwardsModal();
     }
 }
 
@@ -3148,17 +3212,26 @@ function setupGameCountdown() {
         const timeDiff = targetDate - now;
 
         if (hasGameStarted()) {
+            if (intervalNextGame) {
+                clearInterval(intervalNextGame);
+                intervalNextGame = null;
+            }
             nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+            lastNumberGet();
             return;
         }
 
         if (timeDiff <= 0) {
-            clearInterval(intervalNextGame);
+            if (intervalNextGame) {
+                clearInterval(intervalNextGame);
+                intervalNextGame = null;
+            }
 
             if (window.gameIsFinished || isGameFinishedShown) {
                 nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
             } else {
-                nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
+                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+                lastNumberGet();
             }
             return;
         }
@@ -3189,13 +3262,19 @@ function setupGameCountdown() {
     if (now < targetDate) {
         updateCountdown();
         intervalNextGame = setInterval(updateCountdown, 1000);
+        // Sugerir activar sonido proactivamente durante el conteo si el navegador no ha recibido interacción
+        if (typeof audioManager !== 'undefined' && !audioManager._unlocked) {
+            audioManager.showAudioPrompt();
+        }
     } else {
         if (window.gameIsFinished || isGameFinishedShown) {
             nextGameSpan.textContent = (__['game finished!'] || 'JUEGO FINALIZADO').toUpperCase();
         } else if (hasGameStarted()) {
             nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
+            lastNumberGet();
         } else {
             nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
+            lastNumberGet();
         }
     }
 }
@@ -3506,14 +3585,20 @@ function initializeApp() {
         const initialDrawn = window.drawnNumbers
             .map(parseBallNumber)
             .filter(Boolean);
-        if (initialDrawn.length === 1 && !bingoInProgress) {
-            syncDrawnNumbersFromServer(initialDrawn, window.totalNumbersGenerated || 1, { animate: true });
+        // Si hay hasta 5 balotas cantadas al entrar (inicio de partida), reproducirlas y cantarlas en orden
+        if (initialDrawn.length >= 1 && initialDrawn.length <= 5 && !bingoInProgress) {
+            syncDrawnNumbersFromServer(initialDrawn, window.totalNumbersGenerated || initialDrawn.length, { animate: true });
         } else {
             numbersgenerated = initialDrawn.slice();
             lastNumbers = numbersgenerated.slice(-5);
             reconcileBallDisplay(numbersgenerated);
             markGameAsStartedFromServer(numbersgenerated.length);
             updateBallsCounter(numbersgenerated.length);
+            // Si la partida ya estaba avanzada pero sigue en curso, cantar la última balota cantada
+            if (!window.gameIsFinished && !isGameFinishedShown && initialDrawn.length > 0) {
+                const latestBall = initialDrawn[initialDrawn.length - 1];
+                enqueueBallsForPlayback([latestBall]);
+            }
         }
     } else if (Array.isArray(window.fiveNumbers) && window.fiveNumbers.length) {
         lastNumbers = window.fiveNumbers
@@ -3685,6 +3770,7 @@ function initializeApp() {
             pusherHelper.on('game:started', function (data) {
                 console.log('WS game:started received', data);
                 markGameAsStartedFromServer((data && data.drawnCount) || 1);
+                lastNumberGet();
             });
 
             // Fin de partida en tiempo real

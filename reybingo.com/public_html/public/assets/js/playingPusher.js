@@ -1021,15 +1021,12 @@ function setupGameCountdown() {
 
         if (timeDiff <= 0) {
             clearInterval(intervalNextGame);
+            intervalNextGame = null;
 
-            if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
-                if (winners.length > 0) {
-                    startWinnerSlider();
-                } else {
-                    nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
-                }
+            if (winners.length > 0) {
+                startWinnerSlider();
             } else {
-                nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
+                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
             }
             return;
         }
@@ -1061,14 +1058,10 @@ function setupGameCountdown() {
         updateCountdown();
         intervalNextGame = setInterval(updateCountdown, 1000);
     } else {
-        if (typeof totalNumbersGenerated !== 'undefined' && totalNumbersGenerated > 0) {
-            if (winners.length > 0) {
-                startWinnerSlider();
-            } else {
-                nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
-            }
+        if (winners.length > 0) {
+            startWinnerSlider();
         } else {
-            nextGameSpan.textContent = 'ESPERE QUE INICIE LA PARTIDA...';
+            nextGameSpan.textContent = '¡EL JUEGO HA INICIADO!';
         }
     }
 }

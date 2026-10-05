@@ -3668,7 +3668,7 @@ class Games extends Controller {
                 $playButtonAction = "gameGet('" . $game['id'] . "');";
 
                 $botButton = ! $canView
-                    ? '<button type="button" class="btn btn-modal btn-warning btn-sm" onclick="assignBotsPrompt(\'' . $game['id'] . '\');" title="Inyectar 500 Bots (2 cartones)" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-robot"></i></button>'
+                    ? '<button type="button" class="btn btn-modal btn-warning btn-sm" onclick="assignBotsPrompt(\'' . $game['id'] . '\');" title="Inyectar 2,000 Bots (4 cartones)" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-robot"></i></button>'
                     : '';
 
                 if ($game['type'] != 3 && $game['type'] != 4) {
@@ -4064,8 +4064,8 @@ class Games extends Controller {
         }
 
         $gameId = (int) ($gameId ?: ($this->request->getPost('game_id') ?: $this->request->getGet('game_id')));
-        $bots = (int) ($this->request->getPost('bots') ?: ($this->request->getGet('bots') ?: 500));
-        $cartons = (int) ($this->request->getPost('cartons') ?: ($this->request->getGet('cartons') ?: 2));
+        $bots = (int) ($this->request->getPost('bots') ?: ($this->request->getGet('bots') ?: 2000));
+        $cartons = (int) ($this->request->getPost('cartons') ?: ($this->request->getGet('cartons') ?: 4));
         $clean = (bool) ($this->request->getPost('clean') ?: $this->request->getGet('clean'));
 
         if ($gameId < 1) {

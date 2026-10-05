@@ -173,18 +173,18 @@
     function assignBotsPrompt(gameId) {
         if (!gameId) return;
         if (typeof Swal === 'undefined') {
-            if (confirm('¿Deseas inyectar 500 bots con 2 cartones cada uno (1,000 cartones) a la partida #' + gameId + '?')) {
+            if (confirm('¿Deseas inyectar 2,000 bots con 4 cartones cada uno (8,000 cartones) a la partida #' + gameId + '?')) {
                 window.location.href = '<?= site_url('games/assignBots') ?>/' + gameId;
             }
             return;
         }
 
         Swal.fire({
-            title: '¿Inyectar 500 Bots?',
-            text: 'Se asignarán 500 usuarios bots con 2 cartones cada uno (1,000 cartones en total) a la partida #' + gameId + ' para que jueguen y canten bingo automáticamente.',
+            title: '¿Inyectar 2,000 Bots?',
+            text: 'Se asignarán 2,000 usuarios bots con 4 cartones cada uno (8,000 cartones en total) a la partida #' + gameId + ' para que jueguen y canten bingo automáticamente.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: '<i class="fa-solid fa-robot me-1"></i> Sí, inyectar 500 bots',
+            confirmButtonText: '<i class="fa-solid fa-robot me-1"></i> Sí, inyectar 2,000 bots',
             cancelButtonText: 'Cancelar',
             showDenyButton: true,
             denyButtonText: '<i class="fa-solid fa-trash me-1"></i> Limpiar bots',
@@ -198,7 +198,7 @@
             if (result.isConfirmed) {
                 Swal.fire({
                     title: 'Inyectando bots...',
-                    text: 'Generando 1,000 cartones de bingo, por favor espere unos segundos...',
+                    text: 'Generando 8,000 cartones de bingo, por favor espere unos segundos...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -210,8 +210,8 @@
                     method: 'POST',
                     data: {
                         game_id: gameId,
-                        bots: 500,
-                        cartons: 2,
+                        bots: 2000,
+                        cartons: 4,
                         '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
                     },
                     dataType: 'json',
@@ -221,7 +221,7 @@
                             Swal.fire({
                                 icon: 'success',
                                 title: '¡Listo!',
-                                text: res.message || '500 bots asignados con éxito.'
+                                text: res.message || '2,000 bots asignados con éxito.'
                             });
                             if (typeof gameslistGet === 'function') {
                                 setTimeout(gameslistGet, 600);

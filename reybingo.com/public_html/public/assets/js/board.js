@@ -1854,9 +1854,7 @@ function setupEvents() {
         sendMessage((__['game started!'] || '┬íJUEGO INICIADO!') + ' ≡ƒÿÄ', 26);
         ensureGameTimerStarted();
 
-        setTimeout(() => {
-            startAutomaticGeneration();
-        }, 2000);
+        startAutomaticGeneration(true);
     });
 
     $('#next-number-button').on('click', () => {

@@ -1103,11 +1103,21 @@ class Playings extends Controller
         if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
             helper('bingo');
             if (bingo_game_is_due($game) && bingo_can_start_game($game, null, null, false)) {
+                $now = date('Y-m-d H:i:s');
                 $modelGames->update((int) $game['id'], [
                     'status' => 1,
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => $now,
                 ]);
                 $game['status'] = 1;
+                bingo_broadcast_game_status((int) $game['id'], 'game:started', ['status' => 1]);
+
+                if ((int)($game['type'] ?? 0) === 1 && empty($drawnNumbersOrdered)) {
+                    $cron = new \App\Controllers\Cron();
+                    $cron->drawSingleBall((int)$game['id'], $game, $now);
+                    $drawnNumbersOrdered = $this->getOrderedDrawnNumbers((int) $game['id']);
+                    $totalNumbersGenerated = count($drawnNumbersOrdered);
+                    $selectedNumbers = $drawnNumbersOrdered;
+                }
             }
         }
 
@@ -2064,15 +2074,24 @@ class Playings extends Controller
             }
 
             if ((int) ($game['status'] ?? 0) === 2) {
+                $now = date('Y-m-d H:i:s');
                 $modelGames->update((int) $game['id'], [
                     'status' => 1,
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => $now,
                 ]);
                 $game['status'] = 1;
+                bingo_broadcast_game_status((int) $game['id'], 'game:started', ['status' => 1]);
             }
         }
 
         $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->first();
+
+        // Si es partida automática activa y aún no tiene balotas cantadas, cantar la primera de inmediato
+        if (!$lastNumber && (int)($game['type'] ?? 0) === 1 && (int)($game['status'] ?? 0) === 1) {
+            $cron = new \App\Controllers\Cron();
+            $cron->drawSingleBall((int)$game['id'], $game, date('Y-m-d H:i:s'));
+            $lastNumber = $modelBoards->where('game', $game['id'])->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->first();
+        }
 
         if (!$lastNumber) {
             return $this->response->setJSON([
