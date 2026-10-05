@@ -355,20 +355,73 @@ if (!function_exists('bingo_get_number_sings_limit')) {
     }
 }
 
+if (!function_exists('bingo_modality_closed_by_sings')) {
+    /**
+     * Regla de cierre de modalidad:
+     * - En cuanto hay un ganador, la modalidad queda CERRADA para cualquier bola posterior.
+     * - Solo se aceptan empates que ocurran con la MISMA bola del primer ganador
+     *   (hasta numberSings como tope de seguridad).
+     *
+     * @param array $sings        Cantes existentes de la modalidad (deben incluir 'lastnumber').
+     * @param int   $currentBall  Número de la bola con la que se intenta cantar.
+     */
+    function bingo_modality_closed_by_sings(array $sings, int $currentBall): bool
+    {
+        if (empty($sings)) {
+            return false;
+        }
+
+        if (count($sings) >= bingo_get_number_sings_limit()) {
+            return true;
+        }
+
+        foreach ($sings as $sing) {
+            if ((int) ($sing['lastnumber'] ?? 0) !== $currentBall) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('bingo_is_modality_closed')) {
+    function bingo_is_modality_closed(int $gameId, int $modalityId, int $currentBall): bool
+    {
+        $sings = (new SingsModel())
+            ->select('id, lastnumber')
+            ->where('game', $gameId)
+            ->where('modality', $modalityId)
+            ->whereIn('status', [0, 1, 2])
+            ->findAll();
+
+        return bingo_modality_closed_by_sings($sings, $currentBall);
+    }
+}
+
 if (!function_exists('bingo_filter_first_sing_per_modality')) {
     /**
-     * Conserva hasta numberSings cantes oficiales por modalidad (orden de llegada).
-     * Antes solo dejaba el primero y el resto no se pagaba ni se anunciaba.
+     * Conserva los cantes oficiales por modalidad: el primer ganador y SOLO los empates
+     * que ocurrieron con la misma bola (hasta numberSings). Cantes de bolas posteriores
+     * no son oficiales (la modalidad ya estaba cerrada).
      */
     function bingo_filter_first_sing_per_modality(array $sings): array
     {
         $limit = bingo_get_number_sings_limit();
         $counts = [];
+        $firstBall = [];
         $official = [];
 
         foreach ($sings as $sing) {
             $modalityId = (int) ($sing['modality'] ?? 0);
             if ($modalityId < 1) {
+                continue;
+            }
+
+            $ball = (int) ($sing['lastnumber'] ?? 0);
+            if (!isset($firstBall[$modalityId])) {
+                $firstBall[$modalityId] = $ball;
+            } elseif ($firstBall[$modalityId] !== $ball) {
                 continue;
             }
 
@@ -464,12 +517,13 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
         // 1. Candado FOR UPDATE para serializar cantes y evitar que dos procesos o empates superen el límite
         $lockedSings = $db->query(
-            "SELECT id, user, carton FROM sings WHERE game = ? AND modality = ? AND status IN (0, 1, 2) FOR UPDATE",
+            "SELECT id, user, carton, lastnumber FROM sings WHERE game = ? AND modality = ? AND status IN (0, 1, 2) FOR UPDATE",
             [$gameId, (int) $modality['id']]
         )->getResultArray();
 
-        // 2. Si ya se alcanzó el límite exacto de ganadores por modalidad, abortar inmediatamente
-        if (count($lockedSings) >= $numberSingsLimit) {
+        // 2. Modalidad cerrada: ya hay ganador en una bola anterior (solo se permiten empates
+        //    en la misma bola) o se alcanzó el tope de numberSings.
+        if (count($lockedSings) >= $numberSingsLimit || bingo_modality_closed_by_sings($lockedSings, $lastBallNumber)) {
             $db->transRollback();
             return false;
         }
@@ -924,10 +978,15 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
         $singsCountByModality = [];
         $singByCartonModality = [];
         $singByUserModality = [];
+        $closedModalities = [];
         foreach ($existingSings as $s) {
             $mId = (int) $s['modality'];
             $cId = (int) $s['carton'];
             $uId = (int) $s['user'];
+            // Modalidad ganada en una bola anterior => cerrada (no admite más ganadores)
+            if ((int) ($s['lastnumber'] ?? 0) !== $lastBallNumber) {
+                $closedModalities[$mId] = true;
+            }
             $singsCountByModality[$mId] = ($singsCountByModality[$mId] ?? 0) + 1;
             $singByCartonModality[$cId . '_' . $mId] = true;
             $singByUserModality[$uId . '_' . $mId] = true;
@@ -941,7 +1000,7 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
             $modalityId = (int) $modality['id'];
             $currentModalitySings = $singsCountByModality[$modalityId] ?? 0;
 
-            if ($currentModalitySings >= $numberSingsLimit) {
+            if ($currentModalitySings >= $numberSingsLimit || !empty($closedModalities[$modalityId])) {
                 continue;
             }
 

@@ -2359,27 +2359,13 @@ class Playings extends Controller
                     continue;
                 }
 
-                $numberSingsLimit = bingo_get_number_sings_limit();
-                $modalityWinners = $modelSings
-                    ->where('game', $game['id'])
-                    ->where('modality', $modality['id'])
-                    ->countAllResults();
-
-                if ($modalityWinners >= $numberSingsLimit) {
+                // Modalidad cerrada: ya fue ganada en una bola anterior (solo empates en la misma bola)
+                if (bingo_is_modality_closed((int) $game['id'], (int) $modality['id'], (int) $lastBall['number'])) {
                     continue;
                 }
 
                 $requiredPositions = explode(',', (string) $modality['positions']);
                 $matchResult = null;
-
-                if ($singBingoOnlyLastBall == 1) {
-                    $singLastNumber = $modelSings->where('game', $game['id'])->where('modality', $modality['id'])->first();
-                    if ($singLastNumber) {
-                        if ($singLastNumber['lastnumber'] != $lastBall['number']) {
-                            continue;
-                        }
-                    }
-                }
 
                 $cartonNumbers = $modelNumbersCartons
                     ->where('carton', $carton['id'])
@@ -2643,11 +2629,7 @@ class Playings extends Controller
 
         $modalityFull = false;
         foreach ($modalities as $modality) {
-            $winnersForMod = $modelSings
-                ->where('game', $game['id'])
-                ->where('modality', $modality['id'])
-                ->countAllResults();
-            if ($winnersForMod >= bingo_get_number_sings_limit()) {
+            if (bingo_is_modality_closed((int) $game['id'], (int) $modality['id'], (int) $lastBall['number'])) {
                 $modalityFull = true;
                 break;
             }
