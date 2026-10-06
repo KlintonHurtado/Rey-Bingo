@@ -31,6 +31,7 @@ class PusherFactory
         return new \Pusher\Pusher($key, $secret, $appId, [
             'cluster' => $cluster,
             'useTLS'  => filter_var(env('PUSHER_USETLS', true), FILTER_VALIDATE_BOOL),
+            'timeout' => 4,
         ]);
     }
 

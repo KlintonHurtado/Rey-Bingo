@@ -1560,8 +1560,23 @@
 
         // Botones de salida - Mostrar modal al hacer clic
         $('.btn-home, .btn-exit, .btn-back').on('click', function (e) {
+            window.__userLeavingGame = true;
+            if (window.awardsModalTimeoutId) {
+                clearTimeout(window.awardsModalTimeoutId);
+                window.awardsModalTimeoutId = null;
+            }
             if (canLeaveGameWithoutWarning()) {
-                return true;
+                allowUnload = true;
+                window.allowGameUnload = true;
+                const modalAwardsEl = document.getElementById('modalAwards');
+                if (modalAwardsEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const bsModal = bootstrap.Modal.getInstance(modalAwardsEl);
+                    if (bsModal) bsModal.hide();
+                }
+                const playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+                const targetUrl = $(this).attr('href') || $(this).data('href') || playUrl;
+                window.location.replace(targetUrl);
+                return false;
             }
             e.preventDefault();
             exitUrl = $(this).attr('href') || $(this).data('href');

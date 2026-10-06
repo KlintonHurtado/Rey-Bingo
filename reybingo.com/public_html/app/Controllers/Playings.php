@@ -2553,10 +2553,8 @@ class Playings extends Controller
                 ];
             }
 
-            // Pagar a TODOS los ganadores oficiales de esas modalidades (reparto correcto)
-            // Los premios se liquidan al finalizar la partida vía bingo_finalize_game_when_complete / bingo_on_game_finished
-
-            $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+            // Comprobar si con este cante se completaron los premios
+            $gameCompleted = bingo_is_game_finished_by_awards((int) $game['id']);
 
             // Notificar a todos los jugadores en tiempo real (WebSocket + Notificaciones BD)
             foreach ($registeredSings as $item) {
@@ -2596,6 +2594,9 @@ class Playings extends Controller
                     'cartonId'   => (int) $singRow['carton'],
                 ]);
             }
+
+            // Liquidar premios y finalizar la partida si corresponde
+            bingo_finalize_game_when_complete((int) $game['id']);
 
             if ($singsPayload === []) {
                 return $this->response->setJSON([

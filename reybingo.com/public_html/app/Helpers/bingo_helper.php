@@ -171,13 +171,20 @@ if (!function_exists('bingo_broadcast_number_drawn')) {
             $drawn = $drawnNumbers ?? bingo_get_ordered_drawn_numbers($gameId);
             $total = $totalNumbersGenerated ?? count($drawn);
 
-            $client->trigger('private-game-' . $gameId, 'game:number_drawn', [
+            $payload = [
                 'n'                     => $number,
                 'number'                => $number,
                 'drawn'                 => $drawn,
                 'drawnNumbers'          => $drawn,
                 'totalNumbersGenerated' => $total,
-            ]);
+            ];
+
+            $channels = [
+                'private-game-' . $gameId,
+                'game-' . $gameId,
+            ];
+
+            $client->trigger($channels, 'game:number_drawn', $payload);
         } catch (\Throwable $e) {
             log_message('error', 'bingo_broadcast_number_drawn error: ' . $e->getMessage());
         }
@@ -585,10 +592,8 @@ if (!function_exists('bingo_register_sing_if_missing')) {
             try {
                 $singId = $modelSings->insertID();
 
-                // Los premios se liquidan al finalizar la partida vía bingo_finalize_game_when_complete -> bingo_on_game_finished
-
-                // Comprobar y finalizar si con este cante se completaron los premios
-                $gameCompleted = bingo_finalize_game_when_complete($gameId);
+                // Comprobar si con este cante se completaron los premios
+                $gameCompleted = bingo_is_game_finished_by_awards($gameId);
 
                 $modelUsers = new \App\Models\UsersModel();
                 $userSing = $modelUsers->find($userId);
@@ -611,6 +616,9 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                     'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompleted,
                 ]);
+
+                // Finalizar la partida y liquidar premios en BD
+                bingo_finalize_game_when_complete($gameId);
 
                 // Notificar de inmediato a jugadores humanos reales de la partida y al operador
                 bingo_notify_sing_to_all_players($gameId, [

@@ -194,6 +194,14 @@ class AudioManager {
         this.audioCtx = null;
         this._unlocked = false;
         this._promptShown = false;
+        if ('speechSynthesis' in window) {
+            try {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    try { window.speechSynthesis.getVoices(); } catch (e) {}
+                };
+                window.speechSynthesis.getVoices();
+            } catch (e) {}
+        }
         try {
             this.unlockAudio();
         } catch (e) {}
@@ -312,17 +320,29 @@ class AudioManager {
             if (hasSpokenFallback) return;
             hasSpokenFallback = true;
             if (num) {
-                this.speakOfflineNumber(num);
+                const spoken = this.speakOfflineNumber(num);
+                // Si no se pudo sintetizar voz femenina (porque no hay voz de mujer instalada en el dispositivo),
+                // NUNCA hablar con voz de hombre: reintentar la reproducción del audio grabado femenino original
+                if (!spoken && src) {
+                    try {
+                        const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
+                        retryAudio.volume = 1.0;
+                        const rp = retryAudio.play();
+                        if (rp && typeof rp.catch === 'function') {
+                            rp.catch(() => {});
+                        }
+                    } catch (e) {}
+                }
             }
         };
 
-        // Watchdog de red: si el MP3 tarda en descargar, solo recurrir a voz sintetizada tras 3500ms
-        // para dar prioridad absoluta a la locución grabada original del juego.
+        // Watchdog de red: dar tiempo prudencial para descargar el MP3 grabado original (voz femenina)
+        // antes de recurrir a la síntesis de voz femenina.
         const networkTimeout = setTimeout(() => {
             if (audio.readyState < 2) {
                 speakFallback();
             }
-        }, 3500);
+        }, 4500);
 
         audio.onended = () => {
             clearTimeout(networkTimeout);
@@ -333,7 +353,7 @@ class AudioManager {
         audio.onerror = (err) => {
             clearTimeout(networkTimeout);
             audio.onerror = null;
-            // Fallback a voz nativa sin internet si falla la descarga
+            // Fallback si falla la descarga del audio
             if (!hasSpokenFallback) {
                 try {
                     const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
@@ -372,6 +392,79 @@ class AudioManager {
         return audio;
     }
 
+    getFemaleSpanishVoice() {
+        if (!('speechSynthesis' in window)) return null;
+
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (!Array.isArray(voices) || voices.length === 0) return null;
+
+        // Lista estricta de nombres/patrones masculinos que NUNCA deben usarse
+        const malePatterns = [
+            'pablo', 'raul', 'raúl', 'david', 'jorge', 'diego', 'carlos', 'miguel',
+            'alvaro', 'álvaro', 'gonzalo', 'enrique', 'mateo', 'alejandro', 'antonio',
+            'manuel', 'pedro', 'javier', 'andres', 'andrés', 'fernando', 'jose',
+            'josé', 'juan', 'luis', 'sergio', 'victor', 'víctor', 'julio', 'cesar',
+            'césar', 'mario', 'guillermo', 'rodrigo', 'ricardo', 'eduardo', 'tomas',
+            'tomás', 'ignacio', 'esteban', 'santiago', 'felipe', 'marcos', 'lucas',
+            'hugo', 'martin', 'martín', 'alberto', 'emilio', 'male', 'hombre',
+            'guy', 'boy', 'man', 'masculin', 'varon', 'varón'
+        ];
+
+        // Lista de nombres/patrones explícitamente femeninos
+        const femalePatterns = [
+            'helena', 'elena', 'sabina', 'laura', 'monica', 'mónica', 'paulina',
+            'lucia', 'lucía', 'carmen', 'rosa', 'sofia', 'sofía', 'marisol',
+            'luciana', 'zira', 'dalia', 'elvira', 'paloma', 'conchita', 'lupe',
+            'ines', 'inés', 'soledad', 'maria', 'maría', 'victoria', 'valeria',
+            'claudia', 'camila', 'mia', 'mía', 'martina', 'catalina', 'isabella',
+            'abril', 'alicia', 'ana', 'eva', 'juana', 'francisca', 'ximena',
+            'jimena', 'penelope', 'penélope', 'sandra', 'patricia', 'silvia',
+            'teresa', 'irene', 'raquel', 'esther', 'rocio', 'rocío', 'alba',
+            'angelica', 'angélica', 'carlota', 'salome', 'salomé', 'lola', 'pilar',
+            'female', 'mujer', 'chica', 'feminin', 'femenin', 'woman', 'girl'
+        ];
+
+        const isMale = (v) => {
+            if (!v) return true;
+            if (v.gender && String(v.gender).toLowerCase() === 'male') return true;
+            const fullStr = ((v.name || '') + ' ' + (v.voiceURI || '')).toLowerCase();
+            return malePatterns.some(p => {
+                const regex = new RegExp('(?:^|[^a-záéíóúñ])' + p + '(?:$|[^a-záéíóúñ])', 'i');
+                return regex.test(fullStr);
+            });
+        };
+
+        const isFemale = (v) => {
+            if (!v) return false;
+            if (v.gender && String(v.gender).toLowerCase() === 'female') return true;
+            const fullStr = ((v.name || '') + ' ' + (v.voiceURI || '')).toLowerCase();
+            return femalePatterns.some(p => {
+                const regex = new RegExp('(?:^|[^a-záéíóúñ])' + p + '(?:$|[^a-záéíóúñ])', 'i');
+                return regex.test(fullStr);
+            });
+        };
+
+        // Filtrar voces en español (es, es-ES, es-MX, es-US, es-CO, etc.)
+        const esVoices = voices.filter(v => v && v.lang && v.lang.toLowerCase().startsWith('es'));
+        if (esVoices.length === 0) return null;
+
+        // 1. Prioridad: Voz en español confirmada como femenina y libre de nombres masculinos
+        const explicitFemale = esVoices.find(v => isFemale(v) && !isMale(v));
+        if (explicitFemale) {
+            return { voice: explicitFemale, isExplicit: true };
+        }
+
+        // 2. Segunda opción: Voz en español neutra (NO masculina bajo ninguna circunstancia)
+        const neutralEs = esVoices.find(v => !isMale(v));
+        if (neutralEs) {
+            return { voice: neutralEs, isExplicit: false };
+        }
+
+        // 3. Si todas las voces en español son de hombre (ej. sólo Pablo o Raúl instalados):
+        // NUNCA DEVOLVER VOZ MASCULINA.
+        return null;
+    }
+
     speakOfflineNumber(number) {
         try {
             if (!('speechSynthesis' in window)) return false;
@@ -379,31 +472,27 @@ class AudioManager {
             const n = parseInt(number, 10);
             if (!n || isNaN(n)) return false;
 
-            const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
-            const textToSay = letter ? `${letter}, ${n}` : `${n}`;
-
-            const voices = window.speechSynthesis.getVoices();
-            // Buscar voz explícitamente en español
-            let esVoice = null;
-            if (Array.isArray(voices) && voices.length > 0) {
-                esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
-            }
-
-            // Si el dispositivo NO tiene voz en español, NUNCA hablar en inglés ni con voz extraña
-            if (!esVoice && Array.isArray(voices) && voices.length > 0) {
-                console.warn('Dispositivo sin voz en español instalada. Se omite síntesis de voz en inglés.');
+            const femaleVoiceData = this.getFemaleSpanishVoice();
+            // REGLA ESTRICTA: El sistema de Rey Bingo SOLO utiliza locución femenina.
+            // Si el dispositivo/navegador no dispone de una voz femenina verificada,
+            // se cancela cualquier síntesis para evitar que el sistema operativo reproduzca
+            // una voz masculina por defecto.
+            if (!femaleVoiceData || !femaleVoiceData.voice) {
+                console.warn('Dispositivo sin voz femenina en español disponible. Se omite síntesis para evitar voz masculina.');
                 return false;
             }
 
+            const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
+            const textToSay = letter ? `${letter}, ${n}` : `${n}`;
+
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(textToSay);
-            utterance.lang = 'es-ES';
-            utterance.rate = 1.1;
+            utterance.voice = femaleVoiceData.voice;
+            utterance.lang = femaleVoiceData.voice.lang || 'es-ES';
+            // Ajustar tono: si es explícitamente femenina, tono 1.1; si es neutra, elevar a 1.28 para asegurar timbre femenino
+            utterance.pitch = femaleVoiceData.isExplicit ? 1.1 : 1.28;
+            utterance.rate = 1.05;
             utterance.volume = 1.0;
-
-            if (esVoice) {
-                utterance.voice = esVoice;
-            }
 
             window.speechSynthesis.speak(utterance);
             return true;
@@ -1248,14 +1337,14 @@ function handleBingoSuccess(data, resumeCallback) {
         mergeWinnersFromServer(data.winners);
     }
 
-    if (data.gameCompleted === true || window.gameIsFinished) {
+    const isCompleted = (data.gameCompleted === true || window.gameIsFinished);
+    if (isCompleted) {
         window.gameIsFinished = true;
-        showGameFinalized();
-        return;
+        window.allowGameUnload = true;
     }
 
     const afterCountdown = function () {
-        if (data.gameCompleted) {
+        if (isCompleted || data.gameCompleted || window.gameIsFinished) {
             showGameFinalized();
             return;
         }
@@ -1742,71 +1831,100 @@ function playNextBallInQueue() {
         return;
     }
 
-    if (isBallPlaybackActive || !ballPlaybackQueue.length || bingoInProgress) {
+    // Auto-recuperación si bingoInProgress quedó activo indebidamente por más de 4.5 segundos
+    if (bingoInProgress) {
+        if (!window.__bingoInProgressTimestamp) {
+            window.__bingoInProgressTimestamp = Date.now();
+        } else if (Date.now() - window.__bingoInProgressTimestamp > 4500) {
+            console.warn('Auto-recuperación: bingoInProgress activo por >4500ms, liberando bloqueo');
+            bingoInProgress = false;
+            window.__bingoInProgressTimestamp = null;
+        } else {
+            return;
+        }
+    } else {
+        window.__bingoInProgressTimestamp = null;
+    }
+
+    if (isBallPlaybackActive || !ballPlaybackQueue.length) {
         return;
     }
 
     isBallPlaybackActive = true;
-    const currentNumber = ballPlaybackQueue.shift();
 
-    // 1. Mostrar la balota en el cabezal con animación visual
-    updateMainBall(currentNumber);
-    const lastNumberEl = $('#last-number');
-    if (lastNumberEl.length) {
-        lastNumberEl.addClass('move-number');
-        if (ballRevealAfterTimer) {
-            clearTimeout(ballRevealAfterTimer);
-        }
-        ballRevealAfterTimer = setTimeout(function () {
-            lastNumberEl.removeClass('move-number');
-            ballRevealAfterTimer = null;
-        }, 500);
-    }
-
-    // 2. Cantar el audio de la balota inmediatamente si la narración está activa
-    const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
-    if (isNarrationOn && !window.gameIsFinished && !isGameFinishedShown) {
-        const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
-        audioManager.play(basePath + currentNumber + '.mp3', currentNumber);
-    }
-
-    // 3. Marcado INMEDIATO (0ms) en cartón y tablero al salir la balota
-    applyMarksForNumber(currentNumber);
-
-    // Actualizar el carrusel de últimas 5 balotas ordenadas hasta esta balota
-    if (Array.isArray(window.drawnNumbers)) {
-        const idx = window.drawnNumbers.indexOf(currentNumber);
-        if (idx !== -1) {
-            lastNumbers = window.drawnNumbers.slice(0, idx + 1).slice(-5);
-            renderBallHistory();
-        }
-    }
-
-    // 4. Watchdog de seguridad (3.2s) para garantizar que la locución NUNCA quede congelada
+    // Watchdog inmediato (3.5s) que garantiza que el flag isBallPlaybackActive NUNCA quede congelado
     if (window.__ballPlaybackWatchdog) {
         clearTimeout(window.__ballPlaybackWatchdog);
     }
     window.__ballPlaybackWatchdog = setTimeout(function () {
         if (isBallPlaybackActive) {
+            console.warn('Watchdog de balota: forzando liberación tras 3500ms');
             isBallPlaybackActive = false;
             if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
                 playNextBallInQueue();
             }
         }
-    }, 3200);
+    }, 3500);
 
-    // 5. Cadencia entre balotas: 1800ms si hay balotas acumuladas en cola, o 400ms si no hay más
-    const waitMs = ballPlaybackQueue.length > 0 ? 1800 : 400;
-    setTimeout(function () {
-        isBallPlaybackActive = false;
-        if (window.gameIsFinished || isGameFinishedShown) {
-            ballPlaybackQueue = [];
+    const waitMs = ballPlaybackQueue.length > 1 ? 1400 : 1800;
+
+    try {
+        const currentNumber = ballPlaybackQueue.shift();
+        if (!currentNumber) {
+            isBallPlaybackActive = false;
             return;
         }
-        if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
-            playNextBallInQueue();
+
+        // 1. Mostrar la balota en el cabezal con animación visual
+        updateMainBall(currentNumber);
+        const lastNumberEl = $('#last-number');
+        if (lastNumberEl.length) {
+            lastNumberEl.addClass('move-number');
+            if (ballRevealAfterTimer) {
+                clearTimeout(ballRevealAfterTimer);
+            }
+            ballRevealAfterTimer = setTimeout(function () {
+                lastNumberEl.removeClass('move-number');
+                ballRevealAfterTimer = null;
+            }, 500);
         }
-    }, waitMs);
+
+        // 2. Cantar el audio de la balota inmediatamente si la narración está activa
+        const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
+        if (isNarrationOn && !window.gameIsFinished && !isGameFinishedShown) {
+            const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
+            audioManager.play(basePath + currentNumber + '.mp3', currentNumber);
+        }
+
+        // 3. Marcado INMEDIATO (0ms) en cartón y tablero al salir la balota
+        applyMarksForNumber(currentNumber);
+
+        // Actualizar el carrusel de últimas 5 balotas ordenadas hasta esta balota
+        if (Array.isArray(window.drawnNumbers)) {
+            const idx = window.drawnNumbers.indexOf(currentNumber);
+            if (idx !== -1) {
+                lastNumbers = window.drawnNumbers.slice(0, idx + 1).slice(-5);
+                renderBallHistory();
+            }
+        }
+    } catch (err) {
+        console.error('Error al procesar balota en cola:', err);
+    } finally {
+        setTimeout(function () {
+            isBallPlaybackActive = false;
+            if (window.__ballPlaybackWatchdog) {
+                clearTimeout(window.__ballPlaybackWatchdog);
+                window.__ballPlaybackWatchdog = null;
+            }
+            if (window.gameIsFinished || isGameFinishedShown) {
+                ballPlaybackQueue = [];
+                return;
+            }
+            if (ballPlaybackQueue.length > 0 && !bingoInProgress) {
+                playNextBallInQueue();
+            }
+        }, waitMs);
+    }
 }
 
 function scheduleLatestBallMarks(latestNumber, options) {
@@ -1883,14 +2001,14 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
             syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
         }
         // Si la partida está activa y llegaron bolas, cantar al menos la última para no quedar en silencio
-        if (opts.animate !== false && missing.length > 0 && !bingoInProgress && !window.gameIsFinished) {
+        if (opts.animate !== false && missing.length > 0 && !window.gameIsFinished) {
             enqueueBallsForPlayback([missing[missing.length - 1]]);
         }
         return;
     }
 
     // Partida en vivo o inicio de partida: si hay bolas nuevas, marcar inmediatamente en 0ms y reproducir en cola
-    if (missing.length > 0 && !bingoInProgress) {
+    if (missing.length > 0) {
         if (isAutoMarkEnabled()) {
             missing.forEach(function (num) {
                 applyMarksForNumber(num);
@@ -2054,11 +2172,13 @@ function showCountdown(data, callback) {
         });
     }
 
-    // Si el juego finalizó, no demorar con setTimeout ni encadenar bingos
+    // Si el juego finalizó, dar 3.5 segundos de celebración al ganador antes de pasar al fin de juego
     if ((data && data.gameCompleted === true) || window.gameIsFinished || isGameFinishedShown) {
         simultaneousBingos = [];
-        bingoInProgress = false;
-        if (typeof callback === 'function') callback();
+        setTimeout(function () {
+            bingoInProgress = false;
+            if (typeof callback === 'function') callback();
+        }, 3500);
         return;
     }
 
@@ -2167,15 +2287,15 @@ function showOtherPlayerBingoNotice(data, callback) {
         data.isOwnBingo = false;
     }
 
-    // Si la partida terminó con este cante, saltar de inmediato al fin de juego sin esperar
-    if ((data && data.gameCompleted === true) || window.gameIsFinished || isGameFinishedShown) {
+    // Si la partida terminó con este cante, permitir que showCountdown corra la celebración y al terminar llame a showGameFinalized
+    const isCompleted = (data && (data.gameCompleted === true || data.stopped === true));
+    if (isCompleted) {
         window.gameIsFinished = true;
-        showGameFinalized();
-        return;
+        window.allowGameUnload = true;
     }
 
     showCountdown(data, function () {
-        if (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
+        if (isCompleted || data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown) {
             showGameFinalized();
             return;
         }
@@ -2220,17 +2340,13 @@ function processNumberGetResponse(data) {
         return;
     }
 
-    // Partida finalizada: detener inmediatamente intervalos, vaciar cola de balotas y detener audio
+    // Partida finalizada: detener inmediatamente intervalos y vaciar cola de balotas
     if (window.gameIsFinished || isGameFinishedShown || data.status === 'completed' || data.gameCompleted === true) {
         window.gameIsFinished = true;
         window.allowGameUnload = true;
         ballPlaybackQueue = [];
         isBallPlaybackActive = false;
         intervalManager.clear('lastNumber');
-
-        if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-            audioManager.stopAll();
-        }
 
         applyNumberGetMeta(data);
         applyAutoMarkPreferenceFromServer(data.autodial);
@@ -2249,6 +2365,24 @@ function processNumberGetResponse(data) {
         }
 
         window.gameHasWinner = true;
+
+        // Si hay una celebración en progreso, no cortar audio ni interrumpir
+        if (bingoInProgress) {
+            return;
+        }
+
+        // Si hay ganador que no se ha notificado aún, mostrar aviso antes de finalizar
+        const noticeKey = ((data.player || '') + '_' + (data.modality || ''));
+        if (data.player && data.modality && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
+            showOtherPlayerBingoNotice(data, function () {
+                showGameFinalized();
+            });
+            return;
+        }
+
+        if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+            audioManager.stopAll();
+        }
         showGameFinalized();
         return;
     }
@@ -2460,9 +2594,21 @@ function showGameFinalized() {
     }
 
     const exitToPlay = function () {
+        window.__userLeavingGame = true;
         window.allowGameUnload = true;
+        if (window.awardsModalTimeoutId) {
+            clearTimeout(window.awardsModalTimeoutId);
+            window.awardsModalTimeoutId = null;
+        }
+        const modalAwardsEl = document.getElementById('modalAwards');
+        if (modalAwardsEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
+            if (bsAwardsModal) {
+                bsAwardsModal.hide();
+            }
+        }
         const targetUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
-        window.location.href = targetUrl;
+        window.location.replace(targetUrl);
     };
 
     // Actualizar ganadores en segundo plano sin bloquear la UI
@@ -2474,6 +2620,9 @@ function showGameFinalized() {
     const text = $id('finalized');
 
     const openWinnersAwardsModal = function () {
+        if (window.__userLeavingGame) {
+            return;
+        }
         if (container) {
             container.style.display = 'none';
         }
@@ -2526,6 +2675,9 @@ function showGameFinalized() {
         }
 
         $("#modalAwards").load(awardsUrl, function (response, status, xhr) {
+            if (window.__userLeavingGame) {
+                return;
+            }
             if (status === 'error') {
                 console.error('Error cargando modalAwards:', xhr ? xhr.status : status);
                 const bodyEl = document.getElementById('modalGameFinalizedBody');
@@ -2573,11 +2725,12 @@ function showGameFinalized() {
     };
 
     if (container && text) {
-        container.style.display = 'block';
-        text.innerHTML = buildWinnersFinalText();
+        container.style.display = 'none';
     }
-    // Abrir de inmediato el cuadro blanco de ganadores (modalAwards)
-    setTimeout(openWinnersAwardsModal, 500);
+    if (window.awardsModalTimeoutId) {
+        clearTimeout(window.awardsModalTimeoutId);
+    }
+    window.awardsModalTimeoutId = setTimeout(openWinnersAwardsModal, 200);
 }
 
 // Contador de usuarios optimizado
@@ -3757,7 +3910,15 @@ function initializeApp() {
             // Bingos cantados y aceptados en tiempo real
             pusherHelper.on('game:bingo_accepted', function (data) {
                 console.log('WS game:bingo_accepted received', data);
-                if (!data || window.gameIsFinished || isGameFinishedShown) return;
+                if (!data) return;
+
+                const noticeKey = (data.singId ? 'sing_' + data.singId : '') ||
+                                  (data.cartonId ? 'carton_' + data.cartonId + '_' + (data.modalityId || '') : '') ||
+                                  ((data.player || '') + '_' + (data.modality || ''));
+                if (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) {
+                    return;
+                }
+
                 if (Array.isArray(data.winners)) {
                     mergeWinnersFromServer(data.winners);
                 }
@@ -3765,50 +3926,76 @@ function initializeApp() {
                     registerWinner(data.player, data.modality);
                 }
 
-                if (data.gameCompleted === true || data.stopped === true) {
+                const isCompleted = (data.gameCompleted === true || data.stopped === true);
+                if (isCompleted) {
                     window.gameIsFinished = true;
+                    window.allowGameUnload = true;
                     ballPlaybackQueue = [];
                     isBallPlaybackActive = false;
                     intervalManager.clear('lastNumber');
-                    if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-                        audioManager.stopAll();
-                    }
-                    if (!isOwnBingoEvent(data)) {
-                        showOtherPlayerBingoNotice(data);
-                    }
-                    showGameFinalized();
-                    return;
                 }
 
                 if (data.player && data.modality) {
                     if (isOwnBingoEvent(data)) {
-                        if (!bingoInProgress) {
-                            bingoInProgress = true;
-                            intervalManager.clear('lastNumber');
-                            showCountdown({
-                                player: data.player,
-                                modality: data.modality,
+                        bingoInProgress = true;
+                        intervalManager.clear('lastNumber');
+
+                        try {
+                            if (typeof audioManager !== 'undefined' && audioManager.play) {
+                                audioManager.play(audioPath + 'winner.mp3');
+                            } else if (typeof playNotificationSound === 'function') {
+                                playNotificationSound('sing', true);
+                            }
+                        } catch (e) {
+                            console.warn('Error al reproducir audio de ganador:', e);
+                        }
+                        if (typeof window.AppcreateConfetti === 'function') {
+                            window.AppcreateConfetti();
+                        }
+                        if (typeof window.showNotification === 'function') {
+                            const modClean = (data.modality || 'Bingo').replace(/^la\s+/i, '').trim();
+                            window.showNotification({
+                                id: noticeKey || ('own_' + Date.now()),
+                                type: 'own_sing',
                                 modalityId: data.modalityId,
-                                image: data.image,
-                                isOwnBingo: true,
-                                winnerUserId: data.winnerUserId
-                            }, function () {
-                                if (data.gameCompleted || data.stopped || window.gameIsFinished || isGameFinishedShown) {
-                                    showGameFinalized();
-                                    return;
-                                }
-                                startAutomaticLast();
+                                modality: data.modality,
+                                player: data.player || 'Tú',
+                                cartonId: data.cartonId,
+                                title: '🎉 ¡BINGO CANTADO!',
+                                message: `Ganadores de la modalidad ${modClean}: ${data.player || 'Tú'}`,
+                                created_at: new Date().toISOString()
                             });
                         }
-                    } else if (!isGameFinishedShown) {
-                        showOtherPlayerBingoNotice(data);
+
+                        showCountdown({
+                            player: data.player,
+                            modality: data.modality,
+                            modalityId: data.modalityId,
+                            image: data.image,
+                            isOwnBingo: true,
+                            winnerUserId: data.winnerUserId
+                        }, function () {
+                            if (isCompleted || window.gameIsFinished || isGameFinishedShown) {
+                                showGameFinalized();
+                                return;
+                            }
+                            startAutomaticLast();
+                        });
+                    } else {
+                        showOtherPlayerBingoNotice(data, function () {
+                            if (isCompleted || window.gameIsFinished || isGameFinishedShown) {
+                                showGameFinalized();
+                            }
+                        });
                     }
+                } else if (isCompleted) {
+                    showGameFinalized();
                 }
             });
 
             pusherHelper.on('game:bingo_claimed', function (data) {
                 console.log('WS game:bingo_claimed received', data);
-                if (!data || window.gameIsFinished || isGameFinishedShown) return;
+                if (!data) return;
                 if (Array.isArray(data.winners)) {
                     mergeWinnersFromServer(data.winners);
                 }
@@ -3825,9 +4012,16 @@ function initializeApp() {
             pusherHelper.on('game:game_finished', function (data) {
                 console.log('WS game:game_finished received', data);
                 window.gameIsFinished = true;
+                window.allowGameUnload = true;
                 ballPlaybackQueue = [];
                 isBallPlaybackActive = false;
                 intervalManager.clear('lastNumber');
+
+                // Si hay un cante de bingo celebrándose en este momento, no cortar la celebración
+                if (bingoInProgress) {
+                    return;
+                }
+
                 if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
                     audioManager.stopAll();
                 }
@@ -3837,9 +4031,15 @@ function initializeApp() {
             pusherHelper.on('game:completed', function (data) {
                 console.log('WS game:completed received', data);
                 window.gameIsFinished = true;
+                window.allowGameUnload = true;
                 ballPlaybackQueue = [];
                 isBallPlaybackActive = false;
                 intervalManager.clear('lastNumber');
+
+                if (bingoInProgress) {
+                    return;
+                }
+
                 if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
                     audioManager.stopAll();
                 }
@@ -4009,8 +4209,31 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
             };
         }
     };
-
-    console.log('Bingo Debug tools available in window.BingoDebug');
 }
+
+// Manejo prioritario del botón home (casita) para salir inmediatamente sin trabas ni cuadros de ganadores
+$(document).on('click', '.btn-home', function (e) {
+    window.__userLeavingGame = true;
+    if (window.awardsModalTimeoutId) {
+        clearTimeout(window.awardsModalTimeoutId);
+        window.awardsModalTimeoutId = null;
+    }
+    const modalAwardsEl = document.getElementById('modalAwards');
+    if (modalAwardsEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const bsModal = bootstrap.Modal.getInstance(modalAwardsEl);
+        if (bsModal) {
+            bsModal.hide();
+        }
+    }
+    const container = document.getElementById('game-finalized');
+    if (container) {
+        container.style.display = 'none';
+    }
+    window.allowGameUnload = true;
+    const playUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
+    const targetUrl = $(this).attr('href') || playUrl;
+    window.location.replace(targetUrl);
+    return false;
+});
 
 console.log('Bingo App script loaded successfully');

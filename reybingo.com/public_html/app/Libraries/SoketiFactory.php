@@ -48,6 +48,7 @@ class SoketiFactory
             'useTLS'  => $useTls,
             // Necesario para que el SDK no intente conectar a pusher.com
             'cluster' => '',
+            'timeout' => 4,
         ]);
     }
 

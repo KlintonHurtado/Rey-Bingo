@@ -306,7 +306,7 @@
 </style>
 <div class="container-section container-section--board-admin">
     <div class="top-section">
-        <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
+        <a class="btn btn-small btn-home" href="<?= site_url('games'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 
         <button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();">
             <i class="fa-duotone fa-solid fa-wallet"></i>
@@ -714,8 +714,16 @@
 
         // Botones de salida
         $('.btn-home, .btn-exit, .btn-back').on('click', function(e) {
+            window.__userLeavingGame = true;
+            if (window.gameIsFinished || allowUnload || (typeof isGameFinishedShown !== 'undefined' && isGameFinishedShown)) {
+                allowUnload = true;
+                const gamesUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'games';
+                const targetUrl = $(this).attr('href') || $(this).data('href') || gamesUrl;
+                window.location.replace(targetUrl);
+                return false;
+            }
             e.preventDefault();
-            exitUrl = $(this).attr('href') || $(this).data('href');
+            exitUrl = $(this).attr('href') || $(this).data('href') || ((typeof site_url !== 'undefined' ? site_url : '/') + 'games');
             if (typeof showBsModal === 'function') showBsModal('#modalExit');
         });
 

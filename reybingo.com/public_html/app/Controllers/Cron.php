@@ -687,7 +687,7 @@ class Cron extends Controller
 
             // En bingo en vivo siempre se canta como máximo 1 balota por ciclo si corresponde el intervalo.
             // NUNCA cantar balotas en ráfaga (0ms) para evitar balotas adelantadas sin locución.
-            if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
+            if (! $this->canDrawBallNow($gameId, $timeBallGet, $now, $fromSequence)) {
                 log_message('info', "Juego {$gameId} - aún no toca cantar bola (intervalo no cumplido)");
                 continue;
             }
@@ -718,7 +718,7 @@ class Cron extends Controller
                 }
 
                 // Revalidar intervalo justo antes de cantar
-                if (! $this->canDrawBallNow($gameId, $timeBallGet, $now)) {
+                if (! $this->canDrawBallNow($gameId, $timeBallGet, $now, $fromSequence)) {
                     log_message('info', "Juego {$gameId} - bola omitida (intervalo o ya cantada por otro proceso)");
                     continue;
                 }
@@ -796,7 +796,7 @@ class Cron extends Controller
     }
 
     /** True si corresponde cantar una bola ahora (relee DB para evitar duplicados). */
-    private function canDrawBallNow(int $gameId, int $timeBallGet, string $now): bool
+    private function canDrawBallNow(int $gameId, int $timeBallGet, string $now, bool $fromSequence = false): bool
     {
         $lastBall = $this->getLastBall($gameId);
         if (! $lastBall) {
@@ -804,10 +804,11 @@ class Cron extends Controller
             return true;
         }
 
-        // Intervalo estricto en segundos: nunca adelantar balotas
+        // Intervalo en segundos: si viene de ballSequence(), tolerar 1s para evitar saltos por redondeo de microtiempo a segundos
         $minSeconds = max(1, (int) floor($timeBallGet / 1000));
         $elapsedSeconds = strtotime($now) - strtotime($lastBall['created_at']);
-        return $elapsedSeconds >= $minSeconds;
+        $threshold = $fromSequence ? max(1, $minSeconds - 1) : $minSeconds;
+        return $elapsedSeconds >= $threshold;
     }
 
     private function acquireCronLock(string $name, int $ttlSeconds): bool
@@ -1744,7 +1745,7 @@ class Cron extends Controller
 
             // 4. Notificar por Pusher/Soketi a todos los clientes en tiempo real
             $lastBall = $modelBoards->where('game', $gameId)->orderBy('id', 'DESC')->first();
-            $gameCompleted = bingo_finalize_game_when_complete((int) $gameId);
+            $gameCompleted = bingo_is_game_finished_by_awards((int) $gameId);
             $officialWinners = bingo_get_official_sings_for_game((int) $gameId, true);
 
             foreach ($newSings as $sing) {

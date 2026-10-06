@@ -99,6 +99,7 @@ let autoSubmitInFlight = false;
 let generationTimeoutId = null;
 let centerAnimBusy = false;
 let centerAnimQueue = [];
+let lastAnimatedCenterBall = null;
 let autoGenerationWanted = false;
 
 // ==========================================
@@ -191,6 +192,14 @@ class AudioManager {
         this.preloadedAudios = new Set();
         this.voiceAudio = null;
         this.audioPool = [];
+        if ('speechSynthesis' in window) {
+            try {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    try { window.speechSynthesis.getVoices(); } catch (e) {}
+                };
+                window.speechSynthesis.getVoices();
+            } catch (e) {}
+        }
     }
     
     preload(src) {
@@ -201,6 +210,116 @@ class AudioManager {
         audio.src = src;
         this.audioCache.set(src, audio);
         this.preloadedAudios.add(src);
+    }
+
+    getFemaleSpanishVoice() {
+        if (!('speechSynthesis' in window)) return null;
+
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (!Array.isArray(voices) || voices.length === 0) return null;
+
+        // Lista estricta de nombres/patrones masculinos que NUNCA deben usarse
+        const malePatterns = [
+            'pablo', 'raul', 'raúl', 'david', 'jorge', 'diego', 'carlos', 'miguel',
+            'alvaro', 'álvaro', 'gonzalo', 'enrique', 'mateo', 'alejandro', 'antonio',
+            'manuel', 'pedro', 'javier', 'andres', 'andrés', 'fernando', 'jose',
+            'josé', 'juan', 'luis', 'sergio', 'victor', 'víctor', 'julio', 'cesar',
+            'césar', 'mario', 'guillermo', 'rodrigo', 'ricardo', 'eduardo', 'tomas',
+            'tomás', 'ignacio', 'esteban', 'santiago', 'felipe', 'marcos', 'lucas',
+            'hugo', 'martin', 'martín', 'alberto', 'emilio', 'male', 'hombre',
+            'guy', 'boy', 'man', 'masculin', 'varon', 'varón'
+        ];
+
+        // Lista de nombres/patrones explícitamente femeninos
+        const femalePatterns = [
+            'helena', 'elena', 'sabina', 'laura', 'monica', 'mónica', 'paulina',
+            'lucia', 'lucía', 'carmen', 'rosa', 'sofia', 'sofía', 'marisol',
+            'luciana', 'zira', 'dalia', 'elvira', 'paloma', 'conchita', 'lupe',
+            'ines', 'inés', 'soledad', 'maria', 'maría', 'victoria', 'valeria',
+            'claudia', 'camila', 'mia', 'mía', 'martina', 'catalina', 'isabella',
+            'abril', 'alicia', 'ana', 'eva', 'juana', 'francisca', 'ximena',
+            'jimena', 'penelope', 'penélope', 'sandra', 'patricia', 'silvia',
+            'teresa', 'irene', 'raquel', 'esther', 'rocio', 'rocío', 'alba',
+            'angelica', 'angélica', 'carlota', 'salome', 'salomé', 'lola', 'pilar',
+            'female', 'mujer', 'chica', 'feminin', 'femenin', 'woman', 'girl'
+        ];
+
+        const isMale = (v) => {
+            if (!v) return true;
+            if (v.gender && String(v.gender).toLowerCase() === 'male') return true;
+            const fullStr = ((v.name || '') + ' ' + (v.voiceURI || '')).toLowerCase();
+            return malePatterns.some(p => {
+                const regex = new RegExp('(?:^|[^a-záéíóúñ])' + p + '(?:$|[^a-záéíóúñ])', 'i');
+                return regex.test(fullStr);
+            });
+        };
+
+        const isFemale = (v) => {
+            if (!v) return false;
+            if (v.gender && String(v.gender).toLowerCase() === 'female') return true;
+            const fullStr = ((v.name || '') + ' ' + (v.voiceURI || '')).toLowerCase();
+            return femalePatterns.some(p => {
+                const regex = new RegExp('(?:^|[^a-záéíóúñ])' + p + '(?:$|[^a-záéíóúñ])', 'i');
+                return regex.test(fullStr);
+            });
+        };
+
+        // Filtrar voces en español (es, es-ES, es-MX, es-US, es-CO, etc.)
+        const esVoices = voices.filter(v => v && v.lang && v.lang.toLowerCase().startsWith('es'));
+        if (esVoices.length === 0) return null;
+
+        // 1. Prioridad: Voz en español confirmada como femenina y libre de nombres masculinos
+        const explicitFemale = esVoices.find(v => isFemale(v) && !isMale(v));
+        if (explicitFemale) {
+            return { voice: explicitFemale, isExplicit: true };
+        }
+
+        // 2. Segunda opción: Voz en español neutra (NO masculina bajo ninguna circunstancia)
+        const neutralEs = esVoices.find(v => !isMale(v));
+        if (neutralEs) {
+            return { voice: neutralEs, isExplicit: false };
+        }
+
+        // 3. Si todas las voces en español son de hombre (ej. sólo Pablo o Raúl instalados):
+        // NUNCA DEVOLVER VOZ MASCULINA.
+        return null;
+    }
+
+    speakOfflineNumber(number) {
+        try {
+            if (!('speechSynthesis' in window)) return false;
+
+            const n = parseInt(number, 10);
+            if (!n || isNaN(n)) return false;
+
+            const femaleVoiceData = this.getFemaleSpanishVoice();
+            // REGLA ESTRICTA: El sistema de Rey Bingo SOLO utiliza locución femenina.
+            // Si el dispositivo/navegador no dispone de una voz femenina verificada,
+            // se cancela cualquier síntesis para evitar que el sistema operativo reproduzca
+            // una voz masculina por defecto.
+            if (!femaleVoiceData || !femaleVoiceData.voice) {
+                console.warn('Dispositivo sin voz femenina en español disponible. Se omite síntesis para evitar voz masculina.');
+                return false;
+            }
+
+            const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
+            const textToSay = letter ? `${letter}, ${n}` : `${n}`;
+
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(textToSay);
+            utterance.voice = femaleVoiceData.voice;
+            utterance.lang = femaleVoiceData.voice.lang || 'es-ES';
+            // Ajustar tono: si es explícitamente femenina, tono 1.1; si es neutra, elevar a 1.28 para asegurar timbre femenino
+            utterance.pitch = femaleVoiceData.isExplicit ? 1.1 : 1.28;
+            utterance.rate = 1.05;
+            utterance.volume = 1.0;
+
+            window.speechSynthesis.speak(utterance);
+            return true;
+        } catch (e) {
+            console.warn('speechSynthesis fallback error:', e);
+            return false;
+        }
     }
 
     playVoice(src, ballNumber) {
@@ -215,29 +334,20 @@ class AudioManager {
             const speakFallback = () => {
                 if (fallbackTriggered) return;
                 fallbackTriggered = true;
-                if (num && 'speechSynthesis' in window) {
-                    try {
-                        const n = parseInt(num, 10);
-                        const letter = typeof getColumnClass === 'function' ? getColumnClass(n) : '';
-                        const voices = window.speechSynthesis.getVoices();
-                        let esVoice = null;
-                        if (Array.isArray(voices) && voices.length > 0) {
-                            esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
-                        }
-
-                        // Si no hay voz en español, NUNCA hablar en inglés
-                        if (!esVoice && Array.isArray(voices) && voices.length > 0) {
-                            return;
-                        }
-
-                        const u = new SpeechSynthesisUtterance(letter ? `${letter}, ${n}` : `${n}`);
-                        u.lang = 'es-ES';
-                        u.rate = 1.1;
-                        if (esVoice) {
-                            u.voice = esVoice;
-                        }
-                        window.speechSynthesis.speak(u);
-                    } catch (e) {}
+                if (num) {
+                    const spoken = this.speakOfflineNumber(num);
+                    // Si no se pudo sintetizar voz femenina (porque no hay voz de mujer instalada en el dispositivo),
+                    // NUNCA hablar con voz de hombre: reintentar la reproducción del audio grabado femenino original
+                    if (!spoken && src) {
+                        try {
+                            const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
+                            retryAudio.volume = 1.0;
+                            const rp = retryAudio.play();
+                            if (rp && typeof rp.catch === 'function') {
+                                rp.catch(() => {});
+                            }
+                        } catch (e) {}
+                    }
                 }
             };
 
@@ -245,7 +355,7 @@ class AudioManager {
                 if (this.voiceAudio && this.voiceAudio.readyState < 2) {
                     speakFallback();
                 }
-            }, 3500);
+            }, 4500);
 
             this.voiceAudio.onended = () => {
                 clearTimeout(netTimeout);
@@ -255,7 +365,18 @@ class AudioManager {
 
             this.voiceAudio.onerror = () => {
                 clearTimeout(netTimeout);
-                speakFallback();
+                if (!fallbackTriggered) {
+                    try {
+                        const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
+                        retryAudio.volume = 1.0;
+                        const rp = retryAudio.play();
+                        if (rp && typeof rp.catch === 'function') {
+                            rp.catch(() => speakFallback());
+                        }
+                    } catch (e) {
+                        speakFallback();
+                    }
+                }
             };
 
             this.voiceAudio.src = src;
@@ -993,11 +1114,10 @@ function showCountdown(data, callback) {
     centerAnimQueue = [];
     centerAnimBusy = false;
 
-    // Si el bingo completó la partida o ya está finalizada, detener todo de inmediato
-    if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+    // Si el bingo completó la partida, permitir que corra la celebración y al finalizar pasar a fin de juego
+    const isCompleted = (data && (data.gameCompleted === true || data.stopped === true));
+    if (isCompleted) {
         window.gameIsFinished = true;
-        showGameFinalized();
-        return;
     }
 
     const numberHe = $id('countdown');
@@ -1068,10 +1188,11 @@ function showCountdown(data, callback) {
         countdownTimeoutId = null;
     }
 
-    const pauseMs = Math.max(5000, parseInt(timeBallGet, 10) || 5000);
+    const pauseMs = isCompleted ? 3500 : Math.max(5000, parseInt(timeBallGet, 10) || 5000);
     countdownTimeoutId = setTimeout(function () {
         countdownTimeoutId = null;
-        if (isGameFinishedShown || window.gameIsFinished) {
+        if (isCompleted || isGameFinishedShown || window.gameIsFinished) {
+            showGameFinalized();
             return;
         }
         if (typeof callback === 'function' && callback !== startAutomaticGeneration && callback !== startAutomaticLast) {
@@ -1111,7 +1232,7 @@ function parseBallNumber(value) {
     return Number.isNaN(parsed) ? null : parsed;
 }
 
-function clearCenterBallTimers() {
+function clearCenterBallTimers(resetBusy) {
     if (centerBallTimer) {
         clearTimeout(centerBallTimer);
         centerBallTimer = null;
@@ -1120,6 +1241,14 @@ function clearCenterBallTimers() {
     if (centerBallHideTimer) {
         clearTimeout(centerBallHideTimer);
         centerBallHideTimer = null;
+    }
+
+    if (resetBusy !== false) {
+        if (window.__centerAnimWatchdog) {
+            clearTimeout(window.__centerAnimWatchdog);
+            window.__centerAnimWatchdog = null;
+        }
+        centerAnimBusy = false;
     }
 }
 
@@ -1209,7 +1338,8 @@ function enqueueCenterBallAnimation(newNumber) {
     if (!parsed) {
         return;
     }
-    // Solo la ├║ltima bola: si hay cola, no acumular atraso visual vs el jugador
+    lastAnimatedCenterBall = parsed;
+    // Solo la última bola: si hay cola, no acumular atraso visual vs el jugador
     centerAnimQueue = [parsed];
     drainCenterBallQueue();
 }
@@ -1219,58 +1349,80 @@ function drainCenterBallQueue() {
         return;
     }
     centerAnimBusy = true;
-    // Si llegaron m├ís mientras esper├íbamos, tomar la m├ís reciente
+
+    // Watchdog de 2500ms para asegurar que la animación del centro NUNCA quede congelada
+    if (window.__centerAnimWatchdog) {
+        clearTimeout(window.__centerAnimWatchdog);
+    }
+    window.__centerAnimWatchdog = setTimeout(function() {
+        if (centerAnimBusy) {
+            console.warn('[Board] Watchdog animación central activado: restableciendo estado ocupado.');
+            centerAnimBusy = false;
+            drainCenterBallQueue();
+        }
+    }, 2500);
+
+    // Si llegaron más mientras esperábamos, tomar la más reciente
     const next = centerAnimQueue[centerAnimQueue.length - 1];
     centerAnimQueue = [];
     showCenterBallAnimation(next, function() {
+        if (window.__centerAnimWatchdog) {
+            clearTimeout(window.__centerAnimWatchdog);
+            window.__centerAnimWatchdog = null;
+        }
         centerAnimBusy = false;
         drainCenterBallQueue();
     });
 }
 
 function showCenterBallAnimation(newNumber, onDone) {
-    const parsed = parseBallNumber(newNumber);
-    if (!parsed) {
+    const finish = function() {
         if (typeof onDone === 'function') {
             onDone();
         }
+    };
+
+    const parsed = parseBallNumber(newNumber);
+    if (!parsed) {
+        finish();
         return;
     }
 
     const centerBlock = $id('block-number');
     const centerBall = $id('last-number-center');
     if (!centerBlock || !centerBall) {
-        if (typeof onDone === 'function') {
-            onDone();
-        }
+        finish();
         return;
     }
 
-    clearCenterBallTimers();
+    try {
+        clearCenterBallTimers(false);
 
-    centerBlock.style.display = 'flex';
-    centerBall.innerHTML = '';
-    centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
-    centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
-    centerBall.style.display = 'flex';
-    centerBall.style.transform = '';
-    centerBall.style.opacity = '1';
+        centerBlock.style.display = 'flex';
+        centerBall.innerHTML = '';
+        centerBall.innerHTML = `<small style="position: absolute; top: -1px; font-size: 2.5rem; z-index: 1;">${getColumnClass(parsed)}</small><span>${parsed}</span>`;
+        centerBall.className = `bingo-ball-200 ${getColumnClass(parsed)} size-200`;
+        centerBall.style.display = 'flex';
+        centerBall.style.transform = '';
+        centerBall.style.opacity = '1';
 
-    const displayMs = 1200;
+        const displayMs = 1200;
 
-    centerBallHideTimer = setTimeout(function() {
-        centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
-        centerBall.style.opacity = '0';
+        centerBallHideTimer = setTimeout(function() {
+            centerBall.style.transform = 'translate(-50%, -50%) scale(0)';
+            centerBall.style.opacity = '0';
 
-        centerBallTimer = setTimeout(function() {
-            centerBall.removeAttribute('style');
-            centerBall.className = '';
-            centerBlock.style.display = 'none';
-            if (typeof onDone === 'function') {
-                onDone();
-            }
-        }, 350);
-    }, displayMs);
+            centerBallTimer = setTimeout(function() {
+                centerBall.removeAttribute('style');
+                centerBall.className = '';
+                centerBlock.style.display = 'none';
+                finish();
+            }, 350);
+        }, displayMs);
+    } catch (err) {
+        console.error('[Board] Error en animación de balota central:', err);
+        finish();
+    }
 }
 
 function buildOrderedDrawnNumbers(newNumber, drawnNumbers) {
@@ -1334,9 +1486,11 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         audioManager.play(audioPath + missing[missing.length - 1] + '.mp3');
     }
 
-    // Solo animar la ├║ltima bola nueva (si hay varias por race, no apilar 2ΓÇô3 a la vez)
+    // Solo animar la última bola nueva (si hay varias por race, no apilar 2–3 a la vez)
     if (opts.showCenterAnimation && missing.length > 0) {
         enqueueCenterBallAnimation(missing[missing.length - 1]);
+    } else if (opts.forceBall && opts.forceBall !== lastAnimatedCenterBall) {
+        enqueueCenterBallAnimation(opts.forceBall);
     }
 
     if (bingoCardManager.initialized && missing.length > 0) {
@@ -1348,7 +1502,11 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
 
 function handleNewNumber(newNumber, totalNumbersGenerated, drawnNumbers) {
     const ordered = buildOrderedDrawnNumbers(newNumber, drawnNumbers);
-    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, { showCenterAnimation: true });
+    const parsed = parseBallNumber(newNumber);
+    syncDrawnNumbersFromServer(ordered, totalNumbersGenerated, {
+        showCenterAnimation: true,
+        forceBall: parsed
+    });
 }
 
 function handleNewNumberCRON(newNumber, totalNumbersGenerated, drawnNumbers) {
@@ -1647,6 +1805,23 @@ function stopAutomaticLast() {
 function showGameFinalized() {
     if (isGameFinishedShown) return;
     isGameFinishedShown = true;
+    window.gameIsFinished = true;
+    
+    stopAutomaticGeneration();
+    stopAutomaticLast();
+    stopUpdateLiveStatus();
+    messagePoller.stop();
+    clearCenterBallTimers(true);
+    centerAnimQueue = [];
+
+    const controlsDiv = $id('controls');
+    if (controlsDiv) {
+        controlsDiv.remove();
+    }
+
+    if (window.__userLeavingGame) {
+        return;
+    }
     
     const container = $id('game-finalized');
     const text = $id('finalized');
@@ -1656,12 +1831,15 @@ function showGameFinalized() {
         text.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
         
         setTimeout(() => {
+            if (window.__userLeavingGame) {
+                return;
+            }
             if (typeof awardsGet === 'function') {
                 awardsGet();
             }
             container.style.display = 'none';
 
-            // Mostrar modal con bot├│n para volver al inicio
+            // Mostrar modal con botón para volver al inicio
             const bodyEl = document.getElementById('modalGameFinalizedBody');
             if (bodyEl) {
                 bodyEl.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
@@ -1680,17 +1858,7 @@ function showGameFinalized() {
                     }, { once: true });
                 }
             }
-        }, 5000);
-    }
-
-    stopAutomaticGeneration();
-    stopAutomaticLast();
-    stopUpdateLiveStatus();
-    messagePoller.stop();
-
-    const controlsDiv = $id('controls');
-    if (controlsDiv) {
-        controlsDiv.remove();
+        }, 1200);
     }
 }
 
@@ -2517,16 +2685,18 @@ function initBoardPusherRealtime() {
                 ? data.totalNumbersGenerated
                 : (Array.isArray(drawn) ? drawn.length : undefined);
 
-            // Si el auto AJAX ya pintó esta bola, no re-animar (evita doble flash)
-            const parsed = parseBallNumber(number);
-            const alreadyShown = parsed && Array.isArray(numbersgenerated) && numbersgenerated.includes(parsed);
+            let parsed = parseBallNumber(number);
+            if (!parsed && Array.isArray(drawn) && drawn.length) {
+                parsed = parseBallNumber(drawn[drawn.length - 1]);
+            }
 
             if (Array.isArray(drawn) && drawn.length) {
                 syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, {
-                    showCenterAnimation: !alreadyShown && !autoSubmitInFlight
+                    showCenterAnimation: true,
+                    forceBall: parsed
                 });
-            } else if (number && !alreadyShown) {
-                handleNewNumber(number, total, drawn);
+            } else if (parsed) {
+                handleNewNumber(parsed, total, drawn);
             }
 
             if (!gameStarted) {
@@ -2581,34 +2751,40 @@ function initBoardPusherRealtime() {
         // Reclamos de bingo en tiempo real
         channel.bind('game:bingo_claimed', function (data) {
             console.log('Admin board WS: bingo_claimed', data);
-            if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
-                stopAutomaticGeneration();
-                stopAutomaticLast();
-                showGameFinalized();
-                return;
-            }
+            stopAutomaticGeneration();
+            stopAutomaticLast();
             if (data && data.player && data.modality) {
-                showCountdown(data);
+                showCountdown(data, function() {
+                    if (data && (data.gameCompleted === true || window.gameIsFinished)) {
+                        showGameFinalized();
+                    }
+                });
+            } else if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+                showGameFinalized();
             }
         });
 
         channel.bind('game:bingo_accepted', function (data) {
             console.log('Admin board WS: bingo_accepted', data);
-            if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
-                stopAutomaticGeneration();
-                stopAutomaticLast();
-                showGameFinalized();
-                return;
-            }
+            stopAutomaticGeneration();
+            stopAutomaticLast();
             if (data && data.player && data.modality) {
-                showCountdown(data);
+                showCountdown(data, function() {
+                    if (data && (data.gameCompleted === true || window.gameIsFinished)) {
+                        showGameFinalized();
+                    }
+                });
+            } else if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+                showGameFinalized();
             }
         });
 
         channel.bind('game:game_finished', function () {
             stopAutomaticGeneration();
             stopAutomaticLast();
-            showGameFinalized();
+            if (!countdownTimeoutId) {
+                showGameFinalized();
+            }
         });
 
         window.__boardPusher = pusher;
