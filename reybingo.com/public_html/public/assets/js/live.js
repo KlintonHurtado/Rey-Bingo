@@ -863,12 +863,23 @@ function showCountdown(data, callback) {
     }
 
     if (typeof window.showNotification === 'function' && data && data.player && data.modality) {
-        const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
+        const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
+        const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+            ? `Ganadores de la modalidad ${modalityClean}`
+            : `Ganadores de la ${modalityClean}`;
+        const pName = data.player || data.userName || 'Jugador';
+        const noticeKey = data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || pName)));
+
         window.showNotification({
+            id: noticeKey,
             type: 'sing',
+            modalityId: data.modalityId,
+            modality: modalityClean,
+            player: pName,
+            cartonId: data.cartonId || data.carton,
             title: '🎉 ¡BINGO CANTADO!',
-            message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
-            created_at: new Date().toISOString()
+            message: `${modalityLabel}: ${pName}`,
+            created_at: data.created_at || new Date().toISOString()
         });
     }
 

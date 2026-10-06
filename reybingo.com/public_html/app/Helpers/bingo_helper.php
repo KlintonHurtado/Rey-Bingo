@@ -525,6 +525,26 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
         }
 
         bingo_ensure_winners_registered($gameId);
+        $officialWinners = bingo_get_official_sings_for_game($gameId, true);
+        $lastSing = !empty($officialWinners) ? end($officialWinners) : null;
+        $lastWinnerPayload = [];
+        if ($lastSing) {
+            $modelUsers = new \App\Models\UsersModel();
+            $modelModalities = new \App\Models\ModalitiesModel();
+            $u = $modelUsers->find($lastSing['user']);
+            $m = $modelModalities->find($lastSing['modality']);
+            $lastWinnerPayload = [
+                'singId'       => (int) $lastSing['id'],
+                'userId'       => (int) $lastSing['user'],
+                'winnerUserId' => (int) $lastSing['user'],
+                'player'       => $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . $lastSing['user']),
+                'modality'     => $m ? translate($m['name'] ?? '') : 'Bingo',
+                'modalityId'   => (int) $lastSing['modality'],
+                'cartonId'     => (int) $lastSing['carton'],
+                'image'        => !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg'),
+            ];
+        }
+
         $modelGames->where('id', $gameId)->set([
             'status' => 0,
             'updated_at' => date('Y-m-d H:i:s'),
@@ -533,7 +553,10 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
         if (function_exists('bingo_on_game_finished')) {
             bingo_on_game_finished($gameId);
         }
-        bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+        bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
+            'status'  => 0,
+            'winners' => $officialWinners,
+        ], $lastWinnerPayload));
 
         return true;
     }
@@ -726,6 +749,16 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 $staffIds[$gameCreatorId] = true;
             }
 
+            $modalityClean = trim(preg_replace('/^la\s+/i', '', (string) $modalityName));
+            if ($modalityClean === '') {
+                $modalityClean = 'Bingo';
+            }
+            $modalityLabel = (preg_match('/^(bingo|pleno)/i', $modalityClean))
+                ? "Ganadores de la modalidad {$modalityClean}"
+                : "Ganadores de la {$modalityClean}";
+            $unifiedSingTitle = '🎉 ¡BINGO CANTADO!';
+            $unifiedSingMessage = "{$modalityLabel}: {$userName}";
+
             foreach (array_keys($staffIds) as $staffId) {
                 if ($staffId > 0 && $staffId !== $winnerUserId && !isset($alreadyNotified[$staffId])) {
                     $batchInsert[] = [
@@ -736,8 +769,8 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                         'game'       => $gameId,
                         'carton'     => $cartonId,
                         'modality'   => $modalityId,
-                        'title'      => '🎉 ¡BINGO CANTADO EN JUEGO #' . $gameId . '!',
-                        'message'    => 'El jugador ' . $userName . ' cantó ' . $modalityName . ' con el cartón #' . $cartonId . '.',
+                        'title'      => $unifiedSingTitle,
+                        'message'    => $unifiedSingMessage,
                         'status'     => 0,
                         'created_at' => $now,
                     ];
@@ -754,30 +787,39 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                     $targetUserId = (int) ($item['user'] ?? 0);
                     if ($targetUserId > 0) {
                         bingo_broadcast_user_notification($targetUserId, [
-                            'title'      => $item['title'],
-                            'message'    => $item['message'],
-                            'type'       => 'sing',
-                            'game'       => $gameId,
-                            'modality'   => $modalityId,
-                            'carton'     => $cartonId,
-                            'created_at' => $now,
+                            'id'           => 'sing_' . $singId . '_' . $modalityId,
+                            'title'        => $item['title'] ?? $unifiedSingTitle,
+                            'message'      => $item['message'] ?? $unifiedSingMessage,
+                            'type'         => $item['type'] ?? 'sing',
+                            'game'         => $gameId,
+                            'gameId'       => $gameId,
+                            'modality'     => $modalityClean,
+                            'modalityId'   => $modalityId,
+                            'carton'       => $cartonId,
+                            'cartonId'     => $cartonId,
+                            'player'       => $userName,
+                            'userName'     => $userName,
+                            'winnerUserId' => $winnerUserId,
+                            'created_at'   => $now,
                         ]);
                     }
                 }
             }
 
             // EMISIÓN WEBSOCKET AL CANAL GENERAL DE LA PARTIDA (private-game-{gameId})
-            // pusher-client.js se suscribe a este canal y escucha 'game:notification'
+            // pusher-client.js y board.js se suscriben a este canal y escuchan 'game:notification'
             try {
                 $client = bingo_get_broadcast_client();
                 $gameChannel = 'private-game-' . $gameId;
                 $gamePayload = [
+                    'id'           => 'sing_' . $singId . '_' . $modalityId,
                     'type'         => 'sing',
-                    'title'        => '🎉 ¡BINGO CANTADO!',
-                    'message'      => 'El jugador ' . $userName . ' ha cantado Bingo en ' . $modalityName . ' (Cartón #' . $cartonId . ').',
+                    'title'        => $unifiedSingTitle,
+                    'message'      => $unifiedSingMessage,
                     'game'         => $gameId,
                     'gameId'       => $gameId,
-                    'modality'     => $modalityName,
+                    'modality'     => $modalityClean,
+                    'modalityName' => $modalityClean,
                     'modalityId'   => $modalityId,
                     'carton'       => $cartonId,
                     'cartonId'     => $cartonId,

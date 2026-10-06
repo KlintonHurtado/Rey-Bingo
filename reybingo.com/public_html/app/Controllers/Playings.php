@@ -2015,16 +2015,48 @@ class Playings extends Controller
         $gameFinalized = ($gameStatus !== 2) ? bingo_finalize_game_when_complete((int) $game['id']) : false;
         if ($gameStatus === 0 || $gameFinalized) {
             bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->getWinnersForGame((int) $game['id'], true);
+            $lastSing = $modelSings->where('game', $game['id'])->orderBy('id', 'DESC')->first();
+            $lastPlayer = '';
+            $lastModality = '';
+            $lastModalityId = 0;
+            $lastCartonId = 0;
+            $lastSingId = 0;
+            $lastWinnerUserId = 0;
+            $lastImage = site_url('assets/img/avatar.jpg');
+            $isOwn = false;
+
+            if ($lastSing) {
+                $u = $modelUsers->find($lastSing['user']);
+                $m = $modelModalities->find($lastSing['modality']);
+                $lastPlayer = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . $lastSing['user']);
+                $lastModality = $m ? translate($m['name'] ?? '') : 'Bingo';
+                $lastModalityId = (int) $lastSing['modality'];
+                $lastCartonId = (int) $lastSing['carton'];
+                $lastSingId = (int) $lastSing['id'];
+                $lastWinnerUserId = (int) $lastSing['user'];
+                $isOwn = ($lastWinnerUserId === (int) session()->get('id'));
+                if (!empty($u['image'])) {
+                    $lastImage = site_url('uploads/users/' . $u['image']);
+                }
+            }
 
             return $this->response->setJSON([
                 'status' => 'completed',
                 'gameCompleted' => true,
                 'totalNumbersGenerated' => bingo_count_drawn_numbers((int) $game['id']),
                 'drawnNumbers' => $this->getOrderedDrawnNumbers((int) $game['id']),
-                'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                'winners' => $winners,
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => '',
-                'player' => '',
+                'player' => $lastPlayer,
+                'modality' => $lastModality,
+                'modalityId' => $lastModalityId,
+                'cartonId' => $lastCartonId,
+                'singId' => $lastSingId,
+                'winnerUserId' => $lastWinnerUserId,
+                'isOwnBingo' => $isOwn,
+                'image' => $lastImage,
             ]);
         }
 
@@ -2198,6 +2230,12 @@ class Playings extends Controller
                     'number' => $lastNumber['number'],
                     'player' => $userName,
                     'modality' => $modalityName,
+                    'modalityId' => (int) ($modality['id'] ?? $sing['modality']),
+                    'cartonId' => (int) $sing['carton'],
+                    'singId' => (int) $sing['id'],
+                    'winnerUserId' => (int) $sing['user'],
+                    'isOwnBingo' => $isOwn,
+                    'image' => $imagePath,
                 ]);
             }
 

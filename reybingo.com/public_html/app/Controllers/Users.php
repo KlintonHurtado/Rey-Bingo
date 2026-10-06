@@ -3614,6 +3614,8 @@ class Users extends Controller {
         }
         $notifications = $uniqueNotifications;
 
+        $modelModalities = new \App\Models\ModalitiesModel();
+
         foreach ($notifications as &$notification) { 
             if (in_array($notification['type'], ['deposit', 'retire', 'transfer', 'payment', 'referred']) && $notification['type_id'] > 0) {
                 $transactionData = $this->getTransactions($notification['type'], $notification['type_id']);
@@ -3621,7 +3623,79 @@ class Users extends Controller {
                     $notification['transaction'] = $transactionData;
                 }
             }
+
+            if (($notification['type'] ?? '') === 'sing') {
+                $modalityId = (int) ($notification['modality'] ?? 0);
+                $singId = (int) ($notification['type_id'] ?? 0);
+                $cartonId = (int) ($notification['carton'] ?? 0);
+
+                // Obtener nombre de la modalidad
+                $modName = '';
+                if ($modalityId > 0) {
+                    $modRow = $modelModalities->find($modalityId);
+                    if ($modRow) {
+                        $modName = translate($modRow['name'] ?? '');
+                    }
+                }
+
+                // Obtener nombre del jugador ganador
+                $playerName = '';
+                if ($singId > 0) {
+                    $singRow = $modelSings->find($singId);
+                    if ($singRow && !empty($singRow['user'])) {
+                        $winnerUserRow = $model->find($singRow['user']);
+                        if ($winnerUserRow) {
+                            $playerName = trim(($winnerUserRow['firstname'] ?? '') . ' ' . ($winnerUserRow['lastname'] ?? ''));
+                            if ($playerName === '') {
+                                $playerName = $winnerUserRow['username'] ?? 'Jugador';
+                            }
+                        }
+                    }
+                }
+
+                if ($playerName === '') {
+                    if (preg_match('/El jugador\s+<strong>?(.*?)<\/strong>?\s+cant/i', $notification['message'] ?? '', $m)) {
+                        $playerName = strip_tags(trim($m[1]));
+                    } elseif (preg_match('/¡Felicidades\s+(.*?)!/i', $notification['message'] ?? '', $m)) {
+                        $playerName = strip_tags(trim($m[1]));
+                    } elseif (preg_match('/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?[^:]+:\s*<strong>?(.*?)<\/strong>?/i', $notification['message'] ?? '', $m)) {
+                        $playerName = strip_tags(trim($m[1]));
+                    } else {
+                        $playerName = 'Jugador';
+                    }
+                }
+
+                if ($modName === '') {
+                    if (preg_match('/cantó\s+([^(.\n<]+)/i', $notification['message'] ?? '', $m)) {
+                        $modName = trim($m[1]);
+                    } elseif (preg_match('/modalidad\s+([^(\n<]+)/i', $notification['message'] ?? '', $m)) {
+                        $modName = trim($m[1]);
+                    } elseif (preg_match('/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i', $notification['message'] ?? '', $m)) {
+                        $modName = trim($m[1]);
+                    } else {
+                        $modName = 'Bingo';
+                    }
+                }
+
+                $modClean = trim(preg_replace('/^la\s+/i', '', $modName));
+                if ($modClean === '') {
+                    $modClean = 'Bingo';
+                }
+                $modLabel = (preg_match('/^(bingo|pleno)/i', $modClean))
+                    ? "Ganadores de la modalidad {$modClean}"
+                    : "Ganadores de la {$modClean}";
+
+                $notification['title'] = '🎉 ¡BINGO CANTADO!';
+                $notification['message'] = "{$modLabel}: {$playerName}";
+                $notification['modalityId'] = $modalityId;
+                $notification['modality'] = $modClean;
+                $notification['modalityName'] = $modClean;
+                $notification['player'] = $playerName;
+                $notification['userName'] = $playerName;
+                $notification['cartonId'] = $cartonId;
+            }
         }
+        unset($notification);
 
         $response = [
             'notifications' => $notifications

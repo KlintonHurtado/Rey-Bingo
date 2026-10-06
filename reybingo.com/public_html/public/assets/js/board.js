@@ -1164,12 +1164,23 @@ function showCountdown(data, callback) {
     });
 
     if (typeof window.showNotification === 'function' && data && data.player && data.modality) {
-        const cartonText = data.cartonId ? ` (Cartón #${data.cartonId})` : '';
+        const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
+        const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+            ? `Ganadores de la modalidad ${modalityClean}`
+            : `Ganadores de la ${modalityClean}`;
+        const pName = data.player || data.userName || 'Jugador';
+        const noticeKey = data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || pName)));
+
         window.showNotification({
+            id: noticeKey,
             type: 'sing',
+            modalityId: data.modalityId,
+            modality: modalityClean,
+            player: pName,
+            cartonId: data.cartonId || data.carton,
             title: '🎉 ¡BINGO CANTADO!',
-            message: `El jugador <strong>${data.player}</strong> ha cantado <strong>${data.modality}</strong>${cartonText}.`,
-            created_at: new Date().toISOString()
+            message: `${modalityLabel}: ${pName}`,
+            created_at: data.created_at || new Date().toISOString()
         });
     }
 
@@ -2788,6 +2799,44 @@ function initBoardPusherRealtime() {
                 showGameFinalized();
             }
         });
+
+        // Notificaciones unificadas en tiempo real para el administrador
+        function handleAdminBoardNotification(data) {
+            if (!data) return;
+            const isSing = data.type === 'sing' || data.type === 'own_sing' || !!data.modalityId || !!data.modality;
+            if (isSing) {
+                const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
+                const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+                    ? `Ganadores de la modalidad ${modalityClean}`
+                    : `Ganadores de la ${modalityClean}`;
+                const pName = data.player || data.userName || 'Jugador';
+                const noticeKey = data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || pName)));
+
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification({
+                        id: noticeKey,
+                        type: 'sing',
+                        modalityId: data.modalityId,
+                        modality: modalityClean,
+                        player: pName,
+                        cartonId: data.cartonId || data.carton,
+                        title: '🎉 ¡BINGO CANTADO!',
+                        message: `${modalityLabel}: ${pName}`,
+                        created_at: data.created_at || new Date().toISOString()
+                    });
+                }
+            } else if (typeof window.showNotification === 'function') {
+                window.showNotification(data);
+            }
+        }
+
+        channel.bind('game:notification', handleAdminBoardNotification);
+        channel.bind('notification:new', handleAdminBoardNotification);
+
+        if (window.USER_ID && parseInt(window.USER_ID, 10) > 0) {
+            const userChannel = pusher.subscribe('private-user-' + window.USER_ID);
+            userChannel.bind('notification:new', handleAdminBoardNotification);
+        }
 
         window.__boardPusher = pusher;
         window.__boardChannel = channel;

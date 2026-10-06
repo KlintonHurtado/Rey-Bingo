@@ -754,7 +754,11 @@ $isNoMusicRole = session()->get('logged_in') && (
                     let playerName = notification.player || notification.userName || '';
                     let cartonNumber = notification.cartonId || notification.carton || '';
                     if (!playerName && notification.message) {
-                        const matchPlayer = notification.message.match(/El jugador\s+<strong>(.*?)<\/strong>/i) || notification.message.match(/¡Felicidades\s+(.*?)!/i);
+                        const matchPlayer = notification.message.match(/El jugador\s+<strong>?(.*?)<\/strong>?\s+cant/i)
+                            || notification.message.match(/El jugador\s+<strong>(.*?)<\/strong>/i)
+                            || notification.message.match(/¡Felicidades\s+(.*?)!/i)
+                            || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?[^:]+:\s*<strong>?(.*?)<\/strong>?/i)
+                            || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?[^:]+:\s*([^<\n]+)/i);
                         if (matchPlayer) {
                             playerName = matchPlayer[1].replace(/<[^>]+>/g, '').trim();
                         }
@@ -767,15 +771,16 @@ $isNoMusicRole = session()->get('logged_in') && (
                     }
 
                     let rawModality = notification.modality || notification.modalityName || '';
-                    if (!rawModality && notification.message) {
+                    if ((!rawModality || /^\d+$/.test(String(rawModality).trim())) && notification.message) {
                         const matchMod = notification.message.match(/ha cantado Bingo en\s+([^(\n<]+)/i)
                                       || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i)
-                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i);
+                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i)
+                                      || notification.message.match(/cantó\s+([^(.\n<]+)/i);
                         if (matchMod) {
                             rawModality = matchMod[1].trim();
                         }
                     }
-                    const modalityName = rawModality || 'Bingo';
+                    const modalityName = rawModality && !/^\d+$/.test(String(rawModality).trim()) ? rawModality : 'Bingo';
                     const modalityClean = escapeHtml(String(modalityName).replace(/^la\s+/i, '').trim());
                     let modalityLabel = `Ganadores de la ${modalityClean}`;
                     if (/^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)) {
@@ -2302,7 +2307,73 @@ $isNoMusicRole = session()->get('logged_in') && (
         })();
     </script>
 
-    <!-- <script src="<?= site_url('assets/js/notifications.js'); ?>"></script>-->
+    <?php if (session()->get('logged_in')) : ?>
+    <script src="<?= site_url('assets/js/pusher.min.js'); ?>?v=<?= APP_VERSION ?>"></script>
+    <script>
+    (function() {
+        const userId = '<?= (int) session()->get('id') ?>';
+        const soketiKey = '<?= env("SOKETI_KEY") ?>';
+        const pusherKey = soketiKey || '<?= env("PUSHER_KEY") ?>';
+        if (!userId || userId === '0' || !pusherKey) {
+            return;
+        }
+
+        // Si ya hay un websocket activo en la página (p.ej. board.js o playing.js), evitar duplicar conexión
+        if (window.__userNotifPusher || window.__boardPusher || window.__bingoPusherHelper) {
+            return;
+        }
+
+        const soketiHost = '<?= env("SOKETI_HOST") ?>';
+        const soketiPort = parseInt('<?= env("SOKETI_PORT", 443) ?>', 10);
+        const cluster = '<?= env("PUSHER_CLUSTER", "us2") ?>';
+        const authUrl = '<?= site_url("pusher/auth") ?>';
+
+        const pConfig = {
+            channelAuthorization: {
+                endpoint: authUrl,
+                transport: 'ajax'
+            }
+        };
+        if (soketiHost) {
+            pConfig.wsHost = soketiHost;
+            pConfig.wsPort = soketiPort;
+            pConfig.wssPort = soketiPort;
+            pConfig.forceTLS = true;
+            pConfig.enabledTransports = ['ws', 'wss'];
+            pConfig.disableStats = true;
+            pConfig.cluster = '';
+        } else {
+            pConfig.cluster = cluster;
+            pConfig.forceTLS = true;
+        }
+
+        try {
+            if (typeof Pusher === 'undefined') return;
+            const uPusher = new Pusher(pusherKey, pConfig);
+            const userChannel = uPusher.subscribe('private-user-' + userId);
+
+            userChannel.bind('notification:new', function(data) {
+                console.log('Realtime user notification received:', data);
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(data);
+                }
+                if (data && (data.type === 'sing' || data.type === 'own_sing' || data.modalityId || data.modality)) {
+                    if (typeof playNotificationSound === 'function') {
+                        playNotificationSound('winner', true);
+                    }
+                    if (typeof AppcreateConfetti === 'function') {
+                        AppcreateConfetti();
+                    }
+                }
+            });
+
+            window.__userNotifPusher = uPusher;
+        } catch (e) {
+            console.warn('Error inicializando Pusher global para notificaciones:', e);
+        }
+    })();
+    </script>
+    <?php endif; ?>
     <script src="<?= site_url('assets/js/pull-to-refresh.js'); ?>?v=<?= APP_VERSION ?>"></script>
     <style>
         #pull-to-refresh-indicator {

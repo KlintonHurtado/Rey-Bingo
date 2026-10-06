@@ -1145,6 +1145,119 @@
                     return;
                 }
 
+                // UNIFICACIÓN POR MODALIDAD:
+                const isSingType = notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality;
+                if (isSingType) {
+                    const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                    const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
+
+                    let playerName = notification.player || notification.userName || '';
+                    let cartonNumber = notification.cartonId || notification.carton || '';
+                    if (!playerName && notification.message) {
+                        const matchPlayer = notification.message.match(/El jugador\s+<strong>?(.*?)<\/strong>?\s+cant/i)
+                            || notification.message.match(/El jugador\s+<strong>(.*?)<\/strong>/i)
+                            || notification.message.match(/¡Felicidades\s+(.*?)!/i)
+                            || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?[^:]+:\s*<strong>?(.*?)<\/strong>?/i)
+                            || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?[^:]+:\s*([^<\n]+)/i);
+                        if (matchPlayer) {
+                            playerName = matchPlayer[1].replace(/<[^>]+>/g, '').trim();
+                        }
+                    }
+                    if (!cartonNumber && notification.message) {
+                        const matchCarton = notification.message.match(/Cartón\s*#?(\d+)/i);
+                        if (matchCarton) {
+                            cartonNumber = matchCarton[1];
+                        }
+                    }
+
+                    let rawModality = notification.modality || notification.modalityName || '';
+                    if ((!rawModality || /^\d+$/.test(String(rawModality).trim())) && notification.message) {
+                        const matchMod = notification.message.match(/ha cantado Bingo en\s+([^(\n<]+)/i)
+                                      || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i)
+                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i)
+                                      || notification.message.match(/cantó\s+([^(.\n<]+)/i);
+                        if (matchMod) {
+                            rawModality = matchMod[1].trim();
+                        }
+                    }
+                    const modalityName = rawModality && !/^\d+$/.test(String(rawModality).trim()) ? rawModality : 'Bingo';
+                    const modalityClean = escapeHtml(String(modalityName).replace(/^la\s+/i, '').trim());
+                    let modalityLabel = `Ganadores de la ${modalityClean}`;
+                    if (/^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)) {
+                        modalityLabel = `Ganadores de la modalidad ${modalityClean}`;
+                    }
+
+                    if (existingModalityEl) {
+                        existingModalityEl._winners = existingModalityEl._winners || [];
+                        if (playerName) {
+                            const alreadyListed = existingModalityEl._winners.some(w => w.player.toLowerCase() === playerName.toLowerCase());
+                            if (!alreadyListed) {
+                                existingModalityEl._winners.push({ player: playerName, carton: cartonNumber });
+                            }
+                        }
+
+                        const winnersFormatted = existingModalityEl._winners.length > 0
+                            ? existingModalityEl._winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ')
+                            : (playerName ? `<strong>${escapeHtml(playerName)}</strong>` : notification.message);
+
+                        const msgContainer = existingModalityEl.querySelector('.notification-message');
+                        if (msgContainer) {
+                            msgContainer.innerHTML = `${modalityLabel}: ${winnersFormatted}`;
+                        }
+
+                        if (existingModalityEl._autoHideTimer) {
+                            clearTimeout(existingModalityEl._autoHideTimer);
+                        }
+                        existingModalityEl._autoHideTimer = setTimeout(() => {
+                            hideNotification(existingModalityEl);
+                        }, notificationConfig.displayTime);
+
+                        existingModalityEl.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+                        existingModalityEl.style.transform = 'scale(1.02)';
+                        setTimeout(() => {
+                            existingModalityEl.style.transform = '';
+                        }, 250);
+
+                        return;
+                    }
+
+                    const notificationEl = document.createElement('div');
+                    notificationEl.className = `notification notification-${notification.type || 'sing'}`;
+                    notificationEl.dataset.modalityKey = modalityKey;
+                    if (notification.id) {
+                        notificationEl.dataset.notificationId = notification.id;
+                    }
+                    notificationEl._winners = playerName ? [{ player: playerName, carton: cartonNumber }] : [];
+
+                    const initialWinners = playerName 
+                        ? `<strong>${escapeHtml(playerName)}</strong>`
+                        : notification.message;
+
+                    notificationEl.innerHTML = `
+                        <div class="notification-header">
+                            <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
+                        </div>
+                        <div class="notification-message">${modalityLabel}: ${initialWinners}</div>
+                        <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                        <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
+                    `;
+
+                    container.appendChild(notificationEl);
+                    setTimeout(() => {
+                        notificationEl.classList.add('show');
+                    }, 100);
+
+                    if (typeof attachNotificationSwipeDismiss === 'function') {
+                        attachNotificationSwipeDismiss(notificationEl, hideNotification);
+                    }
+
+                    notificationEl._autoHideTimer = setTimeout(() => {
+                        hideNotification(notificationEl);
+                    }, notificationConfig.displayTime);
+
+                    return;
+                }
+
                 if (notification.id && container.querySelector(`[data-notification-id="${notification.id}"]`)) {
                     return;
                 }
