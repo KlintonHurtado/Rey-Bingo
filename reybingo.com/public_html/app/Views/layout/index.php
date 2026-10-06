@@ -2318,8 +2318,12 @@ $isNoMusicRole = session()->get('logged_in') && (
             return;
         }
 
-        // Si ya hay un websocket activo en la página (p.ej. board.js o playing.js), evitar duplicar conexión
-        if (window.__userNotifPusher || window.__boardPusher || window.__bingoPusherHelper) {
+        // Si ya hay un websocket activo en la página o estamos en salas de juego/tableros, evitar duplicar conexión
+        if (typeof GAME_ID !== 'undefined' || typeof window.GAME_ID !== 'undefined' ||
+            window.location.pathname.includes('/playing') ||
+            window.location.pathname.includes('/board') ||
+            window.location.pathname.includes('/live') ||
+            window.__userNotifPusher || window.__boardPusher || window.__bingoPusherHelper) {
             return;
         }
 

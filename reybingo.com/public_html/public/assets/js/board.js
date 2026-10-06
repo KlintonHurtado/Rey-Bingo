@@ -2831,7 +2831,6 @@ function initBoardPusherRealtime() {
         }
 
         channel.bind('game:notification', handleAdminBoardNotification);
-        channel.bind('notification:new', handleAdminBoardNotification);
 
         if (window.USER_ID && parseInt(window.USER_ID, 10) > 0) {
             const userChannel = pusher.subscribe('private-user-' + window.USER_ID);
