@@ -3524,7 +3524,16 @@ class Users extends Controller {
         $modelAwards = new AwardsModel();
         $modelSings = new SingsModel();
 
-        $user = $model->find($userId);
+        $user = $userId > 0 ? $model->find($userId) : null;
+        if (!$user) {
+            return $this->response->setJSON([
+                'notifications' => [],
+                'games'         => [],
+                'wallet'        => 0,
+                'progress'      => []
+            ]);
+        }
+
         $userGroup = (int) ($user['group'] ?? session()->get('group') ?? 0);
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
@@ -3661,7 +3670,7 @@ class Users extends Controller {
 
         if (session()->get('group') == 1) {
             try {
-                $games = $modelGames->findAll();
+                $games = $modelGames->whereIn('status', [1, 2])->orderBy('id', 'DESC')->limit(20)->findAll();
                 $gameProgress = [];
 
                 foreach ($games as $game) {

@@ -643,6 +643,10 @@ $isNoMusicRole = session()->get('logged_in') && (
             window.loadNotifications = async function loadNotifications() {
                 try {
                     const response = await fetch(notificationConfig.apiUrl);
+                    if (!response.ok) {
+                        console.warn(`[Notificaciones] Servidor respondió con estado HTTP ${response.status} (${response.statusText || 'Error'}). Reintentando en próximo ciclo...`);
+                        return;
+                    }
                     const data = await response.json();
 
                     const notifications = data.notifications || [];
@@ -2617,8 +2621,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }
                 isRunning = true;
                 fetch(cronUrl, { method: 'GET', cache: 'no-store' })
-                    .then(function (r) { return r.json(); })
-                    .catch(function (e) { console.log('Virtual Cron:', e); })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            console.warn('[Virtual Cron] Servidor respondió con estado HTTP ' + r.status);
+                            return null;
+                        }
+                        return r.json();
+                    })
+                    .catch(function (e) { console.warn('Virtual Cron:', e); })
                     .finally(function () { isRunning = false; });
             }
             setInterval(runVirtualCron, tickMs);

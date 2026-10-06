@@ -1238,6 +1238,10 @@
             window.loadNotifications = async function loadNotifications() {
                 try {
                     const response = await fetch(notificationConfig.apiUrl);
+                    if (!response.ok) {
+                        console.warn(`[Notificaciones] Servidor respondió con estado HTTP ${response.status}. Reintentando en próximo ciclo...`);
+                        return;
+                    }
                     const data = await response.json();
 
                     const notifications = data.notifications || [];

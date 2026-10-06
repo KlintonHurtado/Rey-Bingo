@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Node.js 20 LTS y Soketi globalmente
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# Instalar Node.js 18 LTS y Soketi globalmente (uWebSockets.js requiere Node 18)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g @soketi/soketi \
     && rm -rf /var/lib/apt/lists/*

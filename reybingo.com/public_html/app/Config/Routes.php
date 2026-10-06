@@ -29,7 +29,9 @@ $routes->group('cron', ['namespace' => 'App\Controllers'], function($routes) {
 });
 
 $routes->get('/', 'Signin::index');
+$routes->head('/', 'Signin::index');
 $routes->get('signin', 'Signin::index');
+$routes->head('signin', 'Signin::index');
 $routes->post('signin/signinSubmit', 'Signin::signinSubmit');
 $routes->get('logout', 'Signin::logout');
 

@@ -23,7 +23,10 @@ for ENV_FILE in "/var/www/html/reybingo.com/public_html/.env"; do
         sed -i "s|^database.default.hostname.*|database.default.hostname = $TARGET_HOST|g" "$ENV_FILE"
         sed -i "s|^database.default.database.*|database.default.database = $TARGET_DB|g" "$ENV_FILE"
         sed -i "s|^database.default.username.*|database.default.username = $TARGET_USER|g" "$ENV_FILE"
-        [ -n "$TARGET_PASS" ] && sed -i "s|^database.default.password.*|database.default.password = $TARGET_PASS|g" "$ENV_FILE"
+        if [ -n "$TARGET_PASS" ]; then
+            ESCAPED_PASS=$(printf '%s\n' "$TARGET_PASS" | sed -e 's/[\/&]/\\&/g')
+            sed -i "s|^database.default.password.*|database.default.password = $ESCAPED_PASS|g" "$ENV_FILE"
+        fi
         sed -i "s|^database.default.port.*|database.default.port = $TARGET_PORT|g" "$ENV_FILE"
     fi
 done
