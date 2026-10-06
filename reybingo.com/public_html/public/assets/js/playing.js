@@ -194,6 +194,9 @@ class AudioManager {
         this.audioCtx = null;
         this._unlocked = false;
         this._promptShown = false;
+        try {
+            this.unlockAudio();
+        } catch (e) {}
     }
 
     initAudioContext() {
@@ -267,56 +270,14 @@ class AudioManager {
     }
 
     showAudioPrompt() {
-        if (this._unlocked || document.getElementById('bingo-audio-unlock-prompt')) {
-            return;
-        }
-        this._promptShown = true;
-        const prompt = document.createElement('div');
-        prompt.id = 'bingo-audio-unlock-prompt';
-        prompt.setAttribute('style', [
-            'position: fixed',
-            'top: 65px',
-            'left: 50%',
-            'transform: translateX(-50%)',
-            'background: linear-gradient(135deg, #1e1b4b, #312e81)',
-            'border: 2px solid #facc15',
-            'color: #fef08a',
-            'padding: 10px 22px',
-            'border-radius: 9999px',
-            'font-size: 0.95rem',
-            'font-weight: 700',
-            'box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 18px rgba(250, 204, 21, 0.45)',
-            'z-index: 99999',
-            'cursor: pointer',
-            'display: flex',
-            'align-items: center',
-            'gap: 8px',
-            'backdrop-filter: blur(8px)',
-            'transition: all 0.3s ease',
-            'animation: promptBounce 1.6s infinite'
-        ].join('; '));
-
-        prompt.innerHTML = '<i class="fa-duotone fa-solid fa-volume-high"></i> <span>Toca la pantalla para activar el sonido</span>';
-        prompt.onclick = () => {
-            unlockUserAudioGesture();
-        };
-
-        if (!document.getElementById('bingo-audio-prompt-style')) {
-            const st = document.createElement('style');
-            st.id = 'bingo-audio-prompt-style';
-            st.textContent = '@keyframes promptBounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-6px); } }';
-            document.head.appendChild(st);
-        }
-
-        document.body.appendChild(prompt);
+        // Desactivado prompt visual; el sonido se activa automáticamente
+        this.unlockAudio();
     }
 
     hideAudioPrompt() {
         const el = document.getElementById('bingo-audio-unlock-prompt');
-        if (el) {
-            el.style.opacity = '0';
-            el.style.transform = 'translateX(-50%) translateY(10px)';
-            setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+        if (el && el.parentNode) {
+            el.parentNode.removeChild(el);
         }
         this._promptShown = false;
     }
@@ -396,7 +357,8 @@ class AudioManager {
                     if (e.name === 'NotAllowedError') {
                         window.pendingBallAudioSrc = src;
                         window.pendingBallNumber = num;
-                        this.showAudioPrompt();
+                        this.unlockAudio();
+                        speakFallback();
                     } else if (e.name !== 'AbortError') {
                         speakFallback();
                     }
@@ -488,7 +450,7 @@ class AudioManager {
             audio.play().catch(e => {
                 if (e.name === 'NotAllowedError') {
                     window.pendingBallAudioSrc = src;
-                    this.showAudioPrompt();
+                    this.unlockAudio();
                 }
             });
             return audio;
@@ -561,6 +523,14 @@ function unlockUserAudioGesture() {
 ['click', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown'].forEach(function (eventName) {
     document.addEventListener(eventName, unlockUserAudioGesture, { capture: true, passive: true });
 });
+
+// Desbloquear audio automáticamente al ingresar a la partida
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', unlockUserAudioGesture);
+} else {
+    unlockUserAudioGesture();
+}
+window.addEventListener('load', unlockUserAudioGesture);
 
 // Reactivación de audio al volver de pestañas en segundo plano o bloqueo de pantalla
 document.addEventListener('visibilitychange', function () {
@@ -3321,9 +3291,9 @@ function setupGameCountdown() {
     if (now < targetDate) {
         updateCountdown();
         intervalNextGame = setInterval(updateCountdown, 1000);
-        // Sugerir activar sonido proactivamente durante el conteo si el navegador no ha recibido interacción
+        // Activar sonido automáticamente durante el conteo
         if (typeof audioManager !== 'undefined' && !audioManager._unlocked) {
-            audioManager.showAudioPrompt();
+            audioManager.unlockAudio();
         }
     } else {
         if (window.gameIsFinished || isGameFinishedShown) {
