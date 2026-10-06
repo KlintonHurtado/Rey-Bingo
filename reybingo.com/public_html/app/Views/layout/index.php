@@ -37,7 +37,7 @@
     <title><?= APP_NAME; ?> · <?= $page['title'] ?></title>
 
     <!-- CSS -->
-    <link href="<?= asset_url('icons/css/all.css') ?>" rel="stylesheet"> 
+    <link href="<?= asset_url('icons/css/all.min.css') ?>" rel="stylesheet"> 
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <link href="<?= asset_url('bootstrap/css/bootstrap.min.css') ?>" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -90,15 +90,17 @@ $isNoMusicRole = session()->get('logged_in') && (
 
     <?php if (session()->get('logged_in')) : ?>
         <?php
-            $layoutSounds = (int) ($user['sounds'] ?? 0);
+            // Jugadores: sonido y locución activados por defecto (1) si no están definidos
+            $layoutSounds = isset($user['sounds']) && $user['sounds'] !== null && $user['sounds'] !== '' ? (int)$user['sounds'] : 1;
             // Admin/Staff, Operador y Punto de venta: sin música de fondo
             if ($isNoMusicRole) {
                 $layoutSounds = 0;
             }
+            $layoutNarration = isset($user['narration']) && $user['narration'] !== null && $user['narration'] !== '' ? (int)$user['narration'] : 1;
         ?>
         <input type="hidden" name="sounds" id="sounds" value="<?= esc($layoutSounds); ?>">
-        <input type="hidden" name="narration" id="narration" value="<?= esc($user['narration'] ?? 0); ?>">
-        <input type="hidden" name="autodial" id="autodial" value="<?= esc($user['autodial'] ?? 0); ?>">
+        <input type="hidden" name="narration" id="narration" value="<?= esc($layoutNarration); ?>">
+        <input type="hidden" name="autodial" id="autodial" value="<?= esc($user['autodial'] ?? 1); ?>">
     <?php else : ?>
         <input type="hidden" name="sounds" id="sounds" value="0">
     <?php endif; ?>
@@ -565,8 +567,11 @@ $isNoMusicRole = session()->get('logged_in') && (
         
         <?php if (session()->get('logged_in')) : ?>
             var imagePath = "<?= $imagePath; ?>";
-            var narrationPlaying = <?= $user['narration'] == 1 ? 'true' : 'false' ?>;
-            var autoMarkEnabled = <?= $user['autodial'] == 1 ? 'true' : 'false' ?>;
+            var soundPlaying = <?= ($layoutSounds === 1) ? 'true' : 'false' ?>;
+            var narrationPlaying = <?= ($layoutNarration === 1) ? 'true' : 'false' ?>;
+            var autoMarkEnabled = <?= ($user['autodial'] ?? 1) == 1 ? 'true' : 'false' ?>;
+            window.soundPlaying = soundPlaying;
+            window.narrationPlaying = narrationPlaying;
         <?php endif; ?>
 
         var __ = [];
@@ -2609,8 +2614,11 @@ $isNoMusicRole = session()->get('logged_in') && (
             }
         });
 
-        <?php if (systemGet('activateCron') == 1) : ?>
-        // Respaldo en navegador (el cron principal debe ser del servidor: spark bingo:cron o /cron/run-auto-games)
+        <?php 
+        $cronController = new \App\Controllers\Cron();
+        if ((int) systemGet('activateCron') === 1 && ! $cronController->isRunnerActive()) : 
+        ?>
+        // Respaldo en navegador desactivado cuando bingo-runner (Node.js) está activo en el servidor
         (function () {
             var cronUrl = '<?= site_url('cron/run-auto-games') ?>';
             var tickMs = 45000;

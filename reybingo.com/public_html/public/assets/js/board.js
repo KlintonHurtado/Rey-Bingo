@@ -1803,7 +1803,8 @@ function stopAutomaticLast() {
 }
 
 function showGameFinalized() {
-    if (isGameFinishedShown) return;
+    if (isGameFinishedShown || window.__gameFinalizationInProgress) return;
+    window.__gameFinalizationInProgress = true;
     isGameFinishedShown = true;
     window.gameIsFinished = true;
     
@@ -1822,6 +1823,17 @@ function showGameFinalized() {
     if (window.__userLeavingGame) {
         return;
     }
+
+    const exitToGames = function () {
+        window.__userLeavingGame = true;
+        window.allowGameUnload = true;
+        window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
+    };
+
+    $(document).off('click', '#modalAwards [data-bs-dismiss="modal"], #modalAwards .btn-exit-game, #modalAwards #btnVolverInicio, #modalGameFinalized .btn-exit-game, #modalGameFinalized #btnVolverInicio')
+        .on('click', '#modalAwards [data-bs-dismiss="modal"], #modalAwards .btn-exit-game, #modalAwards #btnVolverInicio, #modalGameFinalized .btn-exit-game, #modalGameFinalized #btnVolverInicio', function () {
+            exitToGames();
+        });
     
     const container = $id('game-finalized');
     const text = $id('finalized');
@@ -1834,31 +1846,21 @@ function showGameFinalized() {
             if (window.__userLeavingGame) {
                 return;
             }
+            container.style.display = 'none';
             if (typeof awardsGet === 'function') {
                 awardsGet();
-            }
-            container.style.display = 'none';
-
-            // Mostrar modal con botón para volver al inicio
-            const bodyEl = document.getElementById('modalGameFinalizedBody');
-            if (bodyEl) {
-                bodyEl.innerHTML = __['game finished!'] || 'JUEGO FINALIZADO!';
-            }
-
-            const modalEl = document.getElementById('modalGameFinalized');
-            if (modalEl) {
-                const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
-                bsModal.show();
-
-                const btnVolver = document.getElementById('btnVolverInicio');
-                if (btnVolver) {
-                    btnVolver.addEventListener('click', function() {
-                        bsModal.hide();
-                        window.location.href = typeof site_url !== 'undefined' ? site_url + 'games' : '/games';
-                    }, { once: true });
+            } else {
+                const modalEl = document.getElementById('modalGameFinalized');
+                if (modalEl) {
+                    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: false });
+                    bsModal.show();
                 }
             }
-        }, 1200);
+        }, 3500);
+    } else {
+        if (typeof awardsGet === 'function') {
+            awardsGet();
+        }
     }
 }
 

@@ -54,8 +54,8 @@
             </div>
         </div>
         <div class="modal-footer justify-content-center pt-2 pb-2">
-            <button type="button" class="btn btn-secondary w-50 btn-bingo" data-bs-dismiss="modal">
-                <i class="fa-solid fa-arrow-left me-1"></i> <?= translate('Volver al Inicio'); ?>
+            <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game" id="btnVolverInicio" data-bs-dismiss="modal">
+                <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
             </button>
         </div>
     </div>

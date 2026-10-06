@@ -1,4 +1,4 @@
-﻿<link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?v=<?= APP_VERSION ?>">
+<link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?v=<?= APP_VERSION ?>">
 <style>
     .ball-slide-in {
         animation: ballSlideIn 0.45s ease-out;
@@ -1054,7 +1054,7 @@
         </button>
 
         <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();" title="Sonido" aria-label="Sonido">
-            <?php if ($user['sounds'] == 1): ?>
+            <?php if (!isset($user['sounds']) || (int)$user['sounds'] !== 0): ?>
                 <i class="fa-duotone fa-solid fa-volume"></i>
             <?php else: ?>
                 <i class="fa-duotone fa-solid fa-volume-slash"></i>
@@ -1062,7 +1062,7 @@
         </button>
 
         <button class="btn btn-small btn-microphone hidden" onclick="RemoveMicrophone();" title="Narración de balotas" aria-label="Narración">
-            <?php if ($user['narration'] == 1): ?>
+            <?php if (!isset($user['narration']) || (int)$user['narration'] !== 0): ?>
                 <i class="fa-duotone fa-solid fa-microphone"></i>
             <?php else: ?>
                 <i class="fa-duotone fa-solid fa-microphone-slash"></i>
@@ -1466,7 +1466,7 @@
             </div>
             <div class="modal-footer justify-content-center">
                 <button type="button" class="btn btn-primary d-block w-100 btn-bingo mt-1" id="btnVolverInicio">
-                    <?= translate('Volver al Inicio'); ?>
+                    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
                 </button>
             </div>
         </div>

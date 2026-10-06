@@ -177,6 +177,8 @@ if (!function_exists('bingo_broadcast_number_drawn')) {
                 'drawn'                 => $drawn,
                 'drawnNumbers'          => $drawn,
                 'totalNumbersGenerated' => $total,
+                'serverTimestamp'       => (int) round(microtime(true) * 1000),
+                'ts'                    => (int) round(microtime(true) * 1000),
             ];
 
             $channels = [

@@ -620,14 +620,15 @@
       <div class="modal-body pt-2 text-center" id="modalGameFinalizedBody">
       </div>
       <div class="modal-footer justify-content-center">
-        <button type="button" class="btn btn-primary d-block w-100 btn-bingo mt-1" id="btnVolverInicio">
-          <?= translate('Volver al Inicio'); ?>
+        <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game mt-1" id="btnVolverInicio" data-bs-dismiss="modal">
+          <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
         </button>
       </div>
     </div>
   </div>
 </div>
 
+<div class="modal fade" id="modalAwards" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false"></div>
 <div class="modal fade" id="modalPlayers" tabindex="-1" role="dialog"></div>
 
 <script type="text/javascript">

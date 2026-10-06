@@ -1142,11 +1142,17 @@ class Playings extends Controller
             $user['autodial'] = 1;
         }
 
+        $userAudioUpdate = [];
         if (!isset($user['narration']) || $user['narration'] === null || $user['narration'] === '') {
             $user['narration'] = 1;
+            $userAudioUpdate['narration'] = 1;
         }
         if (!isset($user['sounds']) || $user['sounds'] === null || $user['sounds'] === '') {
             $user['sounds'] = 1;
+            $userAudioUpdate['sounds'] = 1;
+        }
+        if (!empty($userAudioUpdate)) {
+            $modelUsers->update((int) session()->get('id'), $userAudioUpdate);
         }
 
         if (!empty($drawnNumbersOrdered)) {
@@ -2708,7 +2714,7 @@ class Playings extends Controller
 
     public function awardsGet()
     {
-        if (!session()->get('logged_in') || session()->get('group') != 0) {
+        if (!session()->get('logged_in')) {
             return redirect()->to('/signin');
         }
 
@@ -2936,15 +2942,16 @@ class Playings extends Controller
 
         $user = $modelUsers->getUserById(session()->get('id'));
 
-        if ($user['sounds'] == 1) {
-            $data['sounds'] = 0;
+        $explicitState = $this->request->getPost('state');
+        if ($explicitState !== null && $explicitState !== '') {
+            $data['sounds'] = ((int)$explicitState === 1) ? 1 : 0;
         } else {
-            $data['sounds'] = 1;
+            $data['sounds'] = ((int)($user['sounds'] ?? 1) === 1) ? 0 : 1;
         }
 
         $modelUsers->update(session()->get('id'), $data);
 
-        return $this->response->setJSON(['status' => 'success']);
+        return $this->response->setJSON(['status' => 'success', 'sounds' => $data['sounds']]);
     }
 
     public function microphoneSubmit()
@@ -2953,15 +2960,16 @@ class Playings extends Controller
 
         $user = $modelUsers->getUserById(session()->get('id'));
 
-        if ($user['narration'] == 1) {
-            $data['narration'] = 0;
+        $explicitState = $this->request->getPost('state');
+        if ($explicitState !== null && $explicitState !== '') {
+            $data['narration'] = ((int)$explicitState === 1) ? 1 : 0;
         } else {
-            $data['narration'] = 1;
+            $data['narration'] = ((int)($user['narration'] ?? 1) === 1) ? 0 : 1;
         }
 
         $modelUsers->update(session()->get('id'), $data);
 
-        return $this->response->setJSON(['status' => 'success']);
+        return $this->response->setJSON(['status' => 'success', 'narration' => $data['narration']]);
     }
 
     public function checkSubmit()
@@ -3026,12 +3034,13 @@ class Playings extends Controller
 
     public function winnersGet()
     {
-        if (!session()->get('logged_in') || session()->get('group') != 0) {
+        if (!session()->get('logged_in')) {
             return redirect()->to('/signin');
         }
 
         $modelGames = new GamesModel();
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
+        $game = $modelGames->find($gameId);
 
         if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);

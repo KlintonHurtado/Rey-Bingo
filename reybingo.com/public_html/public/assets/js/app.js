@@ -186,12 +186,30 @@ var App = function() {
             window.stopBingoSoundtrack();
         }
 
-        const soundsInput = document.getElementById('sounds');
-        const currentlyOn = soundsInput
-            ? String(soundsInput.value) === '1'
-            : !document.querySelector('.btn-volume .fa-volume-slash');
-        const nextOn = !currentlyOn;
+        window.audioSettings = window.audioSettings || {
+            soundEnabled: (function() {
+                const local = localStorage.getItem('reybingo_sound');
+                if (local !== null) return local === '1';
+                const input = document.getElementById('sounds');
+                if (input && input.value !== '') return input.value === '1';
+                return true;
+            })(),
+            narrationEnabled: (function() {
+                const local = localStorage.getItem('reybingo_narration');
+                if (local !== null) return local === '1';
+                const input = document.getElementById('narration');
+                if (input && input.value !== '') return input.value === '1';
+                return true;
+            })(),
+            unlocked: false
+        };
 
+        const nextOn = !window.audioSettings.soundEnabled;
+        window.audioSettings.soundEnabled = nextOn;
+        window.soundPlaying = nextOn;
+        try { localStorage.setItem('reybingo_sound', nextOn ? '1' : '0'); } catch (e) {}
+
+        const soundsInput = document.getElementById('sounds');
         if (soundsInput) {
             soundsInput.value = nextOn ? '1' : '0';
         }
@@ -214,21 +232,30 @@ var App = function() {
         if (typeof site_url !== 'undefined' && typeof $ !== 'undefined') {
             $.ajax({
                 url: site_url + 'playings/volumeSubmit',
-                method: 'POST'
+                method: 'POST',
+                data: { state: nextOn ? 1 : 0 }
             });
         }
     };
 
     window.RemoveMicrophone = function RemoveMicrophone() {
-        if (typeof window.narrationPlaying === 'undefined' && typeof narrationPlaying === 'undefined') {
-            window.narrationPlaying = true;
-        }
-        const current = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : window.narrationPlaying;
-        const next = !current;
+        window.audioSettings = window.audioSettings || {
+            soundEnabled: true,
+            narrationEnabled: true,
+            unlocked: false
+        };
+        const next = !window.audioSettings.narrationEnabled;
+        window.audioSettings.narrationEnabled = next;
+        window.narrationPlaying = next;
         if (typeof narrationPlaying !== 'undefined') {
             narrationPlaying = next;
         }
-        window.narrationPlaying = next;
+        try { localStorage.setItem('reybingo_narration', next ? '1' : '0'); } catch (e) {}
+
+        const narrationInput = document.getElementById('narration');
+        if (narrationInput) {
+            narrationInput.value = next ? '1' : '0';
+        }
 
         const micBtn = document.querySelector('.btn-microphone');
         if (micBtn) {
@@ -240,7 +267,8 @@ var App = function() {
         if (typeof site_url !== 'undefined' && typeof $ !== 'undefined') {
             $.ajax({
                 url: site_url + 'playings/microphoneSubmit',
-                method: 'POST'
+                method: 'POST',
+                data: { state: next ? 1 : 0 }
             });
         }
     };
@@ -489,11 +517,33 @@ function referralsGet() {
 }
 
 function awardsGet() {
+    const gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '');
+    const queryParam = gid ? ('?game_id=' + gid) : '';
     const awardsUrl = (typeof window.playerGroup !== 'undefined' && parseInt(window.playerGroup, 10) === 0)
-        ? site_url + 'playings/awardsGet'
-        : site_url + 'boards/awardsGet';
+        ? (site_url + 'playings/awardsGet' + queryParam)
+        : (site_url + 'boards/awardsGet' + queryParam);
 
-    $("#modalAwards").load(awardsUrl, function() {
+    let modalAwardsEl = document.getElementById('modalAwards');
+    if (!modalAwardsEl) {
+        modalAwardsEl = document.createElement('div');
+        modalAwardsEl.className = 'modal fade';
+        modalAwardsEl.id = 'modalAwards';
+        modalAwardsEl.tabIndex = -1;
+        modalAwardsEl.setAttribute('role', 'dialog');
+        modalAwardsEl.setAttribute('data-bs-backdrop', 'static');
+        modalAwardsEl.setAttribute('data-bs-keyboard', 'false');
+        document.body.appendChild(modalAwardsEl);
+    }
+
+    $("#modalAwards").load(awardsUrl, function(response, status, xhr) {
+        if (status === 'error') {
+            console.error('Error cargando modalAwards:', xhr ? xhr.status : status);
+            const modalEl = document.getElementById('modalGameFinalized');
+            if (modalEl) {
+                showBsModal('#modalGameFinalized');
+            }
+            return;
+        }
         showBsModal('#modalAwards');
         $('#game-finalized').hide();
     });

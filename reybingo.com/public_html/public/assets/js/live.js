@@ -1306,8 +1306,10 @@ function stopAutomaticLast() {
 }
 
 function showGameFinalized() {
-    if (isGameFinishedShown) return;
+    if (isGameFinishedShown || window.__gameFinalizationInProgress) return;
+    window.__gameFinalizationInProgress = true;
     isGameFinishedShown = true;
+    window.gameIsFinished = true;
     
     const container = $id('game-finalized');
     const text = $id('finalized');

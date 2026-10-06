@@ -124,36 +124,85 @@ class PusherClient {
                 console.error('WS error de suscripcion:', error);
                 this.isConnected = false;
                 this.connectionAttempts++;
-                if (this.connectionAttempts < this.maxConnectionAttempts) {
-                    var delay = 2000 * this.connectionAttempts;
-                    console.log('WS reintentando en ' + delay + 'ms (' + this.connectionAttempts + '/' + this.maxConnectionAttempts + ')...');
-                    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
-                    this._reconnectTimer = setTimeout(() => this.reconnect(), delay);
-                } else {
-                    console.error('WS: maximo de reintentos alcanzado. Usando poll de respaldo.');
-                    this._triggerEvent('connection:failed', error);
-                }
+                this._scheduleReconnect();
+                this._triggerEvent('connection:failed', error);
             });
 
-            this.pusher.connection.bind('disconnected', () => {
-                if (this.isConnected) {
-                    console.warn('WS: desconectado inesperadamente');
+            // Monitoreo completo del ciclo de conexión Pusher/Soketi para móviles y redes inestables
+            this.pusher.connection.bind('state_change', (states) => {
+                console.log('WS estado:', states.previous, '->', states.current);
+                if (states.current === 'connected') {
+                    this.isConnected = true;
+                    this.connectionAttempts = 0;
+                    if (this._reconnectTimer) {
+                        clearTimeout(this._reconnectTimer);
+                        this._reconnectTimer = null;
+                    }
+                    this._triggerEvent('connection:success');
+                } else if (states.current === 'disconnected' || states.current === 'unavailable' || states.current === 'failed') {
                     this.isConnected = false;
-                    this._triggerEvent('connection:failed', { message: 'disconnected' });
+                    this._triggerEvent('connection:failed', { state: states.current });
+                    this._scheduleReconnect();
                 }
-            });
-
-            this.pusher.connection.bind('connected', () => {
-                console.log('WS: conexion TCP establecida');
             });
 
             this._setupGameEvents();
+            this._bindMobileLifecycle();
             return true;
 
         } catch (error) {
             console.error('WS: error al inicializar:', error);
             this._triggerEvent('connection:error', error);
             return false;
+        }
+    }
+
+    _scheduleReconnect() {
+        if (this._reconnectTimer) return;
+        this.connectionAttempts++;
+        // Backoff exponencial suave: 1.5s, 3s, 5s, 8s, luego cada 10s continuo (sin límite artificial)
+        const delay = Math.min(10000, Math.max(1500, this.connectionAttempts * 1500));
+        console.log('WS móvil: programando reconexión en ' + delay + 'ms (intento #' + this.connectionAttempts + ')');
+        this._reconnectTimer = setTimeout(() => {
+            this._reconnectTimer = null;
+            this.reconnect();
+        }, delay);
+    }
+
+    _bindMobileLifecycle() {
+        if (this._lifecycleBound) return;
+        this._lifecycleBound = true;
+
+        const handleResume = () => {
+            if (document.hidden) return;
+            console.log('WS móvil: reanudación de primer plano detectada');
+            this.ensureConnected();
+            this._triggerEvent('lifecycle:resume');
+        };
+
+        document.addEventListener('visibilitychange', handleResume);
+        window.addEventListener('pageshow', handleResume);
+        window.addEventListener('focus', handleResume);
+        window.addEventListener('online', () => {
+            console.log('WS móvil: red recuperada (online)');
+            this.ensureConnected();
+            this._triggerEvent('lifecycle:online');
+        });
+    }
+
+    ensureConnected() {
+        if (!this.pusher) {
+            this.reconnect();
+            return;
+        }
+        const state = (this.pusher.connection && this.pusher.connection.state) ? this.pusher.connection.state : 'disconnected';
+        if (state !== 'connected' && state !== 'connecting') {
+            console.log('WS móvil: forzando reconexión tras suspensión (estado: ' + state + ')');
+            try {
+                this.pusher.connect();
+            } catch (e) {
+                this.reconnect();
+            }
         }
     }
 

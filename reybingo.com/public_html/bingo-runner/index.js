@@ -1,13 +1,15 @@
 /**
- * Bingo Runner Daemon - WebSocket Edition (Node.js)
+ * Bingo Runner Daemon - Precision Scheduler Edition (Node.js)
  *
- * Microservicio en segundo plano que:
- * 1. Sincroniza qué juegos automáticos están activos consultando PHP
- * 2. Hace el tick de cada balota llamando al endpoint PHP
- *    (PHP valida unicidad, guarda en MySQL y emite el evento a Soketi)
- * 3. Mantiene timers precisos por juego sin ningún polling en el frontend
- *
- * Flujo: Runner tick → PHP → MySQL + Soketi → Push a todos los jugadores (<50ms)
+ * Microservicio en segundo plano de alta precisión:
+ * 1. Sincroniza partidas automáticas activas consultando /cron/active-auto-games
+ * 2. Mantiene un scheduler por timestamp objetivo (nextBallAt) con setTimeout auto-correctivo
+ * 3. Cero deriva acumulativa: nextBallAt = target_previo + intervalMs
+ * 4. Manejo inteligente de "waiting": espera únicamente remainingMs (ej. 137ms), no un ciclo entero
+ * 5. Manejo inteligente de "paused": espera únicamente el tiempo de pausa por bingo (~2000ms)
+ * 6. Telemetría temporal obligatoria: [BALL-SCHEDULER] y [BALL-DELAY] (>250ms)
+ * 7. Resiliente a reinicios: reconstruye nextBallAt desde la base de datos/servidor
+ * 8. Soporta cambios de configuración de intervalo en caliente de forma atómica
  */
 
 const fs    = require('fs');
@@ -40,18 +42,19 @@ loadEnv();
 const APP_URL          = process.env.APP_URL          || 'https://bingo.reybingo.com';
 const CRON_TOKEN       = process.env.CRON_TOKEN       || 'reybingo_cron_secret_key_2026';
 const SYNC_INTERVAL_MS = parseInt(process.env.SYNC_INTERVAL_MS || '3000', 10);
-const MIN_TICK_MS      = parseInt(process.env.MIN_TICK_MS      || '3000', 10);
+const MIN_TICK_MS      = parseInt(process.env.MIN_TICK_MS      || '1000', 10);
 const STATUS_PORT      = parseInt(process.env.STATUS_PORT      || '9999', 10);
 
 console.log('=======================================================');
-console.log('BINGO RUNNER DAEMON - WebSocket Edition');
-console.log('App Target : ' + APP_URL);
-console.log('Sync cada  : ' + SYNC_INTERVAL_MS + ' ms');
-console.log('Tick min   : ' + MIN_TICK_MS + ' ms');
+console.log('BINGO RUNNER DAEMON - Precision Scheduler Edition');
+console.log('App Target  : ' + APP_URL);
+console.log('Sync cada   : ' + SYNC_INTERVAL_MS + ' ms');
+console.log('Tick min    : ' + MIN_TICK_MS + ' ms');
+console.log('Architecture: nextBallAt + Auto-corrective setTimeout');
 console.log('=======================================================');
 
-// Mapa de timers activos: gameId -> { timerId, intervalMs }
-const activeTimers = new Map();
+// Mapa de schedulers activos: gameId -> GameScheduler
+const activeSchedulers = new Map();
 
 // ─────────────────────────────────────────
 // Cliente HTTP/HTTPS ligero (0 dependencias)
@@ -65,7 +68,7 @@ function requestApi(urlStr, options) {
 
         var transport = parsedUrl.protocol === 'https:' ? https : http;
         var headers = {
-            'User-Agent'   : 'BingoRunner/2.0-WS',
+            'User-Agent'   : 'BingoRunner/3.0-Precision',
             'X-Cron-Token' : CRON_TOKEN
         };
         if (process.env.APP_HOST_HEADER) {
@@ -109,110 +112,272 @@ function requestApi(urlStr, options) {
 }
 
 // ─────────────────────────────────────────
-// Tick de 1 balota para un juego
-// PHP valida, guarda en MySQL y emite a Soketi
+// Estructura y lógica del Scheduler por Juego
 // ─────────────────────────────────────────
-async function tickGame(gameId) {
-    var tag = '[' + new Date().toLocaleTimeString() + '] Juego #' + gameId;
+function formatTime(ts) {
+    if (!ts) return 'N/A';
+    return new Date(ts).toISOString().slice(11, 23);
+}
+
+function scheduleNextTick(scheduler) {
+    if (scheduler.isStopped) return;
+
+    if (scheduler.timeoutRef) {
+        clearTimeout(scheduler.timeoutRef);
+        scheduler.timeoutRef = null;
+    }
+
+    var now = Date.now();
+    var delay = Math.max(0, scheduler.nextBallAt - now);
+
+    scheduler.timeoutRef = setTimeout(function() {
+        executeTick(scheduler);
+    }, delay);
+}
+
+async function executeTick(scheduler) {
+    if (scheduler.isStopped || scheduler.isTicking) return;
+
+    scheduler.isTicking = true;
+    var tickStartTime = Date.now();
+    var driftMs = tickStartTime - scheduler.nextBallAt;
+    var tag = '[' + formatTime(tickStartTime) + '] Juego #' + scheduler.gameId;
+
     try {
         var res = await requestApi(APP_URL + '/cron/tick-auto-game', {
             method : 'POST',
-            body   : { game_id: gameId }
+            body   : {
+                game_id: scheduler.gameId,
+                expected_at: scheduler.nextBallAt
+            }
         });
 
+        var networkEndTime = Date.now();
+        var networkDuration = networkEndTime - tickStartTime;
+
         if (!res.data) {
-            console.warn(tag + ' | Respuesta vacia');
+            console.warn(tag + ' | Respuesta vacia de PHP (' + res.statusCode + ')');
+            scheduler.isTicking = false;
+            // Reintento en 500ms
+            scheduler.nextBallAt = Date.now() + 500;
+            scheduleNextTick(scheduler);
             return;
         }
 
         var d = res.data;
 
-        if (d.ok) {
-            if (d.number) {
-                console.log(tag + ' | Balota: ' + d.number);
+        // ── CASO 1: Balota cantada con éxito ─────────────────────────
+        if (d.ok && d.number) {
+            var ballNumber = parseInt(d.number, 10);
+            var ballTimestamp = d.ballTimestamp ? parseInt(d.ballTimestamp, 10) : tickStartTime;
+            var prevBallTime = scheduler.lastBallAt;
+
+            var driftStr = (driftMs >= 0 ? '+' : '') + driftMs + 'ms';
+            var prevStr = prevBallTime ? formatTime(prevBallTime) : 'Inicio';
+            var expStr  = formatTime(scheduler.nextBallAt);
+            var actStr  = formatTime(tickStartTime);
+
+            var phpMsStr = d.phpProcessingMs !== undefined ? (' | PHP: ' + d.phpProcessingMs + 'ms') : '';
+            console.log(
+                '[BALL-SCHEDULER] Game: ' + scheduler.gameId +
+                ' | Ball: ' + ballNumber +
+                ' | Configured: ' + scheduler.intervalMs + 'ms' +
+                ' | Previous: ' + prevStr +
+                ' | Expected: ' + expStr +
+                ' | Actual: ' + actStr +
+                ' | Drift: ' + driftStr +
+                ' | Net: ' + networkDuration + 'ms' +
+                phpMsStr
+            );
+
+            if (Math.abs(driftMs) > 250) {
+                console.warn(
+                    '[BALL-DELAY] Game: ' + scheduler.gameId +
+                    ' | Ball: ' + ballNumber +
+                    ' | Configured: ' + scheduler.intervalMs + 'ms' +
+                    ' | Expected: ' + expStr +
+                    ' | Actual: ' + actStr +
+                    ' | Drift: ' + driftStr +
+                    ' | schedulerDelay: ' + driftMs + 'ms' +
+                    ' | phpProcessingTime: ' + (d.phpProcessingMs !== undefined ? d.phpProcessingMs + 'ms' : 'N/A') +
+                    ' | networkDuration: ' + networkDuration + 'ms'
+                );
             }
+
+            scheduler.lastBallAt = ballTimestamp;
+            scheduler.lastBallNumber = ballNumber;
+            scheduler.numbersDrawn++;
+
             if (d.completed) {
-                console.log(tag + ' | Partida finalizada');
-                stopGameTimer(gameId);
+                console.log(tag + ' | Partida completada.');
+                stopGame(scheduler.gameId);
+                return;
             }
-            // d.paused = pausa por bingo reciente, es normal
-            // d.waiting = esperando intervalo entre balotas, es normal
-        } else {
-            // Solo detener si explícitamente el juego está inactivo o completado
-            if (d.inactive || d.completed) {
-                console.log(tag + ' | Juego inactivo o completado (' + (d.message || 'sin detalle') + '). Deteniendo.');
-                stopGameTimer(gameId);
-            } else {
-                console.warn(tag + ' | ' + (d.message || JSON.stringify(d)));
+
+            // Cálculo del próximo objetivo SIN deriva acumulativa
+            // nextBallAt = target_previo + intervalMs
+            var nextTarget = scheduler.nextBallAt + scheduler.intervalMs;
+
+            // Si por alguna razón severa hubo un atraso excesivo (> 1.5 intervalos),
+            // resincronizar a partir de ahora para no emitir ráfagas de balotas
+            if (nextTarget < Date.now() - 500) {
+                nextTarget = Date.now() + scheduler.intervalMs;
             }
+
+            scheduler.nextBallAt = nextTarget;
+            scheduler.isTicking = false;
+            scheduleNextTick(scheduler);
+            return;
         }
+
+        // ── CASO 2: Intervalo no cumplido (waiting) ───────────────────
+        if (d.ok && d.waiting) {
+            var waitRemaining = Math.max(25, parseInt(d.remainingMs, 10) || 100);
+            scheduler.nextBallAt = Date.now() + waitRemaining;
+            scheduler.isTicking = false;
+            scheduleNextTick(scheduler);
+            return;
+        }
+
+        // ── CASO 3: Pausa por cante reciente de bingo (paused) ────────
+        if (d.ok && d.paused) {
+            var pauseRemaining = Math.max(50, parseInt(d.pauseRemainingMs, 10) || parseInt(d.remainingMs, 10) || 2000);
+            console.log(tag + ' | Pausa por bingo en curso. Esperando ' + pauseRemaining + 'ms');
+            scheduler.nextBallAt = Date.now() + pauseRemaining;
+            scheduler.isTicking = false;
+            scheduleNextTick(scheduler);
+            return;
+        }
+
+        // ── CASO 4: Partida finalizada o inactiva ─────────────────────
+        if (d.completed || d.inactive) {
+            console.log(tag + ' | Juego completado o inactivo (' + (d.message || '') + '). Deteniendo scheduler.');
+            stopGame(scheduler.gameId);
+            return;
+        }
+
+        // Otros estados transitorios (ej: error en DB): reintentar en 500ms
+        console.warn(tag + ' | Estado inesperado: ' + (d.message || JSON.stringify(d)) + '. Reintentando en 500ms.');
+        scheduler.nextBallAt = Date.now() + 500;
+        scheduler.isTicking = false;
+        scheduleNextTick(scheduler);
+
     } catch (err) {
-        console.error(tag + ' | ERROR: ' + err.message);
+        console.error(tag + ' | ERROR en tick: ' + err.message + '. Reintentando en 1000ms.');
+        scheduler.nextBallAt = Date.now() + 1000;
+        scheduler.isTicking = false;
+        scheduleNextTick(scheduler);
     }
 }
 
 // ─────────────────────────────────────────
-// Inicia o actualiza el timer de un juego
+// Iniciar o actualizar un scheduler de juego
 // ─────────────────────────────────────────
-function startGameTimer(gameId, intervalMs, numbersDrawn) {
-    var safeInterval = Math.max(MIN_TICK_MS, parseInt(intervalMs, 10) || 15000);
+function startOrUpdateGame(game) {
+    var gameId = parseInt(game.id, 10);
+    var intervalMs = Math.max(MIN_TICK_MS, parseInt(game.intervalMs, 10) || 15000);
+    var numbersDrawn = parseInt(game.numbersDrawn, 10) || 0;
 
-    if (activeTimers.has(gameId)) {
-        var existing = activeTimers.get(gameId);
-        if (existing.intervalMs === safeInterval) return;
-        clearInterval(existing.timerId);
-        console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': intervalo actualizado a ' + safeInterval + 'ms');
-    } else {
-        console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': iniciando (cada ' + safeInterval + 'ms)');
-        // Si el juego apenas arranca sin balotas, cantar la primera balota de inmediato
-        if (typeof numbersDrawn !== 'undefined' && numbersDrawn === 0) {
-            console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': primera balota inmediata al iniciar');
-            tickGame(gameId);
+    if (activeSchedulers.has(gameId)) {
+        var existing = activeSchedulers.get(gameId);
+
+        // Detectar cambio de configuración de intervalo en caliente
+        if (existing.intervalMs !== intervalMs) {
+            var oldInterval = existing.intervalMs;
+            existing.intervalMs = intervalMs;
+            existing.nextBallAt = (existing.lastBallAt || Date.now()) + intervalMs;
+            console.log('[' + formatTime(Date.now()) + '] Juego #' + gameId + ': intervalo actualizado de ' + oldInterval + 'ms a ' + intervalMs + 'ms');
+            scheduleNextTick(existing);
         }
+        return;
     }
 
-    var timerId = setInterval(function() { tickGame(gameId); }, safeInterval);
-    activeTimers.set(gameId, { timerId: timerId, intervalMs: safeInterval });
+    // Inicialización de nuevo juego o recuperación tras reinicio
+    var lastBallAt = null;
+    if (game.lastBallTimestamp && parseInt(game.lastBallTimestamp, 10) > 0) {
+        lastBallAt = parseInt(game.lastBallTimestamp, 10);
+    }
+
+    var nextBallAt = Date.now();
+    if (numbersDrawn === 0) {
+        // Primera balota de la partida: de inmediato (0ms)
+        nextBallAt = Date.now();
+    } else if (game.nextBallAt && parseInt(game.nextBallAt, 10) > 0) {
+        nextBallAt = parseInt(game.nextBallAt, 10);
+    } else if (lastBallAt) {
+        nextBallAt = lastBallAt + intervalMs;
+    }
+
+    // Si ya está vencido en el pasado, ejecutar de inmediato
+    if (nextBallAt < Date.now()) {
+        nextBallAt = Date.now();
+    }
+
+    var scheduler = {
+        gameId       : gameId,
+        intervalMs   : intervalMs,
+        nextBallAt   : nextBallAt,
+        lastBallAt   : lastBallAt,
+        lastBallNumber: null,
+        numbersDrawn : numbersDrawn,
+        timeoutRef   : null,
+        isTicking    : false,
+        isStopped    : false
+    };
+
+    activeSchedulers.set(gameId, scheduler);
+    console.log(
+        '[' + formatTime(Date.now()) + '] Juego #' + gameId +
+        ': iniciado scheduler (intervalo: ' + intervalMs + 'ms, balotas previas: ' + numbersDrawn +
+        ', proxima balota en: ' + Math.max(0, nextBallAt - Date.now()) + 'ms)'
+    );
+
+    scheduleNextTick(scheduler);
 }
 
 // ─────────────────────────────────────────
-// Detiene el timer de un juego
+// Detener el scheduler de un juego
 // ─────────────────────────────────────────
-function stopGameTimer(gameId) {
-    if (activeTimers.has(gameId)) {
-        clearInterval(activeTimers.get(gameId).timerId);
-        activeTimers.delete(gameId);
-        console.log('[' + new Date().toLocaleTimeString() + '] Juego #' + gameId + ': timer detenido');
+function stopGame(gameId) {
+    if (activeSchedulers.has(gameId)) {
+        var scheduler = activeSchedulers.get(gameId);
+        scheduler.isStopped = true;
+        if (scheduler.timeoutRef) {
+            clearTimeout(scheduler.timeoutRef);
+            scheduler.timeoutRef = null;
+        }
+        activeSchedulers.delete(gameId);
+        console.log('[' + formatTime(Date.now()) + '] Juego #' + gameId + ': scheduler detenido');
     }
 }
 
 // ─────────────────────────────────────────
-// Sincroniza juegos activos desde PHP
+// Sincronización periódica con el servidor PHP
 // ─────────────────────────────────────────
 async function syncActiveGames() {
     try {
         var res = await requestApi(APP_URL + '/cron/active-auto-games');
 
         if (!res.data || !res.data.ok || !Array.isArray(res.data.activeGames)) {
-            return; // Sin juegos activos o error transitorio
+            return;
         }
 
         var serverGames   = res.data.activeGames;
-        var serverGameIds = new Set(serverGames.map(function(g) { return g.id; }));
+        var serverGameIds = new Set(serverGames.map(function(g) { return parseInt(g.id, 10); }));
 
-        // Arrancar / actualizar juegos activos
+        // Arrancar o actualizar cada juego activo
         serverGames.forEach(function(game) {
-            startGameTimer(game.id, game.intervalMs, game.numbersDrawn);
+            startOrUpdateGame(game);
         });
 
-        // Detener juegos que ya no están activos
-        activeTimers.forEach(function(_, gameId) {
+        // Detener juegos que ya no figuren como activos en el servidor
+        activeSchedulers.forEach(function(_, gameId) {
             if (!serverGameIds.has(gameId)) {
-                stopGameTimer(gameId);
+                stopGame(gameId);
             }
         });
     } catch (err) {
-        console.error('[' + new Date().toLocaleTimeString() + '] ERROR sync: ' + err.message);
+        console.error('[' + formatTime(Date.now()) + '] ERROR sync: ' + err.message);
     }
 }
 
@@ -222,11 +387,25 @@ async function syncActiveGames() {
 // ─────────────────────────────────────────
 http.createServer(function(req, res) {
     if (req.url === '/health' || req.url === '/status') {
+        var schedulersInfo = [];
+        activeSchedulers.forEach(function(s, gId) {
+            schedulersInfo.push({
+                gameId     : gId,
+                intervalMs : s.intervalMs,
+                nextBallAt : s.nextBallAt,
+                remainingMs: Math.max(0, s.nextBallAt - Date.now()),
+                lastBallAt : s.lastBallAt,
+                numbersDrawn: s.numbersDrawn,
+                isTicking  : s.isTicking
+            });
+        });
+
         var status = {
             ok          : true,
             uptime      : Math.round(process.uptime()),
-            activeGames : Array.from(activeTimers.keys()),
-            activeCount : activeTimers.size,
+            activeGames : Array.from(activeSchedulers.keys()),
+            activeCount : activeSchedulers.size,
+            schedulers  : schedulersInfo,
             timestamp   : new Date().toISOString()
         };
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -246,11 +425,11 @@ syncActiveGames();
 setInterval(syncActiveGames, SYNC_INTERVAL_MS);
 
 // ─────────────────────────────────────────
-// Apagado limpio (PM2 / systemd SIGTERM)
+// Apagado limpio (PM2 / systemd / Docker SIGTERM)
 // ─────────────────────────────────────────
 function gracefulShutdown(signal) {
-    console.log('\nSenal ' + signal + ' recibida. Deteniendo runner...');
-    activeTimers.forEach(function(_, gameId) { stopGameTimer(gameId); });
+    console.log('\nSenal ' + signal + ' recibida. Deteniendo schedulers...');
+    activeSchedulers.forEach(function(_, gameId) { stopGame(gameId); });
     process.exit(0);
 }
 process.on('SIGINT',  function() { gracefulShutdown('SIGINT'); });

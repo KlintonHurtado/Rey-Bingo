@@ -84,8 +84,36 @@ try {
 
 let numbersgenerated = [];
 let lastNumbers = (typeof fiveNumbers !== 'undefined' && Array.isArray(fiveNumbers)) ? fiveNumbers : (Array.isArray(window.fiveNumbers) ? window.fiveNumbers : []);
-var narrationPlaying = (typeof window.narrationPlaying !== 'undefined') ? window.narrationPlaying : (typeof narrationPlaying !== 'undefined' ? narrationPlaying : true);
-var soundPlaying = (typeof window.soundPlaying !== 'undefined') ? window.soundPlaying : (typeof soundPlaying !== 'undefined' ? soundPlaying : true);
+
+// Única fuente de verdad para el audio en el cliente, persistente en móviles y sincronizada con el servidor
+window.audioSettings = window.audioSettings || {
+    soundEnabled: (function () {
+        try {
+            const local = localStorage.getItem('reybingo_sound');
+            if (local !== null) return local === '1';
+        } catch (e) { }
+        if (typeof window.soundPlaying !== 'undefined') return window.soundPlaying;
+        const input = document.getElementById('sounds');
+        if (input && input.value !== '') return input.value === '1';
+        return true;
+    })(),
+    narrationEnabled: (function () {
+        try {
+            const local = localStorage.getItem('reybingo_narration');
+            if (local !== null) return local === '1';
+        } catch (e) { }
+        if (typeof window.narrationPlaying !== 'undefined') return window.narrationPlaying;
+        const input = document.getElementById('narration');
+        if (input && input.value !== '') return input.value === '1';
+        return true;
+    })(),
+    unlocked: false
+};
+
+window.soundPlaying = window.audioSettings.soundEnabled;
+window.narrationPlaying = window.audioSettings.narrationEnabled;
+var narrationPlaying = window.narrationPlaying;
+var soundPlaying = window.soundPlaying;
 var audioPath = (typeof window.audioPath !== 'undefined' && window.audioPath) ? window.audioPath : (typeof audioPath !== 'undefined' && audioPath ? audioPath : '/assets/sounds/');
 let narrationAudio;
 let soundWinner;
@@ -300,11 +328,39 @@ class AudioManager {
         this.preloadedAudios.add(src);
     }
 
+    stopCurrentVoice() {
+        for (let i = 0; i < 2; i++) {
+            if (this.voiceAudios[i]) {
+                try {
+                    this.voiceAudios[i].pause();
+                    this.voiceAudios[i].currentTime = 0;
+                    this.voiceAudios[i].onplay = null;
+                    this.voiceAudios[i].onended = null;
+                    this.voiceAudios[i].onerror = null;
+                } catch (e) {}
+            }
+        }
+        if ('speechSynthesis' in window) {
+            try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+    }
+
     playVoice(src, ballNumber) {
+        // Respetar estado unificado y persistente de locución
+        const isNarrationOn = (window.audioSettings && typeof window.audioSettings.narrationEnabled !== 'undefined')
+            ? window.audioSettings.narrationEnabled
+            : ((typeof narrationPlaying !== 'undefined') ? narrationPlaying : true);
+        if (!isNarrationOn) {
+            return null;
+        }
+
         const num = ballNumber || (src.match(/\/(\d+)\.mp3/i) ? src.match(/\/(\d+)\.mp3/i)[1] : null);
 
         this.initAudioContext();
         this.resumeContext();
+
+        // Detener de inmediato cualquier locución previa (MP3 o síntesis) para evitar voces encimadas (doble audio)
+        this.stopCurrentVoice();
 
         // Alternar entre voiceAudios[0] y voiceAudios[1] para evitar AbortError si balotas se suceden rápido
         this.voiceIndex = (this.voiceIndex + 1) % 2;
@@ -348,11 +404,13 @@ class AudioManager {
             if (audio.readyState < 2 && (audio.paused || audio.currentTime === 0)) {
                 speakFallback();
             }
-        }, 4500);
+        }, 3500);
 
         audio.onplay = () => {
             clearTimeout(networkTimeout);
             hasSpokenFallback = true;
+            this._unlocked = true;
+            if (window.audioSettings) window.audioSettings.unlocked = true;
             if ('speechSynthesis' in window) {
                 try {
                     window.speechSynthesis.cancel();
@@ -384,10 +442,14 @@ class AudioManager {
                 p.catch(e => {
                     clearTimeout(networkTimeout);
                     if (e.name === 'NotAllowedError') {
+                        // El navegador móvil bloqueó el autoplay sin interacción previa:
+                        // Guardar la balota pendiente para reproducirla al primer toque, SIN apagar la configuración del usuario
                         window.pendingBallAudioSrc = src;
                         window.pendingBallNumber = num;
-                        this.unlockAudio();
-                        speakFallback();
+                        this._unlocked = false;
+                        if (window.audioSettings) window.audioSettings.unlocked = false;
+                        updateVolumeButtonIcon(window.audioSettings.soundEnabled);
+                        updateMicrophoneButtonIcon(window.audioSettings.narrationEnabled);
                     } else if (e.name !== 'AbortError') {
                         speakFallback();
                     }
@@ -512,6 +574,11 @@ class AudioManager {
     }
 
     playSoft(src) {
+        const isSoundOn = (window.audioSettings && typeof window.audioSettings.soundEnabled !== 'undefined')
+            ? window.audioSettings.soundEnabled
+            : ((typeof soundPlaying !== 'undefined') ? soundPlaying : true);
+        if (!isSoundOn) return null;
+
         try {
             if (!this.effectAudio) {
                 this.effectAudio = new Audio();
@@ -533,6 +600,14 @@ class AudioManager {
         // Para balotas cantadas (/assets/sounds/XX.mp3), usar reproductor de voz con fallback inteligente
         if (/\/\d+\.mp3/i.test(src) || ballNumber) {
             return this.playVoice(src, ballNumber);
+        }
+
+        // Para efectos de sonido (botones, ganador, etc.), respetar soundEnabled
+        const isSoundOn = (window.audioSettings && typeof window.audioSettings.soundEnabled !== 'undefined')
+            ? window.audioSettings.soundEnabled
+            : ((typeof soundPlaying !== 'undefined') ? soundPlaying : true);
+        if (!isSoundOn) {
+            return null;
         }
 
         let audio = this.audioCache.get(src);
@@ -607,7 +682,9 @@ function unlockUserAudioGesture() {
     if (typeof audioManager !== 'undefined' && audioManager.unlockAudio) {
         audioManager.unlockAudio();
     }
-    const isNarrationOn = (typeof narrationPlaying !== 'undefined') ? narrationPlaying : (window.narrationPlaying !== false);
+    const isNarrationOn = (window.audioSettings && typeof window.audioSettings.narrationEnabled !== 'undefined')
+        ? window.audioSettings.narrationEnabled
+        : ((typeof narrationPlaying !== 'undefined') ? narrationPlaying : true);
     if (window.pendingBallAudioSrc && isNarrationOn) {
         const pendingSrc = window.pendingBallAudioSrc;
         const pendingNum = window.pendingBallNumber;
@@ -630,10 +707,65 @@ if (document.readyState === 'loading') {
 }
 window.addEventListener('load', unlockUserAudioGesture);
 
-// Reactivación de audio al volver de pestañas en segundo plano o bloqueo de pantalla
+// Carga asíncrona robusta de voces para síntesis en móviles (Android Chrome / iOS Safari)
+if ('speechSynthesis' in window) {
+    try {
+        window.speechSynthesis.getVoices();
+        window.speechSynthesis.onvoiceschanged = function () {
+            try { window.speechSynthesis.getVoices(); } catch (e) {}
+        };
+    } catch (e) {}
+}
+
+// ==========================================
+// TELEMETRÍA Y DIAGNÓSTICO DE LATENCIA DE BALOTAS
+// Activable via URL con ?debug=1 o localStorage.getItem('reybingo_debug') === '1'
+// ==========================================
+window.ballTelemetry = {
+    enabled: (function () {
+        try {
+            return location.search.includes('debug=1') || localStorage.getItem('reybingo_debug') === '1';
+        } catch (e) { return false; }
+    })(),
+    logBallTiming: function (stage, ballNumber, extra) {
+        if (!this.enabled) return;
+        const now = performance.now();
+        const wallTime = Date.now();
+        console.log(`[BALL-TIMING] Ball #${ballNumber} | Stage: ${stage} | ClientPerfMs: ${now.toFixed(1)} | Epoch: ${wallTime}`, extra || {});
+    }
+};
+
+// Reactivación de audio y sincronización inteligente al volver de pestañas en segundo plano o bloqueo de pantalla
 document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && typeof audioManager !== 'undefined') {
-        audioManager.resumeContext();
+    if (!document.hidden) {
+        if (typeof audioManager !== 'undefined') {
+            audioManager.resumeContext();
+        }
+        if (typeof syncGameState === 'function') {
+            syncGameState('visibility_visible');
+        }
+    } else {
+        // En background: cancelar locución y detener audio para no consumir batería ni quedar desfasado
+        if (typeof audioManager !== 'undefined' && audioManager.stopCurrentVoice) {
+            audioManager.stopCurrentVoice();
+        }
+    }
+});
+
+// Resincronización al recuperar foco o conectividad en navegadores móviles
+window.addEventListener('pageshow', function () {
+    if (typeof syncGameState === 'function') {
+        syncGameState('pageshow');
+    }
+});
+window.addEventListener('focus', function () {
+    if (typeof syncGameState === 'function') {
+        syncGameState('focus');
+    }
+});
+window.addEventListener('online', function () {
+    if (typeof syncGameState === 'function') {
+        syncGameState('online');
     }
 });
 
@@ -1245,7 +1377,9 @@ function buildWinnersFinalText() {
 }
 
 function fetchWinnersBeforeFinalize(callback) {
-    $.get(site_url + 'playings/winnersGet')
+    const gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '');
+    const url = site_url + 'playings/winnersGet' + (gid ? ('?game_id=' + gid) : '');
+    $.get(url)
         .done(function (data) {
             if (data && data.status === 'success' && Array.isArray(data.winners)) {
                 mergeWinnersFromServer(data.winners);
@@ -1994,6 +2128,12 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
         return !previous.includes(num);
     });
 
+    // Deduplicación estricta: si no hay balotas nuevas y ya teníamos estado previo, no duplicar trabajo
+    if (missing.length === 0 && previous.length > 0) {
+        updateBallsCounter(ballsCount);
+        return;
+    }
+
     numbersgenerated = ordered.slice();
     window.drawnNumbers = ordered.slice();
 
@@ -2003,28 +2143,93 @@ function syncDrawnNumbersFromServer(drawnNumbers, totalNumbersGenerated, options
     flushPendingMark();
     clearBallRevealTimers(false);
 
-    // Si animate es false, o si es reconexión masiva (> 5 bolas perdidas) o si es carga tardía en partida avanzada:
-    const isLateMassiveJoin = previous.length === 0 && ordered.length > 5;
-    if (isLateMassiveJoin || missing.length > 5 || opts.animate === false) {
-        reconcileBallDisplay(ordered);
+    // Caso A: Reconciliación múltiple / Desincronización (más de 1 bola nueva a la vez)
+    // Ocurre tras reconexión de WebSocket, regresar de bloqueo de pantalla o cambio de red móvil
+    if (missing.length > 1 || previous.length === 0 || opts.animate === false) {
+        if (window.ballTelemetry) {
+            window.ballTelemetry.logBallTiming('T4_MULTI_RECONCILE', ordered[ordered.length - 1], { missingCount: missing.length });
+        }
+
+        // 1. Marcar inmediatamente TODAS las bolas perdidas en tablero y cartones (0ms)
+        ordered.forEach(function (num) {
+            markBoardNumber(num);
+        });
         if (isAutoMarkEnabled()) {
             syncAutoMarkedNumbers(ordered, { animate: false, persist: false });
         }
-        // Si la partida está activa y llegaron bolas, cantar al menos la última para no quedar en silencio
-        if (opts.animate !== false && missing.length > 0 && !window.gameIsFinished) {
-            enqueueBallsForPlayback([missing[missing.length - 1]]);
+
+        // 2. Mostrar DIRECTAMENTE la última balota del servidor en pantalla (0ms)
+        const latestBall = ordered[ordered.length - 1];
+        lastNumbers = ordered.slice(-5);
+        updateMainBall(latestBall);
+        renderBallHistory();
+
+        // 3. Vaciar cualquier cola antigua de reproducción acumulada para no retrasar el juego
+        ballPlaybackQueue = [];
+        isBallPlaybackActive = false;
+        if (window.__ballPlaybackWatchdog) {
+            clearTimeout(window.__ballPlaybackWatchdog);
+            window.__ballPlaybackWatchdog = null;
+        }
+
+        // 4. Cantar ÚNICAMENTE la última balota si la partida está en vivo y no en pantalla final
+        // NUNCA reproducir una ráfaga de balotas viejas que desfasaría al móvil varios segundos
+        if (opts.animate !== false && missing.length > 0 && !window.gameIsFinished && !isGameFinishedShown && !bingoInProgress) {
+            const isNarrationOn = (window.audioSettings && typeof window.audioSettings.narrationEnabled !== 'undefined')
+                ? window.audioSettings.narrationEnabled
+                : ((typeof narrationPlaying !== 'undefined') ? narrationPlaying : true);
+            if (isNarrationOn) {
+                const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
+                audioManager.play(basePath + latestBall + '.mp3', latestBall);
+            }
         }
         return;
     }
 
-    // Partida en vivo o inicio de partida: si hay bolas nuevas, marcar inmediatamente en 0ms y reproducir en cola
-    if (missing.length > 0) {
-        if (isAutoMarkEnabled()) {
-            missing.forEach(function (num) {
-                applyMarksForNumber(num);
-            });
+    // Caso B: Flujo en tiempo real normal (exactamente 1 balota nueva)
+    const currentNumber = missing[0];
+
+    if (window.ballTelemetry) {
+        window.ballTelemetry.logBallTiming('T5_RENDER_START', currentNumber);
+    }
+
+    // 1. MOSTRAR BALOTA DE INMEDIATO (0ms, la visualización NUNCA depende del audio ni de animaciones)
+    updateMainBall(currentNumber);
+
+    if (window.ballTelemetry) {
+        window.ballTelemetry.logBallTiming('T6_DOM_RENDERED', currentNumber);
+    }
+
+    // 2. Animación visual sutil no bloqueante
+    const lastNumberEl = $('#last-number');
+    if (lastNumberEl.length) {
+        lastNumberEl.addClass('move-number');
+        if (ballRevealAfterTimer) {
+            clearTimeout(ballRevealAfterTimer);
         }
-        enqueueBallsForPlayback(missing);
+        ballRevealAfterTimer = setTimeout(function () {
+            lastNumberEl.removeClass('move-number');
+            ballRevealAfterTimer = null;
+        }, 400);
+    }
+
+    // 3. Marcado instantáneo (0ms) en cartones y tablero
+    applyMarksForNumber(currentNumber);
+
+    // 4. Actualizar historial de balotas de inmediato (0ms)
+    lastNumbers = ordered.slice(-5);
+    renderBallHistory();
+
+    // 5. Locución de audio asíncrona e independiente (no bloquea el flujo visual)
+    const isNarrationOn = (window.audioSettings && typeof window.audioSettings.narrationEnabled !== 'undefined')
+        ? window.audioSettings.narrationEnabled
+        : ((typeof narrationPlaying !== 'undefined') ? narrationPlaying : true);
+    if (isNarrationOn && !window.gameIsFinished && !isGameFinishedShown && !bingoInProgress) {
+        if (window.ballTelemetry) {
+            window.ballTelemetry.logBallTiming('T7_AUDIO_START', currentNumber);
+        }
+        const basePath = (typeof audioPath !== 'undefined' && audioPath) ? audioPath : (window.audioPath || '/assets/sounds/');
+        audioManager.play(basePath + currentNumber + '.mp3', currentNumber);
     }
 }
 
@@ -2226,6 +2431,8 @@ function showOtherPlayerBingoNotice(data, callback) {
     window.seenBingoNotices.add(noticeKey);
 
     window.gameHasWinner = true;
+    bingoInProgress = true;
+    window.__lastWinnerNoticeTime = Date.now();
     // No limpiar lastNumber aquí para no congelar la pantalla de los demás jugadores
 
     if (Array.isArray(data.winners)) {
@@ -2458,35 +2665,60 @@ function processNumberGetResponse(data) {
     }
 }
 
-function lastNumberGet() {
+let isSyncInProgress = false;
+let lastSyncTimestamp = 0;
+
+function syncGameState(reason) {
     if (bingoInProgress || window.gameIsFinished || isGameFinishedShown) {
         return;
     }
-
-    // Solo backoff corto de bolas (2s). NUNCA el cooldown de 45s de chat/status.
     if (bingoIsBallBackingOff()) {
         return;
+    }
+
+    const now = Date.now();
+    // Prevenir peticiones en ráfaga (mínimo 1200ms entre syncs a menos que sea forzado)
+    if (isSyncInProgress || (now - lastSyncTimestamp < 1200 && reason !== 'forced')) {
+        return;
+    }
+    isSyncInProgress = true;
+    lastSyncTimestamp = now;
+
+    if (typeof audioManager !== 'undefined' && audioManager.resumeContext) {
+        audioManager.resumeContext();
+    }
+
+    // Asegurar que Pusher / Soketi esté conectado en móviles
+    if (typeof pusherHelper !== 'undefined' && pusherHelper.ensureConnected) {
+        pusherHelper.ensureConnected();
     }
 
     $.ajax({
         url: site_url + 'playings/numberGet',
         method: 'GET',
         cache: false,
-        data: { _ts: Date.now() }
+        data: { _ts: now, r: reason || 'sync' }
     })
         .done((data) => {
             if (!data || data.status === 'error') {
                 return;
             }
-
             processNumberGetResponse(data);
         })
         .fail((xhr, status, error) => {
             if (xhr && xhr.status === 403) {
                 bingoTripBallBackoff();
             }
-            console.warn('Failed to get last number:', error);
+            console.warn('Failed to sync game state (' + (reason || 'unknown') + '):', error);
+        })
+        .always(() => {
+            isSyncInProgress = false;
         });
+}
+window.syncGameState = syncGameState;
+
+function lastNumberGet() {
+    syncGameState('interval');
 }
 
 function getEffectiveBallIntervalMs() {
@@ -2517,16 +2749,13 @@ function startAutomaticLast() {
         playNextBallInQueue();
     }
 
-    // Primer sync inmediato (para cargar estado al entrar o tras celebrar)
-    lastNumberGet();
+    // Primer sync inmediato para cargar estado al entrar o tras celebrar
+    syncGameState('init');
 
-    var effMs = getEffectiveBallIntervalMs();
     var wsActive = window.__bingoPusherRealtime === true;
-    // Si WebSocket está activo, sincronizar al ritmo del juego (máximo 2.5s para no dejar huecos)
-    // Si no está activo, usar intervalo ágil de respaldo (1.2-2s)
-    var fallbackMs = wsActive
-        ? Math.max(1500, Math.min(2500, effMs))
-        : Math.max(1200, Math.min(2000, effMs));
+    // Si WebSocket está activo, polling relajado (8s) como guardia de deriva sin sobrecargar CPU ni red
+    // Si WebSocket NO está activo, respaldo HTTP cada 2.5s
+    var fallbackMs = wsActive ? 8000 : 2500;
 
     intervalManager.set('lastNumber', lastNumberGet, fallbackMs);
 }
@@ -2536,23 +2765,24 @@ function setBingoPusherRealtime(enabled) {
     window.__bingoPusherRealtime = enabled;
 
     if (window.gameIsFinished || isGameFinishedShown) {
+        intervalManager.clear('lastNumber');
         return;
     }
 
     if (enabled && !wasEnabled) {
-        // WebSocket conectado: sincronizar poll de respaldo ágil
-        var effMs = getEffectiveBallIntervalMs();
-        var pollMs = Math.max(1500, Math.min(3000, effMs));
-        console.log('WS conectado: sincronizando poll de respaldo (' + (pollMs / 1000) + 's)');
+        // WebSocket conectado: polling relajado de 8s (solo guardia de seguridad, WebSocket es la fuente primaria)
+        console.log('WS conectado: reduciendo polling HTTP a guardia relajada (8s)');
         intervalManager.clear('lastNumber');
-        intervalManager.set('lastNumber', lastNumberGet, pollMs);
+        intervalManager.set('lastNumber', lastNumberGet, 8000);
         if (typeof messagePoller !== 'undefined' && messagePoller) {
             messagePoller.baseInterval = 15000;
             messagePoller.currentInterval = 15000;
         }
+        // Resincronizar estado de inmediato para recuperar cualquier posible brecha durante la conexión
+        syncGameState('ws_connected');
     } else if (!enabled && wasEnabled) {
-        // WebSocket caído: volver al poll rápido de respaldo
-        console.warn('WS desconectado: activando poll rápido de respaldo');
+        // WebSocket caído: volver al poll de respaldo ágil (2.5s)
+        console.warn('WS desconectado: activando poll de respaldo HTTP (2.5s)');
         startAutomaticLast();
         if (typeof messagePoller !== 'undefined' && messagePoller) {
             messagePoller.baseInterval = CONFIG.CHAT_POLL_INTERVAL || 3500;
@@ -2572,16 +2802,17 @@ function showGameFinalized() {
     isBallPlaybackActive = false;
     intervalManager.clear('lastNumber');
 
+    // Control de idempotencia estricto: la finalización se ejecuta exactamente una sola vez
+    if (isGameFinishedShown || window.__gameFinalizationInProgress) {
+        return;
+    }
+    window.__gameFinalizationInProgress = true;
+    isGameFinishedShown = true;
+    bingoInProgress = false;
+
     if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
         audioManager.stopAll();
     }
-
-    if (isGameFinishedShown) {
-        return;
-    }
-
-    isGameFinishedShown = true;
-    bingoInProgress = false;
 
     stopAutomaticLast();
     stopUpdateUserCount();
@@ -2606,10 +2837,14 @@ function showGameFinalized() {
     const exitToPlay = function () {
         window.__userLeavingGame = true;
         window.allowGameUnload = true;
+        window.onbeforeunload = null;
+        window.onpopstate = null;
+
         if (window.awardsModalTimeoutId) {
             clearTimeout(window.awardsModalTimeoutId);
             window.awardsModalTimeoutId = null;
         }
+
         const modalAwardsEl = document.getElementById('modalAwards');
         if (modalAwardsEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
             const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
@@ -2617,6 +2852,19 @@ function showGameFinalized() {
                 bsAwardsModal.hide();
             }
         }
+
+        const modalGameFinalizedEl = document.getElementById('modalGameFinalized');
+        if (modalGameFinalizedEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const bsFinModal = bootstrap.Modal.getInstance(modalGameFinalizedEl);
+            if (bsFinModal) {
+                bsFinModal.hide();
+            }
+        }
+
+        if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+            audioManager.stopAll();
+        }
+
         const targetUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
         window.location.replace(targetUrl);
     };
@@ -2628,6 +2876,12 @@ function showGameFinalized() {
 
     const container = $id('game-finalized');
     const text = $id('finalized');
+
+    // PASO 1: Mostrar claramente el mensaje "El juego ha terminado" en el overlay existente
+    if (container && text) {
+        container.style.display = 'block';
+        text.innerHTML = (__['game finished!'] || '¡El juego ha terminado!').toUpperCase();
+    }
 
     const openWinnersAwardsModal = function () {
         if (window.__userLeavingGame) {
@@ -2721,10 +2975,11 @@ function showGameFinalized() {
                 countdownContainer.style.display = 'none';
             }
 
+            // Mostrar la tabla blanca de ganadores (modalAwards)
             const bsAwardsModal = bootstrap.Modal.getOrCreateInstance(modalAwardsEl, { backdrop: 'static', keyboard: false });
             bsAwardsModal.show();
 
-            $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio').on('click', function () {
+            $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
                 cancelAutoExit();
                 bsAwardsModal.hide();
                 exitToPlay();
@@ -2734,13 +2989,11 @@ function showGameFinalized() {
         });
     };
 
-    if (container && text) {
-        container.style.display = 'none';
-    }
+    // PASO 2: Mantener el mensaje "El juego ha terminado" visible durante 3.5 segundos antes de abrir la tabla blanca
     if (window.awardsModalTimeoutId) {
         clearTimeout(window.awardsModalTimeoutId);
     }
-    window.awardsModalTimeoutId = setTimeout(openWinnersAwardsModal, 200);
+    window.awardsModalTimeoutId = setTimeout(openWinnersAwardsModal, 3500);
 }
 
 // Contador de usuarios optimizado
@@ -2981,16 +3234,34 @@ function updateMicrophoneButtonIcon(enabled) {
 }
 
 function RemoveVolume() {
-    const soundsInput = document.getElementById('sounds');
-    const currentlyOn = soundsInput
-        ? String(soundsInput.value) === '1'
-        : !document.querySelector('.btn-volume .fa-volume-slash');
+    const currentlyOn = (window.audioSettings && typeof window.audioSettings.soundEnabled !== 'undefined')
+        ? window.audioSettings.soundEnabled
+        : (typeof soundPlaying !== 'undefined' ? soundPlaying : true);
     const nextOn = !currentlyOn;
 
+    if (window.audioSettings) {
+        window.audioSettings.soundEnabled = nextOn;
+    }
+    window.soundPlaying = nextOn;
+    soundPlaying = nextOn;
+
+    try {
+        localStorage.setItem('reybingo_sound', nextOn ? '1' : '0');
+    } catch (e) {}
+
+    const soundsInput = document.getElementById('sounds');
     if (soundsInput) {
         soundsInput.value = nextOn ? '1' : '0';
     }
     updateVolumeButtonIcon(nextOn);
+
+    if (nextOn && typeof audioManager !== 'undefined' && audioManager.unlockAudio) {
+        audioManager.unlockAudio();
+    } else if (!nextOn && typeof audioManager !== 'undefined') {
+        if (audioManager.effectAudio) {
+            try { audioManager.effectAudio.pause(); } catch (e) {}
+        }
+    }
 
     // Música de fondo deshabilitada permanentemente
     try {
@@ -3005,25 +3276,47 @@ function RemoveVolume() {
     $.ajax({
         url: site_url + 'playings/volumeSubmit',
         method: 'POST',
+        data: { state: nextOn ? 1 : 0 },
         error: function () {
-            console.warn('Error disabling sound');
+            console.warn('Error saving volume state');
         }
     });
 }
 
 function RemoveMicrophone() {
-    if (typeof narrationPlaying === 'undefined') {
-        narrationPlaying = true;
+    const currentlyOn = (window.audioSettings && typeof window.audioSettings.narrationEnabled !== 'undefined')
+        ? window.audioSettings.narrationEnabled
+        : (typeof narrationPlaying !== 'undefined' ? narrationPlaying : true);
+    const nextOn = !currentlyOn;
+
+    if (window.audioSettings) {
+        window.audioSettings.narrationEnabled = nextOn;
     }
-    narrationPlaying = !narrationPlaying;
-    window.narrationPlaying = narrationPlaying;
-    updateMicrophoneButtonIcon(narrationPlaying);
+    window.narrationPlaying = nextOn;
+    narrationPlaying = nextOn;
+
+    try {
+        localStorage.setItem('reybingo_narration', nextOn ? '1' : '0');
+    } catch (e) {}
+
+    const narrationInput = document.getElementById('narration');
+    if (narrationInput) {
+        narrationInput.value = nextOn ? '1' : '0';
+    }
+    updateMicrophoneButtonIcon(nextOn);
+
+    if (nextOn && typeof audioManager !== 'undefined' && audioManager.unlockAudio) {
+        audioManager.unlockAudio();
+    } else if (!nextOn && typeof audioManager !== 'undefined' && audioManager.stopCurrentVoice) {
+        audioManager.stopCurrentVoice();
+    }
 
     $.ajax({
         url: site_url + 'playings/microphoneSubmit',
         method: 'POST',
+        data: { state: nextOn ? 1 : 0 },
         error: function () {
-            console.warn('Error disabling narrator');
+            console.warn('Error saving narration state');
         }
     });
 }
@@ -3534,6 +3827,10 @@ class ResourceManager {
                 pageHiddenTime = Date.now();
             } else {
                 const hiddenDuration = Date.now() - pageHiddenTime;
+                // Al regresar al primer plano en móviles, sincronizar estado del juego de inmediato
+                if (typeof syncGameState === 'function') {
+                    syncGameState('tab_resumed');
+                }
                 // Si la página estuvo oculta por más de 5 minutos, reiniciar algunos recursos
                 if (hiddenDuration > 300000) {
                     this.softReset();
@@ -3851,12 +4148,25 @@ function initializeApp() {
 
             pusherHelper.on('connection:success', function () {
                 setBingoPusherRealtime(true);
+                if (typeof syncGameState === 'function') {
+                    syncGameState('pusher_connected');
+                }
             });
             pusherHelper.on('connection:failed', function () {
                 setBingoPusherRealtime(false);
             });
             pusherHelper.on('connection:error', function () {
                 setBingoPusherRealtime(false);
+            });
+            pusherHelper.on('lifecycle:resume', function () {
+                if (typeof syncGameState === 'function') {
+                    syncGameState('pusher_lifecycle_resume');
+                }
+            });
+            pusherHelper.on('lifecycle:online', function () {
+                if (typeof syncGameState === 'function') {
+                    syncGameState('pusher_lifecycle_online');
+                }
             });
 
             pusherHelper.on('game:postponed', function (data) {
@@ -3876,6 +4186,16 @@ function initializeApp() {
                 const number = data.n ?? data.number;
                 const drawn = data.drawnNumbers || data.drawn || null;
                 const total = data.totalNumbersGenerated;
+
+                if (window.ballTelemetry) {
+                    const srvTs = data.serverTimestamp || data.ts || null;
+                    const wsLatency = srvTs ? (Date.now() - srvTs) : null;
+                    window.ballTelemetry.logBallTiming('T3_WS_RECEIVED', number, {
+                        wsLatencyMs: wsLatency,
+                        serverTs: srvTs,
+                        visibility: document.visibilityState
+                    });
+                }
 
                 if (Array.isArray(drawn) && drawn.length) {
                     syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, { animate: !bingoInProgress });
@@ -3948,6 +4268,7 @@ function initializeApp() {
                 if (data.player && data.modality) {
                     if (isOwnBingoEvent(data)) {
                         bingoInProgress = true;
+                        window.__lastWinnerNoticeTime = Date.now();
                         intervalManager.clear('lastNumber');
 
                         try {
@@ -4028,7 +4349,7 @@ function initializeApp() {
                 intervalManager.clear('lastNumber');
 
                 // Si hay un cante de bingo celebrándose en este momento, no cortar la celebración
-                if (bingoInProgress) {
+                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
                     return;
                 }
 
@@ -4046,7 +4367,7 @@ function initializeApp() {
                 isBallPlaybackActive = false;
                 intervalManager.clear('lastNumber');
 
-                if (bingoInProgress) {
+                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
                     return;
                 }
 
