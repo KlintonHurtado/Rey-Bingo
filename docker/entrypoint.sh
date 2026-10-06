@@ -17,8 +17,9 @@ TARGET_USER="${DB_USERNAME:-${database_default_username:-mysql}}"
 TARGET_PASS="${DB_PASSWORD:-${database_default_password:-}}"
 TARGET_PORT="${DB_PORT:-${database_default_port:-3306}}"
 
-for ENV_FILE in "/var/www/html/reybingo.com/public_html/.env" "/var/www/html/reybingo.com/public_html/vnzl/.env"; do
+for ENV_FILE in "/var/www/html/reybingo.com/public_html/.env"; do
     if [ -f "$ENV_FILE" ]; then
+        sed -i "s|^CI_ENVIRONMENT.*|CI_ENVIRONMENT = production|g" "$ENV_FILE"
         sed -i "s|^database.default.hostname.*|database.default.hostname = $TARGET_HOST|g" "$ENV_FILE"
         sed -i "s|^database.default.database.*|database.default.database = $TARGET_DB|g" "$ENV_FILE"
         sed -i "s|^database.default.username.*|database.default.username = $TARGET_USER|g" "$ENV_FILE"

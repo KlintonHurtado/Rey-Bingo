@@ -652,7 +652,7 @@
 </script>
 
 <!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
-<script src="<?= site_url('assets/js/pusher.min.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/pusher.min.js'); ?>?v=<?= APP_VERSION ?>"></script>
 <script>
     // Configuracion de WebSocket (Soketi self-hosted o Pusher Cloud)
     const GAME_ID        = '<?= $game["id"] ?>';
@@ -678,7 +678,7 @@
         }
     } catch (e) {}
 </script>
-<script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/pusher-client.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
-<script src="<?= site_url('assets/js/app.js'); ?>?<?= md5(date("YmdH")); ?>"></script>
-<script src="<?= site_url('assets/js/live.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/app.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= site_url('assets/js/live.js'); ?>?v=<?= APP_VERSION ?>"></script>

@@ -783,7 +783,7 @@
 </script>
 
 <!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
-<script src="<?= site_url('assets/js/pusher.min.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/pusher.min.js'); ?>?v=<?= APP_VERSION ?>"></script>
 <script>
     const GAME_ID        = '<?= (int) ($game['id'] ?? 0) ?>';
     const AUTH_URL       = '<?= site_url("pusher/auth") ?>';
@@ -810,9 +810,9 @@
         }
     } catch (e) {}
 </script>
-<script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
-<script src="<?= site_url('assets/js/app.js'); ?>?<?= md5(date('YmdH')) ?>"></script>
-<script src="<?= site_url('assets/js/board.js'); ?>?<?= md5(date('YmdHis')) ?>"></script>
+<script src="<?= site_url('assets/js/pusher-client.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= site_url('assets/js/app.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= site_url('assets/js/board.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

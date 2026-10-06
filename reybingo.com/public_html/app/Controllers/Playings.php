@@ -2005,8 +2005,9 @@ class Playings extends Controller
         $gameStatus = (int) ($game['status'] ?? 0);
 
         // status 0 = finalizada. status 2 = programada/pospuesta (sigue jugable; no marcar terminada).
-        $isFinishedByAwards = bingo_finalize_game_when_complete((int) $game['id']);
-        if ($gameStatus === 0 || $isFinishedByAwards) {
+        // OPTIMIZACIÓN: bingo_finalize_game_when_complete se llama UNA vez; $gameFinalized se reutiliza.
+        $gameFinalized = ($gameStatus !== 2) ? bingo_finalize_game_when_complete((int) $game['id']) : false;
+        if ($gameStatus === 0 || $gameFinalized) {
             bingo_ensure_winners_registered((int) $game['id']);
 
             return $this->response->setJSON([
@@ -2117,7 +2118,10 @@ class Playings extends Controller
 
         // Si salieron las 75 bolas, resolver bingos no cantados, pagar premios y finalizar
         if ($totalNumbersGenerated >= 75) {
-            bingo_finalize_game_when_complete((int) $game['id']);
+            // Reutilizar $gameFinalized; solo finalizar si el guard inicial no lo ejecutó (status=2)
+            if (!$gameFinalized) {
+                bingo_finalize_game_when_complete((int) $game['id']);
+            }
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 
@@ -2159,11 +2163,8 @@ class Playings extends Controller
             $modality = $modelModalities->find($sing['modality']);
             $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
 
-            $game = $modelGames->find($game['id']);
-            $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
-            if (!$gameCompleted) {
-                $gameCompleted = (int) ($game['status'] ?? 0) === 0;
-            }
+            // Reutilizar $gameFinalized (calculado al inicio); elimina re-fetch de $game
+            $gameCompleted = $gameFinalized || ((int) ($game['status'] ?? 0) === 0);
 
             $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
             $modalityName = $modality ? translate($modality['name'] ?? '') : 'Bingo';
@@ -2215,12 +2216,11 @@ class Playings extends Controller
             ]);
         }
 
-        // Verificar si todos los premios han sido ganados
-        $gameCompleted = bingo_finalize_game_when_complete((int) $game['id']);
+        // Verificar si todos los premios han sido ganados (reutilizando $gameFinalized del inicio)
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($gameCompleted || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
+        if ($gameFinalized || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 
@@ -2884,16 +2884,19 @@ class Playings extends Controller
         $afterId = (int) ($this->request->getGet('after_id') ?? 0);
         $currentUserId = (int) session()->get('id');
 
-        $builder = $modelMessages
-            ->where('game', $game['id'])
-            ->where('status', 1)
-            ->where('user !=', $currentUserId);
+        $db = \Config\Database::connect();
+        $builder = $db->table('messages m')
+            ->select('m.id, m.message, m.user, m.game, m.created_at, u.image')
+            ->join('users u', 'u.id = m.user', 'left')
+            ->where('m.game', $game['id'])
+            ->where('m.status', 1)
+            ->where('m.user !=', $currentUserId);
 
         if ($afterId > 0) {
-            $builder->where('id >', $afterId);
+            $builder->where('m.id >', $afterId);
         }
 
-        $rows = $builder->orderBy('id', 'ASC')->limit(50)->findAll();
+        $rows = $builder->orderBy('m.id', 'ASC')->limit(50)->get()->getResultArray();
 
         if (empty($rows)) {
             return $this->response->setJSON([
@@ -2904,15 +2907,14 @@ class Playings extends Controller
 
         $messages = [];
         foreach ($rows as $row) {
-            $user = $modelUsers->find($row['user']);
             $messages[] = [
                 'id' => (int) $row['id'],
                 'message' => $row['message'],
                 'user' => (int) $row['user'],
                 'game' => (int) $row['game'],
                 'created_at' => $row['created_at'] ?? null,
-                'image' => !empty($user['image'])
-                    ? site_url('uploads/users/' . $user['image'])
+                'image' => !empty($row['image'])
+                    ? site_url('uploads/users/' . $row['image'])
                     : site_url('assets/img/avatar.jpg'),
             ];
         }

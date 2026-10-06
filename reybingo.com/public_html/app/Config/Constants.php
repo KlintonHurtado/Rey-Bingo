@@ -17,6 +17,7 @@ defined('APP_NAMESPACE') || define('APP_NAMESPACE', 'App');
 
 // The name of the aplication
 define('APP_NAME', 'Rey Bingo');
+define('APP_VERSION', '2.5.0');
 define('IS_DEMO', 1);
 
 /*

@@ -68,6 +68,9 @@ function requestApi(urlStr, options) {
             'User-Agent'   : 'BingoRunner/2.0-WS',
             'X-Cron-Token' : CRON_TOKEN
         };
+        if (process.env.APP_HOST_HEADER) {
+            headers['Host'] = process.env.APP_HOST_HEADER;
+        }
         Object.assign(headers, options.headers || {});
 
         var postData = '';

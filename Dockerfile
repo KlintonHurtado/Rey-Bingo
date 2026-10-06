@@ -41,8 +41,20 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Habilitar modulos necesarios de Apache (mod_rewrite, proxy para Soketi WebSockets)
-RUN a2enmod rewrite headers proxy proxy_http proxy_wstunnel
+# Habilitar modulos necesarios de Apache (mod_rewrite, proxy para Soketi WebSockets, compresion y cache)
+RUN a2enmod rewrite headers proxy proxy_http proxy_wstunnel deflate expires
+
+# Configuracion optimizada de OPcache para PHP
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.enable_cli=1'; \
+        echo 'opcache.memory_consumption=256'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=20000'; \
+        echo 'opcache.revalidate_freq=2'; \
+        echo 'opcache.validate_timestamps=1'; \
+        echo 'opcache.save_comments=1'; \
+    } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
 # Configurar Apache VirtualHost
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
@@ -65,8 +77,8 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/reybingo.com/public_html/writable \
     && chmod +x /var/www/html/docker/entrypoint.sh
 
-# Exponer el puerto web de Apache
-EXPOSE 80
+# Exponer el puerto web de Apache (80) y el puerto directo de Soketi (6001)
+EXPOSE 80 6001
 
 ENTRYPOINT ["/var/www/html/docker/entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

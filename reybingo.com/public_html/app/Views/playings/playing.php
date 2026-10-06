@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?<?= md5(date("Hms")); ?>">
+﻿<link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?v=<?= APP_VERSION ?>">
 <style>
     .ball-slide-in {
         animation: ballSlideIn 0.45s ease-out;
@@ -1475,7 +1475,7 @@
 
 <div class="modal fade" id="modalAwards" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false"></div>
 
-<script src="<?= site_url('assets/plyr/plyr.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
 <script type="text/javascript">
     // Silenciar y detener de inmediato cualquier canción de fondo en la partida
@@ -1670,7 +1670,7 @@
 </script>
 
 <!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
-<script src="<?= site_url('assets/js/pusher.min.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/pusher.min.js'); ?>?v=<?= APP_VERSION ?>"></script>
 <script>
     // Configuracion de WebSocket (Soketi self-hosted o Pusher Cloud)
     const GAME_ID        = '<?= $game["id"] ?>';
@@ -1684,6 +1684,6 @@
     const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
     const USER_ID        = '<?= session()->get('id') ?>';
 </script>
-<script src="<?= site_url('assets/js/pusher-client.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/pusher-client.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
-<script src="<?= site_url('assets/js/playing.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/playing.js'); ?>?v=<?= APP_VERSION ?>"></script>

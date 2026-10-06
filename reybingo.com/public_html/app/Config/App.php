@@ -98,29 +98,37 @@ class App extends BaseConfig {
      * strings (like currency markers, numbers, etc), that your program
      * should run under for this request.
      */
-    //public string $defaultLocale = 'es';
-    
+    public string $defaultLocale = 'es';
+
     private function getLanguageFromDatabase(): string {
+        static $cachedLocale = null;
+        if ($cachedLocale !== null) {
+            return $cachedLocale;
+        }
+
         try {
             $db = \Config\Database::connect();
             $builder = $db->table('system');
 
             $query = $builder->select('value')->where('key', 'language')->get();
-            $row = $query->getRow();
-            $language = $row ? (string) ($row->value ?? 'english') : 'english';
+            $row = $query ? $query->getRow() : null;
+            $language = $row ? (string) ($row->value ?? 'spanish') : 'spanish';
 
             if ($language === 'spanish') {
-                return 'es';
+                $cachedLocale = 'es';
+                return $cachedLocale;
             }
 
             if ($language === 'english') {
-                return 'en';
+                $cachedLocale = 'en';
+                return $cachedLocale;
             }
         } catch (\Throwable $e) {
-            log_message('error', 'No se pudo leer el idioma desde la base de datos: ' . $e->getMessage());
+            // Silently fall back to 'es' during bootstrap / CLI / migration
         }
 
-        return 'en';
+        $cachedLocale = 'es';
+        return $cachedLocale;
     }
 
 

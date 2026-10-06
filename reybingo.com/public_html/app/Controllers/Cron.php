@@ -1678,39 +1678,31 @@ class Cron extends Controller
         return $availableNumbers[array_rand($availableNumbers)];
     }
 
-    // Función para marcar números automáticamente en el cron
+    // Función para marcar números automáticamente en el cron (1 solo query atómico optimizado)
     public function dialNumber($number, $gameId) {
-        $modelBoards = new BoardsModel();
-        $modelGames = new GamesModel();
-        $modelNumbersCartons = new NumbersCartonsModel();
-
-        $game = $modelGames->find($gameId);
-        if (!$game) {
+        $number = (int) $number;
+        $gameId = (int) $gameId;
+        if ($number < 1 || $gameId < 1) {
             return false;
         }
 
-        // Marcar automáticamente para todos los usuarios que tienen el número
-        $existingNumbers = $modelNumbersCartons->select('numbers.*')
-            ->join('cartons', 'cartons.id = numbers.carton')
-            ->where('cartons.game', $gameId)
-            ->where('cartons.user !=', 0)
-            ->where('numbers.number', $number)
-            ->where('numbers.status', 0) // Solo los no marcados
-            ->findAll();
-
-        if (!empty($existingNumbers)) {
+        try {
             $db = \Config\Database::connect();
-            $db->transStart();
+            $db->query("
+                UPDATE numbers n
+                JOIN cartons c ON c.id = n.carton
+                SET n.status = 1
+                WHERE c.game = ?
+                  AND c.user != 0
+                  AND n.number = ?
+                  AND n.status = 0
+            ", [$gameId, $number]);
 
-            $ids = array_column($existingNumbers, 'id');
-            $modelNumbersCartons->whereIn('id', $ids)->set(['status' => 1])->update();
-
-            $db->transComplete();
-
-            return $db->transStatus() !== FALSE;
+            return true;
+        } catch (\Throwable $e) {
+            log_message('error', 'Cron::dialNumber error: ' . $e->getMessage());
+            return false;
         }
-
-        return true;
     }
 
     // Función para cantar bingo automáticamente en el cron usando la misma lógica que Live

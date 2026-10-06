@@ -319,14 +319,20 @@ class AudioManager {
         const speakFallback = () => {
             if (hasSpokenFallback) return;
             hasSpokenFallback = true;
+            clearTimeout(networkTimeout);
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (e) {}
             if (num) {
                 const spoken = this.speakOfflineNumber(num);
                 // Si no se pudo sintetizar voz femenina (porque no hay voz de mujer instalada en el dispositivo),
                 // NUNCA hablar con voz de hombre: reintentar la reproducción del audio grabado femenino original
                 if (!spoken && src) {
                     try {
-                        const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
+                        const retryAudio = new Audio(src);
                         retryAudio.volume = 1.0;
+                        retryAudio.onended = () => { retryAudio.src = ''; };
                         const rp = retryAudio.play();
                         if (rp && typeof rp.catch === 'function') {
                             rp.catch(() => {});
@@ -339,31 +345,34 @@ class AudioManager {
         // Watchdog de red: dar tiempo prudencial para descargar el MP3 grabado original (voz femenina)
         // antes de recurrir a la síntesis de voz femenina.
         const networkTimeout = setTimeout(() => {
-            if (audio.readyState < 2) {
+            if (audio.readyState < 2 && (audio.paused || audio.currentTime === 0)) {
                 speakFallback();
             }
         }, 4500);
 
+        audio.onplay = () => {
+            clearTimeout(networkTimeout);
+            hasSpokenFallback = true;
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                } catch (e) {}
+            }
+        };
+
         audio.onended = () => {
             clearTimeout(networkTimeout);
+            audio.onplay = null;
             audio.onended = null;
             audio.onerror = null;
         };
 
         audio.onerror = (err) => {
             clearTimeout(networkTimeout);
+            audio.onplay = null;
             audio.onerror = null;
-            // Fallback si falla la descarga del audio
             if (!hasSpokenFallback) {
-                try {
-                    const retryAudio = new Audio(src + (src.includes('?') ? '&' : '?') + '_r=' + Date.now());
-                    const rp = retryAudio.play();
-                    if (rp && typeof rp.catch === 'function') {
-                        rp.catch(() => speakFallback());
-                    }
-                } catch (e) {
-                    speakFallback();
-                }
+                speakFallback();
             }
         };
 
@@ -1526,6 +1535,7 @@ function pollMessagesOptimized() {
 
 // Ejecutar auto-sing periódicamente (sin spamear la CPU en móviles)
 setInterval(() => {
+    if (document.hidden) return;
     try { autoSingIfComplete(); } catch (e) { }
 }, 4000);
 

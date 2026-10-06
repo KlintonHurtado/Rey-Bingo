@@ -891,6 +891,9 @@ if (!function_exists('bingo_resolve_missed_bingos_for_game')) {
         $modelSings = new SingsModel();
         $modelUsers = new UsersModel();
         $db = \Config\Database::connect();
+        if (function_exists('bingo_ensure_performance_indexes')) {
+            bingo_ensure_performance_indexes();
+        }
 
         $game = $modelGames->find($gameId);
         if (!$game) {
@@ -3550,9 +3553,74 @@ if (!function_exists('bingo_voucher_sync_after_insert')) {
     }
 }
 
+if (!function_exists('bingo_ensure_performance_indexes')) {
+    function bingo_ensure_performance_indexes(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $ensured = true;
+
+        try {
+            $db = \Config\Database::connect();
+
+            $indexMap = [
+                'numbers' => [
+                    'idx_numbers_carton_status' => ['carton', 'status'],
+                    'idx_numbers_number'        => ['number'],
+                ],
+                'cartons' => [
+                    'idx_cartons_game_user'     => ['game', 'user'],
+                    'idx_cartons_user'          => ['user'],
+                ],
+                'boards' => [
+                    'idx_boards_game_number'    => ['game', 'number'],
+                    'idx_boards_game_created'   => ['game', 'created_at'],
+                ],
+                'games' => [
+                    'idx_games_type_status'     => ['type', 'status'],
+                    'idx_games_date_status'     => ['date', 'status'],
+                ],
+                'sings' => [
+                    'idx_sings_game_status'     => ['game', 'status'],
+                    'idx_sings_game_modality'   => ['game', 'modality'],
+                ],
+                'messages' => [
+                    'idx_messages_game_status_id' => ['game', 'status', 'id'],
+                ],
+            ];
+
+            foreach ($indexMap as $table => $indexes) {
+                if (!$db->tableExists($table)) {
+                    continue;
+                }
+                $existingIndexes = [];
+                $rows = $db->query("SHOW INDEX FROM `{$table}`")->getResultArray();
+                foreach ($rows as $r) {
+                    $existingIndexes[$r['Key_name']] = true;
+                }
+
+                foreach ($indexes as $indexName => $columns) {
+                    if (isset($existingIndexes[$indexName])) {
+                        continue;
+                    }
+                    $colList = implode('`, `', $columns);
+                    $db->query("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` (`{$colList}`)");
+                }
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_ensure_performance_indexes: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('bingo_ensure_games_schema')) {
     function bingo_ensure_games_schema(): void
     {
+        if (function_exists('bingo_ensure_performance_indexes')) {
+            bingo_ensure_performance_indexes();
+        }
         static $ensured = false;
         if ($ensured) {
             return;

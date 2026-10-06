@@ -1048,4 +1048,4 @@
     });
 </script>
 
-<script src="<?= site_url('assets/js/play.js'); ?>?<?= md5(date("Hms")); ?>"></script>
+<script src="<?= site_url('assets/js/play.js'); ?>?v=<?= APP_VERSION ?>"></script>

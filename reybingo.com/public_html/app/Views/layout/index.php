@@ -2262,9 +2262,8 @@ $isNoMusicRole = session()->get('logged_in') && (
     </script>
     
     <!-- JS -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="<?= asset_url('bootstrap/js/bootstrap.bundle.min.js') ?>"></script>
-    <script src="<?= asset_url('js/app.js') ?>"></script>
+    <script src="<?= asset_url('js/app.js') ?>?v=<?= APP_VERSION ?>"></script>
     <script src="<?= asset_url('js/toastify.js') ?>"></script>
     <script src="<?= asset_url('js/sweetalert.js') ?>"></script>
     <script>
@@ -2295,7 +2294,7 @@ $isNoMusicRole = session()->get('logged_in') && (
     </script>
 
     <!-- <script src="<?= site_url('assets/js/notifications.js'); ?>"></script>-->
-    <script src="<?= site_url('assets/js/pull-to-refresh.js'); ?>?<?= md5(date('YmdHi')); ?>"></script>
+    <script src="<?= site_url('assets/js/pull-to-refresh.js'); ?>?v=<?= APP_VERSION ?>"></script>
     <style>
         #pull-to-refresh-indicator {
             position: fixed;

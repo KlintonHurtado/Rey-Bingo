@@ -1,6 +1,6 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
-    <link rel="stylesheet" href="<?= site_url('assets/css/styles.css'); ?>?<?= md5(date("Hms")); ?>">
+    <link rel="stylesheet" href="<?= site_url('assets/css/styles.css'); ?>">
     <body style="background-color: #222533; padding: 20px; font-size: 14px; line-height: 1.43; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;">
         <div style="max-width: 600px; margin: 0px auto; background-color: #fff; box-shadow: 0px 20px 50px rgba(0,0,0,0.05);">
             <table style="width: 100%;">
