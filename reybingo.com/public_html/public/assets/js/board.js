@@ -2915,8 +2915,11 @@ function initBoardPusherRealtime() {
         // Notificaciones unificadas en tiempo real para el administrador
         function handleAdminBoardNotification(data) {
             if (!data) return;
-            const isNewGame = data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title));
-            const isSing = !isNewGame && (data.type === 'sing' || data.type === 'own_sing' || !!data.modalityId || !!data.modality);
+            const isNewGame = data.type === 'game'
+                || data.type === 'new_game'
+                || (data.title && /partida/i.test(data.title))
+                || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message)));
+            const isSing = !isNewGame && (data.type === 'sing' || data.type === 'own_sing');
             if (isSing) {
                 const noticeKey = data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || data.player || '')));
                 if (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) {

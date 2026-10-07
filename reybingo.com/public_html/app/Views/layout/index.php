@@ -631,9 +631,9 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }, 1500);
 
                 try {
-                    const soundFile = (type === 'game' || type === 'new_game' || (!isWinner && type !== 'winner' && type !== 'sing' && type !== 'own_sing'))
-                        ? 'notification.mp3'
-                        : 'winner.mp3';
+                    const soundFile = (isWinner || type === 'winner' || type === 'sing' || type === 'own_sing')
+                        ? 'winner.mp3'
+                        : 'notification.mp3';
                     let audioSrc = audioPath + soundFile;
                     const audio = initializeAudio(audioSrc);
                     audio.volume = 0.8;
@@ -672,8 +672,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
                         // Determinar el tipo de sonido a reproducir: winner.mp3 solo para bingos/ganadores
-                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing' || n.type === 'own_sing');
-                        let soundType = hasSingNotification ? 'winner' : 'game';
+                        const hasSingNotification = limitedNotifications.some(n => {
+                            const isGame = n.type === 'game'
+                                || n.type === 'new_game'
+                                || (n.title && /partida/i.test(n.title))
+                                || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
+                            return !isGame && (n.type === 'sing' || n.type === 'own_sing');
+                        });
+                        let soundType = hasSingNotification ? 'winner' : 'default';
                         let isWinnerSound = hasSingNotification;
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
@@ -751,9 +757,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                 // Si es una notificación de bingo (sing/own_sing), agrupar por modalidad
                 const isNewGameNotice = notification.type === 'game'
                     || notification.type === 'new_game'
-                    || (notification.title && /partida/i.test(notification.title));
+                    || (notification.title && /partida/i.test(notification.title))
+                    || (notification.message && (/precio.*cart[oó]n/i.test(notification.message) || /premio.*total/i.test(notification.message)));
 
-                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality);
+                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing');
                 if (isSingType) {
                     const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
@@ -895,15 +902,19 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (notification.id) {
                     notificationEl.dataset.notificationId = notification.id;
                 }
-                const notifTitle = isNewGameNotice ? 'Nueva partida' : notification.title;
-                const notifMessage = isNewGameNotice ? 'Se ha creado una nueva partida.' : notification.message;
+                const notifTitle = isNewGameNotice
+                    ? (notification.title && !/bingo/i.test(notification.title) ? notification.title : 'Nueva partida')
+                    : (notification.title || 'Notificación');
+                const notifMessage = (notification.message && notification.message.trim() !== '')
+                    ? notification.message
+                    : (isNewGameNotice ? 'Se ha creado una nueva partida.' : '');
                 notificationEl.innerHTML = `
                     <div class="notification-header">
                         <h6 class="notification-title">${notifTitle}</h6>
                     </div>
                     <div class="notification-message">${notifMessage}</div>
                     <span class="notification-hint">Desliza a la derecha para cerrar</span>
-                    <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
+                    <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                 `;
                 
                 container.appendChild(notificationEl);
@@ -2371,17 +2382,22 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
                 }
-                const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)));
+                const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)) || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message))));
+                const isSingEvent = data && !isNewGame && (data.type === 'sing' || data.type === 'own_sing');
                 if (isNewGame) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('game', false);
                     }
-                } else if (data && (data.type === 'sing' || data.type === 'own_sing' || data.modalityId || data.modality)) {
+                } else if (isSingEvent) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('winner', true);
                     }
                     if (typeof AppcreateConfetti === 'function') {
                         AppcreateConfetti();
+                    }
+                } else {
+                    if (typeof playNotificationSound === 'function') {
+                        playNotificationSound('default', false);
                     }
                 }
             });

@@ -1609,6 +1609,8 @@ class Cron extends Controller
                 continue;
             }
             $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($totalPrize, 2) : translate('accumulated');
+            helper('system');
+            $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText;
 
             $batchNotifications[] = [
                 'user' => $user['id'],
@@ -1618,7 +1620,7 @@ class Cron extends Controller
                 'game' => $gameId,
                 'modality' => $gameData['modalities'],
                 'title' => 'Nueva partida',
-                'message' => 'Se ha creado una nueva partida.',
+                'message' => $gameMessage,
                 'created_at' => $createdAt
             ];
         }

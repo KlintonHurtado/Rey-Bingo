@@ -1169,7 +1169,7 @@
                 if (hasPlayedSound) return; // Si ya se reprodujo, no reproducir de nuevo
                 
                 try {
-                    let audioSrc = audioPath + ((type === 'game' || type === 'new_game' || type === 'default') ? 'notification.mp3' : 'winner.mp3');
+                    let audioSrc = audioPath + ((type === 'winner' || type === 'sing' || type === 'own_sing') ? 'winner.mp3' : 'notification.mp3');
                     
                     const audio = initializeAudio(audioSrc);
                     audio.volume = 0.8;
@@ -1207,7 +1207,7 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 const audioContext = new AudioContext();
                 
-                let audioSrc = audioPath + ((type === 'game' || type === 'new_game' || type === 'default') ? 'notification.mp3' : 'winner.mp3');
+                let audioSrc = audioPath + ((type === 'winner' || type === 'sing' || type === 'own_sing') ? 'winner.mp3' : 'notification.mp3');
                 
                 try {
                     const response = await fetch(audioSrc);
@@ -1260,8 +1260,19 @@
                         
                         // Determinar el tipo de sonido a reproducir (priorizar 'sing')
                         let soundType = 'default';
-                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing');
-                        const hasGameNotification = limitedNotifications.some(n => n.type === 'game');
+                        const hasSingNotification = limitedNotifications.some(n => {
+                            const isGame = n.type === 'game'
+                                || n.type === 'new_game'
+                                || (n.title && /partida/i.test(n.title))
+                                || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
+                            return !isGame && (n.type === 'sing' || n.type === 'own_sing');
+                        });
+                        const hasGameNotification = limitedNotifications.some(n => {
+                            return n.type === 'game'
+                                || n.type === 'new_game'
+                                || (n.title && /partida/i.test(n.title))
+                                || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
+                        });
                         
                         if (hasSingNotification) {
                             soundType = 'sing';
@@ -1339,9 +1350,10 @@
                 // UNIFICACIÓN POR MODALIDAD:
                 const isNewGameNotice = notification.type === 'game'
                     || notification.type === 'new_game'
-                    || (notification.title && /partida/i.test(notification.title));
+                    || (notification.title && /partida/i.test(notification.title))
+                    || (notification.message && (/precio.*cart[oó]n/i.test(notification.message) || /premio.*total/i.test(notification.message)));
 
-                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality);
+                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing');
                 if (isSingType) {
                     const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
@@ -1475,8 +1487,12 @@
                 if (notification.id) {
                     notificationEl.dataset.notificationId = notification.id;
                 }
-                const notifTitle = isNewGameNotice ? 'Nueva partida' : notification.title;
-                const notifMessage = isNewGameNotice ? 'Se ha creado una nueva partida.' : notification.message;
+                const notifTitle = isNewGameNotice
+                    ? (notification.title && !/bingo/i.test(notification.title) ? notification.title : 'Nueva partida')
+                    : (notification.title || 'Notificación');
+                const notifMessage = (notification.message && notification.message.trim() !== '')
+                    ? notification.message
+                    : (isNewGameNotice ? 'Se ha creado una nueva partida.' : '');
                 notificationEl.innerHTML = `
                     <div class="notification-header">
                         <h6 class="notification-title">${notifTitle}</h6>

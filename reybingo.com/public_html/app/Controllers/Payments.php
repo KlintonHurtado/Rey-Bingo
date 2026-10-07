@@ -2278,7 +2278,7 @@ class Payments extends Controller {
                         'from' => $currentUserId,
                         'type' => 'deposit',
                         'type_id' => $deposit['id'],
-                        'title' => '✅ DEPÓSITO ACREDITADO',
+                        'title' => '✅ CRÉDITO APROBADO',
                         'message' => 'Su depósito por ' . systemGet('currency') . ' ' . number_format($deposit['amount'], 2) . ' ha sido verificado y acreditado correctamente en su billetera.',
                     ];
 

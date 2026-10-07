@@ -3616,11 +3616,19 @@ class Users extends Controller {
 
         $modelModalities = new \App\Models\ModalitiesModel();
 
-        foreach ($notifications as &$notification) { 
-            if (($notification['type'] ?? '') === 'game' || stripos($notification['title'] ?? '', 'partida') !== false) {
+        foreach ($notifications as &$notification) {
+            $isGameNotification = (($notification['type'] ?? '') === 'game')
+                || (stripos($notification['title'] ?? '', 'partida') !== false)
+                || (stripos($notification['message'] ?? '', 'cartón') !== false && stripos($notification['message'] ?? '', 'premio') !== false);
+
+            if ($isGameNotification) {
                 $notification['type'] = 'game';
                 $notification['title'] = 'Nueva partida';
-                $notification['message'] = 'Se ha creado una nueva partida.';
+                $msgTrimmed = trim((string) ($notification['message'] ?? ''));
+                if ($msgTrimmed === '') {
+                    $notification['message'] = 'Se ha creado una nueva partida.';
+                }
+                unset($notification['modality']);
             }
 
             if (in_array($notification['type'], ['deposit', 'retire', 'transfer', 'payment', 'referred']) && $notification['type_id'] > 0) {
@@ -3628,6 +3636,10 @@ class Users extends Controller {
                 if ($transactionData) {
                     $notification['transaction'] = $transactionData;
                 }
+            }
+
+            if (($notification['type'] ?? '') !== 'sing') {
+                unset($notification['modality']);
             }
 
             if (($notification['type'] ?? '') === 'sing') {

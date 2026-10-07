@@ -129,7 +129,7 @@ class PaymentWebhook extends Controller
             'from'    => 0,
             'type'    => 'deposit',
             'type_id' => $depositId,
-            'title'   => '✅ DEPÓSITO ACREDITADO',
+            'title'   => '✅ CRÉDITO APROBADO',
             'message' => 'Su depósito por ' . systemGet('currency') . ' ' . number_format($amount, 2) . ' fue acreditado vía ' . $gateway . '.',
             'status'  => 0,
             'sent_at' => date('Y-m-d H:i:s'),
