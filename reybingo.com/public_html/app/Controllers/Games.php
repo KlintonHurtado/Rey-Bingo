@@ -3062,17 +3062,19 @@ class Games extends Controller {
                 $notificationData = [
                     'user' => $user['id'],
                     'from' => $currentUserId,
+                    'type' => 'game',
+                    'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => '✅ NUEVA PARTIDA AGREGADA',
-                    'message' => $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText,
+                    'title' => 'Nueva partida',
+                    'message' => 'Se ha creado una nueva partida.',
                 ];
 
                 $batchNotifications[] = $notificationData;
 
                 $pushPayload = [
-                    'title' => $notificationData['title'],
-                    'message' => $notificationData['message'],
+                    'title' => 'Nueva partida',
+                    'message' => 'Se ha creado una nueva partida.',
                     'game' => $gameId,
                     'url' => base_url('/game/' . $gameId)
                 ];
@@ -3503,17 +3505,19 @@ class Games extends Controller {
                 $notificationData = [
                     'user' => $user['id'],
                     'from' => $currentUserId,
+                    'type' => 'game',
+                    'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => '✅ NUEVA PARTIDA AGREGADA',
-                    'message' => $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText,
+                    'title' => 'Nueva partida',
+                    'message' => 'Se ha creado una nueva partida.',
                 ];
 
                 $batchNotifications[] = $notificationData;
 
                 $pushPayload = [
-                    'title' => $notificationData['title'],
-                    'message' => $notificationData['message'],
+                    'title' => 'Nueva partida',
+                    'message' => 'Se ha creado una nueva partida.',
                     'game' => $gameId,
                     'url' => base_url('/game/' . $gameId)
                 ];

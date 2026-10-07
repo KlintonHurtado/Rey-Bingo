@@ -229,8 +229,8 @@ class Cron extends Controller
             helper('firebase_push');
             $horaFormateada = $nextGame->format('h:i A');
             send_firebase_push_to_all(
-                '¡Nueva partida de Bingo!', 
-                "Se ha programado una nueva partida para las {$horaFormateada}. ¡Entra y compra tus cartones!"
+                'Nueva partida', 
+                'Se ha creado una nueva partida.'
             );
 
             return $this->response->setJSON($result);
@@ -1617,8 +1617,8 @@ class Cron extends Controller
                 'type_id' => $gameId,
                 'game' => $gameId,
                 'modality' => $gameData['modalities'],
-                'title' => '✅ NUEVA PARTIDA AGREGADA',
-                'message' => $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText,
+                'title' => 'Nueva partida',
+                'message' => 'Se ha creado una nueva partida.',
                 'created_at' => $createdAt
             ];
         }

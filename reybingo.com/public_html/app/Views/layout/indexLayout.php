@@ -978,7 +978,7 @@
                 if (hasPlayedSound) return; // Si ya se reprodujo, no reproducir de nuevo
                 
                 try {
-                    let audioSrc = audioPath + 'winner.mp3';
+                    let audioSrc = audioPath + ((type === 'game' || type === 'new_game' || type === 'default') ? 'notification.mp3' : 'winner.mp3');
                     
                     const audio = initializeAudio(audioSrc);
                     audio.volume = 0.8;
@@ -1016,7 +1016,7 @@
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 const audioContext = new AudioContext();
                 
-                let audioSrc = audioPath + 'winner.mp3';
+                let audioSrc = audioPath + ((type === 'game' || type === 'new_game' || type === 'default') ? 'notification.mp3' : 'winner.mp3');
                 
                 try {
                     const response = await fetch(audioSrc);
@@ -1146,7 +1146,11 @@
                 }
 
                 // UNIFICACIÓN POR MODALIDAD:
-                const isSingType = notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality;
+                const isNewGameNotice = notification.type === 'game'
+                    || notification.type === 'new_game'
+                    || (notification.title && /partida/i.test(notification.title));
+
+                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality);
                 if (isSingType) {
                     const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
@@ -1280,11 +1284,13 @@
                 if (notification.id) {
                     notificationEl.dataset.notificationId = notification.id;
                 }
+                const notifTitle = isNewGameNotice ? 'Nueva partida' : notification.title;
+                const notifMessage = isNewGameNotice ? 'Se ha creado una nueva partida.' : notification.message;
                 notificationEl.innerHTML = `
                     <div class="notification-header">
-                        <h6 class="notification-title">${notification.title}</h6>
+                        <h6 class="notification-title">${notifTitle}</h6>
                     </div>
-                    <div class="notification-message">${notification.message}</div>
+                    <div class="notification-message">${notifMessage}</div>
                     <span class="notification-hint">Desliza a la derecha para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
                 `;

@@ -3617,6 +3617,12 @@ class Users extends Controller {
         $modelModalities = new \App\Models\ModalitiesModel();
 
         foreach ($notifications as &$notification) { 
+            if (($notification['type'] ?? '') === 'game' || stripos($notification['title'] ?? '', 'partida') !== false) {
+                $notification['type'] = 'game';
+                $notification['title'] = 'Nueva partida';
+                $notification['message'] = 'Se ha creado una nueva partida.';
+            }
+
             if (in_array($notification['type'], ['deposit', 'retire', 'transfer', 'payment', 'referred']) && $notification['type_id'] > 0) {
                 $transactionData = $this->getTransactions($notification['type'], $notification['type_id']);
                 if ($transactionData) {

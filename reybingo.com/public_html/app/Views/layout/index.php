@@ -631,7 +631,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }, 1500);
 
                 try {
-                    let audioSrc = audioPath + 'winner.mp3';
+                    const soundFile = (type === 'game' || type === 'new_game' || (!isWinner && type !== 'winner' && type !== 'sing' && type !== 'own_sing'))
+                        ? 'notification.mp3'
+                        : 'winner.mp3';
+                    let audioSrc = audioPath + soundFile;
                     const audio = initializeAudio(audioSrc);
                     audio.volume = 0.8;
                     const playPromise = audio.play();
@@ -668,9 +671,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Determinar el tipo de sonido a reproducir: siempre winner.mp3
-                        let soundType = 'winner';
-                        let isWinnerSound = true;
+                        // Determinar el tipo de sonido a reproducir: winner.mp3 solo para bingos/ganadores
+                        const hasSingNotification = limitedNotifications.some(n => n.type === 'sing' || n.type === 'own_sing');
+                        let soundType = hasSingNotification ? 'winner' : 'game';
+                        let isWinnerSound = hasSingNotification;
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
                         if (limitedNotifications.length > 0) {
@@ -745,7 +749,11 @@ $isNoMusicRole = session()->get('logged_in') && (
 
                 // UNIFICACIÓN POR MODALIDAD:
                 // Si es una notificación de bingo (sing/own_sing), agrupar por modalidad
-                const isSingType = notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality;
+                const isNewGameNotice = notification.type === 'game'
+                    || notification.type === 'new_game'
+                    || (notification.title && /partida/i.test(notification.title));
+
+                const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing' || !!notification.modalityId || !!notification.modality);
                 if (isSingType) {
                     const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
@@ -887,11 +895,13 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (notification.id) {
                     notificationEl.dataset.notificationId = notification.id;
                 }
+                const notifTitle = isNewGameNotice ? 'Nueva partida' : notification.title;
+                const notifMessage = isNewGameNotice ? 'Se ha creado una nueva partida.' : notification.message;
                 notificationEl.innerHTML = `
                     <div class="notification-header">
-                        <h6 class="notification-title">${notification.title}</h6>
+                        <h6 class="notification-title">${notifTitle}</h6>
                     </div>
-                    <div class="notification-message">${notification.message}</div>
+                    <div class="notification-message">${notifMessage}</div>
                     <span class="notification-hint">Desliza a la derecha para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
                 `;
@@ -2361,7 +2371,12 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
                 }
-                if (data && (data.type === 'sing' || data.type === 'own_sing' || data.modalityId || data.modality)) {
+                const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)));
+                if (isNewGame) {
+                    if (typeof playNotificationSound === 'function') {
+                        playNotificationSound('game', false);
+                    }
+                } else if (data && (data.type === 'sing' || data.type === 'own_sing' || data.modalityId || data.modality)) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('winner', true);
                     }
