@@ -2277,44 +2277,31 @@ class Cron extends Controller
         }
 
         $candidate = null;
-        $inserted = false;
         for ($attempt = 0; $attempt < 8; $attempt++) {
             $cand = $this->generateUniqueNumber($gameId);
             if ($cand === null || $cand === false || $cand === 0) {
                 break;
             }
-            $inserted = bingo_insert_drawn_number($gameId, (int) $cand, [
-                'user'       => $game['user'] ?? 1,
-                'isCRON'     => 1,
-                'created_at' => $now,
-            ]);
-            if ($inserted) {
+            if (!bingo_number_already_drawn($gameId, (int) $cand)) {
                 $candidate = (int) $cand;
                 break;
             }
         }
 
-        if (! $inserted || ! $candidate) {
+        if (! $candidate) {
             return null;
         }
 
-        $number = (int) $candidate;
-        bingo_broadcast_number_drawn($gameId, $number);
+        $result = bingo_process_ball_cycle($gameId, (int) $candidate, [
+            'userId' => $game['user'] ?? 1,
+            'isCRON' => 1,
+            'now'    => $now,
+        ]);
 
-        $this->dialNumber($number, $gameId);
-        $this->singBingo($gameId);
-
-        $completedNow = $this->isGameCompleted($gameId);
-        if ($completedNow) {
-            $modelGames = new GamesModel();
-            $modelGames->update($gameId, [
-                'status' => 0,
-                'updated_at' => $now,
-            ]);
-            bingo_on_game_finished($gameId);
-            bingo_broadcast_game_status($gameId, 'game:game_finished', ['status' => 0]);
+        if (!($result['ok'] ?? false)) {
+            return null;
         }
 
-        return $number;
+        return (int) $candidate;
     }
 }

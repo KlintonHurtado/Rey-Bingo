@@ -671,16 +671,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Determinar el tipo de sonido a reproducir: winner.mp3 solo para bingos/ganadores
-                        const hasSingNotification = limitedNotifications.some(n => {
-                            const isGame = n.type === 'game'
-                                || n.type === 'new_game'
-                                || (n.title && /partida/i.test(n.title))
-                                || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
-                            return !isGame && (n.type === 'sing' || n.type === 'own_sing');
-                        });
-                        let soundType = hasSingNotification ? 'winner' : 'default';
-                        let isWinnerSound = hasSingNotification;
+                        // Sondeo HTTP general: nunca reproducir winner.mp3 ni lanzar confeti por polling.
+                        // Esos efectos están reservados estrictamente para eventos en tiempo real (WebSocket).
+                        const soundType = 'default';
+                        const isWinnerSound = false;
 
                         // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
                         if (limitedNotifications.length > 0) {
@@ -688,7 +682,6 @@ $isNoMusicRole = session()->get('logged_in') && (
                         }
 
                         // Procesar cada notificación
-                        let hasPlayedConfetti = false;
                         const notifIdsToMark = [];
                         limitedNotifications.forEach(notification => {
                             showNotification(notification);
@@ -700,13 +693,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 addPaymentRowToModal(notification.transaction);
                             }
 
-                            // Efectos de confeti para cualquier bingo (ganador propio o ajeno)
-                            if ((notification.type === 'sing' || notification.type === 'own_sing') && !hasPlayedConfetti) {
-                                hasPlayedConfetti = true;
-                                if (typeof AppcreateConfetti === 'function') {
-                                    AppcreateConfetti();
-                                }
-                            } else if (notification.type === 'game') {
+                            if (notification.type === 'game') {
                                 <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
                                     gameslistGet();
                                 <?php endif; ?>
@@ -739,7 +726,17 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }
             }
 
+            window.__sessionSeenNotifIds = window.__sessionSeenNotifIds || new Set();
             window.showNotification = function showNotification(notification) {
+                if (!notification) return;
+                const notifId = notification.id ? String(notification.id) : null;
+                if (notifId && window.__sessionSeenNotifIds.has(notifId)) {
+                    return;
+                }
+                if (notifId) {
+                    window.__sessionSeenNotifIds.add(notifId);
+                }
+
                 const isGameNotice = notification.type === 'game';
                 <?php if (session()->get('logged_in') && function_exists('bingo_is_operator') && function_exists('bingo_is_store') && (bingo_is_operator() || bingo_is_store() || (function_exists('bingo_is_admin') && bingo_is_admin()))) : ?>
                     if (isGameNotice) return;

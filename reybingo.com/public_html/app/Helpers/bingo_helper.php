@@ -562,6 +562,264 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
     }
 }
 
+if (!function_exists('bingo_process_ball_cycle')) {
+    /**
+     * Pipeline común y unificado para el procesamiento de una balota en cualquier modalidad (Automática o Live).
+     *
+     * Flujo de ejecución:
+     * 1. Validar juego y estado de la partida
+     * 2. Validar que la balota no haya sido cantada previamente
+     * 3. Insertar la balota en la tabla boards (la balota queda persistida en BD)
+     * 4. Transmitir inmediatamente la balota por WebSocket (game:number_drawn)
+     * 5. Actualizar en tiempo real los números de los cartones de bots y jugadores (dialNumber / UPDATE atómico)
+     * 6. Evaluar patrones de cartones (bots y autodial) y registrar ganadores (bingo_resolve_missed_bingos_for_game)
+     * 7. Verificar cantes pendientes de anunciar al presentador (bingo_claim_pending_board_sing)
+     * 8. Verificar y ejecutar la finalización si todas las modalidades fueron premiadas o se llegó a 75 balotas
+     * 9. Retornar el resultado estructurado para el controlador/cron
+     *
+     * @param int $gameId
+     * @param int $number
+     * @param array $options ['userId' => int, 'isCRON' => int, 'now' => string]
+     * @return array
+     */
+    function bingo_process_ball_cycle(int $gameId, int $number, array $options = []): array
+    {
+        helper(['bingo', 'wallet']);
+
+        $db = \Config\Database::connect();
+        $modelGames = new \App\Models\GamesModel();
+        $modelBoards = new \App\Models\BoardsModel();
+        $modelSings = new \App\Models\SingsModel();
+        $modelUsers = new \App\Models\UsersModel();
+        $modelModalities = new \App\Models\ModalitiesModel();
+
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return [
+                'ok' => false,
+                'status' => 'error',
+                'message' => translate('game not found') ?: 'Partida no encontrada',
+            ];
+        }
+
+        $number = (int) $number;
+        if ($number < 1 || $number > 75) {
+            return [
+                'ok' => false,
+                'status' => 'error',
+                'message' => translate('invalid number') ?: 'Número inválido',
+            ];
+        }
+
+        $now = $options['now'] ?? date('Y-m-d H:i:s');
+        $userId = (int) ($options['userId'] ?? ($game['user'] ?? 1));
+        $isCRON = (int) ($options['isCRON'] ?? 0);
+
+        // 1. Verificar si ya fue cantada
+        if (bingo_number_already_drawn($gameId, $number)) {
+            $drawnNumbers = bingo_get_ordered_drawn_numbers($gameId);
+            return [
+                'ok' => false,
+                'status' => 'error',
+                'message' => translate('number already drawn') ?: 'Ese número ya fue cantado',
+                'totalNumbersGenerated' => count($drawnNumbers),
+                'drawnNumbers' => $drawnNumbers,
+            ];
+        }
+
+        $totalBefore = bingo_count_drawn_numbers($gameId);
+
+        // 2. Si el juego ya está terminado o todos los premios completados
+        if ((int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards($gameId)) {
+            if ((int) ($game['status'] ?? 0) !== 0) {
+                bingo_finalize_game_when_complete($gameId);
+            }
+            $drawnNumbers = bingo_get_ordered_drawn_numbers($gameId);
+            return [
+                'ok' => true,
+                'status' => 'completed',
+                'number' => null,
+                'totalNumbersGenerated' => count($drawnNumbers),
+                'drawnNumbers' => $drawnNumbers,
+                'message' => translate('the game is over, all the prizes have been awarded'),
+                'winners' => bingo_get_official_sings_for_game($gameId, true),
+            ];
+        }
+
+        // Si la partida estaba en espera (status 2), activarla a status 1
+        if ((int) ($game['status'] ?? 0) === 2) {
+            $modelGames->update($gameId, ['status' => 1, 'updated_at' => $now]);
+            $game['status'] = 1;
+        }
+
+        // 3. Guardar balota en DB primero (NUNCA SE PIERDE LA BALOTA)
+        $inserted = bingo_insert_drawn_number($gameId, $number, [
+            'user'       => $userId,
+            'isCRON'     => $isCRON,
+            'created_at' => $now,
+        ]);
+
+        if (!$inserted) {
+            $drawnNumbers = bingo_get_ordered_drawn_numbers($gameId);
+            return [
+                'ok' => false,
+                'status' => 'error',
+                'message' => translate('number already drawn') ?: 'Ese número ya fue cantado',
+                'totalNumbersGenerated' => count($drawnNumbers),
+                'drawnNumbers' => $drawnNumbers,
+            ];
+        }
+
+        $drawnNumbers = bingo_get_ordered_drawn_numbers($gameId);
+        $totalNumbersGenerated = count($drawnNumbers);
+
+        // 4. WebSocket: Emitir número cantado inmediatamente
+        bingo_broadcast_number_drawn($gameId, $number, $drawnNumbers, $totalNumbersGenerated);
+
+        // 5. Marcar balota en cartones de bots y jugadores en tiempo real (1 solo query atómico)
+        try {
+            $db->query("
+                UPDATE numbers n
+                JOIN cartons c ON c.id = n.carton
+                SET n.status = 1
+                WHERE c.game = ?
+                  AND c.user != 0
+                  AND n.number = ?
+                  AND n.status = 0
+            ", [$gameId, $number]);
+        } catch (\Throwable $de) {
+            log_message('error', "bingo_process_ball_cycle dialNumber error: {$de->getMessage()}");
+        }
+
+        // 6. Evaluar patrones de cartones (bots y autodial) y registrar ganadores
+        $newRegisteredSingsCount = 0;
+        try {
+            $newRegisteredSingsCount = bingo_resolve_missed_bingos_for_game($gameId, false);
+        } catch (\Throwable $re) {
+            log_message('error', "bingo_process_ball_cycle resolve_missed_bingos error: {$re->getMessage()}");
+        }
+
+        // 7. Si hay cantes con status 0 pendientes de confirmar, confirmarlos y notificar
+        $pendingZeroSings = $modelSings->where('game', $gameId)->where('status', 0)->findAll();
+        if (!empty($pendingZeroSings)) {
+            $modelSings->where('game', $gameId)->where('status', 0)->set(['status' => 1])->update();
+            $gameCompletedCheck = bingo_is_game_finished_by_awards($gameId);
+            $officialWinnersList = bingo_get_official_sings_for_game($gameId, true);
+
+            foreach ($pendingZeroSings as $pSing) {
+                $pUser = $modelUsers->find($pSing['user']);
+                $pMod = $modelModalities->find($pSing['modality']);
+                $pUserName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : ('Jugador #' . $pSing['user']);
+                $pImagePath = !empty($pUser['image']) ? site_url('uploads/users/' . $pUser['image']) : site_url('assets/img/avatar.jpg');
+
+                bingo_broadcast_sing_accepted($gameId, [
+                    'singId'        => (int) $pSing['id'],
+                    'userId'        => (int) $pSing['user'],
+                    'winnerUserId'  => (int) $pSing['user'],
+                    'playerId'      => (string) $pSing['user'],
+                    'player'        => $pUserName,
+                    'playerName'    => $pUserName,
+                    'modality'      => translate($pMod['name'] ?? ''),
+                    'modalityId'    => (int) $pSing['modality'],
+                    'modalityName'  => translate($pMod['name'] ?? ''),
+                    'cartonId'      => (int) $pSing['carton'],
+                    'lastNumber'    => $number,
+                    'image'         => $pImagePath,
+                    'isOwnBingo'    => false,
+                    'gameCompleted' => $gameCompletedCheck,
+                    'winners'       => $officialWinnersList,
+                ]);
+
+                bingo_notify_sing_to_all_players($gameId, [
+                    'singId'     => (int) $pSing['id'],
+                    'userId'     => (int) $pSing['user'],
+                    'userName'   => $pUserName,
+                    'modalityId' => (int) $pSing['modality'],
+                    'modality'   => translate($pMod['name'] ?? ''),
+                    'cartonId'   => (int) $pSing['carton'],
+                ]);
+            }
+        }
+
+        // 8. Verificar cante pendiente de notificar al presentador (humano o bot)
+        $pendingBoardSing = bingo_claim_pending_board_sing($gameId);
+
+        // 9. Comprobar finalización de la partida
+        $gameFinalizedNow = false;
+        if (bingo_is_game_finished_by_awards($gameId)) {
+            $gameFinalizedNow = bingo_finalize_game_when_complete($gameId);
+        } elseif ($totalNumbersGenerated >= 75) {
+            $modelGames->update($gameId, [
+                'status' => 0,
+                'updated_at' => $now,
+            ]);
+            if (function_exists('bingo_on_game_finished')) {
+                bingo_on_game_finished($gameId);
+            }
+            bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                'status'  => 0,
+                'winners' => bingo_get_official_sings_for_game($gameId, true),
+            ]);
+            $gameFinalizedNow = true;
+        }
+
+        $officialWinners = bingo_get_official_sings_for_game($gameId, true);
+        foreach ($officialWinners as &$winner) {
+            $u = $modelUsers->find($winner['user']);
+            $m = $modelModalities->find($winner['modality']);
+            $winner['player'] = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . $winner['user']);
+            $winner['modality'] = $m ? translate($m['name'] ?? '') : 'Bingo';
+        }
+
+        // Determinar estado de respuesta
+        if ($gameFinalizedNow || (int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards($gameId) || $totalNumbersGenerated >= 75) {
+            return [
+                'ok' => true,
+                'status' => 'completed',
+                'number' => $number,
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
+                'winners' => $officialWinners,
+                'message' => translate('the game is over, all the prizes have been awarded'),
+            ];
+        }
+
+        if ($newRegisteredSingsCount > 0 || !empty($pendingZeroSings) || $pendingBoardSing) {
+            $pauseInfo = $pendingBoardSing;
+            if (!$pauseInfo && !empty($officialWinners)) {
+                $lastW = end($officialWinners);
+                $pauseInfo = [
+                    'player'     => $lastW['player'] ?? '',
+                    'modality'   => $lastW['modality'] ?? '',
+                    'modalityId' => $lastW['modality'] ?? 0,
+                    'image'      => site_url('assets/img/avatar.jpg'),
+                ];
+            }
+
+            return [
+                'ok' => true,
+                'status' => 'pause',
+                'number' => $number,
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'drawnNumbers' => $drawnNumbers,
+                'winners' => $officialWinners,
+                'pendingSing' => $pauseInfo,
+                'message' => 'Se ha cantado un bingo. Pausando el juego por 10 segundos.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'status' => 'success',
+            'number' => $number,
+            'totalNumbersGenerated' => $totalNumbersGenerated,
+            'drawnNumbers' => $drawnNumbers,
+            'winners' => $officialWinners,
+            'message' => translate('new number generated'),
+        ];
+    }
+}
+
 if (!function_exists('bingo_register_sing_if_missing')) {
     function bingo_register_sing_if_missing(
         int $gameId,

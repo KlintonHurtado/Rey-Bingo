@@ -1067,15 +1067,9 @@
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Determinar el tipo de sonido a reproducir (priorizar 'sing')
+                        // Sondeo HTTP general: nunca reproducir winner.mp3 ni lanzar confeti por polling.
+                        // Esos efectos están reservados estrictamente para eventos en tiempo real (WebSocket).
                         let soundType = 'default';
-                        const hasSingNotification = limitedNotifications.some(n => {
-                            const isGame = n.type === 'game'
-                                || n.type === 'new_game'
-                                || (n.title && /partida/i.test(n.title))
-                                || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
-                            return !isGame && (n.type === 'sing' || n.type === 'own_sing');
-                        });
                         const hasGameNotification = limitedNotifications.some(n => {
                             return n.type === 'game'
                                 || n.type === 'new_game'
@@ -1083,9 +1077,7 @@
                                 || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
                         });
                         
-                        if (hasSingNotification) {
-                            soundType = 'sing';
-                        } else if (hasGameNotification) {
+                        if (hasGameNotification) {
                             soundType = 'game';
                         }
 
@@ -1106,10 +1098,7 @@
                                 addPaymentRowToModal(notification.transaction);
                             }
 
-                            // Efectos especiales solo para tipo 'sing'
-                            if (notification.type === 'sing') {
-                                AppcreateConfetti();
-                            } else if (notification.type === 'game') {
+                            if (notification.type === 'game') {
                                 <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
                                     gameslistGet();
                                 <?php endif; ?>
@@ -1142,7 +1131,17 @@
                 }
             }
 
+            window.__sessionSeenNotifIds = window.__sessionSeenNotifIds || new Set();
             window.showNotification = function showNotification(notification) {
+                if (!notification) return;
+                const notifId = notification.id ? String(notification.id) : null;
+                if (notifId && window.__sessionSeenNotifIds.has(notifId)) {
+                    return;
+                }
+                if (notifId) {
+                    window.__sessionSeenNotifIds.add(notifId);
+                }
+
                 const isGameNotice = notification.type === 'game' || (notification.title && notification.title.indexOf('PARTIDA') !== -1) || (notification.message && notification.message.indexOf('PARTIDA') !== -1);
                 <?php if (session()->get('logged_in') && function_exists('bingo_is_operator') && function_exists('bingo_is_store') && (bingo_is_operator() || bingo_is_store() || (function_exists('bingo_is_admin') && bingo_is_admin()))) : ?>
                     if (isGameNotice) return;

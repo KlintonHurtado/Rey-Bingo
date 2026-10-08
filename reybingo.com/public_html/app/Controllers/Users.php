@@ -3537,9 +3537,19 @@ class Users extends Controller {
         $userGroup = (int) ($user['group'] ?? session()->get('group') ?? 0);
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
+        // Regla de Negocio: La notificación de ganador es un EVENTO EN TIEMPO REAL emitido por WebSocket,
+        // NO un registro histórico para re-notificar al ingresar al sistema tras haber estado ausente.
+        // Se marcan como leídas (status = 1) en BD para preservar el 100% del historial y trazabilidad
+        // sin borrarlas de la base de datos, y se excluyen del array de alertas activas para evitar spam sonoro/visual.
+        $modelNotifications
+            ->where('user', $user['id'])
+            ->where('status', 0)
+            ->where('type', 'sing')
+            ->set(['status' => 1])
+            ->update();
+
         if ($isOperatorOrStore) {
-            // Operadores y Puntos de venta no deben recibir notificaciones de nuevas partidas (type='game')
-            // Pero SÍ deben recibir notificaciones de bingo cantado (type='sing'), premios (type='payment') y del sistema.
+            // Operadores y Puntos de venta no reciben notificaciones de nuevas partidas (type='game')
             $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
@@ -3552,48 +3562,23 @@ class Users extends Controller {
                 ->where('status', 0)
                 ->groupStart()
                     ->where('type !=', 'game')
+                    ->where('type !=', 'sing')
                     ->orWhere('type IS NULL', null, false)
                 ->groupEnd()
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
         } else {
-            $notifications = $modelNotifications->where('user', $user['id'])->where('status', 0)->orderBy('created_at', 'DESC')->limit(15)->findAll();
-
-            // Jugadores: solo ven notificaciones de bingo ('sing') si el ganador fueron ellos.
-            // Los bingos de otros jugadores ya se mostraron en vivo dentro de la partida;
-            // se marcan como leídos para que no reaparezcan al salir de la partida.
-            if ($userGroup === 0 && !empty($notifications)) {
-                $singIds = [];
-                foreach ($notifications as $n) {
-                    if (($n['type'] ?? '') === 'sing' && (int) ($n['type_id'] ?? 0) > 0) {
-                        $singIds[] = (int) $n['type_id'];
-                    }
-                }
-
-                $singOwners = [];
-                if (!empty($singIds)) {
-                    foreach ($modelSings->select('id, user')->whereIn('id', array_unique($singIds))->findAll() as $s) {
-                        $singOwners[(int) $s['id']] = (int) $s['user'];
-                    }
-                }
-
-                $foreignIds = [];
-                $notifications = array_values(array_filter($notifications, function ($n) use ($singOwners, $userId, &$foreignIds) {
-                    if (($n['type'] ?? '') !== 'sing') {
-                        return true;
-                    }
-                    $owner = $singOwners[(int) ($n['type_id'] ?? 0)] ?? 0;
-                    if ($owner === $userId) {
-                        return true;
-                    }
-                    $foreignIds[] = (int) $n['id'];
-                    return false;
-                }));
-
-                if (!empty($foreignIds)) {
-                    $modelNotifications->whereIn('id', $foreignIds)->set(['status' => 1])->update();
-                }
-            }
+            // Jugadores y Administradores: solo reciben alertas activas no-sing (pagos, balance, sistema, nuevas partidas)
+            $notifications = $modelNotifications
+                ->where('user', $user['id'])
+                ->where('status', 0)
+                ->groupStart()
+                    ->where('type !=', 'sing')
+                    ->orWhere('type IS NULL', null, false)
+                ->groupEnd()
+                ->orderBy('created_at', 'DESC')
+                ->limit(15)
+                ->findAll();
         }
 
         // Deduplicar notificaciones repetidas en memoria y marcar duplicados en BD como leídos
