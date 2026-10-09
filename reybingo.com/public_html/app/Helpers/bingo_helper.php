@@ -764,21 +764,39 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 bingo_ensure_winners_registered($gameId);
                 bingo_pay_pending_awards_for_game($gameId);
                 $liveWinners = bingo_get_official_sings_for_game($gameId, true);
-                bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                $lastSing = !empty($liveWinners) ? end($liveWinners) : null;
+                $lastWinnerPayload = [];
+                if ($lastSing) {
+                    $modelUsers = new \App\Models\UsersModel();
+                    $modelModalities = new \App\Models\ModalitiesModel();
+                    $u = $modelUsers->find($lastSing['user']);
+                    $m = $modelModalities->find($lastSing['modality']);
+                    $lastWinnerPayload = [
+                        'singId'       => (int) ($lastSing['id'] ?? 0),
+                        'userId'       => (int) ($lastSing['user'] ?? 0),
+                        'winnerUserId' => (int) ($lastSing['user'] ?? 0),
+                        'player'       => $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lastSing['user'] ?? '')),
+                        'modality'     => $m ? translate($m['name'] ?? '') : 'Bingo',
+                        'modalityId'   => (int) ($lastSing['modality'] ?? 0),
+                        'cartonId'     => (int) ($lastSing['carton'] ?? 0),
+                        'image'        => !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg'),
+                    ];
+                }
+                bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
                     'status'        => 1,
                     'gameId'        => $gameId,
                     'gameCompleted' => true,
                     'isLiveGame'    => true,
                     'liveFinalized' => false,
                     'winners'       => $liveWinners,
-                ]);
-                bingo_broadcast_game_status($gameId, 'game:completed', [
+                ], $lastWinnerPayload));
+                bingo_broadcast_game_status($gameId, 'game:completed', array_merge([
                     'status'        => 1,
                     'gameId'        => $gameId,
                     'gameCompleted' => true,
                     'isLiveGame'    => true,
                     'winners'       => $liveWinners,
-                ]);
+                ], $lastWinnerPayload));
                 $gameFinalizedNow = true;
             } else {
                 $gameFinalizedNow = bingo_finalize_game_when_complete($gameId);
@@ -788,21 +806,39 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 bingo_ensure_winners_registered($gameId);
                 bingo_pay_pending_awards_for_game($gameId);
                 $liveWinners = bingo_get_official_sings_for_game($gameId, true);
-                bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                $lastSing = !empty($liveWinners) ? end($liveWinners) : null;
+                $lastWinnerPayload = [];
+                if ($lastSing) {
+                    $modelUsers = new \App\Models\UsersModel();
+                    $modelModalities = new \App\Models\ModalitiesModel();
+                    $u = $modelUsers->find($lastSing['user']);
+                    $m = $modelModalities->find($lastSing['modality']);
+                    $lastWinnerPayload = [
+                        'singId'       => (int) ($lastSing['id'] ?? 0),
+                        'userId'       => (int) ($lastSing['user'] ?? 0),
+                        'winnerUserId' => (int) ($lastSing['user'] ?? 0),
+                        'player'       => $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lastSing['user'] ?? '')),
+                        'modality'     => $m ? translate($m['name'] ?? '') : 'Bingo',
+                        'modalityId'   => (int) ($lastSing['modality'] ?? 0),
+                        'cartonId'     => (int) ($lastSing['carton'] ?? 0),
+                        'image'        => !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg'),
+                    ];
+                }
+                bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
                     'status'        => 1,
                     'gameId'        => $gameId,
                     'gameCompleted' => true,
                     'isLiveGame'    => true,
                     'liveFinalized' => false,
                     'winners'       => $liveWinners,
-                ]);
-                bingo_broadcast_game_status($gameId, 'game:completed', [
+                ], $lastWinnerPayload));
+                bingo_broadcast_game_status($gameId, 'game:completed', array_merge([
                     'status'        => 1,
                     'gameId'        => $gameId,
                     'gameCompleted' => true,
                     'isLiveGame'    => true,
                     'winners'       => $liveWinners,
-                ]);
+                ], $lastWinnerPayload));
                 $gameFinalizedNow = true;
             } else {
                 $modelGames->update($gameId, [
@@ -830,6 +866,7 @@ if (!function_exists('bingo_process_ball_cycle')) {
 
         // Determinar estado de respuesta
         if ($gameFinalizedNow || (int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards($gameId) || $totalNumbersGenerated >= 75) {
+            $lastWinnerSing = !empty($officialWinners) ? end($officialWinners) : null;
             return [
                 'ok' => true,
                 'status' => 'completed',
@@ -837,6 +874,10 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $officialWinners,
+                'player' => $lastWinnerSing['player'] ?? '',
+                'modality' => $lastWinnerSing['modality'] ?? '',
+                'modalityId' => $lastWinnerSing['modalityId'] ?? ($lastWinnerSing['modality'] ?? 0),
+                'image' => $lastWinnerSing['image'] ?? site_url('assets/img/avatar.jpg'),
                 'message' => translate('the game is over, all the prizes have been awarded'),
             ];
         }

@@ -648,6 +648,47 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }
             }
 
+            // Gestión persistente de IDs de notificaciones vistas durante la sesión del navegador
+            window.__getSeenNotifIds = function() {
+                try {
+                    const stored = sessionStorage.getItem('reybingo_seen_notif_ids');
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (Array.isArray(parsed)) {
+                            return new Set(parsed.map(String));
+                        }
+                    }
+                } catch (e) {}
+                return window.__sessionSeenNotifIds || new Set();
+            };
+
+            window.__markNotifIdSeen = function(id) {
+                if (!id) return;
+                const strId = String(id);
+                if (!window.__sessionSeenNotifIds) {
+                    window.__sessionSeenNotifIds = new Set();
+                }
+                window.__sessionSeenNotifIds.add(strId);
+                try {
+                    const currentSet = window.__getSeenNotifIds();
+                    currentSet.add(strId);
+                    const arr = Array.from(currentSet).slice(-150);
+                    sessionStorage.setItem('reybingo_seen_notif_ids', JSON.stringify(arr));
+                } catch (e) {}
+            };
+
+            window.__isNotifIdSeen = function(id) {
+                if (!id) return false;
+                const strId = String(id);
+                if (window.__sessionSeenNotifIds && window.__sessionSeenNotifIds.has(strId)) {
+                    return true;
+                }
+                const set = window.__getSeenNotifIds();
+                return set.has(strId);
+            };
+
+            window.__sessionSeenNotifIds = window.__getSeenNotifIds();
+
             window.loadNotifications = async function loadNotifications() {
                 try {
                     const response = await fetch(notificationConfig.apiUrl);
@@ -665,20 +706,26 @@ $isNoMusicRole = session()->get('logged_in') && (
                     if (notifications.length > 0) {
                         showNotificationIndicator();
                         
-                        // Resetear el flag de sonido para esta nueva carga
-                        hasPlayedSound = false;
-                        
                         // Limitar a máximo 5 notificaciones
                         const limitedNotifications = notifications.slice(0, notificationConfig.maxNotifications);
                         
-                        // Sondeo HTTP general: nunca reproducir winner.mp3 ni lanzar confeti por polling.
-                        // Esos efectos están reservados estrictamente para eventos en tiempo real (WebSocket).
-                        const soundType = 'default';
-                        const isWinnerSound = false;
+                        // Filtrar notificaciones verdaderamente nuevas que no hayan sido mostradas ni procesadas
+                        const freshNotifications = limitedNotifications.filter(n => {
+                            const id = n.id ? String(n.id) : null;
+                            return !id || !window.__isNotifIdSeen(id);
+                        });
 
-                        // Reproducir sonido UNA SOLA VEZ para todas las notificaciones
-                        if (limitedNotifications.length > 0) {
-                            playNotificationSound(soundType, isWinnerSound);
+                        // Reproducir sonido UNA SOLA VEZ y ÚNICAMENTE si hay notificaciones genuinamente nuevas
+                        if (freshNotifications.length > 0) {
+                            hasPlayedSound = false;
+                            const hasGameNotification = freshNotifications.some(n => {
+                                return n.type === 'game'
+                                    || n.type === 'new_game'
+                                    || (n.title && /partida/i.test(n.title))
+                                    || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
+                            });
+                            const soundType = hasGameNotification ? 'game' : 'default';
+                            playNotificationSound(soundType, false);
                         }
 
                         // Procesar cada notificación
@@ -726,15 +773,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }
             }
 
-            window.__sessionSeenNotifIds = window.__sessionSeenNotifIds || new Set();
             window.showNotification = function showNotification(notification) {
                 if (!notification) return;
                 const notifId = notification.id ? String(notification.id) : null;
-                if (notifId && window.__sessionSeenNotifIds.has(notifId)) {
+                if (notifId && window.__isNotifIdSeen(notifId)) {
                     return;
                 }
                 if (notifId) {
-                    window.__sessionSeenNotifIds.add(notifId);
+                    window.__markNotifIdSeen(notifId);
                 }
 
                 const isGameNotice = notification.type === 'game';
@@ -2376,15 +2422,29 @@ $isNoMusicRole = session()->get('logged_in') && (
 
             userChannel.bind('notification:new', function(data) {
                 console.log('Realtime user notification received:', data);
+                if (!data) return;
+                const notifId = data.id ? String(data.id) : null;
+                if (notifId && typeof window.__isNotifIdSeen === 'function' && window.__isNotifIdSeen(notifId)) {
+                    return; // Ya procesada (deduplicada contra HTTP polling o evento repetido)
+                }
+
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
+                } else if (notifId && typeof window.__markNotifIdSeen === 'function') {
+                    window.__markNotifIdSeen(notifId);
                 }
+
                 const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)) || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message))));
                 const isSingEvent = data && !isNewGame && (data.type === 'sing' || data.type === 'own_sing');
                 if (isNewGame) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('game', false);
                     }
+                    <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
+                        if (typeof gameslistGet === 'function') {
+                            gameslistGet();
+                        }
+                    <?php endif; ?>
                 } else if (isSingEvent) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('winner', true);
@@ -2396,6 +2456,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('default', false);
                     }
+                }
+
+                if (notifId && typeof markAsRead === 'function') {
+                    markAsRead([notifId]);
                 }
             });
 

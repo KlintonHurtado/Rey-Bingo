@@ -2630,8 +2630,32 @@ function processNumberGetResponse(data) {
             return;
         }
 
-        // Si la partida ya está completada, registrar como visto y no reproducir celebraciones ni sonidos de ganadores pasados
-        const noticeKey = ((data.player || '') + '_' + (data.modality || ''));
+        // Si viene un ganador no notificado aún y el jugador estaba activo en la sala, mostrar aviso antes de finalizar
+        const isInitialSync = (Date.now() - (window.__gameSessionJoinedAt || 0)) < 4000;
+        let lastWinner = null;
+        if (data.player && data.modality) {
+            lastWinner = data;
+        } else if (Array.isArray(data.winners) && data.winners.length > 0) {
+            const lw = data.winners[data.winners.length - 1];
+            if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
+                lastWinner = Object.assign({}, data, {
+                    player: lw.player || lw.userName,
+                    modality: lw.modality || lw.modalityName,
+                    modalityId: lw.modalityId || lw.modality,
+                    cartonId: lw.cartonId || lw.carton,
+                    image: lw.image || site_url + 'assets/img/avatar.jpg'
+                });
+            }
+        }
+
+        const noticeKey = lastWinner ? ((lastWinner.player || '') + '_' + (lastWinner.modality || '')) : '';
+        if (!isInitialSync && noticeKey && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
+            showOtherPlayerBingoNotice(lastWinner, function () {
+                showGameFinalized();
+            });
+            return;
+        }
+
         if (noticeKey && window.seenBingoNotices) {
             window.seenBingoNotices.add(noticeKey);
         }
@@ -3057,25 +3081,42 @@ function showGameFinalized() {
             const btnVer = document.getElementById('btn-ver-ganadores-player');
             if (btnVer) btnVer.style.display = 'inline-flex';
 
-            // Al cerrar la tabla por el botón de cerrar (X)
-            $(modalAwardsEl).find('[data-bs-dismiss="modal"]').off('click').on('click', function () {
+            if (window.isLiveGame && !window.isLiveFinalized) {
                 cancelAutoExit();
-                bsAwardsModal.hide();
-                if (window.isLiveGame && !window.isLiveFinalized) {
-                    if (btnVer) btnVer.style.display = 'inline-flex';
-                    return;
+
+                // En Live no finalizado: bloquear salida del jugador y mostrar mensaje de espera
+                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game, .btn-close-awards, [data-bs-dismiss="modal"]').hide();
+                let waitNotice = modalAwardsEl.querySelector('#live-waiting-admin-notice');
+                if (!waitNotice) {
+                    const footer = modalAwardsEl.querySelector('.modal-footer');
+                    if (footer) {
+                        waitNotice = document.createElement('div');
+                        waitNotice.id = 'live-waiting-admin-notice';
+                        waitNotice.className = 'text-center py-2 px-3 my-1 rounded-pill fw-bold';
+                        waitNotice.style.cssText = 'font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4); display: inline-block;';
+                        waitNotice.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...';
+                        footer.prepend(waitNotice);
+                    }
+                } else {
+                    waitNotice.style.display = 'inline-block';
                 }
-                exitToPlay();
-            });
+            } else {
+                // Al cerrar la tabla por el botón de cerrar (X)
+                $(modalAwardsEl).find('[data-bs-dismiss="modal"]').off('click').on('click', function () {
+                    cancelAutoExit();
+                    bsAwardsModal.hide();
+                    exitToPlay();
+                });
 
-            // Al hacer clic en salir explícitamente
-            $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
-                cancelAutoExit();
-                bsAwardsModal.hide();
-                exitToPlay();
-            });
+                // Al hacer clic en salir explícitamente
+                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+                    cancelAutoExit();
+                    bsAwardsModal.hide();
+                    exitToPlay();
+                });
 
-            scheduleAutoExit();
+                scheduleAutoExit();
+            }
         });
     };
 
@@ -4472,10 +4513,26 @@ function initializeApp() {
                     return;
                 }
 
-                // Si viene información del último ganador que no se haya notificado aún, mostrar aviso antes de finalizar
-                const noticeKey = (data && data.player && data.modality) ? ((data.player || '') + '_' + (data.modality || '')) : '';
+                // Extraer el último ganador ya sea de data o del array winners
+                let lastWinner = null;
+                if (data && data.player && data.modality) {
+                    lastWinner = data;
+                } else if (Array.isArray(data && data.winners) && data.winners.length > 0) {
+                    const lw = data.winners[data.winners.length - 1];
+                    if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
+                        lastWinner = Object.assign({}, data, {
+                            player: lw.player || lw.userName,
+                            modality: lw.modality || lw.modalityName,
+                            modalityId: lw.modalityId || lw.modality,
+                            cartonId: lw.cartonId || lw.carton,
+                            image: lw.image || site_url + 'assets/img/avatar.jpg'
+                        });
+                    }
+                }
+
+                const noticeKey = lastWinner ? ((lastWinner.player || '') + '_' + (lastWinner.modality || '')) : '';
                 if (noticeKey && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
-                    showOtherPlayerBingoNotice(data, function () {
+                    showOtherPlayerBingoNotice(lastWinner, function () {
                         showGameFinalized();
                     });
                     return;
@@ -4499,9 +4556,25 @@ function initializeApp() {
                     return;
                 }
 
-                const noticeKey = (data && data.player && data.modality) ? ((data.player || '') + '_' + (data.modality || '')) : '';
+                let lastWinnerComp = null;
+                if (data && data.player && data.modality) {
+                    lastWinnerComp = data;
+                } else if (Array.isArray(data && data.winners) && data.winners.length > 0) {
+                    const lw = data.winners[data.winners.length - 1];
+                    if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
+                        lastWinnerComp = Object.assign({}, data, {
+                            player: lw.player || lw.userName,
+                            modality: lw.modality || lw.modalityName,
+                            modalityId: lw.modalityId || lw.modality,
+                            cartonId: lw.cartonId || lw.carton,
+                            image: lw.image || site_url + 'assets/img/avatar.jpg'
+                        });
+                    }
+                }
+
+                const noticeKey = lastWinnerComp ? ((lastWinnerComp.player || '') + '_' + (lastWinnerComp.modality || '')) : '';
                 if (noticeKey && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
-                    showOtherPlayerBingoNotice(data, function () {
+                    showOtherPlayerBingoNotice(lastWinnerComp, function () {
                         showGameFinalized();
                     });
                     return;
@@ -4559,7 +4632,11 @@ function handleLiveFinalizedByAdmin(data) {
 
     const modalAwardsEl = document.getElementById('modalAwards');
     if (modalAwardsEl) {
-        $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+        const waitNotice = modalAwardsEl.querySelector('#live-waiting-admin-notice');
+        if (waitNotice) waitNotice.style.display = 'none';
+
+        const exitBtns = $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game, .btn-close-awards');
+        exitBtns.show().prop('disabled', false).off('click').on('click', function () {
             const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
             if (bsAwardsModal) bsAwardsModal.hide();
             if (typeof window.exitToPlay === 'function') {

@@ -1202,7 +1202,8 @@ class Signup extends Controller {
             'username'  => $user['username'],
             'email'     => $user['email'],
             'phone'     => $user['phone'] ?? null,
-            'logged_in' => true
+            'logged_in' => true,
+            'session_connect_time' => date('Y-m-d H:i:s'),
         ];
 
         session()->set($sessionData);

@@ -3537,49 +3537,120 @@ class Users extends Controller {
         $userGroup = (int) ($user['group'] ?? session()->get('group') ?? 0);
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
-        // Regla de Negocio: La notificación de ganador es un EVENTO EN TIEMPO REAL emitido por WebSocket,
-        // NO un registro histórico para re-notificar al ingresar al sistema tras haber estado ausente.
-        // Se marcan como leídas (status = 1) en BD para preservar el 100% del historial y trazabilidad
-        // sin borrarlas de la base de datos, y se excluyen del array de alertas activas para evitar spam sonoro/visual.
-        $modelNotifications
+        // Regla de Negocio: Separación estricta entre Historial y Alertas Emergentes en Tiempo Real.
+        // 1. Ganadores ('sing'): Son eventos en vivo gestionados por WebSocket en la sala activa.
+        // Se marcan como leídas (status = 1) en BD para preservar el 100% del historial y trazabilidad,
+        // excluyéndose de las alertas emergentes para evitar spam sonoro/visual al ingresar.
+        $modelNotifications->builder()
             ->where('user', $user['id'])
             ->where('status', 0)
             ->where('type', 'sing')
-            ->set(['status' => 1])
-            ->update();
+            ->update(['status' => 1]);
+
+        // 2. Control de conexión y ventana de tiempo para alertas emergentes:
+        // Las alertas emergentes (popups y sonido) son EXCLUSIVAS para eventos generados
+        // mientras el usuario está conectado en su sesión actual.
+        // Si el usuario estuvo desconectado (por horas o días), las partidas creadas en su ausencia
+        // NO deben reproducirse como emergentes ni ejecutar sonidos al volver a entrar.
+        $sessionConnectTime = session()->get('session_connect_time');
+        $nowTs = time();
+        $recentWindowSeconds = 180; // 3 minutos de ventana máxima reciente para eventos en vivo
+        $minAllowedTime = date('Y-m-d H:i:s', $nowTs - $recentWindowSeconds);
+
+        if (!$sessionConnectTime) {
+            $sessionConnectTime = date('Y-m-d H:i:s', $nowTs - 15);
+            session()->set('session_connect_time', $sessionConnectTime);
+
+            // Primera llamada en esta sesión: marcar en BD como leídas las notificaciones de tipo 'game'
+            // creadas antes de la conexión del usuario para evitar que queden acumuladas como emergentes.
+            // Se preserva el registro intacto en la tabla notifications.
+            $modelNotifications->builder()
+                ->where('user', $user['id'])
+                ->where('status', 0)
+                ->groupStart()
+                    ->where('type', 'game')
+                    ->orWhere('game >', 0)
+                ->groupEnd()
+                ->where('created_at <', $sessionConnectTime)
+                ->update(['status' => 1]);
+        }
+
+        // El umbral efectivo garantiza que nunca se alerten eventos anteriores a la sesión del usuario
+        // ni eventos más antiguos que la ventana reciente (3 minutos), incluso tras reanudar pestañas inactivas.
+        $effectiveThreshold = max($sessionConnectTime, $minAllowedTime);
+
+        // Limpiar en BD notificaciones 'game' anteriores al umbral efectivo
+        $modelNotifications->builder()
+            ->where('user', $user['id'])
+            ->where('status', 0)
+            ->groupStart()
+                ->where('type', 'game')
+                ->orWhere('game >', 0)
+            ->groupEnd()
+            ->where('created_at <', $effectiveThreshold)
+            ->update(['status' => 1]);
 
         if ($isOperatorOrStore) {
             // Operadores y Puntos de venta no reciben notificaciones de nuevas partidas (type='game')
-            $modelNotifications
+            $modelNotifications->builder()
                 ->where('user', $user['id'])
                 ->where('status', 0)
-                ->where('type', 'game')
-                ->set(['status' => 1])
-                ->update();
+                ->groupStart()
+                    ->where('type', 'game')
+                    ->orWhere('game >', 0)
+                ->groupEnd()
+                ->update(['status' => 1]);
 
             $notifications = $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
+                ->where('created_at >=', $effectiveThreshold)
+                ->where('type !=', 'game')
+                ->where('type !=', 'sing')
                 ->groupStart()
-                    ->where('type !=', 'game')
-                    ->where('type !=', 'sing')
-                    ->orWhere('type IS NULL', null, false)
+                    ->where('game IS NULL', null, false)
+                    ->orWhere('game', 0)
                 ->groupEnd()
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
         } else {
-            // Jugadores y Administradores: solo reciben alertas activas no-sing (pagos, balance, sistema, nuevas partidas)
+            // Jugadores y Administradores: solo reciben alertas activas en tiempo real
+            // creadas DESPUÉS de que el usuario se conectó (created_at >= $effectiveThreshold)
             $notifications = $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
+                ->where('created_at >=', $effectiveThreshold)
                 ->groupStart()
                     ->where('type !=', 'sing')
                     ->orWhere('type IS NULL', null, false)
                 ->groupEnd()
                 ->orderBy('created_at', 'DESC')
-                ->limit(15)
+                ->limit(10)
                 ->findAll();
         }
+
+        // Validar contexto de partida: si una notificación de tipo 'game' corresponde a una partida
+        // que ya finalizó (status = 0), marcarla como leída y no alertar.
+        $activeNotifications = [];
+        foreach ($notifications as $n) {
+            $isGameNotification = (($n['type'] ?? '') === 'game')
+                || (stripos($n['title'] ?? '', 'partida') !== false)
+                || (stripos($n['message'] ?? '', 'cartón') !== false && stripos($n['message'] ?? '', 'premio') !== false);
+
+            if ($isGameNotification) {
+                $gameId = (int) ($n['game'] ?? $n['type_id'] ?? 0);
+                if ($gameId > 0) {
+                    $gameRow = $modelGames->find($gameId);
+                    if ($gameRow && (int) ($gameRow['status'] ?? 0) === 0) {
+                        // Partida ya finalizada: marcar como leída y no mostrar popup
+                        $modelNotifications->where('id', $n['id'])->set(['status' => 1])->update();
+                        continue;
+                    }
+                }
+            }
+            $activeNotifications[] = $n;
+        }
+        $notifications = $activeNotifications;
 
         // Deduplicar notificaciones repetidas en memoria y marcar duplicados en BD como leídos
         $uniqueNotifications = [];

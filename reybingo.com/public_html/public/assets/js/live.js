@@ -1278,7 +1278,15 @@ function generateNumber(number) {
                     showCountdown(data, startAutomaticLast);
                 }
             } else if (data.status === 'completed') {
-                showGameFinalized();
+                const pKey = getBingoDedupeKey(data);
+                if (data.player && data.modality && (!pKey || !window.seenBingoNotices.has(pKey))) {
+                    if (pKey) window.seenBingoNotices.add(pKey);
+                    showCountdown(data, function() {
+                        showGameFinalized();
+                    });
+                } else {
+                    showGameFinalized();
+                }
             } else if (data.status === 'error') {
                 numbersgenerated = numbersgenerated.filter(function(n) { return parseInt(n, 10) !== parsed; });
                 lastNumbers = lastNumbers.filter(function(n) { return parseInt(n, 10) !== parsed; });
@@ -1533,7 +1541,7 @@ function confirmarFinalizarLive() {
     if (typeof Swal !== 'undefined') {
         Swal.fire({
             title: '¿Estás seguro de que deseas finalizar el Live?',
-            text: 'Se dará por finalizada oficialmente la transmisión y se notificará a los jugadores conectados.',
+            text: 'Los jugadores podrán salir de la partida.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sí, finalizar Live',
@@ -1549,7 +1557,7 @@ function confirmarFinalizarLive() {
             }
         });
     } else {
-        if (confirm('¿Estás seguro de que deseas finalizar el Live?')) {
+        if (confirm('¿Estás seguro de que deseas finalizar el Live? Los jugadores podrán salir de la partida.')) {
             ejecutarFinalizarLive();
         }
     }
@@ -2441,6 +2449,37 @@ function initializeApp() {
                     window.isLiveFinalized = true;
                     $('#btn-finalizar-live').hide();
                 }
+
+                // Si hay un cante de ganador celebrándose, no interrumpir la celebración
+                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
+                    return;
+                }
+
+                let lastWinner = null;
+                if (data && data.player && data.modality) {
+                    lastWinner = data;
+                } else if (Array.isArray(data && data.winners) && data.winners.length > 0) {
+                    const lw = data.winners[data.winners.length - 1];
+                    if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
+                        lastWinner = Object.assign({}, data, {
+                            player: lw.player || lw.userName,
+                            modality: lw.modality || lw.modalityName,
+                            modalityId: lw.modalityId || lw.modality,
+                            cartonId: lw.cartonId || lw.carton,
+                            image: lw.image || site_url + 'assets/img/avatar.jpg'
+                        });
+                    }
+                }
+
+                const pKey = lastWinner ? getBingoDedupeKey(lastWinner) : '';
+                if (pKey && (!window.seenBingoNotices || !window.seenBingoNotices.has(pKey))) {
+                    if (window.seenBingoNotices) window.seenBingoNotices.add(pKey);
+                    showCountdown(lastWinner, function() {
+                        showGameFinalized();
+                    });
+                    return;
+                }
+
                 if (!isGameFinishedShown) {
                     showGameFinalized();
                 }

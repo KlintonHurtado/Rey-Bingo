@@ -148,7 +148,8 @@ class Signin extends Controller {
             'username' => $user['username'],
             'phone' => $user['phone'],
             'email' => $user['email'],
-            'logged_in' => true
+            'logged_in' => true,
+            'session_connect_time' => date('Y-m-d H:i:s'),
         ];
         
         session()->set($sessionData);

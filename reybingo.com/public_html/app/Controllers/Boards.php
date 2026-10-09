@@ -428,7 +428,12 @@ class Boards extends Controller {
             'winners' => $result['winners'] ?? [],
         ];
 
-        if ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
+        if (!empty($result['player'])) {
+            $responsePayload['player'] = $result['player'];
+            $responsePayload['modality'] = $result['modality'] ?? '';
+            $responsePayload['modalityId'] = $result['modalityId'] ?? 0;
+            $responsePayload['image'] = $result['image'] ?? site_url('assets/img/avatar.jpg');
+        } elseif ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
             $ps = $result['pendingSing'];
             $responsePayload['player'] = $ps['player'] ?? ($ps['userName'] ?? '');
             $responsePayload['modality'] = $ps['modality'] ?? ($ps['modalityName'] ?? '');
@@ -519,7 +524,12 @@ class Boards extends Controller {
             'winners' => $result['winners'] ?? [],
         ];
 
-        if ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
+        if (!empty($result['player'])) {
+            $responsePayload['player'] = $result['player'];
+            $responsePayload['modality'] = $result['modality'] ?? '';
+            $responsePayload['modalityId'] = $result['modalityId'] ?? 0;
+            $responsePayload['image'] = $result['image'] ?? site_url('assets/img/avatar.jpg');
+        } elseif ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
             $ps = $result['pendingSing'];
             $responsePayload['player'] = $ps['player'] ?? ($ps['userName'] ?? '');
             $responsePayload['modality'] = $ps['modality'] ?? ($ps['modalityName'] ?? '');
@@ -644,6 +654,8 @@ class Boards extends Controller {
                 bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
             }
             
+            $lastW = !empty($winners) ? end($winners) : null;
+
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -651,10 +663,10 @@ class Boards extends Controller {
                 'winners' => $winners,
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
-                'player' => '',
-                'modality' => '',
-                'modalityId' => '',
-                'image' => ''
+                'player' => $lastW['player'] ?? '',
+                'modality' => $lastW['modality'] ?? '',
+                'modalityId' => $lastW['modalityId'] ?? 0,
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 

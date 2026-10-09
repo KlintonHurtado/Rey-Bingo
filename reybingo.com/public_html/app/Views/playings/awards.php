@@ -1,8 +1,14 @@
+<?php
+$isLiveGameType = isset($game) && in_array((int)($game['type'] ?? 0), [3, 4], true);
+$isLiveGameOpen = $isLiveGameType && ((int)($game['status'] ?? 0) !== 0);
+$isPlayerViewer = (session()->get('group') == 0);
+$showWaitingNotice = $isLiveGameOpen && $isPlayerViewer;
+?>
 <div class="modal-dialog modal-dialog-centered max-w-70">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2"><i class="fa-duotone fa-solid fa-trophy-star"></i> <?= translate('winners'); ?> <br /> <small><?= $game['description']; ?></small></h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <button class="btn-close me-1 btn-close-awards" type="button" aria-label="close" data-bs-dismiss="modal" style="<?= $showWaitingNotice ? 'display: none !important;' : '' ?>"><i class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body pt-0">
             <div class="card">
@@ -43,7 +49,7 @@
                     </div>
 
                     <?php if (session()->get('group') == 0) : ?>
-                        <?php if (isset($lastGame) && count($lastGame) > 0): ?>
+                        <?php if (isset($lastGame) && count($lastGame) > 0 && !$isLiveGameType): ?>
                             <h5 class="text-center continue-text">Quieres continuar jugando?</h5>
                             <h6 class="text-center next-game-play mt-2 text-uppercase" data-game-date="<?= $lastGame["date"] ?> <?= $lastGame["time"] ?>"></h6>
                             <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo bingo-bg-success card-button-buy continue-button-buy mb-1" id="card-button-buy-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
@@ -53,8 +59,11 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer justify-content-center pt-2 pb-2">
-            <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game" id="btnVolverInicio" data-bs-dismiss="modal">
+        <div class="modal-footer justify-content-center pt-2 pb-2 flex-column">
+            <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="<?= $showWaitingNotice ? 'display: inline-block;' : 'display: none;' ?> font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
+                <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
+            </div>
+            <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" style="<?= $showWaitingNotice ? 'display: none !important;' : '' ?>">
                 <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
             </button>
         </div>
