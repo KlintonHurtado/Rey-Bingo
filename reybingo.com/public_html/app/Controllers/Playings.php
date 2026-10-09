@@ -2014,11 +2014,16 @@ class Playings extends Controller
         }
 
         $gameStatus = (int) ($game['status'] ?? 0);
+        $totalNumbersGenerated = bingo_count_drawn_numbers((int) $game['id']);
+        $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
+        $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
+        $isGameCompleted = ($totalNumbersGenerated >= 75)
+            || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
 
         // status 0 = finalizada. status 2 = programada/pospuesta (sigue jugable; no marcar terminada).
         // OPTIMIZACIÓN: bingo_finalize_game_when_complete se llama UNA vez; $gameFinalized se reutiliza.
         $gameFinalized = ($gameStatus !== 2) ? bingo_finalize_game_when_complete((int) $game['id']) : false;
-        if ($gameStatus === 0 || $gameFinalized) {
+        if ($gameStatus === 0 || $gameFinalized || $isGameCompleted) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id'], true);
             $lastSing = $modelSings->where('game', $game['id'])->orderBy('id', 'DESC')->first();
@@ -2207,7 +2212,7 @@ class Playings extends Controller
             $imagePath = !empty($singUser['image']) ? site_url('uploads/users/' . $singUser['image']) : site_url('assets/img/avatar.jpg');
 
             // Reutilizar $gameFinalized (calculado al inicio); elimina re-fetch de $game
-            $gameCompleted = $gameFinalized || ((int) ($game['status'] ?? 0) === 0);
+            $gameCompleted = $gameFinalized || $isGameCompleted || ((int) ($game['status'] ?? 0) === 0);
 
             $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
             $modalityName = $modality ? translate($modality['name'] ?? '') : 'Bingo';
@@ -2269,7 +2274,7 @@ class Playings extends Controller
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
-        if ($gameFinalized || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
+        if ($gameFinalized || $isGameCompleted || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
 

@@ -360,7 +360,12 @@ class Boards extends Controller {
         $lastBall = $model->where('game', $game['id'])->orderBy('created_at', 'DESC')->first();
 
         if ($totalNumbersGenerated >= 75) {
-            bingo_finalize_game_when_complete((int) $game['id']);
+            if ($isLiveGame) {
+                bingo_ensure_winners_registered((int) $game['id']);
+                bingo_pay_pending_awards_for_game((int) $game['id']);
+            } else {
+                bingo_finalize_game_when_complete((int) $game['id']);
+            }
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -370,7 +375,12 @@ class Boards extends Controller {
         }
 
         if (bingo_is_game_finished_by_awards((int) $game['id'])) {
-            bingo_finalize_game_when_complete((int) $game['id']);
+            if ($isLiveGame) {
+                bingo_ensure_winners_registered((int) $game['id']);
+                bingo_pay_pending_awards_for_game((int) $game['id']);
+            } else {
+                bingo_finalize_game_when_complete((int) $game['id']);
+            }
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,

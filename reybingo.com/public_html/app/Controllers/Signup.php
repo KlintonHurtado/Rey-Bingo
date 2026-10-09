@@ -1195,7 +1195,7 @@ class Signup extends Controller {
     {
         $sessionData = [
             'id'        => $user['id'],
-            'group'     => 0,
+            'group'     => (int) ($user['group'] ?? 0),
             'document'  => $user['document'] ?? null,
             'firstname' => $user['firstname'],
             'lastname'  => $user['lastname'],
@@ -1206,6 +1206,10 @@ class Signup extends Controller {
         ];
 
         session()->set($sessionData);
+
+        if ((int) ($user['group'] ?? 0) === (function_exists('bingo_group_admin') ? bingo_group_admin() : 1) && function_exists('bingo_load_admin_authz_into_session')) {
+            bingo_load_admin_authz_into_session($user);
+        }
     }
 
     public function sendVerificationEmail($user, $token) {

@@ -572,6 +572,8 @@
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
     window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
+    window.gameId = '<?= (int) ($game["id"] ?? 0); ?>';
+    window.GAME_ID = '<?= (int) ($game["id"] ?? 0); ?>';
     window.isAdmin = <?= !empty($isAdmin) ? 'true' : 'false'; ?>;
     window.isLiveGame = <?= !empty($isLiveGame) ? 'true' : 'false'; ?>;
     window.isGameCompleted = <?= !empty($isGameCompleted) ? 'true' : 'false'; ?>;

@@ -1518,7 +1518,7 @@
     window.drawnNumbers = <?= json_encode(array_values(array_map('intval', $selectedNumbers ?? []))) ?>;
     window.currentUserId = <?= (int) session()->get('id') ?>;
     window.allowGameUnload = window.gameIsFinished;
-    window.playerGroup = <?= (int) session()->get('group') ?>;
+    window.playerGroup = 0;
     window.awardsGet = function() {
         const gid = window.gameId || '<?= $game["id"] ?>';
         const url = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/awardsGet?game_id=' + gid;

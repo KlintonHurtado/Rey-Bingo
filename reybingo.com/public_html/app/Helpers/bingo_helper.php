@@ -520,18 +520,21 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
             return true;
         }
 
+        $totalDrawn = bingo_count_drawn_numbers($gameId);
+        $isFinished = ($totalDrawn >= 75) || bingo_is_game_finished_by_awards($gameId);
+        if (!$isFinished) {
+            return false;
+        }
+
+        bingo_ensure_winners_registered($gameId);
+        bingo_pay_pending_awards_for_game($gameId);
+
         // En modalidad LIVE (tipo 3 o 4), la finalización oficial a status 0 es manual
         // y exclusiva del administrador mediante el botón "Finalizar Live" ($forceLive = true).
         $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
         if ($isLiveGame && !$forceLive) {
             return false;
         }
-
-        if (!bingo_is_game_finished_by_awards($gameId)) {
-            return false;
-        }
-
-        bingo_ensure_winners_registered($gameId);
         $officialWinners = bingo_get_official_sings_for_game($gameId, true);
         $lastSing = !empty($officialWinners) ? end($officialWinners) : null;
         $lastWinnerPayload = [];
@@ -757,14 +760,50 @@ if (!function_exists('bingo_process_ball_cycle')) {
 
         if (bingo_is_game_finished_by_awards($gameId)) {
             if ($isLiveGame) {
-                // En Live: asegurar ganadores oficiales sin cerrar la partida a status 0 (el admin finaliza manualmente)
+                // En Live: asegurar ganadores oficiales y premios sin cerrar la partida a status 0 (el admin finaliza manualmente)
                 bingo_ensure_winners_registered($gameId);
+                bingo_pay_pending_awards_for_game($gameId);
+                $liveWinners = bingo_get_official_sings_for_game($gameId, true);
+                bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                    'status'        => 1,
+                    'gameId'        => $gameId,
+                    'gameCompleted' => true,
+                    'isLiveGame'    => true,
+                    'liveFinalized' => false,
+                    'winners'       => $liveWinners,
+                ]);
+                bingo_broadcast_game_status($gameId, 'game:completed', [
+                    'status'        => 1,
+                    'gameId'        => $gameId,
+                    'gameCompleted' => true,
+                    'isLiveGame'    => true,
+                    'winners'       => $liveWinners,
+                ]);
+                $gameFinalizedNow = true;
             } else {
                 $gameFinalizedNow = bingo_finalize_game_when_complete($gameId);
             }
         } elseif ($totalNumbersGenerated >= 75) {
             if ($isLiveGame) {
                 bingo_ensure_winners_registered($gameId);
+                bingo_pay_pending_awards_for_game($gameId);
+                $liveWinners = bingo_get_official_sings_for_game($gameId, true);
+                bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                    'status'        => 1,
+                    'gameId'        => $gameId,
+                    'gameCompleted' => true,
+                    'isLiveGame'    => true,
+                    'liveFinalized' => false,
+                    'winners'       => $liveWinners,
+                ]);
+                bingo_broadcast_game_status($gameId, 'game:completed', [
+                    'status'        => 1,
+                    'gameId'        => $gameId,
+                    'gameCompleted' => true,
+                    'isLiveGame'    => true,
+                    'winners'       => $liveWinners,
+                ]);
+                $gameFinalizedNow = true;
             } else {
                 $modelGames->update($gameId, [
                     'status' => 0,
@@ -2186,8 +2225,12 @@ if (!function_exists('bingo_pay_pending_awards_for_game')) {
             $fromUserId = (int) ($game['user'] ?? 0);
         }
 
-        if ($fromUserId < 1 && function_exists('session')) {
-            $fromUserId = (int) (session()->get('id') ?? 0);
+        if ($fromUserId < 1 && !is_cli() && function_exists('session')) {
+            try {
+                $fromUserId = (int) (session()->get('id') ?? 0);
+            } catch (\Throwable $e) {
+                $fromUserId = 0;
+            }
         }
 
         $pendingSings = bingo_filter_first_sing_per_modality(

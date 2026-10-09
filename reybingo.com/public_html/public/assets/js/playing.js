@@ -4553,6 +4553,10 @@ function handleLiveFinalizedByAdmin(data) {
         nextGameSpan.textContent = 'LIVE FINALIZADO';
     }
 
+    if (!isGameFinishedShown) {
+        showGameFinalized();
+    }
+
     const modalAwardsEl = document.getElementById('modalAwards');
     if (modalAwardsEl) {
         $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
@@ -4585,16 +4589,26 @@ function handleLiveFinalizedByAdmin(data) {
             title: '📢 Transmisión Finalizada',
             text: msg,
             icon: 'info',
-            confirmButtonText: 'Aceptar',
-            allowOutsideClick: false,
+            confirmButtonText: 'Volver a la Sala',
+            showCancelButton: true,
+            cancelButtonText: 'Ver Ganadores',
+            allowOutsideClick: true,
             customClass: {
-                confirmButton: 'btn btn-primary btn-bingo'
-            }
-        }).then(() => {
-            if (typeof window.exitToPlay === 'function') {
-                window.exitToPlay();
+                confirmButton: 'btn btn-primary btn-bingo me-2',
+                cancelButton: 'btn btn-secondary'
+            },
+            buttonsStyling: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (typeof window.exitToPlay === 'function') {
+                    window.exitToPlay();
+                } else {
+                    window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+                }
             } else {
-                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+                if (typeof window.awardsGet === 'function') {
+                    window.awardsGet();
+                }
             }
         });
     } else {
