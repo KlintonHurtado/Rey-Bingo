@@ -1475,6 +1475,10 @@
 
 <div class="modal fade" id="modalAwards" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false"></div>
 
+<button id="btn-ver-ganadores-player" class="btn btn-warning btn-bingo" type="button" style="display: none; position: fixed; bottom: 25px; right: 25px; z-index: 1040; border-radius: 50px; font-weight: 700; box-shadow: 0 4px 15px rgba(0,0,0,0.4); padding: 10px 20px; font-size: 15px;" onclick="if(typeof window.awardsGet === 'function'){ window.awardsGet(); }">
+    <i class="fa-solid fa-trophy-star me-2"></i><?= translate('Ver Ganadores'); ?>
+</button>
+
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
 <script type="text/javascript">
@@ -1503,6 +1507,10 @@
     window.numberSingsLimit = <?= (int) (function_exists('bingo_get_number_sings_limit') ? bingo_get_number_sings_limit() : 1) ?>;
     window.gameDate = '<?= esc(function_exists('bingo_game_start_iso') ? bingo_game_start_iso($game) : ($game['date'] . 'T' . $game['time']), 'js') ?>';
     window.gameStatus = <?= (int) ($game['status'] ?? 0) ?>;
+    window.isLiveGame = <?= (!empty($isLiveGame) || ((int) ($game['type'] ?? 0) === 3 || (int) ($game['type'] ?? 0) === 4)) ? 'true' : 'false' ?>;
+    window.isGameCompleted = <?= !empty($isGameCompleted) ? 'true' : 'false' ?>;
+    window.isLiveFinalized = <?= (!empty($isLiveFinalized) || ((int) ($game['status'] ?? 0) === 0)) ? 'true' : 'false' ?>;
+    window.isAdmin = <?= bingo_is_admin() ? 'true' : 'false' ?>;
     window.gameIsFinished = <?= !empty($gameIsFinished) ? 'true' : 'false' ?>;
     window.activeModalities = <?= json_encode($modalities ?? []) ?>;
     window.autoMarkEnabled = <?= (isset($user['autodial']) && $user['autodial'] == 1) ? 'true' : 'false' ?>;
@@ -1510,7 +1518,7 @@
     window.drawnNumbers = <?= json_encode(array_values(array_map('intval', $selectedNumbers ?? []))) ?>;
     window.currentUserId = <?= (int) session()->get('id') ?>;
     window.allowGameUnload = window.gameIsFinished;
-    window.playerGroup = 0;
+    window.playerGroup = <?= (int) session()->get('group') ?>;
     window.awardsGet = function() {
         const gid = window.gameId || '<?= $game["id"] ?>';
         const url = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/awardsGet?game_id=' + gid;

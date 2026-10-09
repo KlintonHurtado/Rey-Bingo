@@ -53,6 +53,8 @@ $routes->get('signup/colaborador/(:segment)', 'Signup::operatorAffiliate/$1');
 $routes->get('signup/operator/(:segment)', 'Signup::operatorAffiliate/$1');
 $routes->get('signup/(:segment)', 'Signup::index/$1');
 $routes->get('verify/(:any)', 'Signup::verifyEmail/$1');
+$routes->head('verify/(:any)', 'Signup::verifyEmail/$1');
+$routes->post('verify/(:any)', 'Signup::confirmVerificationEmail/$1');
 
 $routes->get('restore', 'Restore::index');
 $routes->post('restore/restoreSubmit', 'Restore::restoreSubmit');
@@ -177,6 +179,8 @@ $routes->get('boards', 'Boards::index');
 $routes->get('board', 'Boards::board');
 $routes->get('live', 'Boards::live');
 $routes->post('boards/boardSubmit', 'Boards::boardSubmit');
+$routes->post('boards/finalizeLiveSubmit', 'Boards::finalizeLiveSubmit');
+$routes->post('games/finalizeLiveSubmit', 'Boards::finalizeLiveSubmit');
 $routes->get('boards/numberAutoSubmit', 'Boards::numberAutoSubmit');
 $routes->get('boards/numberSubmit/(:segment)', 'Boards::numberSubmit/$1');
 $routes->get('boards/numberGet', 'Boards::numberGet');

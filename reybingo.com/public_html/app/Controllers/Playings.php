@@ -145,9 +145,12 @@ class Playings extends Controller
             $gameIsFinished = ($totalNumbersGenerated >= 75)
                 || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
 
-            // Si el juego finalizó, actualizamos su estado para no volver a consultarlo
+            $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
+            // Si el juego finalizó, actualizamos su estado para no volver a consultarlo (en Live solo el admin finaliza)
             if ($gameIsFinished) {
-                $modelGames->update($game['id'], ['status' => 0]);
+                if (!$isLiveGame) {
+                    $modelGames->update($game['id'], ['status' => 0]);
+                }
                 continue; // Skip already played/finished games
             }
 
@@ -1093,11 +1096,13 @@ class Playings extends Controller
         $totalNumbersGenerated = count($drawnNumbersOrdered);
         $selectedNumbers = $drawnNumbersOrdered;
 
+        $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
         $singsCountFinished = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
-        $gameIsFinished = ((int) ($game['status'] ?? 0) === 0)
-            || ($totalNumbersGenerated >= 75)
+        $isGameCompleted = ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
+        $isLiveFinalized = ((int) ($game['status'] ?? 0) === 0);
+        $gameIsFinished = $isLiveFinalized || $isGameCompleted;
 
         // Solo el cron (o llegar la hora + mínimos) inicia la partida: no activar solo por entrar a /playing
         if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
@@ -1228,7 +1233,7 @@ class Playings extends Controller
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'gameIsFinished' => $gameIsFinished, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
+            'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'gameIsFinished' => $gameIsFinished, 'isLiveGame' => $isLiveGame, 'isGameCompleted' => $isGameCompleted, 'isLiveFinalized' => $isLiveFinalized, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
         ];
 
         if ($this->request->isAJAX()) {

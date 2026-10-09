@@ -1302,5 +1302,9 @@
     "google signup expired": "Google signup expired. Please try again.",
     "number already drawn": "Number already drawn",
     "TEST_LIVE_CORNER": "TEST_LIVE_CORNER",
-    "TEST_LIVE_FULL": "TEST_LIVE_FULL"
+    "TEST_LIVE_FULL": "TEST_LIVE_FULL",
+    "confirm my email address": "Confirm my email address",
+    "email verified! you can now sign in and participate": "Email verified! You can now sign in and play",
+    "email already verified. you can sign in and play.": "Your email is already verified. You can sign in and play.",
+    "we sent a verification email. check your inbox and spam folder.": "We sent you a verification email. Check your inbox and spam folder."
 }

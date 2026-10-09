@@ -267,13 +267,37 @@ class Boards extends Controller {
         $user = $modelUsers->find(session()->get('id'));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
-            
+
+        $isGameCompleted = ($status === 'stop' || $totalNumbersGenerated >= 75 || ($AwardsCount > 0 && $SingsCount >= $AwardsCount));
+        $isGameFinalized = ((int) ($game['status'] ?? 0) === 0);
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+        $isAdmin = bingo_is_admin();
+
         $data = [
             'page' => [
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('boards/live', ['contacts' => $contacts, 'user' => $user, 'status' => $status, 'game' => $game, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'imagePath' => $imagePath])
+            'contentPage' => view('boards/live', [
+                'contacts' => $contacts,
+                'user' => $user,
+                'status' => $status,
+                'game' => $game,
+                'selectedNumbers' => $selectedNumbers,
+                'singsModalities' => $singsModalities,
+                'lastNumber' => $lastNumber['number'] ?? '',
+                'fourNumbers' => $fourNumbers,
+                'lastNumbersJson' => json_encode($fiveNumbers),
+                'getClass' => $getClass,
+                'modalities' => $modalities,
+                'winners' => $winners,
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'imagePath' => $imagePath,
+                'isAdmin' => $isAdmin,
+                'isLiveGame' => $isLiveGame,
+                'isGameCompleted' => $isGameCompleted,
+                'isGameFinalized' => $isGameFinalized,
+            ])
         ];
 
         if ($this->request->isAJAX()) {
@@ -302,10 +326,11 @@ class Boards extends Controller {
         }
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->select('number')->distinct()->countAllResults();
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
 
         // 1. Si la partida ya fue finalizada (status 0) o todos los premios fueron cantados, detener de inmediato
         if ((int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards((int) $game['id'])) {
-            if ((int) ($game['status'] ?? 0) !== 0) {
+            if ((int) ($game['status'] ?? 0) !== 0 && !$isLiveGame) {
                 bingo_finalize_game_when_complete((int) $game['id']);
             }
             return $this->response->setJSON([
@@ -436,9 +461,10 @@ class Boards extends Controller {
         }
 
         $totalNumbersGenerated = bingo_count_drawn_numbers($gameId);
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
 
         if ((int) ($game['status'] ?? 0) === 0 || bingo_is_game_finished_by_awards($gameId)) {
-            if ((int) ($game['status'] ?? 0) !== 0) {
+            if ((int) ($game['status'] ?? 0) !== 0 && !$isLiveGame) {
                 bingo_finalize_game_when_complete($gameId);
             }
             return $this->response->setJSON([
@@ -530,12 +556,16 @@ class Boards extends Controller {
             $winner['modality'] = translate($wmodality['name']);
         }
 
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+
         // Si salieron las 75 bolas, finalizar juego
         if ($totalNumbersGenerated >= 75) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
-            $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
-            bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            if (!$isLiveGame) {
+                $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            }
 
             return $this->response->setJSON([
                 'status' => 'completed',
@@ -562,8 +592,10 @@ class Boards extends Controller {
             if ($AwardsCount > 0 && $updatedSingsCount >= $AwardsCount) {
                 bingo_ensure_winners_registered((int) $game['id']);
                 $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
-                $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
-                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+                if (!$isLiveGame) {
+                    $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+                    bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+                }
 
                 return $this->response->setJSON([
                     'status' => 'completed',
@@ -597,8 +629,10 @@ class Boards extends Controller {
         if ($AwardsCount > 0 && $SingsCount >= $AwardsCount) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
-            $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
-            bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            if (!$isLiveGame) {
+                $modelGames->where('id', $game['id'])->where('status', 1)->set(['status' => 0])->update();
+                bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
+            }
             
             return $this->response->setJSON([
                 'status' => 'completed',
@@ -641,6 +675,102 @@ class Boards extends Controller {
             'modality' => '',
             'modalityId' => '',
             'image' => ''
+        ]);
+    }
+
+    /**
+     * Finaliza oficialmente una partida en modalidad LIVE.
+     * Acción exclusiva para usuarios con rol ADMIN.
+     */
+    public function finalizeLiveSubmit()
+    {
+        if (!session()->get('logged_in')) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized') ?: 'No autorizado',
+            ]);
+        }
+
+        helper(['bingo', 'wallet']);
+
+        if (!bingo_is_admin()) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => translate('unauthorized access') ?: 'Acceso denegado. Se requiere rol de administrador para finalizar el Live.',
+            ]);
+        }
+
+        $gameId = (int) ($this->request->getPost('game_id') ?: session()->get('game_id'));
+        if ($gameId < 1) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('game not found') ?: 'ID de partida no especificado.',
+            ]);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => translate('game not found') ?: 'Partida no encontrada.',
+            ]);
+        }
+
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+        if (!$isLiveGame) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Esta acción solo está disponible para partidas en modalidad Live.',
+            ]);
+        }
+
+        // Idempotencia: si ya estaba finalizada en BD
+        if ((int) ($game['status'] ?? 0) === 0) {
+            return $this->response->setJSON([
+                'success' => true,
+                'alreadyFinalized' => true,
+                'message' => 'El Live ya ha sido finalizado previamente.',
+                'redirect' => site_url('games'),
+            ]);
+        }
+
+        // 1. Asegurar registro oficial de ganadores y pago de premios pendientes
+        bingo_ensure_winners_registered($gameId);
+        bingo_pay_pending_awards_for_game($gameId);
+
+        // 2. Finalizar oficialmente la partida en base de datos (status = 0)
+        $modelGames->update($gameId, [
+            'status' => 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        if (function_exists('bingo_on_game_finished')) {
+            bingo_on_game_finished($gameId, (int) session()->get('id'));
+        }
+
+        $officialWinners = bingo_get_official_sings_for_game($gameId, true);
+
+        // 3. Notificar a todos los jugadores conectados vía WebSocket/Soketi
+        bingo_broadcast_game_status($gameId, 'game:live_finalized', [
+            'status'        => 0,
+            'gameId'        => $gameId,
+            'liveFinalized' => true,
+            'message'       => 'La transmisión en vivo ha finalizado.',
+            'winners'       => $officialWinners,
+        ]);
+
+        bingo_broadcast_game_status($gameId, 'game:game_finished', [
+            'status'        => 0,
+            'liveFinalized' => true,
+            'gameId'        => $gameId,
+            'winners'       => $officialWinners,
+        ]);
+
+        return $this->response->setJSON([
+            'success'  => true,
+            'message'  => 'El Live ha sido finalizado exitosamente.',
+            'redirect' => site_url('games'),
         ]);
     }
 

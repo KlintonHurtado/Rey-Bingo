@@ -57,6 +57,40 @@
         pointer-events: auto !important;
     }
 
+    .btn-finalizar-live {
+        background: linear-gradient(135deg, #dc3545, #b02a37) !important;
+        border: none !important;
+        color: #fff !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        letter-spacing: 0.5px !important;
+        border-radius: 25px !important;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.45) !important;
+        transition: all 0.3s ease !important;
+        cursor: pointer !important;
+    }
+    .btn-finalizar-live:hover {
+        background: linear-gradient(135deg, #bb2d3b, #842029) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6) !important;
+    }
+    .btn-ver-ganadores {
+        background: linear-gradient(135deg, #ffc107, #ff9800) !important;
+        border: none !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        font-size: 0.95rem !important;
+        border-radius: 25px !important;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4) !important;
+        transition: all 0.3s ease !important;
+        cursor: pointer !important;
+    }
+    .btn-ver-ganadores:hover {
+        background: linear-gradient(135deg, #e0a800, #e65100) !important;
+        color: #fff !important;
+        transform: translateY(-2px) !important;
+    }
+
     .container-transmission {
         display: flex;
         flex-direction: column;
@@ -365,14 +399,24 @@
 </div>
 
 <div class="bottom-section">
-    <?php if ($status != 'stop') : ?>
     <div class="controls-board text-center my-3" id="controls">
+        <?php if ($status != 'stop' && empty($isGameCompleted)) : ?>
         <button id="start-button" class="btn btn-small btn-primary size-50"><i class="fa-duotone fa-solid fa-play"></i></button>
         <button id="play-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-play"></i></button>
         <button id="stop-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-pause"></i></button>
         <button id="next-number-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-forward-step"></i></button>
+        <?php endif; ?>
+
+        <?php if (!empty($isAdmin)) : ?>
+        <button id="btn-ver-ganadores" type="button" class="btn btn-warning btn-ver-ganadores px-3 py-2 me-2" style="<?= (!empty($isGameCompleted)) ? 'display: inline-flex;' : 'display: none;' ?> align-items: center;" onclick="awardsGet();">
+            <i class="fa-duotone fa-solid fa-trophy-star me-2"></i> <?= translate('Ver Ganadores'); ?>
+        </button>
+
+        <button id="btn-finalizar-live" type="button" class="btn btn-danger btn-finalizar-live px-4 py-2" style="<?= (!empty($isGameCompleted) && empty($isGameFinalized)) ? 'display: inline-flex;' : 'display: none;' ?> align-items: center;" onclick="confirmarFinalizarLive();">
+            <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
+        </button>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 
 <button type="button" class="btn btn-small btn-chat" id="toggle-messages-btn" aria-label="Chat" aria-expanded="false"><i class="fa-duotone fa-solid fa-comments-question"></i></button>
@@ -528,6 +572,12 @@
     window.fiveNumbers = <?= $lastNumbersJson ?? '[]' ?>;
     window.winners = <?= json_encode($winners) ?>;
     window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
+    window.isAdmin = <?= !empty($isAdmin) ? 'true' : 'false'; ?>;
+    window.isLiveGame = <?= !empty($isLiveGame) ? 'true' : 'false'; ?>;
+    window.isGameCompleted = <?= !empty($isGameCompleted) ? 'true' : 'false'; ?>;
+    window.isLiveFinalized = <?= !empty($isGameFinalized) ? 'true' : 'false'; ?>;
+    window.csrfTokenName = '<?= csrf_token(); ?>';
+    window.csrfHash = '<?= csrf_hash(); ?>';
 
     document.getElementById('activateAlgorithm').addEventListener('change', function() {
         let value = this.checked ? 1 : 0;

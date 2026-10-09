@@ -685,12 +685,40 @@ class Signup extends Controller {
 
             bingo_apply_signup_referral((int) $id);
 
-            $verificationToken = random_string('md5');
+            helper('bingo');
+            if (function_exists('bingo_ensure_email_verification_schema')) {
+                bingo_ensure_email_verification_schema();
+            }
 
-            $model->update($id, ['verification_token' => $verificationToken]);
+            $rawToken = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $rawToken);
+            $now = date('Y-m-d H:i:s');
+            $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 horas
+
+            $model->update($id, [
+                'verification_token' => $tokenHash,
+                'verification_token_expires_at' => $expiresAt,
+                'verification_token_prev' => null,
+                'verification_token_prev_expires_at' => null,
+                'email_verification_sent_at' => $now,
+            ]);
 
             $user = $model->find($id);
-            $this->sendVerificationEmail($user, $verificationToken);
+            $this->sendVerificationEmail($user, $rawToken);
+
+            $modelLogs = new LogsModel();
+            $ip = (string) ($this->request->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? ''));
+            $country = $this->getCountryFromIp($ip);
+
+            $log = [
+                'id_user'    => $id,
+                'action'     => 'account',
+                'details'    => 'user account created successfully. pending email verification.',
+                'ip_address' => $ip,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'country'    => $country,
+            ];
+            $modelLogs->insert($log);
 
             if (bingo_is_store() || (bingo_is_operator() && bingo_get_acting_store_id() > 0)) {
                 $response = [
@@ -707,35 +735,17 @@ class Signup extends Controller {
             $response = [
                 'success' => true,
                 'redirect' => site_url('signup/verifyPending?email=' . rawurlencode((string) $data['email'])),
-                'message' => translate('please verify your email before login'),
+                'message' => 'Te enviamos un correo de verificación. Revisa tu bandeja de entrada y la carpeta de spam.',
             ];
+
+            return $this->response->setJSON($response);
         } else {
             $response = [
                 'success' => false,
                 'error' => translate('there was an error in the system')
             ];
+            return $this->response->setJSON($response);
         }
-
-        $modelLogs = new LogsModel();
-
-        $ip = $_SERVER['REMOTE_ADDR'];
-
-        $geo = @json_decode(@file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
-
-        $country = (is_array($geo) && ($geo['status'] ?? '') === 'success') ? $geo['country'] : 'Unknown';
-
-        $log = [
-            'id_user'    => $id,
-            'action'     => 'account',
-            'details'    => 'user account created successfully. pending email verification.',
-            'ip_address' => $ip,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
-            'country'    => $country
-        ];
-
-        $modelLogs->insert($log);
-        
-        return $this->response->setJSON($response);
     }
 
     public function google() 
@@ -924,8 +934,16 @@ class Signup extends Controller {
             return redirect()->to(site_url('signin'))->with('error', translate('email already in use'));
         }
 
+        helper('bingo');
+        if (function_exists('bingo_ensure_email_verification_schema')) {
+            bingo_ensure_email_verification_schema();
+        }
+
         $generateReferred_code = strtoupper(random_string('alnum', 8));
-        $verificationToken = random_string('md5');
+        $rawToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $now = date('Y-m-d H:i:s');
+        $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 horas
 
         $data = [
             'group' => 0,
@@ -935,7 +953,11 @@ class Signup extends Controller {
             'email'     => $pending['email'],
             'password'  => password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
             'verified_email' => 0,
-            'verification_token' => $verificationToken,
+            'verification_token' => $tokenHash,
+            'verification_token_expires_at' => $expiresAt,
+            'verification_token_prev' => null,
+            'verification_token_prev_expires_at' => null,
+            'email_verification_sent_at' => $now,
             'referred_code' => $generateReferred_code,
             'status'    => 1,
             'autodial'  => 1,
@@ -1002,14 +1024,13 @@ class Signup extends Controller {
         bingo_apply_signup_referral((int) $id);
 
         $user = $model->find($id);
-        $this->sendVerificationEmail($user, $verificationToken);
+        $this->sendVerificationEmail($user, $rawToken);
 
         session()->remove('google_signup_pending');
 
         $modelLogs = new LogsModel();
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-        $geo = @json_decode(@file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country"), true);
-        $country = (is_array($geo) && ($geo['status'] ?? '') === 'success') ? $geo['country'] : 'Unknown';
+        $ip = (string) ($this->request->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? ''));
+        $country = $this->getCountryFromIp($ip);
         $modelLogs->insert([
             'id_user' => $id,
             'action' => 'account',
@@ -1020,12 +1041,57 @@ class Signup extends Controller {
         ]);
 
         return redirect()->to(site_url('signup/verifyPending?email=' . rawurlencode((string) $pending['email'])))
-            ->with('success', translate('please verify your email before login'));
+            ->with('success', 'Te enviamos un correo de verificación. Revisa tu bandeja de entrada y la carpeta de spam.');
+    }
+
+    private function getCountryFromIp(string $ip): string
+    {
+        $ip = trim($ip);
+        if ($ip === '' || $ip === '127.0.0.1' || $ip === '::1' || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.') || str_starts_with($ip, '172.')) {
+            return 'Localhost';
+        }
+
+        $ctx = stream_context_create([
+            'http' => [
+                'timeout' => 1.2,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        try {
+            $raw = @file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country", false, $ctx);
+            if ($raw !== false) {
+                $geo = @json_decode($raw, true);
+                if (is_array($geo) && ($geo['status'] ?? '') === 'success' && !empty($geo['country'])) {
+                    return (string) $geo['country'];
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback silencioso a Unknown
+        }
+
+        return 'Unknown';
     }
 
     public function verifyPending()
     {
+        helper('bingo');
+        if (function_exists('bingo_ensure_email_verification_schema')) {
+            bingo_ensure_email_verification_schema();
+        }
+
         $email = trim((string) ($this->request->getGet('email') ?: session()->getFlashdata('email') ?: ''));
+        $cooldownRemaining = 60;
+
+        if ($email !== '') {
+            $model = new UsersModel();
+            $user = $model->where('email', $email)->where('group', 0)->first();
+            if ($user && !empty($user['email_verification_sent_at'])) {
+                $diff = time() - strtotime($user['email_verification_sent_at']);
+                $cooldownRemaining = max(0, 60 - $diff);
+            }
+        }
+
         $modelContacts = new ContactsModel();
 
         $data = [
@@ -1033,6 +1099,7 @@ class Signup extends Controller {
             'validation' => \Config\Services::validation(),
             'contentPage' => view('signup/verify_pending', [
                 'email' => $email,
+                'cooldownRemaining' => $cooldownRemaining,
                 'contacts' => $modelContacts->findAll(),
             ]),
         ];
@@ -1042,6 +1109,11 @@ class Signup extends Controller {
 
     public function resendVerification()
     {
+        helper('bingo');
+        if (function_exists('bingo_ensure_email_verification_schema')) {
+            bingo_ensure_email_verification_schema();
+        }
+
         $email = trim((string) $this->request->getPost('email'));
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->response->setJSON([
@@ -1055,6 +1127,7 @@ class Signup extends Controller {
         if (! $user) {
             return $this->response->setJSON([
                 'success' => true,
+                'cooldown' => 60,
                 'message' => translate('if the email exists we sent a new link'),
             ]);
         }
@@ -1062,22 +1135,59 @@ class Signup extends Controller {
         if ((int) ($user['verified_email'] ?? 0) === 1) {
             return $this->response->setJSON([
                 'success' => true,
-                'message' => translate('email already verified'),
+                'message' => 'Tu correo ya está verificado. Puedes iniciar sesión y continuar jugando.',
                 'redirect' => site_url('signin'),
             ]);
         }
 
-        $token = random_string('md5');
-        $model->update((int) $user['id'], [
-            'verification_token' => $token,
+        // Backend rate-limit: 60 segundos entre reenvíos
+        if (!empty($user['email_verification_sent_at'])) {
+            $diff = time() - strtotime($user['email_verification_sent_at']);
+            if ($diff < 60) {
+                $remaining = 60 - $diff;
+                return $this->response->setJSON([
+                    'success' => false,
+                    'rate_limited' => true,
+                    'remaining' => $remaining,
+                    'message' => "Por favor espera {$remaining} segundos antes de solicitar otro reenvío de correo.",
+                ]);
+            }
+        }
+
+        // Transición de tokens: preservar el token actual en prev (2 horas de gracia)
+        $rawToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $rawToken);
+        $now = date('Y-m-d H:i:s');
+        $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 horas
+
+        $updateData = [
+            'verification_token' => $tokenHash,
+            'verification_token_expires_at' => $expiresAt,
+            'email_verification_sent_at' => $now,
             'verified_email' => 0,
-        ]);
-        $user['verification_token'] = $token;
-        $this->sendVerificationEmail($user, $token);
+        ];
+
+        if (!empty($user['verification_token'])) {
+            $updateData['verification_token_prev'] = $user['verification_token'];
+            $updateData['verification_token_prev_expires_at'] = date('Y-m-d H:i:s', time() + 7200); // 2 horas de gracia
+        }
+
+        $model->update((int) $user['id'], $updateData);
+
+        $user['verification_token'] = $tokenHash;
+        $sent = $this->sendVerificationEmail($user, $rawToken);
+
+        if (! $sent) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No se pudo enviar el correo de verificación en este momento por un error temporal del servidor. Por favor intenta de nuevo en unos minutos.',
+            ]);
+        }
 
         return $this->response->setJSON([
             'success' => true,
-            'message' => translate('verification email resent'),
+            'cooldown' => 60,
+            'message' => 'Correo de verificación reenviado. Revisa tu bandeja de entrada y la carpeta de spam.',
         ]);
     }
 
@@ -1099,20 +1209,31 @@ class Signup extends Controller {
     }
 
     public function sendVerificationEmail($user, $token) {
-        $emailConfig = \Config\Services::email();
-        $config = new \Config\Email();
+        try {
+            $emailConfig = \Config\Services::email();
+            $config = new \Config\Email();
 
-        $subject = translate('please verify your email address');
-        $message = view('emails/verification_email', ['user' => $user, 'token' => $token]);
+            $emailConfig->clear(true);
 
-        $emailConfig->setFrom($config->fromEmail, $config->fromName); 
-        $emailConfig->setTo($user['email']);
-        $emailConfig->setSubject($subject);
-        $emailConfig->setMessage($message);
+            $subject = translate('please verify your email address');
+            $message = view('emails/verification_email', ['user' => $user, 'token' => $token]);
 
-        if ($emailConfig->send()) {
-            return true;
-        } else {
+            $emailConfig->setFrom($config->fromEmail, $config->fromName); 
+            $emailConfig->setTo($user['email']);
+            $emailConfig->setSubject($subject);
+            $emailConfig->setMessage($message);
+
+            $sent = $emailConfig->send(false);
+            if ($sent) {
+                return true;
+            }
+
+            $rawDebug = (string) $emailConfig->printDebugger(['headers', 'subject']);
+            $cleanDebug = preg_replace('/(pass|password|pwd|auth|key|token)[=:\s]+[^\r\n]+/i', '$1: [REDACTED]', $rawDebug);
+            log_message('error', 'SMTP sendVerificationEmail failed for user ID ' . ($user['id'] ?? 0) . ': ' . substr($cleanDebug, 0, 500));
+            return false;
+        } catch (\Throwable $e) {
+            log_message('error', 'SMTP Exception in sendVerificationEmail: ' . $e->getMessage());
             return false;
         }
     }
@@ -1138,32 +1259,158 @@ class Signup extends Controller {
     }
 
     public function verifyEmail($token) {
-        $model = new UsersModel();
-
-        $user = $model->where('verification_token', $token)->first();
-
-        if ($user) {
-
-            $model->update($user['id'], ['verified_email' => 1, 'verification_token' => null]);
-
-            $sessionData = [
-                'id' => $user['id'],
-                'group' => $user['group'],
-                'firstname' => $user['firstname'],
-                'lastname' => $user['lastname'],
-                'document' => $user['document'],
-                'username' => $user['username'],
-                'phone' => $user['phone'],
-                'email' => $user['email'],
-                'logged_in' => true
-            ];
-            
-            session()->set($sessionData);
-
-            return redirect()->to('/play')->with('success', translate('email verified successfully'));
-        } else {
-            return redirect()->to('/signin')->with('error', translate('invalid or expired verification link'));
+        helper('bingo');
+        if (function_exists('bingo_ensure_email_verification_schema')) {
+            bingo_ensure_email_verification_schema();
         }
+
+        $method = strtoupper((string) $this->request->getMethod());
+        if ($method === 'POST') {
+            return $this->confirmVerificationEmail($token);
+        }
+
+        // Una petición HEAD de previsualización o escáner no altera BD
+        if ($method === 'HEAD') {
+            return $this->response->setStatusCode(200);
+        }
+
+        $token = trim((string) $token);
+        if ($token === '') {
+            $data = [
+                'page' => ['title' => translate('verify your email')],
+                'contentPage' => view('signup/verify_confirm', [
+                    'state' => 'invalid',
+                    'token' => '',
+                    'user' => null,
+                ]),
+            ];
+            return view('layout/index', $data);
+        }
+
+        $model = new UsersModel();
+        $tokenHash = hash('sha256', $token);
+        $now = date('Y-m-d H:i:s');
+
+        // 1. Buscar por hash actual
+        $user = $model->where('verification_token', $tokenHash)->first();
+
+        // 2. Buscar por hash previo (periodo de gracia tras reenvío)
+        if (! $user) {
+            $user = $model->where('verification_token_prev', $tokenHash)->first();
+            if ($user && !empty($user['verification_token_prev_expires_at']) && $user['verification_token_prev_expires_at'] < $now) {
+                $user = null;
+            }
+        }
+
+        // 3. Fallback retrocompatible para tokens antiguos en texto plano
+        if (! $user) {
+            $user = $model->where('verification_token', $token)->first();
+        }
+
+        // Comprobar expiración del token principal (24 horas)
+        if ($user && !empty($user['verification_token_expires_at']) && $user['verification_token_expires_at'] < $now) {
+            $user = null;
+        }
+
+        if (! $user) {
+            $data = [
+                'page' => ['title' => translate('verify your email')],
+                'contentPage' => view('signup/verify_confirm', [
+                    'state' => 'invalid',
+                    'token' => $token,
+                    'user' => null,
+                ]),
+            ];
+            return view('layout/index', $data);
+        }
+
+        if ((int) ($user['verified_email'] ?? 0) === 1) {
+            $data = [
+                'page' => ['title' => translate('verify your email')],
+                'contentPage' => view('signup/verify_confirm', [
+                    'state' => 'already_verified',
+                    'token' => $token,
+                    'user' => $user,
+                ]),
+            ];
+            return view('layout/index', $data);
+        }
+
+        // Mostrar pantalla de confirmación (visita GET NO consume token)
+        $data = [
+            'page' => ['title' => translate('verify your email')],
+            'contentPage' => view('signup/verify_confirm', [
+                'state' => 'confirm',
+                'token' => $token,
+                'user' => $user,
+            ]),
+        ];
+        return view('layout/index', $data);
+    }
+
+    public function confirmVerificationEmail($token) {
+        helper('bingo');
+        if (function_exists('bingo_ensure_email_verification_schema')) {
+            bingo_ensure_email_verification_schema();
+        }
+
+        $token = trim((string) $token);
+        if ($token === '') {
+            return redirect()->to(site_url('signin'))->with('error', translate('invalid or expired verification link'));
+        }
+
+        $model = new UsersModel();
+        $tokenHash = hash('sha256', $token);
+        $now = date('Y-m-d H:i:s');
+
+        // 1. Buscar por hash actual
+        $user = $model->where('verification_token', $tokenHash)->first();
+
+        // 2. Buscar por hash previo (periodo de gracia)
+        if (! $user) {
+            $user = $model->where('verification_token_prev', $tokenHash)->first();
+            if ($user && !empty($user['verification_token_prev_expires_at']) && $user['verification_token_prev_expires_at'] < $now) {
+                $user = null;
+            }
+        }
+
+        // 3. Fallback retrocompatible
+        if (! $user) {
+            $user = $model->where('verification_token', $token)->first();
+        }
+
+        // Comprobar expiración del token principal
+        if ($user && !empty($user['verification_token_expires_at']) && $user['verification_token_expires_at'] < $now) {
+            return redirect()->to(site_url('signup/verifyPending' . (!empty($user['email']) ? ('?email=' . rawurlencode($user['email'])) : '')))
+                ->with('error', 'El enlace de verificación ha expirado. Por favor solicita uno nuevo.');
+        }
+
+        if (! $user) {
+            return redirect()->to(site_url('signin'))->with('error', translate('invalid or expired verification link'));
+        }
+
+        // Idempotencia: si ya está verificado, iniciar sesión e informar
+        if ((int) ($user['verified_email'] ?? 0) === 1) {
+            $this->setSession($user);
+            return redirect()->to('/play')->with('info', 'Tu correo ya está verificado. Puedes iniciar sesión y continuar jugando.');
+        }
+
+        // Confirmación atómica y segura
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $updateData = [
+            'verified_email' => 1,
+        ];
+
+        $model->update($user['id'], $updateData);
+        $db->transComplete();
+
+        // Autenticar al usuario
+        $user['verified_email'] = 1;
+        $this->setSession($user);
+
+        return redirect()->to('/play')->with('success', '¡Correo verificado! Ya puedes ingresar y participar');
     }
 
     private function captureAuthSessionBackup(): ?array

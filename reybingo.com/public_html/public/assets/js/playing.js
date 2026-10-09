@@ -2931,6 +2931,7 @@ function showGameFinalized() {
         const targetUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
         window.location.replace(targetUrl);
     };
+    window.exitToPlay = exitToPlay;
 
     // Actualizar ganadores en segundo plano sin bloquear la UI
     if (typeof fetchWinnersBeforeFinalize === 'function') {
@@ -2959,6 +2960,10 @@ function showGameFinalized() {
         const autoExitDuration = 60000;
 
         const scheduleAutoExit = function () {
+            // En modalidad LIVE, NO programar salida automática mientras el Live continúe abierto
+            if (window.isLiveGame && !window.isLiveFinalized) {
+                return;
+            }
             if (autoExitTimer) clearTimeout(autoExitTimer);
             autoExitTimer = setTimeout(function () {
                 exitToPlay();
@@ -2977,9 +2982,14 @@ function showGameFinalized() {
             cancelAutoExit();
         });
 
-        // Al cerrar cualquiera de los modales, salir limpiamente a la sala principal
+        // Al cerrar cualquiera de los modales, salir a la sala principal solo si no es Live abierto
         $('#modalAwards, #modalGameFinalized').on('hidden.bs.modal', function () {
             cancelAutoExit();
+            if (window.isLiveGame && !window.isLiveFinalized) {
+                const btnVer = document.getElementById('btn-ver-ganadores-player');
+                if (btnVer) btnVer.style.display = 'inline-flex';
+                return;
+            }
             exitToPlay();
         });
 
@@ -3022,7 +3032,9 @@ function showGameFinalized() {
                         btnVolver.addEventListener('click', function () {
                             cancelAutoExit();
                             bsModal.hide();
-                            exitToPlay();
+                            if (!window.isLiveGame || window.isLiveFinalized) {
+                                exitToPlay();
+                            }
                         }, { once: true });
                     }
                 }
@@ -3042,7 +3054,22 @@ function showGameFinalized() {
             const bsAwardsModal = bootstrap.Modal.getOrCreateInstance(modalAwardsEl, { backdrop: 'static', keyboard: false });
             bsAwardsModal.show();
 
-            $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+            const btnVer = document.getElementById('btn-ver-ganadores-player');
+            if (btnVer) btnVer.style.display = 'inline-flex';
+
+            // Al cerrar la tabla por el botón de cerrar (X)
+            $(modalAwardsEl).find('[data-bs-dismiss="modal"]').off('click').on('click', function () {
+                cancelAutoExit();
+                bsAwardsModal.hide();
+                if (window.isLiveGame && !window.isLiveFinalized) {
+                    if (btnVer) btnVer.style.display = 'inline-flex';
+                    return;
+                }
+                exitToPlay();
+            });
+
+            // Al hacer clic en salir explícitamente
+            $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
                 cancelAutoExit();
                 bsAwardsModal.hide();
                 exitToPlay();
@@ -4421,9 +4448,19 @@ function initializeApp() {
                 lastNumberGet();
             });
 
+            // Finalización manual del Live por el administrador
+            pusherHelper.on('game:live_finalized', function (data) {
+                console.log('WS game:live_finalized received', data);
+                handleLiveFinalizedByAdmin(data);
+            });
+
             // Fin de partida en tiempo real
             pusherHelper.on('game:game_finished', function (data) {
                 console.log('WS game:game_finished received', data);
+                if (window.isLiveGame && data && data.liveFinalized === true) {
+                    handleLiveFinalizedByAdmin(data);
+                    return;
+                }
                 window.gameIsFinished = true;
                 window.allowGameUnload = true;
                 ballPlaybackQueue = [];
@@ -4490,6 +4527,84 @@ function initializeApp() {
     }
 
     console.log('Bingo App with Enhanced Chat initialized successfully');
+}
+
+function handleLiveFinalizedByAdmin(data) {
+    if (window.__liveFinalizedHandled) {
+        return;
+    }
+    window.__liveFinalizedHandled = true;
+    window.isLiveFinalized = true;
+    window.gameIsFinished = true;
+    window.allowGameUnload = true;
+
+    ballPlaybackQueue = [];
+    isBallPlaybackActive = false;
+    if (typeof intervalManager !== 'undefined' && intervalManager.clear) {
+        intervalManager.clear('lastNumber');
+    }
+    if (typeof stopAutomaticLast === 'function') stopAutomaticLast();
+    if (typeof stopUpdateUserCount === 'function') stopUpdateUserCount();
+    if (typeof stopUpdateGameAccumulated === 'function') stopUpdateGameAccumulated();
+    if (typeof messagePoller !== 'undefined' && messagePoller.stop) messagePoller.stop();
+
+    const nextGameSpan = document.querySelector('.next-game');
+    if (nextGameSpan) {
+        nextGameSpan.textContent = 'LIVE FINALIZADO';
+    }
+
+    const modalAwardsEl = document.getElementById('modalAwards');
+    if (modalAwardsEl) {
+        $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+            const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
+            if (bsAwardsModal) bsAwardsModal.hide();
+            if (typeof window.exitToPlay === 'function') {
+                window.exitToPlay();
+            } else {
+                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+            }
+        });
+    }
+
+    const modalGameFinalizedEl = document.getElementById('modalGameFinalized');
+    if (modalGameFinalizedEl) {
+        $(modalGameFinalizedEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+            const bsFinModal = bootstrap.Modal.getInstance(modalGameFinalizedEl);
+            if (bsFinModal) bsFinModal.hide();
+            if (typeof window.exitToPlay === 'function') {
+                window.exitToPlay();
+            } else {
+                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+            }
+        });
+    }
+
+    const msg = (data && data.message) ? data.message : 'El administrador ha dado por finalizada la transmisión en vivo.';
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: '📢 Transmisión Finalizada',
+            text: msg,
+            icon: 'info',
+            confirmButtonText: 'Aceptar',
+            allowOutsideClick: false,
+            customClass: {
+                confirmButton: 'btn btn-primary btn-bingo'
+            }
+        }).then(() => {
+            if (typeof window.exitToPlay === 'function') {
+                window.exitToPlay();
+            } else {
+                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+            }
+        });
+    } else {
+        alert(msg);
+        if (typeof window.exitToPlay === 'function') {
+            window.exitToPlay();
+        } else {
+            window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
+        }
+    }
 }
 
 // ==========================================

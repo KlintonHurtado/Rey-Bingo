@@ -35,6 +35,12 @@ $groupNames = [
     </div>
 </div>
 
+<?php if (! empty($stats['error_message'])) : ?>
+    <div class="alert alert-warning py-2 mb-3">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i> <?= esc($stats['error_message']); ?>
+    </div>
+<?php endif; ?>
+
 <!-- KPI Cards Resumen Financiero del Período -->
 <div class="row g-2 mb-3 admin-audit-kpi">
     <div class="col-6 col-md-3">

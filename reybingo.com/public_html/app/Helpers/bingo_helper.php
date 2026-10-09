@@ -503,7 +503,7 @@ if (!function_exists('bingo_is_game_finished_by_awards')) {
 }
 
 if (!function_exists('bingo_finalize_game_when_complete')) {
-    function bingo_finalize_game_when_complete(int $gameId): bool
+    function bingo_finalize_game_when_complete(int $gameId, bool $forceLive = false): bool
     {
         if ($gameId < 1) {
             return false;
@@ -518,6 +518,13 @@ if (!function_exists('bingo_finalize_game_when_complete')) {
         // Si ya está finalizado en BD
         if ((int) ($game['status'] ?? 0) === 0) {
             return true;
+        }
+
+        // En modalidad LIVE (tipo 3 o 4), la finalización oficial a status 0 es manual
+        // y exclusiva del administrador mediante el botón "Finalizar Live" ($forceLive = true).
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+        if ($isLiveGame && !$forceLive) {
+            return false;
         }
 
         if (!bingo_is_game_finished_by_awards($gameId)) {
@@ -746,21 +753,32 @@ if (!function_exists('bingo_process_ball_cycle')) {
 
         // 9. Comprobar finalización de la partida
         $gameFinalizedNow = false;
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+
         if (bingo_is_game_finished_by_awards($gameId)) {
-            $gameFinalizedNow = bingo_finalize_game_when_complete($gameId);
-        } elseif ($totalNumbersGenerated >= 75) {
-            $modelGames->update($gameId, [
-                'status' => 0,
-                'updated_at' => $now,
-            ]);
-            if (function_exists('bingo_on_game_finished')) {
-                bingo_on_game_finished($gameId);
+            if ($isLiveGame) {
+                // En Live: asegurar ganadores oficiales sin cerrar la partida a status 0 (el admin finaliza manualmente)
+                bingo_ensure_winners_registered($gameId);
+            } else {
+                $gameFinalizedNow = bingo_finalize_game_when_complete($gameId);
             }
-            bingo_broadcast_game_status($gameId, 'game:game_finished', [
-                'status'  => 0,
-                'winners' => bingo_get_official_sings_for_game($gameId, true),
-            ]);
-            $gameFinalizedNow = true;
+        } elseif ($totalNumbersGenerated >= 75) {
+            if ($isLiveGame) {
+                bingo_ensure_winners_registered($gameId);
+            } else {
+                $modelGames->update($gameId, [
+                    'status' => 0,
+                    'updated_at' => $now,
+                ]);
+                if (function_exists('bingo_on_game_finished')) {
+                    bingo_on_game_finished($gameId);
+                }
+                bingo_broadcast_game_status($gameId, 'game:game_finished', [
+                    'status'  => 0,
+                    'winners' => bingo_get_official_sings_for_game($gameId, true),
+                ]);
+                $gameFinalizedNow = true;
+            }
         }
 
         $officialWinners = bingo_get_official_sings_for_game($gameId, true);
@@ -3913,6 +3931,57 @@ if (!function_exists('bingo_ensure_performance_indexes')) {
             }
         } catch (\Throwable $e) {
             log_message('error', 'bingo_ensure_performance_indexes: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('bingo_ensure_email_verification_schema')) {
+    function bingo_ensure_email_verification_schema(): void
+    {
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $ensured = true;
+
+        try {
+            $db = \Config\Database::connect();
+            if (!$db->tableExists('users')) {
+                return;
+            }
+
+            $forge = \Config\Database::forge();
+            $fields = [
+                'verification_token_expires_at' => [
+                    'type' => 'DATETIME',
+                    'null' => true,
+                    'after' => 'verification_token',
+                ],
+                'verification_token_prev' => [
+                    'type' => 'VARCHAR',
+                    'constraint' => 64,
+                    'null' => true,
+                    'after' => 'verification_token_expires_at',
+                ],
+                'verification_token_prev_expires_at' => [
+                    'type' => 'DATETIME',
+                    'null' => true,
+                    'after' => 'verification_token_prev',
+                ],
+                'email_verification_sent_at' => [
+                    'type' => 'DATETIME',
+                    'null' => true,
+                    'after' => 'verification_token_prev_expires_at',
+                ],
+            ];
+
+            foreach ($fields as $name => $def) {
+                if (!$db->fieldExists($name, 'users')) {
+                    $forge->addColumn('users', [$name => $def]);
+                }
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_ensure_email_verification_schema: ' . $e->getMessage());
         }
     }
 }
