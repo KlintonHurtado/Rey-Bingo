@@ -77,7 +77,14 @@ if (! function_exists('getLogo')) {
 
 if (!function_exists('translate_day')) {
     function translate_day($date) {
-        $dateTime = new DateTime($date);
+        if (empty($date) || !is_string($date) || trim($date) === '') {
+            return '';
+        }
+        try {
+            $dateTime = new DateTime($date);
+        } catch (\Throwable $e) {
+            return '';
+        }
 
         $dayOfWeek = $dateTime->format('l');
         $month = $dateTime->format('F');
@@ -86,9 +93,9 @@ if (!function_exists('translate_day')) {
         $minutes = $dateTime->format('i');
         $ampm = $dateTime->format('a') == 'am' ? 'AM' : 'PM';
 
-        $dayOfWeekTranslation = translate(strtolower($dayOfWeek));
-        $monthTranslation = translate(strtolower($month));
-        $ampmTranslation = translate($ampm);
+        $dayOfWeekTranslation = function_exists('translate') ? translate(strtolower($dayOfWeek)) : $dayOfWeek;
+        $monthTranslation = function_exists('translate') ? translate(strtolower($month)) : $month;
+        $ampmTranslation = function_exists('translate') ? translate($ampm) : $ampm;
 
         $formattedDate = "{$dayOfWeekTranslation} - {$hour}:{$minutes} {$ampmTranslation}";
 
@@ -98,7 +105,14 @@ if (!function_exists('translate_day')) {
 
 if (!function_exists('translate_date')) {
     function translate_date($date) {
-        $dateTime = new DateTime($date);
+        if (empty($date) || !is_string($date) || trim($date) === '') {
+            return '';
+        }
+        try {
+            $dateTime = new DateTime($date);
+        } catch (\Throwable $e) {
+            return '';
+        }
 
         $dayOfWeek = $dateTime->format('l');
         $month = $dateTime->format('F');
@@ -107,9 +121,9 @@ if (!function_exists('translate_date')) {
         $minutes = $dateTime->format('i');
         $ampm = $dateTime->format('a') == 'am' ? 'AM' : 'PM';
 
-        $dayOfWeekTranslation = translate(strtolower($dayOfWeek));
-        $monthTranslation = translate(strtolower($month));
-        $ampmTranslation = translate($ampm);
+        $dayOfWeekTranslation = function_exists('translate') ? translate(strtolower($dayOfWeek)) : $dayOfWeek;
+        $monthTranslation = function_exists('translate') ? translate(strtolower($month)) : $month;
+        $ampmTranslation = function_exists('translate') ? translate($ampm) : $ampm;
 
         $formattedDate = "{$day} {$monthTranslation} {$dateTime->format('Y')}";
 
@@ -119,7 +133,14 @@ if (!function_exists('translate_date')) {
 
 if (!function_exists('translate_time')) {
     function translate_time($date) {
-        $dateTime = new DateTime($date);
+        if (empty($date) || !is_string($date) || trim($date) === '') {
+            return '';
+        }
+        try {
+            $dateTime = new DateTime($date);
+        } catch (\Throwable $e) {
+            return '';
+        }
 
         $dayOfWeek = $dateTime->format('l');
         $month = $dateTime->format('F');
@@ -128,9 +149,9 @@ if (!function_exists('translate_time')) {
         $minutes = $dateTime->format('i');
         $ampm = $dateTime->format('a') == 'am' ? 'AM' : 'PM';
 
-        $dayOfWeekTranslation = translate(strtolower($dayOfWeek));
-        $monthTranslation = translate(strtolower($month));
-        $ampmTranslation = translate($ampm);
+        $dayOfWeekTranslation = function_exists('translate') ? translate(strtolower($dayOfWeek)) : $dayOfWeek;
+        $monthTranslation = function_exists('translate') ? translate(strtolower($month)) : $month;
+        $ampmTranslation = function_exists('translate') ? translate($ampm) : $ampm;
 
         $formattedDate = "{$hour}:{$minutes} {$ampmTranslation}";
 

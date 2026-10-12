@@ -1612,168 +1612,203 @@ class Games extends Controller {
 
     public function financialAudit()
     {
-        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
-        bingo_ensure_permissions_schema();
-        if (session()->get('admin_permissions') === null) {
-            bingo_load_admin_authz_into_session();
-        }
-
-        if ($deny = bingo_require_admin_permission('audit.view')) {
-            return $deny;
-        }
-
-        bingo_ensure_users_schema();
-
-        $modelUsers = new UsersModel();
-        $modelContacts = new ContactsModel();
-        $userId = session()->get('id');
-        $user = $userId ? ($modelUsers->find($userId) ?? []) : [];
-        $user = array_merge([
-            'id' => $userId,
-            'firstname' => '',
-            'lastname' => '',
-            'document' => '',
-            'username' => session()->get('username') ?? '',
-            'phone' => '',
-            'email' => '',
-            'image' => '',
-            'group' => session()->get('group') ?? 1,
-            'sounds' => 1,
-            'narration' => 1,
-            'autodial' => 1,
-        ], (array) $user);
-
-        $imagePath = ! empty($user['image'])
-            ? site_url('uploads/users/' . $user['image'])
-            : site_url('assets/img/avatar.jpg');
-
         try {
-            $auditStats = $this->buildFinancialAuditData($this->request->getGet());
-        } catch (\Throwable $e) {
-            log_message('error', 'Error building financial audit data: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
-            $auditStats = [
-                'items' => [],
-                'total_records' => 0,
-                'total_pages' => 1,
-                'current_page' => 1,
-                'per_page' => 30,
-                'total_income' => 0.0,
-                'total_expense' => 0.0,
-                'net_balance' => 0.0,
-                'total_cartons_volume' => 0.0,
-                'total_prizes_volume' => 0.0,
-                'actor_group' => 'all',
-                'movement_type' => 'all',
-                'start_date' => date('Y-m-01'),
-                'end_date' => date('Y-m-d'),
-                'search' => '',
-                'error_message' => 'Ocurrió un error al procesar algunos datos financieros: ' . $e->getMessage(),
-            ];
-        }
+            helper(['form', 'url', 'bingo', 'permissions', 'wallet', 'system', 'translation']);
+            if (function_exists('bingo_ensure_permissions_schema')) {
+                bingo_ensure_permissions_schema();
+            }
+            if (session()->get('admin_permissions') === null && function_exists('bingo_load_admin_authz_into_session')) {
+                bingo_load_admin_authz_into_session();
+            }
 
-        try {
-            $contacts = $modelContacts->findAll();
-        } catch (\Throwable $e) {
-            $contacts = [];
-        }
+            if (function_exists('bingo_require_admin_permission') && ($deny = bingo_require_admin_permission('audit.view'))) {
+                return $deny;
+            }
 
-        try {
-            $contentPage = view('games/financial_audit', [
+            if (function_exists('bingo_ensure_users_schema')) {
+                bingo_ensure_users_schema();
+            }
+
+            $modelUsers = new UsersModel();
+            $modelContacts = new ContactsModel();
+            $userId = session()->get('id');
+            $user = null;
+            if ($userId) {
+                try {
+                    $user = $modelUsers->find($userId);
+                } catch (\Throwable $e) {
+                    $user = null;
+                }
+            }
+            $user = array_merge([
+                'id' => $userId,
+                'firstname' => '',
+                'lastname' => '',
+                'document' => '',
+                'username' => session()->get('username') ?? '',
+                'phone' => '',
+                'email' => '',
+                'image' => '',
+                'group' => session()->get('group') ?? 1,
+                'sounds' => 1,
+                'narration' => 1,
+                'autodial' => 1,
+            ], (array) ($user ?? []));
+
+            $imagePath = ! empty($user['image'])
+                ? site_url('uploads/users/' . $user['image'])
+                : site_url('assets/img/avatar.jpg');
+
+            try {
+                $auditStats = $this->buildFinancialAuditData($this->request->getGet());
+            } catch (\Throwable $e) {
+                log_message('error', 'Error building financial audit data: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                $auditStats = [
+                    'items' => [],
+                    'total_records' => 0,
+                    'total_pages' => 1,
+                    'current_page' => 1,
+                    'per_page' => 30,
+                    'total_income' => 0.0,
+                    'total_expense' => 0.0,
+                    'net_balance' => 0.0,
+                    'total_cartons_volume' => 0.0,
+                    'total_prizes_volume' => 0.0,
+                    'actor_group' => 'all',
+                    'movement_type' => 'all',
+                    'start_date' => date('Y-m-01'),
+                    'end_date' => date('Y-m-d'),
+                    'search' => '',
+                    'error_message' => 'Ocurrió un error al procesar algunos datos financieros: ' . $e->getMessage(),
+                ];
+            }
+
+            try {
+                $contacts = $modelContacts->findAll();
+            } catch (\Throwable $e) {
+                $contacts = [];
+            }
+
+            try {
+                $contentPage = view('games/financial_audit', [
+                    'user' => $user,
+                    'imagePath' => $imagePath,
+                    'contacts' => $contacts,
+                    'audit_stats' => $auditStats,
+                    'standalone_audit' => true,
+                ]);
+            } catch (\Throwable $e) {
+                log_message('error', 'Error rendering games/financial_audit view: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                $contentPage = '<div class="alert alert-danger m-3">Error al cargar la vista de auditoría: ' . esc($e->getMessage()) . '</div>';
+            }
+
+            $data = [
+                'page' => [
+                    'title' => 'Auditoría Financiera',
+                ],
                 'user' => $user,
                 'imagePath' => $imagePath,
-                'contacts' => $contacts,
-                'audit_stats' => $auditStats,
-                'standalone_audit' => true,
-            ]);
-        } catch (\Throwable $e) {
-            log_message('error', 'Error rendering games/financial_audit view: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
-            $contentPage = '<div class="alert alert-danger m-3">Error al cargar la vista de auditoría: ' . esc($e->getMessage()) . '</div>';
+                'validation' => \Config\Services::validation(),
+                'contentPage' => $contentPage,
+            ];
+
+            if ($this->request->isAJAX()) {
+                return $this->response->setBody($data['contentPage']);
+            }
+
+            try {
+                return view('layout/index', $data);
+            } catch (\Throwable $layoutErr) {
+                log_message('error', 'Error rendering layout/index for financialAudit: ' . $layoutErr->getMessage() . ' at ' . $layoutErr->getFile() . ':' . $layoutErr->getLine());
+                return $this->response->setBody('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auditoría Financiera</title><link href="' . asset_url('bootstrap/css/bootstrap.min.css') . '" rel="stylesheet"><link href="' . asset_url('icons/css/all.min.css') . '" rel="stylesheet"><link href="' . asset_url('css/bingo.css') . '" rel="stylesheet"><script src="https://code.jquery.com/jquery-3.6.0.min.js"></script></head><body class="bg-gradient-bingo"><div class="container-fluid py-3">' . $contentPage . '</div><script src="' . asset_url('bootstrap/js/bootstrap.bundle.min.js') . '"></script></body></html>');
+            }
+        } catch (\Throwable $fatal) {
+            log_message('error', 'FATAL in financialAudit(): ' . $fatal->getMessage() . ' at ' . $fatal->getFile() . ':' . $fatal->getLine());
+            return redirect()->to(site_url('games'))->with('error', 'No se pudo cargar la auditoría: ' . $fatal->getMessage());
         }
-
-        $data = [
-            'page' => [
-                'title' => 'Auditoría Financiera',
-            ],
-            'user' => $user,
-            'imagePath' => $imagePath,
-            'validation' => \Config\Services::validation(),
-            'contentPage' => $contentPage,
-        ];
-
-        if ($this->request->isAJAX()) {
-            return $this->response->setBody($data['contentPage']);
-        }
-
-        return view('layout/index', $data);
     }
 
     public function financialAuditGet()
     {
-        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
-        bingo_ensure_permissions_schema();
-        if (session()->get('admin_permissions') === null) {
-            bingo_load_admin_authz_into_session();
-        }
-
-        if ($deny = bingo_require_admin_permission('audit.view')) {
-            return $deny;
-        }
-
-        bingo_ensure_users_schema();
-
         try {
-            $auditStats = $this->buildFinancialAuditData($this->request->getGet());
-        } catch (\Throwable $e) {
-            log_message('error', 'Error in financialAuditGet: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
-            $auditStats = [
-                'items' => [],
-                'total_records' => 0,
-                'total_pages' => 1,
-                'current_page' => 1,
-                'per_page' => 30,
-                'total_income' => 0.0,
-                'total_expense' => 0.0,
-                'net_balance' => 0.0,
-                'total_cartons_volume' => 0.0,
-                'total_prizes_volume' => 0.0,
-                'actor_group' => 'all',
-                'movement_type' => 'all',
-                'start_date' => date('Y-m-01'),
-                'end_date' => date('Y-m-d'),
-                'search' => '',
-                'error_message' => 'Ocurrió un error al procesar algunos datos financieros: ' . $e->getMessage(),
-            ];
-        }
+            helper(['form', 'url', 'bingo', 'permissions', 'wallet', 'system', 'translation']);
+            if (function_exists('bingo_ensure_permissions_schema')) {
+                bingo_ensure_permissions_schema();
+            }
+            if (session()->get('admin_permissions') === null && function_exists('bingo_load_admin_authz_into_session')) {
+                bingo_load_admin_authz_into_session();
+            }
 
-        return view('games/statistics/audit', [
-            'audit_stats' => $auditStats,
-            'standalone_audit' => true,
-        ]);
+            if (function_exists('bingo_require_admin_permission') && ($deny = bingo_require_admin_permission('audit.view'))) {
+                return $deny;
+            }
+
+            if (function_exists('bingo_ensure_users_schema')) {
+                bingo_ensure_users_schema();
+            }
+
+            try {
+                $auditStats = $this->buildFinancialAuditData($this->request->getGet());
+            } catch (\Throwable $e) {
+                log_message('error', 'Error in financialAuditGet: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+                $auditStats = [
+                    'items' => [],
+                    'total_records' => 0,
+                    'total_pages' => 1,
+                    'current_page' => 1,
+                    'per_page' => 30,
+                    'total_income' => 0.0,
+                    'total_expense' => 0.0,
+                    'net_balance' => 0.0,
+                    'total_cartons_volume' => 0.0,
+                    'total_prizes_volume' => 0.0,
+                    'actor_group' => 'all',
+                    'movement_type' => 'all',
+                    'start_date' => date('Y-m-01'),
+                    'end_date' => date('Y-m-d'),
+                    'search' => '',
+                    'error_message' => 'Ocurrió un error al procesar algunos datos financieros: ' . $e->getMessage(),
+                ];
+            }
+
+            return view('games/statistics/audit', [
+                'audit_stats' => $auditStats,
+                'standalone_audit' => true,
+            ]);
+        } catch (\Throwable $fatal) {
+            log_message('error', 'FATAL error in financialAuditGet: ' . $fatal->getMessage());
+            return '<div class="alert alert-danger m-3">Error al procesar la auditoría: ' . esc($fatal->getMessage()) . '</div>';
+        }
     }
 
     public function exportFinancialAudit()
     {
-        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
-        bingo_ensure_permissions_schema();
-        if (session()->get('admin_permissions') === null) {
-            bingo_load_admin_authz_into_session();
-        }
-
-        if ($deny = bingo_require_admin_permission('audit.view')) {
-            return $deny;
-        }
-
-        bingo_ensure_users_schema();
-        $params = $this->request->getGet();
-        $params['page'] = 1;
-        $params['per_page'] = 10000;
-
         try {
-            $auditData = $this->buildFinancialAuditData($params);
-        } catch (\Throwable $e) {
-            log_message('error', 'Error in exportFinancialAudit: ' . $e->getMessage());
-            return redirect()->to(site_url('games/financialAudit'))->with('error', 'No se pudo exportar la auditoría: ' . $e->getMessage());
-        }
+            helper(['form', 'url', 'bingo', 'permissions', 'wallet', 'system', 'translation']);
+            if (function_exists('bingo_ensure_permissions_schema')) {
+                bingo_ensure_permissions_schema();
+            }
+            if (session()->get('admin_permissions') === null && function_exists('bingo_load_admin_authz_into_session')) {
+                bingo_load_admin_authz_into_session();
+            }
+
+            if (function_exists('bingo_require_admin_permission') && ($deny = bingo_require_admin_permission('audit.view'))) {
+                return $deny;
+            }
+
+            if (function_exists('bingo_ensure_users_schema')) {
+                bingo_ensure_users_schema();
+            }
+            $params = $this->request->getGet();
+            $params['page'] = 1;
+            $params['per_page'] = 10000;
+
+            try {
+                $auditData = $this->buildFinancialAuditData($params);
+            } catch (\Throwable $e) {
+                log_message('error', 'Error in exportFinancialAudit: ' . $e->getMessage());
+                return redirect()->to(site_url('games/financialAudit'))->with('error', 'No se pudo exportar la auditoría: ' . $e->getMessage());
+            }
 
         $headers = [
             'ID / Ref',
@@ -1819,6 +1854,10 @@ class Games extends Controller {
         return (new ExcelExport())->downloadResponse($headers, $rows, $filename, [
             'sheet_name' => 'Auditoria Financiera',
         ]);
+        } catch (\Throwable $fatal) {
+            log_message('error', 'FATAL error in exportFinancialAudit: ' . $fatal->getMessage());
+            return redirect()->to(site_url('games/financialAudit'))->with('error', 'No se pudo exportar la auditoría: ' . $fatal->getMessage());
+        }
     }
 
     private function buildFinancialAuditData(array $params): array
@@ -1828,8 +1867,10 @@ class Games extends Controller {
         bingo_ensure_users_schema();
         
         $actorGroup = (string) ($params['actor_group'] ?? 'all');
-        $startDate = !empty($params['startdate']) ? $params['startdate'] : date('Y-m-01');
-        $endDate = !empty($params['enddate']) ? $params['enddate'] : date('Y-m-d');
+        $rawStartDate = (string) ($params['startdate'] ?? '');
+        $rawEndDate = (string) ($params['enddate'] ?? '');
+        $startDate = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawStartDate)) ? $rawStartDate : date('Y-m-01');
+        $endDate = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawEndDate)) ? $rawEndDate : date('Y-m-d');
         $movementType = (string) ($params['movement_type'] ?? 'all');
         $search = trim((string) ($params['search'] ?? ''));
         $page = max(1, (int) ($params['page'] ?? 1));
@@ -1864,7 +1905,8 @@ class Games extends Controller {
                         FROM deposits d
                         INNER JOIN users u ON u.id = d.user
                         WHERE (d.created_at BETWEEN ? AND ? OR d.date BETWEEN ? AND ?)
-                        {$groupCondition} {$searchCondition}";
+                        {$groupCondition} {$searchCondition}
+                        ORDER BY d.id DESC LIMIT 1000";
                 $paramsSql = array_merge([$from, $to, $startDate, $endDate], $searchParams);
                 $res = $db->query($sql, $paramsSql)->getResultArray();
                 foreach ($res as $r) {
@@ -1905,7 +1947,8 @@ class Games extends Controller {
                         FROM retires r
                         INNER JOIN users u ON u.id = r.user
                         WHERE r.created_at BETWEEN ? AND ?
-                        {$groupCondition} {$searchCondition}";
+                        {$groupCondition} {$searchCondition}
+                        ORDER BY r.id DESC LIMIT 1000";
                 $paramsSql = array_merge([$from, $to], $searchParams);
                 $res = $db->query($sql, $paramsSql)->getResultArray();
                 foreach ($res as $r) {
@@ -1948,7 +1991,8 @@ class Games extends Controller {
                         INNER JOIN users u ON u.id = c.user
                         LEFT JOIN games g ON g.id = c.game
                         WHERE c.user > 0 AND c.created_at BETWEEN ? AND ?
-                        {$groupCondition} {$searchCondition}";
+                        {$groupCondition} {$searchCondition}
+                        ORDER BY c.id DESC LIMIT 1000";
                 $paramsSql = array_merge([$from, $to], $searchParams);
                 $res = $db->query($sql, $paramsSql)->getResultArray();
                 foreach ($res as $r) {
@@ -1993,7 +2037,8 @@ class Games extends Controller {
                         LEFT JOIN games g ON g.id = s.game
                         LEFT JOIN modalities m ON m.id = s.modality
                         WHERE p.type = 'award' AND p.created_at BETWEEN ? AND ?
-                        {$groupCondition} {$searchCondition}";
+                        {$groupCondition} {$searchCondition}
+                        ORDER BY p.id DESC LIMIT 1000";
                 $paramsSql = array_merge([$from, $to], $searchParams);
                 $res = $db->query($sql, $paramsSql)->getResultArray();
                 foreach ($res as $r) {
@@ -2035,7 +2080,8 @@ class Games extends Controller {
                         FROM roulettes rl
                         INNER JOIN users u ON u.id = rl.user
                         WHERE rl.created_at BETWEEN ? AND ?
-                        {$groupCondition} {$searchCondition}";
+                        {$groupCondition} {$searchCondition}
+                        ORDER BY rl.id DESC LIMIT 1000";
                 $paramsSql = array_merge([$from, $to], $searchParams);
                 $res = $db->query($sql, $paramsSql)->getResultArray();
                 foreach ($res as $r) {
@@ -2078,7 +2124,8 @@ class Games extends Controller {
                         FROM transfers t
                         LEFT JOIN users us ON us.id = t.`from`
                         LEFT JOIN users ur ON ur.id = t.user
-                        WHERE t.created_at BETWEEN ? AND ?";
+                        WHERE t.created_at BETWEEN ? AND ?
+                        ORDER BY t.id DESC LIMIT 1000";
                 $res = $db->query($sql, [$from, $to])->getResultArray();
                 foreach ($res as $r) {
                     // Emisor (-)
@@ -2117,7 +2164,7 @@ class Games extends Controller {
                             'ref_id' => (int) $r['id'],
                             'datetime' => $r['event_time'] ?: $startDate . ' 12:00:00',
                             'user_id' => (int) $r['user_receiver'],
-                            'user_name' => trim(($r['r_firstname'] ?? '') . ' ' . ($r['r_lastname'] ?? '')) ?: ($r['r_username'] ?? 'N/A'),
+                            'user_name' => trim(($r['r_firstname'] ?? '') . ' ' . ($r['r_lastname'] ?? '')) ?: ($r['username'] ?? 'N/A'),
                             'user_code' => $r['r_code'] ?? '',
                             'username' => $r['r_username'] ?? '',
                             'user_group' => (int) ($r['r_group'] ?? 0),
@@ -2155,7 +2202,8 @@ class Games extends Controller {
                         'operator_ggr_commission', 'affiliate_cpa', 'store_player_affiliate_commission', 'store_affiliate_commission',
                         'referred', 'referral'
                       )
-                    {$groupCondition} {$searchCondition}";
+                    {$groupCondition} {$searchCondition}
+                    ORDER BY p.id DESC LIMIT 1000";
             $paramsSql = array_merge([$from, $to], $searchParams);
             $res = $db->query($sql, $paramsSql)->getResultArray();
             foreach ($res as $r) {

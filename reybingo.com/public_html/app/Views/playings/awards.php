@@ -63,16 +63,10 @@ $showWaitingNotice = $isLivePlayerLocked;
         </div>
         <div class="modal-footer justify-content-center pt-2 pb-2 flex-column">
             <?php if ($isLivePlayerLocked) : ?>
-                <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="display: inline-block; font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
-                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
-                </div>
                 <button type="button" class="btn btn-primary w-50 btn-bingo my-1" data-bs-dismiss="modal">
                     <i class="fa-solid fa-eye me-1"></i> <?= translate('Seguir viendo Live'); ?>
                 </button>
             <?php else : ?>
-                <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="display: none; font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
-                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
-                </div>
                 <?php if ($isLiveGameType && $isAdminViewer && $isLiveGameOpen) : ?>
                 <button type="button" class="btn btn-danger btn-finalizar-live px-4 py-2 my-2 fw-bold" id="btnModalFinalizarLive" onclick="if (typeof confirmarFinalizarLive === 'function') { confirmarFinalizarLive(); } else if (typeof window.confirmarFinalizarLive === 'function') { window.confirmarFinalizarLive(); }">
                     <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live

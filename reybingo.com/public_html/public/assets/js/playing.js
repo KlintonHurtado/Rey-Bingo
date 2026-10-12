@@ -3108,25 +3108,11 @@ function showGameFinalized() {
                 $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"]').show();
                 // Ocultar cualquier botón que intente salir de la sala
                 $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').hide();
-
-                let waitNotice = modalAwardsEl.querySelector('#live-waiting-admin-notice');
-                if (!waitNotice) {
-                    const footer = modalAwardsEl.querySelector('.modal-footer');
-                    if (footer) {
-                        waitNotice = document.createElement('div');
-                        waitNotice.id = 'live-waiting-admin-notice';
-                        waitNotice.className = 'text-center py-2 px-3 my-1 rounded-pill fw-bold';
-                        waitNotice.style.cssText = 'font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4); display: inline-block;';
-                        waitNotice.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...';
-                        footer.prepend(waitNotice);
-                    }
-                } else {
-                    waitNotice.style.display = 'inline-block';
-                }
+                $(modalAwardsEl).find('#live-waiting-admin-notice').remove();
             } else {
                 // Live ya finalizado o partida regular: permitir salir y mostrar botón de salir
                 $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').show();
-                $(modalAwardsEl).find('#live-waiting-admin-notice').hide();
+                $(modalAwardsEl).find('#live-waiting-admin-notice').remove();
 
                 // Al cerrar la tabla por el botón de cerrar (X)
                 $(modalAwardsEl).find('[data-bs-dismiss="modal"]').off('click').on('click', function () {
