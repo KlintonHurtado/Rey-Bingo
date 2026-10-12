@@ -23,9 +23,14 @@ $canKyc = function_exists('bingo_can') ? bingo_can('kyc.review') : false;
 $canLegal = bingo_is_admin(); // Todos los admins pueden ver T&C; la vista controla si pueden editar
 $canPayments = function_exists('bingo_can') ? bingo_can_any(['payments.view', 'payments.manage']) : false;
 
-$lowBalancePending = function_exists('bingo_low_balance_roulette_pending_count')
-    ? (int) bingo_low_balance_roulette_pending_count()
-    : 0;
+$lowBalancePending = 0;
+if (!empty($canLowBalance) && function_exists('bingo_low_balance_roulette_pending_count')) {
+    try {
+        $lowBalancePending = (int) bingo_low_balance_roulette_pending_count();
+    } catch (\Throwable $e) {
+        $lowBalancePending = 0;
+    }
+}
 
 $menuItems = [];
 

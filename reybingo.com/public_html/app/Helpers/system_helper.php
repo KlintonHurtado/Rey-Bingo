@@ -2,40 +2,61 @@
 
 if (! function_exists('systemGet')) {
     function systemGet(string $key): ?string {
-        $db = \Config\Database::connect();
-        $system = $db->table('system');
-
-        $result = $system->select('value')->where('key', $key)->get()->getRow();
-
-        $val = $result->value ?? null;
-        if ($key === 'name' && (empty($val) || stripos($val, 'Bingo Family') !== false)) {
-            return 'Reybingo.com';
+        static $cache = [];
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
         }
 
+        try {
+            $db = \Config\Database::connect();
+            $system = $db->table('system');
+
+            $result = $system->select('value')->where('key', $key)->get()->getRow();
+            $val = $result->value ?? null;
+        } catch (\Throwable $e) {
+            $val = null;
+        }
+
+        if ($key === 'name' && (empty($val) || stripos($val, 'Bingo Family') !== false)) {
+            $val = 'Reybingo.com';
+        } elseif ($key === 'currency' && empty($val)) {
+            $val = '$';
+        }
+
+        $cache[$key] = $val;
         return $val;
     }
 }
 
 if (! function_exists('lastGame')) {
     function lastGame(string $field): ?string {
-        $db = \Config\Database::connect();
+        static $cachedLastGame = null;
+        static $gameResolved = false;
 
-        $lastGame = $db->table('games')->orderBy('date', 'DESC')->get()->getRowArray();
+        try {
+            $db = \Config\Database::connect();
+            if (! $gameResolved) {
+                $cachedLastGame = $db->table('games')->orderBy('date', 'DESC')->get()->getRowArray();
+                $gameResolved = true;
+            }
 
-        if (! $lastGame) {
-            return null; 
+            if (! $cachedLastGame) {
+                return null; 
+            }
+
+            if ($field === 'total') {
+                $cartons = $db->table('cartons')->where('game', $cachedLastGame['id'])->where('user !=', 0)->countAllResults();
+                $accumulated = $cartons * (float) ($cachedLastGame['price'] ?? 0);
+                $rate = (float) (systemGet('rateEarnings') ?? 0);
+                $total = $accumulated - ($accumulated * $rate);
+
+                return (string) $total;
+            }
+
+            return $cachedLastGame[$field] ?? null;
+        } catch (\Throwable $e) {
+            return null;
         }
-
-        if ($field === 'total') {
-            $cartons = $db->table('cartons')->where('game', $lastGame['id'])->where('user !=', 0)->countAllResults();
-
-            $accumulated = $cartons * $lastGame['price'];
-            $total = $accumulated - ($accumulated * systemGet('rateEarnings'));
-
-            return (string) $total;
-        }
-
-        return $lastGame[$field] ?? null;
     }
 }
 

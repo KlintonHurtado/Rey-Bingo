@@ -186,19 +186,19 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 <div class="col-md-9">
                                     <div class="col-md-12 mb-1">
                                         <label for="firstname" class="form-label"><?= translate('first name'); ?></label>
-                                        <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('first name')); ?>" autofocus autocomplete="off" value="<?= $user['firstname']; ?>">
+                                        <input type="text" class="form-control form-control-lg form-bingo" name="firstname" id="firstname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('first name')); ?>" autofocus autocomplete="off" value="<?= esc($user['firstname'] ?? ''); ?>">
                                         <small id="firstname-error" class="text-danger d-none"></small>
                                     </div>
 
                                     <div class="col-md-12 mb-1">
                                         <label for="lastname" class="form-label"><?= translate('last name'); ?></label>
-                                        <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('last name')); ?>" autocomplete="off" value="<?= $user['lastname']; ?>">
+                                        <input type="text" class="form-control form-control-lg form-bingo" name="lastname" id="lastname" placeholder="<?= translate('enter a'); ?> <?= strtolower(translate('last name')); ?>" autocomplete="off" value="<?= esc($user['lastname'] ?? ''); ?>">
                                         <small id="lastname-error" class="text-danger d-none"></small>
                                     </div>
 
                                     <div class="col-md-12 mb-1">
                                         <label for="document" class="form-label"><?= translate('document'); ?></label>
-                                        <input type="number" class="form-control form-control-lg form-bingo" name="document" id="document" placeholder="<?= translate('document'); ?>" autocomplete="off" value="<?= $user['document']; ?>">
+                                        <input type="number" class="form-control form-control-lg form-bingo" name="document" id="document" placeholder="<?= translate('document'); ?>" autocomplete="off" value="<?= esc($user['document'] ?? ''); ?>">
                                         <small id="document-error" class="text-danger d-none"></small>
                                     </div>
                                 </div>
@@ -211,19 +211,19 @@ $isNoMusicRole = session()->get('logged_in') && (
                             <div class="row" id="profile-step-2" style="display: none;">
                                 <div class="col-md-12 mb-1">
                                     <label for="username" class="form-label"><?= translate('username'); ?></label>
-                                    <input type="text" class="form-control form-control-lg form-bingo" name="username" id="username" placeholder="<?= translate('username'); ?>" autocomplete="off" value="<?= $user['username']; ?>">
+                                    <input type="text" class="form-control form-control-lg form-bingo" name="username" id="username" placeholder="<?= translate('username'); ?>" autocomplete="off" value="<?= esc($user['username'] ?? ''); ?>">
                                     <small id="username-error" class="text-danger d-none"></small>
                                 </div>
 
                                 <div class="col-md-12 mb-1">
                                     <label for="phone" class="form-label"><?= translate('phone'); ?></label>
-                                    <input type="number" class="form-control form-control-lg form-bingo" name="phone" id="phone" placeholder="<?= translate('phone'); ?>" autocomplete="off" value="<?= $user['phone']; ?>">
+                                    <input type="number" class="form-control form-control-lg form-bingo" name="phone" id="phone" placeholder="<?= translate('phone'); ?>" autocomplete="off" value="<?= esc($user['phone'] ?? ''); ?>">
                                     <small id="phone-error" class="text-danger d-none"></small>
                                 </div>
                                 
                                 <div class="col-md-12 mb-3">
                                     <label for="email" class="form-label"><?= translate('email'); ?></label>
-                                    <input type="text" class="form-control form-control-lg form-bingo" name="email" id="email" placeholder="<?= translate('email'); ?>" autocomplete="off" value="<?= $user['email']; ?>">
+                                    <input type="text" class="form-control form-control-lg form-bingo" name="email" id="email" placeholder="<?= translate('email'); ?>" autocomplete="off" value="<?= esc($user['email'] ?? ''); ?>">
                                     <small id="email-error" class="text-danger d-none"></small>
                                 </div>
 

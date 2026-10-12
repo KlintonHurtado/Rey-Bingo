@@ -211,7 +211,7 @@
         -webkit-overflow-scrolling: touch !important;
         align-items: flex-start !important;
         justify-content: flex-start !important;
-        padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+        padding: 10px 10px calc(115px + env(safe-area-inset-bottom, 0px)) !important;
     }
 
     /* Habilitar y estilizar scrollbar visible para PC/Web */
@@ -568,6 +568,56 @@
         display: none !important;
     }
 
+    /* Botón flotante Ver Ganadores para jugador: centrado abajo entre Modalidades (izq) y Chat (der) */
+    #btn-ver-ganadores-player {
+        position: fixed !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+        transform: translateX(-50%) !important;
+        z-index: 1056 !important;
+        border-radius: 50px !important;
+        font-weight: 800 !important;
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%) !important;
+        color: #1a0b36 !important;
+        border: 2px solid rgba(255, 255, 255, 0.75) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 12px rgba(255, 193, 7, 0.4) !important;
+        padding: 9px 18px !important;
+        font-size: 14px !important;
+        white-space: nowrap !important;
+        max-width: calc(100vw - 180px) !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease !important;
+    }
+
+    #btn-ver-ganadores-player:hover {
+        transform: translateX(-50%) scale(1.06) !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 15px rgba(255, 193, 7, 0.5) !important;
+    }
+
+    #btn-ver-ganadores-player:active {
+        transform: translateX(-50%) scale(0.96) !important;
+    }
+
+    body.modalities-panel-open #btn-ver-ganadores-player,
+    body.chat-panel-open #btn-ver-ganadores-player {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    @media (max-width: 480px) {
+        #btn-ver-ganadores-player {
+            font-size: 13px !important;
+            padding: 8px 14px !important;
+            bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+            max-width: calc(100vw - 170px) !important;
+        }
+    }
+
     .modalities-display-container {
         display: none;
         flex-direction: column;
@@ -772,7 +822,7 @@
         .container-section--playing .cartons-section.cartons-section--playing {
             justify-content: center !important;
             align-items: flex-start !important;
-            padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+            padding: 10px 10px calc(115px + env(safe-area-inset-bottom, 0px)) !important;
             height: 100% !important;
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch !important;
@@ -1211,6 +1261,7 @@
                 <?php else: ?>
                     <p><?= translate('there are no cards available for this game'); ?></p>
                 <?php endif; ?>
+                <div class="playing-cartons-bottom-spacer" style="width: 100%; height: 30px; flex-shrink: 0; pointer-events: none;"></div>
             </div>
         </div>
     </div>
@@ -1475,8 +1526,8 @@
 
 <div class="modal fade" id="modalAwards" tabindex="-1" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false"></div>
 
-<button id="btn-ver-ganadores-player" class="btn btn-warning btn-bingo" type="button" style="display: none; position: fixed; bottom: 25px; right: 25px; z-index: 1040; border-radius: 50px; font-weight: 700; box-shadow: 0 4px 15px rgba(0,0,0,0.4); padding: 10px 20px; font-size: 15px;" onclick="if(typeof window.awardsGet === 'function'){ window.awardsGet(); }">
-    <i class="fa-solid fa-trophy-star me-2"></i><?= translate('Ver Ganadores'); ?>
+<button id="btn-ver-ganadores-player" class="btn btn-warning btn-bingo" type="button" style="display: none;" onclick="if(typeof window.awardsGet === 'function'){ window.awardsGet(); }">
+    <i class="fa-solid fa-trophy-star me-1"></i><span><?= translate('Ver Ganadores'); ?></span>
 </button>
 
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>

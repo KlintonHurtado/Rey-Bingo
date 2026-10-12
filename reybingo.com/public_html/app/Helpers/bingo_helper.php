@@ -10250,42 +10250,50 @@ if (!function_exists('bingo_fetch_low_balance_players')) {
      */
     function bingo_fetch_low_balance_players(): array
     {
-        helper('wallet');
+        try {
+            helper('wallet');
 
-        $modelUsers = new \App\Models\UsersModel();
-        $players = $modelUsers
-            ->where('group', bingo_group_player())
-            ->where('deleted', 0)
-            ->where('status', 1)
-            ->findAll();
+            $modelUsers = new \App\Models\UsersModel();
+            $players = $modelUsers
+                ->where('group', bingo_group_player())
+                ->where('deleted', 0)
+                ->where('status', 1)
+                ->findAll();
 
-        $threshold = bingo_low_balance_threshold();
-        $list = [];
+            $threshold = bingo_low_balance_threshold();
+            $list = [];
 
-        foreach ($players as $player) {
-            $player = wallet_service()->normalizeUser($player);
-            $total = wallet_total($player);
+            foreach ($players as $player) {
+                $player = wallet_service()->normalizeUser($player);
+                $total = wallet_total($player);
 
-            if ($total > $threshold) {
-                continue;
+                if ($total > $threshold) {
+                    continue;
+                }
+
+                $player['wallet_total'] = $total;
+                $player['wallet_recharge_display'] = wallet_recharge_balance($player);
+                $player['wallet_withdraw_display'] = wallet_withdrawable($player);
+                $list[] = $player;
             }
 
-            $player['wallet_total'] = $total;
-            $player['wallet_recharge_display'] = wallet_recharge_balance($player);
-            $player['wallet_withdraw_display'] = wallet_withdrawable($player);
-            $list[] = $player;
+            usort($list, static function (array $a, array $b): int {
+                return $a['wallet_total'] <=> $b['wallet_total'];
+            });
+
+            $list = bingo_attach_latest_low_balance_grants($list);
+
+            return [
+                'players' => $list,
+                'threshold' => $threshold,
+            ];
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_fetch_low_balance_players error: ' . $e->getMessage());
+            return [
+                'players' => [],
+                'threshold' => 1.0,
+            ];
         }
-
-        usort($list, static function (array $a, array $b): int {
-            return $a['wallet_total'] <=> $b['wallet_total'];
-        });
-
-        $list = bingo_attach_latest_low_balance_grants($list);
-
-        return [
-            'players' => $list,
-            'threshold' => $threshold,
-        ];
     }
 }
 
@@ -10293,16 +10301,21 @@ if (!function_exists('bingo_low_balance_roulette_pending_count')) {
     /** Jugadores con poco saldo que aún no tienen ruleta disponible (roulette = 1). */
     function bingo_low_balance_roulette_pending_count(): int
     {
-        $payload = bingo_fetch_low_balance_players();
-        $count = 0;
+        try {
+            $payload = bingo_fetch_low_balance_players();
+            $count = 0;
 
-        foreach ($payload['players'] as $player) {
-            if ((int) ($player['roulette'] ?? 1) === 1) {
-                $count++;
+            foreach ($payload['players'] as $player) {
+                if ((int) ($player['roulette'] ?? 1) === 1) {
+                    $count++;
+                }
             }
-        }
 
-        return $count;
+            return $count;
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_low_balance_roulette_pending_count error: ' . $e->getMessage());
+            return 0;
+        }
     }
 }
 

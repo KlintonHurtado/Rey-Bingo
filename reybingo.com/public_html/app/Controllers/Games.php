@@ -26,7 +26,7 @@ use CodeIgniter\Controller;
 
 class Games extends Controller {
     public function __construct() {
-        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions', 'wallet']);
         session();
     }
     
@@ -1612,17 +1612,37 @@ class Games extends Controller {
 
     public function financialAudit()
     {
+        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
+        bingo_ensure_permissions_schema();
+        if (session()->get('admin_permissions') === null) {
+            bingo_load_admin_authz_into_session();
+        }
+
         if ($deny = bingo_require_admin_permission('audit.view')) {
             return $deny;
         }
 
-        helper(['bingo', 'permissions']);
         bingo_ensure_users_schema();
 
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
         $userId = session()->get('id');
         $user = $userId ? ($modelUsers->find($userId) ?? []) : [];
+        $user = array_merge([
+            'id' => $userId,
+            'firstname' => '',
+            'lastname' => '',
+            'document' => '',
+            'username' => session()->get('username') ?? '',
+            'phone' => '',
+            'email' => '',
+            'image' => '',
+            'group' => session()->get('group') ?? 1,
+            'sounds' => 1,
+            'narration' => 1,
+            'autodial' => 1,
+        ], (array) $user);
+
         $imagePath = ! empty($user['image'])
             ? site_url('uploads/users/' . $user['image'])
             : site_url('assets/img/avatar.jpg');
@@ -1651,6 +1671,25 @@ class Games extends Controller {
             ];
         }
 
+        try {
+            $contacts = $modelContacts->findAll();
+        } catch (\Throwable $e) {
+            $contacts = [];
+        }
+
+        try {
+            $contentPage = view('games/financial_audit', [
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'contacts' => $contacts,
+                'audit_stats' => $auditStats,
+                'standalone_audit' => true,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Error rendering games/financial_audit view: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            $contentPage = '<div class="alert alert-danger m-3">Error al cargar la vista de auditoría: ' . esc($e->getMessage()) . '</div>';
+        }
+
         $data = [
             'page' => [
                 'title' => 'Auditoría Financiera',
@@ -1658,13 +1697,7 @@ class Games extends Controller {
             'user' => $user,
             'imagePath' => $imagePath,
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('games/financial_audit', [
-                'user' => $user,
-                'imagePath' => $imagePath,
-                'contacts' => $modelContacts->findAll(),
-                'audit_stats' => $auditStats,
-                'standalone_audit' => true,
-            ]),
+            'contentPage' => $contentPage,
         ];
 
         if ($this->request->isAJAX()) {
@@ -1676,11 +1709,16 @@ class Games extends Controller {
 
     public function financialAuditGet()
     {
+        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
+        bingo_ensure_permissions_schema();
+        if (session()->get('admin_permissions') === null) {
+            bingo_load_admin_authz_into_session();
+        }
+
         if ($deny = bingo_require_admin_permission('audit.view')) {
             return $deny;
         }
 
-        helper(['bingo', 'permissions']);
         bingo_ensure_users_schema();
 
         try {
@@ -1715,6 +1753,12 @@ class Games extends Controller {
 
     public function exportFinancialAudit()
     {
+        helper(['form', 'url', 'bingo', 'permissions', 'wallet']);
+        bingo_ensure_permissions_schema();
+        if (session()->get('admin_permissions') === null) {
+            bingo_load_admin_authz_into_session();
+        }
+
         if ($deny = bingo_require_admin_permission('audit.view')) {
             return $deny;
         }
@@ -1779,6 +1823,7 @@ class Games extends Controller {
 
     private function buildFinancialAuditData(array $params): array
     {
+        helper(['bingo', 'permissions', 'wallet']);
         $db = \Config\Database::connect();
         bingo_ensure_users_schema();
         
