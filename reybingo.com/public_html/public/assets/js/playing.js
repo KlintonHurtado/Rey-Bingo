@@ -1524,6 +1524,53 @@ function handleBingoSuccess(data, resumeCallback) {
     }, afterCountdown);
 }
 
+function applyWonStylesToCard(cartn) {
+    if (!cartn) return;
+    cartn.classList.add('cartn-sing');
+
+    let borderCarton = cartn.parentElement;
+    while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+        borderCarton = borderCarton.parentElement;
+    }
+    if (borderCarton) {
+        borderCarton.classList.add('modality-won');
+    }
+
+    cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+        el.classList.add('sing');
+        el.innerText = '⭐️';
+    });
+}
+
+function markModalityCardWon(modalityId, modalityName) {
+    try {
+        let found = false;
+        if (modalityId) {
+            const byId = document.querySelectorAll(`[id="modality-${modalityId}"]`);
+            if (byId && byId.length) {
+                byId.forEach(cartn => {
+                    found = true;
+                    applyWonStylesToCard(cartn);
+                });
+            }
+        }
+        if (!found && modalityName) {
+            const cleanTarget = String(modalityName).trim().toLowerCase();
+            const allCards = document.querySelectorAll('[id^="modality-"], .cartn-modalidad, .border-carton');
+            allCards.forEach(card => {
+                const titleEl = card.querySelector('.title-modality, .modality-title, h4, h5, h6, strong, span');
+                const text = (titleEl ? titleEl.textContent : card.textContent || '').trim().toLowerCase();
+                if (text && (text === cleanTarget || text.includes(cleanTarget) || cleanTarget.includes(text))) {
+                    const cartn = card.classList.contains('cartn-modalidad') ? card : (card.querySelector('.cartn-modalidad') || card);
+                    applyWonStylesToCard(cartn);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Error marking modality card won in playing.js:', e);
+    }
+}
+
 function mergeWinnersFromServer(serverWinners) {
     if (!Array.isArray(serverWinners)) {
         return;
@@ -1532,8 +1579,8 @@ function mergeWinnersFromServer(serverWinners) {
     const limit = parseInt(window.numberSingsLimit, 10) || 1;
 
     serverWinners.forEach(function (winner) {
-        const player = winner.player || '';
-        const modality = winner.modality || '';
+        const player = winner.player || winner.userName || '';
+        const modality = winner.modality || winner.modalityName || '';
 
         if (!player) {
             return;
@@ -1552,25 +1599,7 @@ function mergeWinnersFromServer(serverWinners) {
         }
 
         // Apply won styling to modality in real-time
-        if (winner.modalityId) {
-            const cartns = document.querySelectorAll(`[id="modality-${winner.modalityId}"]`);
-            cartns.forEach(cartn => {
-                cartn.classList.add('cartn-sing');
-
-                let borderCarton = cartn.parentElement;
-                while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                    borderCarton = borderCarton.parentElement;
-                }
-                if (borderCarton) {
-                    borderCarton.classList.add('modality-won');
-                }
-
-                cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                    el.classList.add('sing');
-                    el.innerText = '⭐️';
-                });
-            });
-        }
+        markModalityCardWon(winner.modalityId || winner.modality, winner.modalityName || winner.modality);
     });
 }
 
@@ -2375,33 +2404,17 @@ function showCountdown(data, callback) {
         mergeWinnersFromServer(data.winners);
     }
 
-    if (data && data.modalityId) {
-        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-        cartns.forEach(cartn => {
-            cartn.classList.add('cartn-sing');
-
-            let borderCarton = cartn.parentElement;
-            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                borderCarton = borderCarton.parentElement;
-            }
-            if (borderCarton) {
-                borderCarton.classList.add('modality-won');
-            }
-
-            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                el.classList.add('sing');
-                el.innerText = '⭐️';
-            });
-        });
+    if (data) {
+        markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
     }
 
-    // Si el juego finalizó, dar 3.5 segundos de celebración al ganador antes de pasar al fin de juego
+    // Si el juego finalizó, dar 4.5 segundos de celebración al ganador antes de pasar al fin de juego
     if ((data && data.gameCompleted === true) || window.gameIsFinished || isGameFinishedShown) {
         simultaneousBingos = [];
         setTimeout(function () {
             bingoInProgress = false;
             if (typeof callback === 'function') callback();
-        }, 3500);
+        }, 4500);
         return;
     }
 
@@ -2486,25 +2499,7 @@ function showOtherPlayerBingoNotice(data, callback) {
     }
 
     // Convertir visualmente la modalidad a "ganada" en tiempo real para todos los jugadores
-    if (data.modalityId) {
-        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-        cartns.forEach(cartn => {
-            cartn.classList.add('cartn-sing');
-
-            let borderCarton = cartn.parentElement;
-            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                borderCarton = borderCarton.parentElement;
-            }
-            if (borderCarton) {
-                borderCarton.classList.add('modality-won');
-            }
-
-            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                el.classList.add('sing');
-                el.innerText = '⭐️';
-            });
-        });
-    }
+    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
 
     // 1. Reproducir sonido de notificación con winner.mp3
     try {
@@ -2648,6 +2643,10 @@ function processNumberGetResponse(data) {
             }
         }
 
+        if (lastWinner && (lastWinner.modalityId || lastWinner.modality)) {
+            markModalityCardWon(lastWinner.modalityId || lastWinner.modality, lastWinner.modalityName || lastWinner.modality);
+        }
+
         const noticeKey = lastWinner ? ((lastWinner.player || '') + '_' + (lastWinner.modality || '')) : '';
         if (!isInitialSync && noticeKey && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
             showOtherPlayerBingoNotice(lastWinner, function () {
@@ -2660,9 +2659,6 @@ function processNumberGetResponse(data) {
             window.seenBingoNotices.add(noticeKey);
         }
 
-        if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-            audioManager.stopAll();
-        }
         showGameFinalized();
         return;
     }
@@ -2883,23 +2879,30 @@ function stopAutomaticLast() {
 }
 
 function showGameFinalized() {
+    // Control de idempotencia estricto: la finalización se ejecuta exactamente una sola vez
+    if (isGameFinishedShown || window.__gameFinalizationInProgress) {
+        return;
+    }
+
+    if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4500))) {
+        const remaining = Math.max(1000, 4500 - (Date.now() - (window.__lastWinnerNoticeTime || 0)));
+        setTimeout(function () {
+            if (!isGameFinishedShown) {
+                showGameFinalized();
+            }
+        }, remaining);
+        return;
+    }
+
     window.gameIsFinished = true;
     window.allowGameUnload = true;
     ballPlaybackQueue = [];
     isBallPlaybackActive = false;
     intervalManager.clear('lastNumber');
 
-    // Control de idempotencia estricto: la finalización se ejecuta exactamente una sola vez
-    if (isGameFinishedShown || window.__gameFinalizationInProgress) {
-        return;
-    }
     window.__gameFinalizationInProgress = true;
     isGameFinishedShown = true;
     bingoInProgress = false;
-
-    if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-        audioManager.stopAll();
-    }
 
     stopAutomaticLast();
     stopUpdateUserCount();
@@ -4480,6 +4483,9 @@ function initializeApp() {
                 if (Array.isArray(data.winners)) {
                     mergeWinnersFromServer(data.winners);
                 }
+                if (data && (data.modalityId || data.modality)) {
+                    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+                }
             });
 
             // Inicio de partida en tiempo real
@@ -4496,8 +4502,8 @@ function initializeApp() {
             });
 
             // Fin de partida en tiempo real
-            pusherHelper.on('game:game_finished', function (data) {
-                console.log('WS game:game_finished received', data);
+            function handlePlayingGameFinished(data) {
+                console.log('WS game:game_finished / game:completed received', data);
                 if (window.isLiveGame && data && data.liveFinalized === true) {
                     handleLiveFinalizedByAdmin(data);
                     return;
@@ -4508,12 +4514,6 @@ function initializeApp() {
                 isBallPlaybackActive = false;
                 intervalManager.clear('lastNumber');
 
-                // Si hay un cante de bingo celebrándose en este momento, no cortar la celebración
-                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
-                    return;
-                }
-
-                // Extraer el último ganador ya sea de data o del array winners
                 let lastWinner = null;
                 if (data && data.player && data.modality) {
                     lastWinner = data;
@@ -4522,12 +4522,29 @@ function initializeApp() {
                     if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
                         lastWinner = Object.assign({}, data, {
                             player: lw.player || lw.userName,
+                            userName: lw.userName || lw.player,
                             modality: lw.modality || lw.modalityName,
+                            modalityName: lw.modalityName || lw.modality,
                             modalityId: lw.modalityId || lw.modality,
                             cartonId: lw.cartonId || lw.carton,
                             image: lw.image || site_url + 'assets/img/avatar.jpg'
                         });
                     }
+                }
+
+                if (lastWinner && (lastWinner.modalityId || lastWinner.modality)) {
+                    markModalityCardWon(lastWinner.modalityId || lastWinner.modality, lastWinner.modalityName || lastWinner.modality);
+                }
+
+                // Si hay un cante de bingo celebrándose en este momento, no cortar la celebración
+                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4500))) {
+                    const remaining = Math.max(1000, 4500 - (Date.now() - (window.__lastWinnerNoticeTime || 0)));
+                    setTimeout(function () {
+                        if (!isGameFinishedShown) {
+                            showGameFinalized();
+                        }
+                    }, remaining);
+                    return;
                 }
 
                 const noticeKey = lastWinner ? ((lastWinner.player || '') + '_' + (lastWinner.modality || '')) : '';
@@ -4538,53 +4555,11 @@ function initializeApp() {
                     return;
                 }
 
-                if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-                    audioManager.stopAll();
-                }
                 showGameFinalized();
-            });
+            }
 
-            pusherHelper.on('game:completed', function (data) {
-                console.log('WS game:completed received', data);
-                window.gameIsFinished = true;
-                window.allowGameUnload = true;
-                ballPlaybackQueue = [];
-                isBallPlaybackActive = false;
-                intervalManager.clear('lastNumber');
-
-                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
-                    return;
-                }
-
-                let lastWinnerComp = null;
-                if (data && data.player && data.modality) {
-                    lastWinnerComp = data;
-                } else if (Array.isArray(data && data.winners) && data.winners.length > 0) {
-                    const lw = data.winners[data.winners.length - 1];
-                    if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
-                        lastWinnerComp = Object.assign({}, data, {
-                            player: lw.player || lw.userName,
-                            modality: lw.modality || lw.modalityName,
-                            modalityId: lw.modalityId || lw.modality,
-                            cartonId: lw.cartonId || lw.carton,
-                            image: lw.image || site_url + 'assets/img/avatar.jpg'
-                        });
-                    }
-                }
-
-                const noticeKey = lastWinnerComp ? ((lastWinnerComp.player || '') + '_' + (lastWinnerComp.modality || '')) : '';
-                if (noticeKey && window.seenBingoNotices && !window.seenBingoNotices.has(noticeKey)) {
-                    showOtherPlayerBingoNotice(lastWinnerComp, function () {
-                        showGameFinalized();
-                    });
-                    return;
-                }
-
-                if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
-                    audioManager.stopAll();
-                }
-                showGameFinalized();
-            });
+            pusherHelper.on('game:game_finished', handlePlayingGameFinished);
+            pusherHelper.on('game:completed', handlePlayingGameFinished);
 
             // Reinicio de partida
             pusherHelper.on('game:game_reset', function () {

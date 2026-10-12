@@ -763,23 +763,39 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 // En Live: asegurar ganadores oficiales y premios sin cerrar la partida a status 0 (el admin finaliza manualmente)
                 bingo_ensure_winners_registered($gameId);
                 bingo_pay_pending_awards_for_game($gameId);
-                $liveWinners = bingo_get_official_sings_for_game($gameId, true);
+                $rawLiveWinners = bingo_get_official_sings_for_game($gameId, true);
+                $liveWinners = [];
+                $modelUsers = new \App\Models\UsersModel();
+                $modelModalities = new \App\Models\ModalitiesModel();
+                foreach ($rawLiveWinners as $lwItem) {
+                    $u = $modelUsers->find($lwItem['user']);
+                    $m = $modelModalities->find($lwItem['modality']);
+                    $pName = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lwItem['user'] ?? ''));
+                    $mName = $m ? translate($m['name'] ?? '') : 'Bingo';
+                    $lwItem['modalityId']   = (int) ($lwItem['modality'] ?? 0);
+                    $lwItem['cartonId']     = (int) ($lwItem['carton'] ?? 0);
+                    $lwItem['player']       = $pName;
+                    $lwItem['userName']     = $pName;
+                    $lwItem['modalityName'] = $mName;
+                    $lwItem['modality']     = $mName;
+                    $lwItem['image']        = !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg');
+                    $liveWinners[] = $lwItem;
+                }
+
                 $lastSing = !empty($liveWinners) ? end($liveWinners) : null;
                 $lastWinnerPayload = [];
                 if ($lastSing) {
-                    $modelUsers = new \App\Models\UsersModel();
-                    $modelModalities = new \App\Models\ModalitiesModel();
-                    $u = $modelUsers->find($lastSing['user']);
-                    $m = $modelModalities->find($lastSing['modality']);
                     $lastWinnerPayload = [
                         'singId'       => (int) ($lastSing['id'] ?? 0),
                         'userId'       => (int) ($lastSing['user'] ?? 0),
                         'winnerUserId' => (int) ($lastSing['user'] ?? 0),
-                        'player'       => $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lastSing['user'] ?? '')),
-                        'modality'     => $m ? translate($m['name'] ?? '') : 'Bingo',
-                        'modalityId'   => (int) ($lastSing['modality'] ?? 0),
-                        'cartonId'     => (int) ($lastSing['carton'] ?? 0),
-                        'image'        => !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg'),
+                        'player'       => $lastSing['player'],
+                        'userName'     => $lastSing['userName'],
+                        'modality'     => $lastSing['modality'],
+                        'modalityName' => $lastSing['modalityName'],
+                        'modalityId'   => (int) ($lastSing['modalityId'] ?? 0),
+                        'cartonId'     => (int) ($lastSing['cartonId'] ?? 0),
+                        'image'        => $lastSing['image'],
                     ];
                 }
                 bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
@@ -805,23 +821,39 @@ if (!function_exists('bingo_process_ball_cycle')) {
             if ($isLiveGame) {
                 bingo_ensure_winners_registered($gameId);
                 bingo_pay_pending_awards_for_game($gameId);
-                $liveWinners = bingo_get_official_sings_for_game($gameId, true);
+                $rawLiveWinners = bingo_get_official_sings_for_game($gameId, true);
+                $liveWinners = [];
+                $modelUsers = new \App\Models\UsersModel();
+                $modelModalities = new \App\Models\ModalitiesModel();
+                foreach ($rawLiveWinners as $lwItem) {
+                    $u = $modelUsers->find($lwItem['user']);
+                    $m = $modelModalities->find($lwItem['modality']);
+                    $pName = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lwItem['user'] ?? ''));
+                    $mName = $m ? translate($m['name'] ?? '') : 'Bingo';
+                    $lwItem['modalityId']   = (int) ($lwItem['modality'] ?? 0);
+                    $lwItem['cartonId']     = (int) ($lwItem['carton'] ?? 0);
+                    $lwItem['player']       = $pName;
+                    $lwItem['userName']     = $pName;
+                    $lwItem['modalityName'] = $mName;
+                    $lwItem['modality']     = $mName;
+                    $lwItem['image']        = !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg');
+                    $liveWinners[] = $lwItem;
+                }
+
                 $lastSing = !empty($liveWinners) ? end($liveWinners) : null;
                 $lastWinnerPayload = [];
                 if ($lastSing) {
-                    $modelUsers = new \App\Models\UsersModel();
-                    $modelModalities = new \App\Models\ModalitiesModel();
-                    $u = $modelUsers->find($lastSing['user']);
-                    $m = $modelModalities->find($lastSing['modality']);
                     $lastWinnerPayload = [
                         'singId'       => (int) ($lastSing['id'] ?? 0),
                         'userId'       => (int) ($lastSing['user'] ?? 0),
                         'winnerUserId' => (int) ($lastSing['user'] ?? 0),
-                        'player'       => $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($lastSing['user'] ?? '')),
-                        'modality'     => $m ? translate($m['name'] ?? '') : 'Bingo',
-                        'modalityId'   => (int) ($lastSing['modality'] ?? 0),
-                        'cartonId'     => (int) ($lastSing['carton'] ?? 0),
-                        'image'        => !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg'),
+                        'player'       => $lastSing['player'],
+                        'userName'     => $lastSing['userName'],
+                        'modality'     => $lastSing['modality'],
+                        'modalityName' => $lastSing['modalityName'],
+                        'modalityId'   => (int) ($lastSing['modalityId'] ?? 0),
+                        'cartonId'     => (int) ($lastSing['cartonId'] ?? 0),
+                        'image'        => $lastSing['image'],
                     ];
                 }
                 bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
@@ -848,20 +880,60 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 if (function_exists('bingo_on_game_finished')) {
                     bingo_on_game_finished($gameId);
                 }
-                bingo_broadcast_game_status($gameId, 'game:game_finished', [
-                    'status'  => 0,
-                    'winners' => bingo_get_official_sings_for_game($gameId, true),
-                ]);
+                $rawWinners = bingo_get_official_sings_for_game($gameId, true);
+                $enrichedWinners = [];
+                $modelUsers = new \App\Models\UsersModel();
+                $modelModalities = new \App\Models\ModalitiesModel();
+                foreach ($rawWinners as $wItem) {
+                    $u = $modelUsers->find($wItem['user']);
+                    $m = $modelModalities->find($wItem['modality']);
+                    $pName = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($wItem['user'] ?? ''));
+                    $mName = $m ? translate($m['name'] ?? '') : 'Bingo';
+                    $wItem['modalityId']   = (int) ($wItem['modality'] ?? 0);
+                    $wItem['cartonId']     = (int) ($wItem['carton'] ?? 0);
+                    $wItem['player']       = $pName;
+                    $wItem['userName']     = $pName;
+                    $wItem['modalityName'] = $mName;
+                    $wItem['modality']     = $mName;
+                    $wItem['image']        = !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg');
+                    $enrichedWinners[] = $wItem;
+                }
+                $lastSingAuto = !empty($enrichedWinners) ? end($enrichedWinners) : null;
+                bingo_broadcast_game_status($gameId, 'game:game_finished', array_merge([
+                    'status'        => 0,
+                    'gameId'        => $gameId,
+                    'gameCompleted' => true,
+                    'winners'       => $enrichedWinners,
+                ], $lastSingAuto ? [
+                    'player'       => $lastSingAuto['player'],
+                    'userName'     => $lastSingAuto['userName'],
+                    'modality'     => $lastSingAuto['modality'],
+                    'modalityName' => $lastSingAuto['modalityName'],
+                    'modalityId'   => (int) ($lastSingAuto['modalityId'] ?? 0),
+                    'cartonId'     => (int) ($lastSingAuto['cartonId'] ?? 0),
+                    'image'        => $lastSingAuto['image'],
+                ] : []));
                 $gameFinalizedNow = true;
             }
         }
 
-        $officialWinners = bingo_get_official_sings_for_game($gameId, true);
-        foreach ($officialWinners as &$winner) {
+        $rawOfficialWinners = bingo_get_official_sings_for_game($gameId, true);
+        $officialWinners = [];
+        $modelUsers = new \App\Models\UsersModel();
+        $modelModalities = new \App\Models\ModalitiesModel();
+        foreach ($rawOfficialWinners as $winner) {
             $u = $modelUsers->find($winner['user']);
             $m = $modelModalities->find($winner['modality']);
-            $winner['player'] = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . $winner['user']);
-            $winner['modality'] = $m ? translate($m['name'] ?? '') : 'Bingo';
+            $pName = $u ? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) : ('Jugador #' . ($winner['user'] ?? ''));
+            $mName = $m ? translate($m['name'] ?? '') : 'Bingo';
+            $winner['modalityId']   = (int) ($winner['modality'] ?? 0);
+            $winner['cartonId']     = (int) ($winner['carton'] ?? 0);
+            $winner['player']       = $pName;
+            $winner['userName']     = $pName;
+            $winner['modalityName'] = $mName;
+            $winner['modality']     = $mName;
+            $winner['image']        = !empty($u['image']) ? site_url('uploads/users/' . $u['image']) : site_url('assets/img/avatar.jpg');
+            $officialWinners[] = $winner;
         }
 
         // Determinar estado de respuesta
@@ -875,8 +947,11 @@ if (!function_exists('bingo_process_ball_cycle')) {
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $officialWinners,
                 'player' => $lastWinnerSing['player'] ?? '',
+                'userName' => $lastWinnerSing['userName'] ?? ($lastWinnerSing['player'] ?? ''),
                 'modality' => $lastWinnerSing['modality'] ?? '',
-                'modalityId' => $lastWinnerSing['modalityId'] ?? ($lastWinnerSing['modality'] ?? 0),
+                'modalityName' => $lastWinnerSing['modalityName'] ?? ($lastWinnerSing['modality'] ?? ''),
+                'modalityId' => (int) ($lastWinnerSing['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastWinnerSing['cartonId'] ?? 0),
                 'image' => $lastWinnerSing['image'] ?? site_url('assets/img/avatar.jpg'),
                 'message' => translate('the game is over, all the prizes have been awarded'),
             ];
@@ -1103,6 +1178,11 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
             }
             if ($gameCreatorId > 0) {
                 $staffIds[$gameCreatorId] = true;
+            }
+            $currentSessionId = (int) (session()->get('id') ?? 0);
+            $currentSessionGroup = (int) (session()->get('group') ?? 0);
+            if ($currentSessionId > 0 && ($currentSessionGroup === 1 || $currentSessionGroup === 3 || (function_exists('bingo_is_admin') && bingo_is_admin($currentSessionGroup)))) {
+                $staffIds[$currentSessionId] = true;
             }
 
             $modalityClean = trim(preg_replace('/^la\s+/i', '', (string) $modalityName));

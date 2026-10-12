@@ -1,7 +1,8 @@
 <?php
 $isLiveGameType = isset($game) && in_array((int)($game['type'] ?? 0), [3, 4], true);
 $isLiveGameOpen = $isLiveGameType && ((int)($game['status'] ?? 0) !== 0);
-$isPlayerViewer = (session()->get('group') == 0);
+$isPlayerViewer = ((int) session()->get('group') === 0);
+$isAdminViewer = ((int) session()->get('group') === 1) || (function_exists('bingo_is_admin') && bingo_is_admin());
 $showWaitingNotice = $isLiveGameOpen && $isPlayerViewer;
 ?>
 <div class="modal-dialog modal-dialog-centered max-w-70">
@@ -63,6 +64,11 @@ $showWaitingNotice = $isLiveGameOpen && $isPlayerViewer;
             <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="<?= $showWaitingNotice ? 'display: inline-block;' : 'display: none;' ?> font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
                 <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
             </div>
+            <?php if ($isLiveGameType && $isAdminViewer && $isLiveGameOpen) : ?>
+            <button type="button" class="btn btn-danger btn-finalizar-live px-4 py-2 my-2 fw-bold" id="btnModalFinalizarLive" onclick="if (typeof confirmarFinalizarLive === 'function') { confirmarFinalizarLive(); } else if (typeof window.confirmarFinalizarLive === 'function') { window.confirmarFinalizarLive(); }">
+                <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
+            </button>
+            <?php endif; ?>
             <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" style="<?= $showWaitingNotice ? 'display: none !important;' : '' ?>">
                 <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
             </button>

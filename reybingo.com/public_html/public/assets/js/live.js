@@ -875,16 +875,42 @@ function mergeWinnersFromServer(serverWinners) {
         }
 
         const modId = winner.modalityId || winner.modality;
-        if (modId) {
-            const cartn = $id(`modality-${modId}`);
-            if (cartn) {
-                cartn.classList.add('cartn-sing');
-                cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                    el.classList.add('sing');
-                    el.innerText = '⭐️';
-                });
-            }
+        markModalityCardWon(modId, winner.modality || winner.modalityName);
+    });
+}
+
+function markModalityCardWon(modalityId, modalityName) {
+    let targets = [];
+    if (modalityId) {
+        const byId = document.querySelectorAll(`[id="modality-${modalityId}"]`);
+        if (byId.length) {
+            targets = Array.from(byId);
         }
+    }
+    if (targets.length === 0 && modalityName) {
+        const cleanName = String(modalityName).toLowerCase().replace(/^la\s+/i, '').trim();
+        document.querySelectorAll('.container-cartons-modalities .border-carton, .border-carton').forEach(border => {
+            const label = border.querySelector('small');
+            if (label) {
+                const text = label.textContent.toLowerCase().replace(/^la\s+/i, '').trim();
+                if (text === cleanName || cleanName.includes(text) || text.includes(cleanName)) {
+                    const cartn = border.querySelector('.carton');
+                    if (cartn) targets.push(cartn);
+                }
+            }
+        });
+    }
+
+    targets.forEach(cartn => {
+        cartn.classList.add('cartn-sing');
+        const parentBorder = cartn.closest('.border-carton');
+        if (parentBorder) {
+            parentBorder.classList.add('modality-won');
+        }
+        cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+            el.classList.add('sing');
+            el.innerText = '⭐️';
+        });
     });
 }
 
@@ -892,6 +918,9 @@ function showOtherPlayerBingoNotice(data, callback) {
     if (!data) {
         return;
     }
+
+    // Asegurar que la card de modalidad siempre se actualice visualmente con estrellas
+    markModalityCardWon(data.modalityId, data.modality || data.modalityName);
 
     const noticeKey = getBingoDedupeKey(data);
 
@@ -918,16 +947,7 @@ function showOtherPlayerBingoNotice(data, callback) {
         }
     }
 
-    if (data.modalityId) {
-        const cartn = $id(`modality-${data.modalityId}`);
-        if (cartn) {
-            cartn.classList.add('cartn-sing');
-            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                el.classList.add('sing');
-                el.innerText = '⭐️';
-            });
-        }
-    }
+    window.__lastWinnerNoticeTime = Date.now();
 
     // 1. Reproducir sonido de notificación con winner.mp3 (sin bloquear)
     try {
@@ -940,14 +960,16 @@ function showOtherPlayerBingoNotice(data, callback) {
         console.warn('Error al reproducir audio de ganador:', e);
     }
 
+    const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
+    const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+        ? `Ganadores de la modalidad ${modalityClean}`
+        : `Ganadores de la ${modalityClean}`;
+    const pName = data.player || data.userName || 'Jugador';
+    const cartonNum = data.cartonId || data.carton || '';
+    const cartonInfo = cartonNum ? ` (Cartón #${cartonNum})` : '';
+
     // 2. Disparar notificación toast visual del sistema unificada por modalidad
     if (typeof window.showNotification === 'function') {
-        const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
-        const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
-            ? `Ganadores de la modalidad ${modalityClean}`
-            : `Ganadores de la ${modalityClean}`;
-        const pName = data.player || data.userName || 'Jugador';
-
         window.showNotification({
             id: noticeKey,
             type: 'sing',
@@ -956,9 +978,35 @@ function showOtherPlayerBingoNotice(data, callback) {
             player: pName,
             cartonId: data.cartonId || data.carton,
             title: '🎉 ¡BINGO CANTADO!',
-            message: `${modalityLabel}: ${pName}`,
+            message: `${modalityLabel}: ${pName}${cartonInfo}`,
             created_at: data.created_at || new Date().toISOString()
         });
+    }
+
+    // 2b. Toast flotante Toastify garantizado en pantalla para el administrador
+    try {
+        if (typeof Toastify === 'function') {
+            Toastify({
+                text: `🎉 ¡BINGO CANTADO!\n${modalityLabel}: ${pName}${cartonInfo}`,
+                duration: 9000,
+                gravity: 'top',
+                position: 'right',
+                style: {
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+                    borderRadius: '14px',
+                    fontSize: '16px',
+                    fontWeight: '700',
+                    color: '#ffffff',
+                    border: '2px solid rgba(255,255,255,0.4)',
+                    padding: '16px 22px',
+                    zIndex: 999999
+                },
+                stopOnFocus: true
+            }).showToast();
+        }
+    } catch (te) {
+        console.warn('Error al mostrar Toastify de ganador en LIVE:', te);
     }
 
     // 3. Efectos visuales de confeti
@@ -993,9 +1041,23 @@ function showOtherPlayerBingoNotice(data, callback) {
 function showCountdown(data, callback) {
     if (isGameFinishedShown) return;
 
-    if (data && (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown)) {
+    if (data) {
+        markModalityCardWon(data.modalityId, data.modality || data.modalityName);
+    }
+
+    const isFinished = (data && (data.gameCompleted === true || data.status === 'completed')) || window.gameIsFinished || window.isGameCompleted;
+
+    if (isFinished) {
         window.gameIsFinished = true;
-        showGameFinalized();
+        window.isGameCompleted = true;
+        // Permitir 4.5 segundos completos de celebración para la última modalidad antes de transicionar
+        setTimeout(function () {
+            if (typeof callback === 'function' && callback !== startAutomaticGeneration && callback !== startAutomaticLast) {
+                callback();
+            } else {
+                showGameFinalized();
+            }
+        }, 4500);
         return;
     }
 
@@ -1274,16 +1336,31 @@ function generateNumber(number) {
             if (data.status === 'pause') {
                 const pKey = getBingoDedupeKey(data);
                 if (!pKey || !window.seenBingoNotices.has(pKey)) {
-                    if (pKey) window.seenBingoNotices.add(pKey);
-                    showCountdown(data, startAutomaticLast);
+                    showOtherPlayerBingoNotice(data, startAutomaticLast);
                 }
             } else if (data.status === 'completed') {
-                const pKey = getBingoDedupeKey(data);
-                if (data.player && data.modality && (!pKey || !window.seenBingoNotices.has(pKey))) {
-                    if (pKey) window.seenBingoNotices.add(pKey);
-                    showCountdown(data, function() {
-                        showGameFinalized();
+                let winnerData = data;
+                if ((!winnerData.player || !winnerData.modality) && Array.isArray(winnerData.winners) && winnerData.winners.length > 0) {
+                    const lw = winnerData.winners[winnerData.winners.length - 1];
+                    winnerData = Object.assign({}, data, {
+                        player: lw.player || lw.userName,
+                        modality: lw.modality || lw.modalityName,
+                        modalityId: lw.modalityId || lw.modality,
+                        cartonId: lw.cartonId || lw.carton,
+                        image: lw.image || site_url + 'assets/img/avatar.jpg'
                     });
+                }
+                const pKey = getBingoDedupeKey(winnerData);
+                if (winnerData.player && winnerData.modality) {
+                    markModalityCardWon(winnerData.modalityId, winnerData.modality);
+                    const timeSinceNotice = window.__lastWinnerNoticeTime ? (Date.now() - window.__lastWinnerNoticeTime) : 99999;
+                    if (!pKey || !window.seenBingoNotices.has(pKey) || timeSinceNotice > 4500) {
+                        showOtherPlayerBingoNotice(winnerData, function() {
+                            showGameFinalized();
+                        });
+                    } else {
+                        showGameFinalized();
+                    }
                 } else {
                     showGameFinalized();
                 }
@@ -1435,19 +1512,30 @@ function lastNumberGet() {
             if (data.status === 'pause') {
                 const pKey = getBingoDedupeKey(data);
                 if (!pKey || !window.seenBingoNotices.has(pKey)) {
-                    if (pKey) window.seenBingoNotices.add(pKey);
                     stopAutomaticGeneration();
                     intervalManager.clear('lastNumber');
-                    showCountdown(data, startAutomaticLast);
+                    showOtherPlayerBingoNotice(data, startAutomaticLast);
                 }
             } else if (data.status === 'completed') {
                 stopAutomaticGeneration();
                 intervalManager.clear('lastNumber');
-                if (data.player && data.player !== '') {
-                    const pKey = getBingoDedupeKey(data);
-                    if (!pKey || !window.seenBingoNotices.has(pKey)) {
-                        if (pKey) window.seenBingoNotices.add(pKey);
-                        showCountdown(data, () => {
+                let winnerData = data;
+                if ((!winnerData.player || !winnerData.modality) && Array.isArray(winnerData.winners) && winnerData.winners.length > 0) {
+                    const lw = winnerData.winners[winnerData.winners.length - 1];
+                    winnerData = Object.assign({}, data, {
+                        player: lw.player || lw.userName,
+                        modality: lw.modality || lw.modalityName,
+                        modalityId: lw.modalityId || lw.modality,
+                        cartonId: lw.cartonId || lw.carton,
+                        image: lw.image || site_url + 'assets/img/avatar.jpg'
+                    });
+                }
+                const pKey = getBingoDedupeKey(winnerData);
+                if (winnerData.player && winnerData.modality) {
+                    markModalityCardWon(winnerData.modalityId, winnerData.modality);
+                    const timeSinceNotice = window.__lastWinnerNoticeTime ? (Date.now() - window.__lastWinnerNoticeTime) : 99999;
+                    if (!pKey || !window.seenBingoNotices.has(pKey) || timeSinceNotice > 4500) {
+                        showOtherPlayerBingoNotice(winnerData, () => {
                             showGameFinalized();
                         });
                     } else {
@@ -1485,6 +1573,18 @@ function stopAutomaticLast() {
 
 function showGameFinalized() {
     if (isGameFinishedShown || window.__gameFinalizationInProgress) return;
+
+    // Si se está celebrando la última modalidad ganada (dentro de los últimos 4.5 segundos),
+    // esperar a que termine de celebrarse antes de tapar la pantalla con el cartel de juego terminado.
+    const timeSinceLastNotice = window.__lastWinnerNoticeTime ? (Date.now() - window.__lastWinnerNoticeTime) : 99999;
+    if (timeSinceLastNotice < 4500) {
+        const remainingDelay = Math.max(500, 4500 - timeSinceLastNotice);
+        setTimeout(function() {
+            showGameFinalized();
+        }, remainingDelay);
+        return;
+    }
+
     window.__gameFinalizationInProgress = true;
     isGameFinishedShown = true;
     window.gameIsFinished = true;
@@ -2401,6 +2501,10 @@ function initializeApp() {
                 stopAutomaticGeneration();
                 stopAutomaticLast();
 
+                if (data.modalityId || data.modality) {
+                    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+                }
+
                 const isCompleted = (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown);
                 if (isCompleted) {
                     window.gameIsFinished = true;
@@ -2427,7 +2531,45 @@ function initializeApp() {
                 if (data && Array.isArray(data.winners)) {
                     mergeWinnersFromServer(data.winners);
                 }
+                if (data && (data.modalityId || data.modality)) {
+                    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+                }
             });
+
+            // Notificaciones en tiempo real para el administrador en LIVE
+            function handleLiveSingNotification(data) {
+                console.log('LIVE WS: notificación de ganador recibida', data);
+                if (!data) return;
+                const isNewGame = data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title));
+                const isSing = !isNewGame && (data.type === 'sing' || data.type === 'own_sing' || (data.title && /bingo/i.test(data.title)) || (data.message && /ganador/i.test(data.message)));
+                if (isSing) {
+                    const noticeKey = getBingoDedupeKey(data) || data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || data.player || '')));
+                    if (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) {
+                        return;
+                    }
+                    const singPayload = {
+                        singId: data.singId || data.id,
+                        userId: data.userId || data.winnerUserId,
+                        winnerUserId: data.winnerUserId || data.userId,
+                        player: data.player || data.userName || 'Jugador',
+                        userName: data.userName || data.player || 'Jugador',
+                        modality: data.modality || data.modalityName || 'Bingo',
+                        modalityName: data.modalityName || data.modality || 'Bingo',
+                        modalityId: data.modalityId || data.modality,
+                        cartonId: data.cartonId || data.carton,
+                        created_at: data.created_at || new Date().toISOString()
+                    };
+                    if (singPayload.modalityId || singPayload.modality) {
+                        markModalityCardWon(singPayload.modalityId || singPayload.modality, singPayload.modalityName || singPayload.modality);
+                    }
+                    showOtherPlayerBingoNotice(singPayload, function() {
+                        startAutomaticLast();
+                    });
+                }
+            }
+
+            pusherHelper.on('game:notification', handleLiveSingNotification);
+            pusherHelper.on('notification:new', handleLiveSingNotification);
 
             // Evento de finalización oficial del Live por el admin
             pusherHelper.on('game:live_finalized', function(data) {
@@ -2440,19 +2582,14 @@ function initializeApp() {
             });
 
             // Fin de partida
-            pusherHelper.on('game:game_finished', function(data) {
-                console.log('LIVE WS: game_finished recibido', data);
+            function handleLiveGameFinished(data) {
+                console.log('LIVE WS: game_finished / game_completed recibido', data);
                 stopAutomaticGeneration();
                 stopAutomaticLast();
                 window.gameIsFinished = true;
                 if (data && data.liveFinalized) {
                     window.isLiveFinalized = true;
                     $('#btn-finalizar-live').hide();
-                }
-
-                // Si hay un cante de ganador celebrándose, no interrumpir la celebración
-                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4000))) {
-                    return;
                 }
 
                 let lastWinner = null;
@@ -2463,7 +2600,9 @@ function initializeApp() {
                     if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
                         lastWinner = Object.assign({}, data, {
                             player: lw.player || lw.userName,
+                            userName: lw.userName || lw.player,
                             modality: lw.modality || lw.modalityName,
+                            modalityName: lw.modalityName || lw.modality,
                             modalityId: lw.modalityId || lw.modality,
                             cartonId: lw.cartonId || lw.carton,
                             image: lw.image || site_url + 'assets/img/avatar.jpg'
@@ -2471,10 +2610,24 @@ function initializeApp() {
                     }
                 }
 
+                if (lastWinner && (lastWinner.modalityId || lastWinner.modality)) {
+                    markModalityCardWon(lastWinner.modalityId || lastWinner.modality, lastWinner.modalityName || lastWinner.modality);
+                }
+
+                // Si hay un cante de ganador celebrándose, no interrumpir la celebración
+                if (bingoInProgress || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4500))) {
+                    const remainingCelebration = Math.max(1000, 4500 - (Date.now() - (window.__lastWinnerNoticeTime || 0)));
+                    setTimeout(function() {
+                        if (!isGameFinishedShown) {
+                            showGameFinalized();
+                        }
+                    }, remainingCelebration);
+                    return;
+                }
+
                 const pKey = lastWinner ? getBingoDedupeKey(lastWinner) : '';
                 if (pKey && (!window.seenBingoNotices || !window.seenBingoNotices.has(pKey))) {
-                    if (window.seenBingoNotices) window.seenBingoNotices.add(pKey);
-                    showCountdown(lastWinner, function() {
+                    showOtherPlayerBingoNotice(lastWinner, function() {
                         showGameFinalized();
                     });
                     return;
@@ -2483,10 +2636,52 @@ function initializeApp() {
                 if (!isGameFinishedShown) {
                     showGameFinalized();
                 }
-            });
+            }
+
+            pusherHelper.on('game:game_finished', handleLiveGameFinished);
+            pusherHelper.on('game:completed', handleLiveGameFinished);
         } catch (pe) {
             console.warn('Error inicializando PusherClient en LIVE:', pe);
         }
+    }
+
+    // Asegurar definición de showNotification para tablero LIVE con toast sonoro
+    if (typeof window.showNotification !== 'function') {
+        window.showNotification = function(payload) {
+            if (!payload) return;
+            const modalityClean = (payload.modality || payload.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
+            const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
+                ? `Ganadores de la modalidad ${modalityClean}`
+                : `Ganadores de la ${modalityClean}`;
+            const pName = payload.player || payload.userName || 'Jugador';
+            const carton = payload.cartonId || payload.carton || '';
+            const cartonText = carton ? ` (Cartón #${carton})` : '';
+
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: `🎉 ¡BINGO CANTADO!\n${modalityLabel}: ${pName}${cartonText}`,
+                    duration: 8000,
+                    gravity: 'top',
+                    position: 'right',
+                    style: {
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                        borderRadius: '12px',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        color: '#ffffff'
+                    },
+                    stopOnFocus: true
+                }).showToast();
+            }
+            try {
+                if (typeof audioManager !== 'undefined' && audioManager.play) {
+                    audioManager.play(audioPath + 'winner.mp3');
+                } else if (typeof playNotificationSound === 'function') {
+                    playNotificationSound('winner', true);
+                }
+            } catch (e) {}
+        };
     }
 
     // Interceptar notificaciones duplicadas de sings desde pusher-client o polling
@@ -2499,8 +2694,8 @@ function initializeApp() {
                 if (nKey && window.seenBingoNotices && window.seenBingoNotices.has(nKey)) {
                     return; // Ignorar notificación duplicada de cante
                 }
-                if (nKey && window.seenBingoNotices) {
-                    window.seenBingoNotices.add(nKey);
+                if (payload.player && payload.modality) {
+                    showOtherPlayerBingoNotice(payload);
                 }
             }
             return originalShowNotification.apply(this, arguments);
@@ -2686,14 +2881,14 @@ console.log('Bingo App with Enhanced Chat script loaded successfully');
 
 // Inicialización de estado si la página se recarga con partida ya completada
 $(function() {
+    if (window.isAdmin && !window.isLiveFinalized && !window.__liveFinalized) {
+        $('#btn-finalizar-live').show().css('display', 'inline-flex');
+    }
     if (window.isGameCompleted) {
         $('.bingo-ball[onclick^="generateNumber"]').removeAttr('onclick');
         $('#start-button, #play-button, #stop-button, #next-number-button').hide();
         if (window.isAdmin) {
             $('#btn-ver-ganadores').show().css('display', 'inline-flex');
-            if (!window.isLiveFinalized && !window.__liveFinalized) {
-                $('#btn-finalizar-live').show().css('display', 'inline-flex');
-            }
         }
     }
 });

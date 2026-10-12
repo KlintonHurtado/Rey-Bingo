@@ -3535,17 +3535,20 @@ class Users extends Controller {
         }
 
         $userGroup = (int) ($user['group'] ?? session()->get('group') ?? 0);
+        $isAdmin = ($userGroup === 1 || (function_exists('bingo_is_admin') && bingo_is_admin($userGroup)));
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
-        // Regla de Negocio: Separación estricta entre Historial y Alertas Emergentes en Tiempo Real.
-        // 1. Ganadores ('sing'): Son eventos en vivo gestionados por WebSocket en la sala activa.
-        // Se marcan como leídas (status = 1) en BD para preservar el 100% del historial y trazabilidad,
-        // excluyéndose de las alertas emergentes para evitar spam sonoro/visual al ingresar.
-        $modelNotifications->builder()
-            ->where('user', $user['id'])
-            ->where('status', 0)
-            ->where('type', 'sing')
-            ->update(['status' => 1]);
+        // Regla de Negocio:
+        // Para administradores y operadores, las notificaciones de ganadores ('sing') son críticas y se deben entregar.
+        // Si el usuario es un jugador regular (no admin/staff), solo limpiar notificaciones de sing antiguas (>5 min).
+        if (!$isAdmin && $userGroup !== 3) {
+            $modelNotifications->builder()
+                ->where('user', $user['id'])
+                ->where('status', 0)
+                ->where('type', 'sing')
+                ->where('created_at <', date('Y-m-d H:i:s', time() - 300))
+                ->update(['status' => 1]);
+        }
 
         // 2. Control de conexión y ventana de tiempo para alertas emergentes:
         // Las alertas emergentes (popups y sonido) son EXCLUSIVAS para eventos generados
@@ -3606,24 +3609,31 @@ class Users extends Controller {
                 ->where('status', 0)
                 ->where('created_at >=', $effectiveThreshold)
                 ->where('type !=', 'game')
-                ->where('type !=', 'sing')
                 ->groupStart()
                     ->where('game IS NULL', null, false)
                     ->orWhere('game', 0)
+                    ->orWhere('type', 'sing')
                 ->groupEnd()
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
         } else {
-            // Jugadores y Administradores: solo reciben alertas activas en tiempo real
+            // Jugadores y Administradores: reciben alertas activas en tiempo real
             // creadas DESPUÉS de que el usuario se conectó (created_at >= $effectiveThreshold)
-            $notifications = $modelNotifications
+            $notifQuery = $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
-                ->where('created_at >=', $effectiveThreshold)
-                ->groupStart()
+                ->where('created_at >=', $effectiveThreshold);
+
+            if (!$isAdmin) {
+                // Jugadores regulares: no recibir sings ajenos, solo su propio cante o notificaciones no-sing
+                $notifQuery->groupStart()
                     ->where('type !=', 'sing')
                     ->orWhere('type IS NULL', null, false)
-                ->groupEnd()
+                    ->orWhere('title LIKE', '%¡HAS CANTADO BINGO!%')
+                ->groupEnd();
+            }
+
+            $notifications = $notifQuery
                 ->orderBy('created_at', 'DESC')
                 ->limit(10)
                 ->findAll();

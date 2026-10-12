@@ -95,6 +95,10 @@ class Boards extends Controller {
             return redirect()->to('/games');
         }
 
+        if (in_array((int) ($game['type'] ?? 0), [3, 4], true)) {
+            return redirect()->to('/live');
+        }
+
         $status = 'start';
 
         $totalNumbersGenerated = $model->where('game', $game['id'])->countAllResults();
@@ -271,7 +275,7 @@ class Boards extends Controller {
         $isGameCompleted = ($status === 'stop' || $totalNumbersGenerated >= 75 || ($AwardsCount > 0 && $SingsCount >= $AwardsCount));
         $isGameFinalized = ((int) ($game['status'] ?? 0) === 0);
         $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
-        $isAdmin = bingo_is_admin();
+        $isAdmin = bingo_is_admin() || ((int) session()->get('group') === 1);
 
         $data = [
             'page' => [
@@ -333,11 +337,22 @@ class Boards extends Controller {
             if ((int) ($game['status'] ?? 0) !== 0 && !$isLiveGame) {
                 bingo_finalize_game_when_complete((int) $game['id']);
             }
+            bingo_ensure_winners_registered((int) $game['id']);
+            $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
+            $lastW = !empty($winners) ? end($winners) : null;
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => null
+                'number' => null,
+                'winners' => $winners,
+                'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
+                'modality' => $lastW['modality'] ?? '',
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 
@@ -366,11 +381,21 @@ class Boards extends Controller {
             } else {
                 bingo_finalize_game_when_complete((int) $game['id']);
             }
+            $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
+            $lastW = !empty($winners) ? end($winners) : null;
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
-                'number' => null
+                'number' => null,
+                'winners' => $winners,
+                'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
+                'modality' => $lastW['modality'] ?? '',
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 
@@ -381,11 +406,21 @@ class Boards extends Controller {
             } else {
                 bingo_finalize_game_when_complete((int) $game['id']);
             }
+            $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
+            $lastW = !empty($winners) ? end($winners) : null;
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
-                'number' => null
+                'number' => null,
+                'winners' => $winners,
+                'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
+                'modality' => $lastW['modality'] ?? '',
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 
@@ -441,6 +476,16 @@ class Boards extends Controller {
             $responsePayload['image'] = $ps['image'] ?? site_url('assets/img/avatar.jpg');
         }
 
+        if (empty($responsePayload['player']) && !empty($responsePayload['winners'])) {
+            $lastW = end($responsePayload['winners']);
+            if (!empty($lastW['player'])) {
+                $responsePayload['player'] = $lastW['player'];
+                $responsePayload['modality'] = $lastW['modality'] ?? '';
+                $responsePayload['modalityId'] = $lastW['modalityId'] ?? 0;
+                $responsePayload['image'] = $lastW['image'] ?? site_url('assets/img/avatar.jpg');
+            }
+        }
+
         return $this->response->setJSON($responsePayload);
     }
 
@@ -482,11 +527,22 @@ class Boards extends Controller {
             if ((int) ($game['status'] ?? 0) !== 0 && !$isLiveGame) {
                 bingo_finalize_game_when_complete($gameId);
             }
+            bingo_ensure_winners_registered($gameId);
+            $winners = $this->buildWinnersList($gameId, new SingsModel(), new UsersModel(), new ModalitiesModel());
+            $lastW = !empty($winners) ? end($winners) : null;
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => null,
+                'winners' => $winners,
+                'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
+                'modality' => $lastW['modality'] ?? '',
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 
@@ -526,15 +582,34 @@ class Boards extends Controller {
 
         if (!empty($result['player'])) {
             $responsePayload['player'] = $result['player'];
+            $responsePayload['userName'] = $result['userName'] ?? $result['player'];
             $responsePayload['modality'] = $result['modality'] ?? '';
-            $responsePayload['modalityId'] = $result['modalityId'] ?? 0;
+            $responsePayload['modalityName'] = $result['modalityName'] ?? ($result['modality'] ?? '');
+            $responsePayload['modalityId'] = (int) ($result['modalityId'] ?? 0);
+            $responsePayload['cartonId'] = (int) ($result['cartonId'] ?? 0);
             $responsePayload['image'] = $result['image'] ?? site_url('assets/img/avatar.jpg');
         } elseif ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
             $ps = $result['pendingSing'];
             $responsePayload['player'] = $ps['player'] ?? ($ps['userName'] ?? '');
+            $responsePayload['userName'] = $responsePayload['player'];
             $responsePayload['modality'] = $ps['modality'] ?? ($ps['modalityName'] ?? '');
-            $responsePayload['modalityId'] = $ps['modalityId'] ?? ($ps['modality'] ?? 0);
+            $responsePayload['modalityName'] = $responsePayload['modality'];
+            $responsePayload['modalityId'] = (int) ($ps['modalityId'] ?? ($ps['modality'] ?? 0));
+            $responsePayload['cartonId'] = (int) ($ps['cartonId'] ?? ($ps['carton'] ?? 0));
             $responsePayload['image'] = $ps['image'] ?? site_url('assets/img/avatar.jpg');
+        }
+
+        if (empty($responsePayload['player']) && !empty($responsePayload['winners'])) {
+            $lastW = end($responsePayload['winners']);
+            if (!empty($lastW['player'])) {
+                $responsePayload['player'] = $lastW['player'];
+                $responsePayload['userName'] = $lastW['userName'] ?? $lastW['player'];
+                $responsePayload['modality'] = $lastW['modality'] ?? '';
+                $responsePayload['modalityName'] = $lastW['modalityName'] ?? ($lastW['modality'] ?? '');
+                $responsePayload['modalityId'] = (int) ($lastW['modalityId'] ?? 0);
+                $responsePayload['cartonId'] = (int) ($lastW['cartonId'] ?? 0);
+                $responsePayload['image'] = $lastW['image'] ?? site_url('assets/img/avatar.jpg');
+            }
         }
 
         return $this->response->setJSON($responsePayload);
@@ -587,6 +662,7 @@ class Boards extends Controller {
                 bingo_on_game_finished((int) $game['id'], (int) session()->get('id'));
             }
 
+            $lastW = !empty($winners) ? end($winners) : null;
             return $this->response->setJSON([
                 'status' => 'completed',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
@@ -594,10 +670,13 @@ class Boards extends Controller {
                 'winners' => $winners,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
                 'number' => $lastNumber['number'],
-                'player' => '',
-                'modality' => '',
-                'modalityId' => '',
-                'image' => ''
+                'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
+                'modality' => $lastW['modality'] ?? '',
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
 
@@ -625,8 +704,11 @@ class Boards extends Controller {
                     'message' => translate('the game is over, all the prizes have been awarded'),
                     'number' => $lastNumber['number'],
                     'player' => $pendingBoardSing['player'],
+                    'userName' => $pendingBoardSing['player'],
                     'modality' => $pendingBoardSing['modality'],
-                    'modalityId' => $pendingBoardSing['modalityId'],
+                    'modalityName' => $pendingBoardSing['modality'],
+                    'modalityId' => (int) ($pendingBoardSing['modalityId'] ?? 0),
+                    'cartonId' => (int) ($pendingBoardSing['cartonId'] ?? 0),
                     'image' => $pendingBoardSing['image'],
                 ]);
             }
@@ -639,8 +721,11 @@ class Boards extends Controller {
                 'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
                 'number' => $lastNumber['number'],
                 'player' => $pendingBoardSing['player'],
+                'userName' => $pendingBoardSing['player'],
                 'modality' => $pendingBoardSing['modality'],
-                'modalityId' => $pendingBoardSing['modalityId'],
+                'modalityName' => $pendingBoardSing['modality'],
+                'modalityId' => (int) ($pendingBoardSing['modalityId'] ?? 0),
+                'cartonId' => (int) ($pendingBoardSing['cartonId'] ?? 0),
                 'image' => $pendingBoardSing['image'],
             ]);
         }
@@ -664,8 +749,11 @@ class Boards extends Controller {
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
                 'player' => $lastW['player'] ?? '',
+                'userName' => $lastW['userName'] ?? ($lastW['player'] ?? ''),
                 'modality' => $lastW['modality'] ?? '',
-                'modalityId' => $lastW['modalityId'] ?? 0,
+                'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
+                'modalityId' => (int) ($lastW['modalityId'] ?? 0),
+                'cartonId' => (int) ($lastW['cartonId'] ?? 0),
                 'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
@@ -715,7 +803,7 @@ class Boards extends Controller {
 
         helper(['bingo', 'wallet']);
 
-        if (!bingo_is_admin()) {
+        if (!bingo_is_admin() && (int) session()->get('group') !== 1) {
             return $this->response->setStatusCode(403)->setJSON([
                 'success' => false,
                 'message' => translate('unauthorized access') ?: 'Acceso denegado. Se requiere rol de administrador para finalizar el Live.',
@@ -1381,8 +1469,15 @@ class Boards extends Controller {
         foreach ($winners as &$winner) {
             $user = $modelUsers->find($winner['user']);
             $wmodality = $modelModalities->find($winner['modality']);
-            $winner['player'] = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-            $winner['modality'] = translate($wmodality['name'] ?? '');
+            $pName = $user ? trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')) : ('Jugador #' . ($winner['user'] ?? ''));
+            $mName = translate($wmodality['name'] ?? '');
+            $winner['modalityId']   = (int) ($winner['modality'] ?? 0);
+            $winner['cartonId']     = (int) ($winner['carton'] ?? 0);
+            $winner['player']       = $pName;
+            $winner['userName']     = $pName;
+            $winner['modalityName'] = $mName;
+            $winner['modality']     = $mName;
+            $winner['image']        = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
         }
 
         return $winners;

@@ -407,12 +407,12 @@
         <button id="next-number-button" class="btn btn-small btn-primary size-50" style="display: none;"><i class="fa-duotone fa-solid fa-forward-step"></i></button>
         <?php endif; ?>
 
-        <?php if (!empty($isAdmin)) : ?>
+        <?php if (!empty($isAdmin) || (int) session()->get('group') === 1) : ?>
         <button id="btn-ver-ganadores" type="button" class="btn btn-warning btn-ver-ganadores px-3 py-2 me-2" style="<?= (!empty($isGameCompleted)) ? 'display: inline-flex;' : 'display: none;' ?> align-items: center;" onclick="awardsGet();">
             <i class="fa-duotone fa-solid fa-trophy-star me-2"></i> <?= translate('Ver Ganadores'); ?>
         </button>
 
-        <button id="btn-finalizar-live" type="button" class="btn btn-danger btn-finalizar-live px-4 py-2" style="<?= (!empty($isGameCompleted) && empty($isGameFinalized)) ? 'display: inline-flex;' : 'display: none;' ?> align-items: center;" onclick="confirmarFinalizarLive();">
+        <button id="btn-finalizar-live" type="button" class="btn btn-danger btn-finalizar-live px-4 py-2" style="<?= empty($isGameFinalized) ? 'display: inline-flex;' : 'display: none;' ?> align-items: center;" onclick="confirmarFinalizarLive();">
             <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
         </button>
         <?php endif; ?>
@@ -574,7 +574,7 @@
     window.gameDate = '<?= $game["date"] ?> <?= $game["time"] ?>';
     window.gameId = '<?= (int) ($game["id"] ?? 0); ?>';
     window.GAME_ID = '<?= (int) ($game["id"] ?? 0); ?>';
-    window.isAdmin = <?= !empty($isAdmin) ? 'true' : 'false'; ?>;
+    window.isAdmin = <?= (!empty($isAdmin) || (int) session()->get('group') === 1) ? 'true' : 'false'; ?>;
     window.isLiveGame = <?= !empty($isLiveGame) ? 'true' : 'false'; ?>;
     window.isGameCompleted = <?= !empty($isGameCompleted) ? 'true' : 'false'; ?>;
     window.isLiveFinalized = <?= !empty($isGameFinalized) ? 'true' : 'false'; ?>;

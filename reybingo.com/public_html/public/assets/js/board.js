@@ -1101,6 +1101,53 @@ if (Array.isArray(window.winners)) {
     });
 }
 
+function applyWonStylesToCard(cartn) {
+    if (!cartn) return;
+    cartn.classList.add('cartn-sing');
+
+    let borderCarton = cartn.parentElement;
+    while (borderCarton && !borderCarton.classList.contains('border-carton')) {
+        borderCarton = borderCarton.parentElement;
+    }
+    if (borderCarton) {
+        borderCarton.classList.add('modality-won');
+    }
+
+    cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
+        el.classList.add('sing');
+        el.innerText = '⭐️';
+    });
+}
+
+function markModalityCardWon(modalityId, modalityName) {
+    try {
+        let found = false;
+        if (modalityId) {
+            const byId = document.querySelectorAll(`[id="modality-${modalityId}"]`);
+            if (byId && byId.length) {
+                byId.forEach(cartn => {
+                    found = true;
+                    applyWonStylesToCard(cartn);
+                });
+            }
+        }
+        if (!found && modalityName) {
+            const cleanTarget = String(modalityName).trim().toLowerCase();
+            const allCards = document.querySelectorAll('[id^="modality-"], .cartn-modalidad, .border-carton');
+            allCards.forEach(card => {
+                const titleEl = card.querySelector('.title-modality, .modality-title, h4, h5, h6, strong, span');
+                const text = (titleEl ? titleEl.textContent : card.textContent || '').trim().toLowerCase();
+                if (text && (text === cleanTarget || text.includes(cleanTarget) || cleanTarget.includes(text))) {
+                    const cartn = card.classList.contains('cartn-modalidad') ? card : (card.querySelector('.cartn-modalidad') || card);
+                    applyWonStylesToCard(cartn);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Error marking modality card won in board.js:', e);
+    }
+}
+
 function mergeWinnersFromServer(serverWinners) {
     if (!Array.isArray(serverWinners)) {
         return;
@@ -1128,26 +1175,7 @@ function mergeWinnersFromServer(serverWinners) {
             winners.push({ player: player, modality: modality });
         }
 
-        const modId = winner.modalityId || winner.modality;
-        if (modId) {
-            const cartns = document.querySelectorAll(`[id="modality-${modId}"]`);
-            cartns.forEach(cartn => {
-                cartn.classList.add('cartn-sing');
-
-                let borderCarton = cartn.parentElement;
-                while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                    borderCarton = borderCarton.parentElement;
-                }
-                if (borderCarton) {
-                    borderCarton.classList.add('modality-won');
-                }
-
-                cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                    el.classList.add('sing');
-                    el.innerText = '⭐️';
-                });
-            });
-        }
+        markModalityCardWon(winner.modalityId || winner.modality, winner.modalityName || winner.modality);
     });
 }
 
@@ -1170,6 +1198,7 @@ function showOtherPlayerBingoNotice(data, callback) {
     if (data.player && data.modality) {
         window.seenBingoNotices.add(data.player + '_' + data.modality);
     }
+    window.__lastWinnerNoticeTime = Date.now();
 
     if (Array.isArray(data.winners)) {
         mergeWinnersFromServer(data.winners);
@@ -1182,25 +1211,7 @@ function showOtherPlayerBingoNotice(data, callback) {
     }
 
     // Convertir visualmente la modalidad a "ganada" en tiempo real
-    if (data.modalityId) {
-        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-        cartns.forEach(cartn => {
-            cartn.classList.add('cartn-sing');
-
-            let borderCarton = cartn.parentElement;
-            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                borderCarton = borderCarton.parentElement;
-            }
-            if (borderCarton) {
-                borderCarton.classList.add('modality-won');
-            }
-
-            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                el.classList.add('sing');
-                el.innerText = '⭐️';
-            });
-        });
-    }
+    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
 
     // 1. Reproducir sonido de notificación con winner.mp3
     try {
@@ -1300,24 +1311,8 @@ function showCountdown(data, callback) {
         textHe.innerHTML = '';
     }
 
-    if (data && data.modalityId) {
-        const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-        cartns.forEach(cartn => {
-            cartn.classList.add('cartn-sing');
-
-            let borderCarton = cartn.parentElement;
-            while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                borderCarton = borderCarton.parentElement;
-            }
-            if (borderCarton) {
-                borderCarton.classList.add('modality-won');
-            }
-
-            cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                el.classList.add('sing');
-                el.innerText = '⭐️';
-            });
-        });
+    if (data) {
+        markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
     }
 
     if (countdownTimeoutId) {
@@ -1325,7 +1320,7 @@ function showCountdown(data, callback) {
         countdownTimeoutId = null;
     }
 
-    const pauseMs = isCompleted ? 3500 : Math.max(5000, parseInt(timeBallGet, 10) || 5000);
+    const pauseMs = isCompleted ? 4500 : Math.max(5000, parseInt(timeBallGet, 10) || 5000);
     countdownTimeoutId = setTimeout(function () {
         countdownTimeoutId = null;
         if (isCompleted || isGameFinishedShown || window.gameIsFinished) {
@@ -1670,16 +1665,27 @@ function processNumberGetResponse(data) {
 
     if (data.status === 'pause') {
         intervalManager.clear('lastNumber');
-        showCountdown(data, startAutomaticLast);
+        showOtherPlayerBingoNotice(data, startAutomaticLast);
     } else if (data.status === 'success') {
         startAutomaticLast();
     } else if (data.status === 'completed') {
         intervalManager.clear('lastNumber');
-        const noticeKey = ((data.player || '') + '_' + (data.modality || ''));
-        if (noticeKey && window.seenBingoNotices) {
-            window.seenBingoNotices.add(noticeKey);
+        let winnerData = data;
+        if ((!winnerData.player || !winnerData.modality) && Array.isArray(winnerData.winners) && winnerData.winners.length > 0) {
+            const lw = winnerData.winners[winnerData.winners.length - 1];
+            winnerData = Object.assign({}, data, {
+                player: lw.player || lw.userName,
+                modality: lw.modality || lw.modalityName,
+                modalityId: lw.modalityId || lw.modality,
+                cartonId: lw.cartonId || lw.carton,
+                image: lw.image || site_url + 'assets/img/avatar.jpg'
+            });
         }
-        showGameFinalized();
+        if (winnerData.player && winnerData.modality) {
+            showOtherPlayerBingoNotice(winnerData, showGameFinalized);
+        } else {
+            showGameFinalized();
+        }
     }
 }
 
@@ -1721,7 +1727,7 @@ function ensureGameTimerStarted() {
     gameTimerInterval = setInterval(updateGameTimer, 1000);
 }
 
-// Una sola petici├│n a la vez: el intervalo viejo disparaba otra antes de que terminara la anterior
+// Una sola petición a la vez: el intervalo viejo disparaba otra antes de que terminara la anterior
 function generateAutoNumber(done) {
     const finish = function() {
         if (typeof done === 'function') {
@@ -1745,11 +1751,28 @@ function generateAutoNumber(done) {
             if (data.status === 'pause') {
                 stopAutomaticGeneration();
                 autoGenerationWanted = false;
-                showCountdown(data, startAutomaticLast);
+                showOtherPlayerBingoNotice(data, startAutomaticLast);
             } else if (data.status === 'completed') {
                 stopAutomaticGeneration();
                 autoGenerationWanted = false;
-                showGameFinalized();
+                let winnerData = data;
+                if ((!winnerData.player || !winnerData.modality) && Array.isArray(winnerData.winners) && winnerData.winners.length > 0) {
+                    const lw = winnerData.winners[winnerData.winners.length - 1];
+                    winnerData = Object.assign({}, data, {
+                        player: lw.player || lw.userName,
+                        userName: lw.userName || lw.player,
+                        modality: lw.modality || lw.modalityName,
+                        modalityName: lw.modalityName || lw.modality,
+                        modalityId: lw.modalityId || lw.modality,
+                        cartonId: lw.cartonId || lw.carton,
+                        image: lw.image || site_url + 'assets/img/avatar.jpg'
+                    });
+                }
+                if (winnerData.player && winnerData.modality) {
+                    showOtherPlayerBingoNotice(winnerData, showGameFinalized);
+                } else {
+                    showGameFinalized();
+                }
             } else if (data.status === 'success') {
                 // Pintar al instante al recibir el AJAX (antes del broadcast a jugadores)
                 handleNewNumber(data.number, data.totalNumbersGenerated, data.drawnNumbers);
@@ -1813,7 +1836,24 @@ function generateNumber(number) {
                 autoGenerationWanted = false;
                 showCountdown(data, startAutomaticLast);
             } else if (data.status === 'completed') {
-                showGameFinalized();
+                let winnerData = data;
+                if ((!winnerData.player || !winnerData.modality) && Array.isArray(winnerData.winners) && winnerData.winners.length > 0) {
+                    const lw = winnerData.winners[winnerData.winners.length - 1];
+                    winnerData = Object.assign({}, data, {
+                        player: lw.player || lw.userName,
+                        userName: lw.userName || lw.player,
+                        modality: lw.modality || lw.modalityName,
+                        modalityName: lw.modalityName || lw.modality,
+                        modalityId: lw.modalityId || lw.modality,
+                        cartonId: lw.cartonId || lw.carton,
+                        image: lw.image || site_url + 'assets/img/avatar.jpg'
+                    });
+                }
+                if (winnerData.player && winnerData.modality) {
+                    showOtherPlayerBingoNotice(winnerData, showGameFinalized);
+                } else {
+                    showGameFinalized();
+                }
             } else if (data.status === 'success') {
                 if (Array.isArray(data.drawnNumbers)) {
                     syncDrawnNumbersFromServer(data.drawnNumbers, data.totalNumbersGenerated, { showCenterAnimation: false });
@@ -1938,6 +1978,15 @@ function stopAutomaticLast() {
 
 function showGameFinalized() {
     if (isGameFinishedShown || window.__gameFinalizationInProgress) return;
+    if (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4500)) {
+        const remaining = Math.max(1000, 4500 - (Date.now() - window.__lastWinnerNoticeTime));
+        setTimeout(function() {
+            if (!isGameFinishedShown) {
+                showGameFinalized();
+            }
+        }, remaining);
+        return;
+    }
     window.__gameFinalizationInProgress = true;
     isGameFinishedShown = true;
     window.gameIsFinished = true;
@@ -2892,6 +2941,9 @@ function initBoardPusherRealtime() {
             if (data && Array.isArray(data.winners)) {
                 mergeWinnersFromServer(data.winners);
             }
+            if (data && (data.modalityId || data.modality)) {
+                markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+            }
         });
 
         channel.bind('game:bingo_accepted', function (data) {
@@ -2900,6 +2952,10 @@ function initBoardPusherRealtime() {
 
             stopAutomaticGeneration();
             stopAutomaticLast();
+
+            if (data.modalityId || data.modality) {
+                markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+            }
 
             const isCompleted = (data.gameCompleted === true || data.stopped === true);
             if (isCompleted) {
@@ -2917,13 +2973,57 @@ function initBoardPusherRealtime() {
             }
         });
 
-        channel.bind('game:game_finished', function () {
+        function handleAdminGameFinished(data) {
+            console.log('Admin board WS: game_finished / game_completed', data);
             stopAutomaticGeneration();
             stopAutomaticLast();
-            if (!countdownTimeoutId) {
-                showGameFinalized();
+            window.gameIsFinished = true;
+
+            let lastWinner = null;
+            if (data && data.player && data.modality) {
+                lastWinner = data;
+            } else if (Array.isArray(data && data.winners) && data.winners.length > 0) {
+                const lw = data.winners[data.winners.length - 1];
+                if (lw && (lw.player || lw.userName) && (lw.modality || lw.modalityName)) {
+                    lastWinner = Object.assign({}, data, {
+                        player: lw.player || lw.userName,
+                        userName: lw.userName || lw.player,
+                        modality: lw.modality || lw.modalityName,
+                        modalityName: lw.modalityName || lw.modality,
+                        modalityId: lw.modalityId || lw.modality,
+                        cartonId: lw.cartonId || lw.carton,
+                        image: lw.image || site_url + 'assets/img/avatar.jpg'
+                    });
+                }
             }
-        });
+
+            if (lastWinner && (lastWinner.modalityId || lastWinner.modality)) {
+                markModalityCardWon(lastWinner.modalityId || lastWinner.modality, lastWinner.modalityName || lastWinner.modality);
+            }
+
+            if (countdownTimeoutId || (window.__lastWinnerNoticeTime && (Date.now() - window.__lastWinnerNoticeTime < 4500))) {
+                const remaining = Math.max(1000, 4500 - (Date.now() - (window.__lastWinnerNoticeTime || 0)));
+                setTimeout(function() {
+                    if (!isGameFinishedShown) {
+                        showGameFinalized();
+                    }
+                }, remaining);
+                return;
+            }
+
+            const pKey = lastWinner ? (lastWinner.player + '_' + lastWinner.modality) : '';
+            if (pKey && (!window.seenBingoNotices || !window.seenBingoNotices.has(pKey))) {
+                showOtherPlayerBingoNotice(lastWinner, function() {
+                    showGameFinalized();
+                });
+                return;
+            }
+
+            showGameFinalized();
+        }
+
+        channel.bind('game:game_finished', handleAdminGameFinished);
+        channel.bind('game:completed', handleAdminGameFinished);
 
         // Notificaciones unificadas en tiempo real para el administrador
         function handleAdminBoardNotification(data) {
@@ -2941,7 +3041,9 @@ function initBoardPusherRealtime() {
                 if (window.seenBingoNotices && noticeKey) {
                     window.seenBingoNotices.add(noticeKey);
                 }
-                if (typeof window.showNotification === 'function') {
+                if (data.player && data.modality) {
+                    showOtherPlayerBingoNotice(data);
+                } else if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
                 }
             } else if (typeof window.showNotification === 'function') {

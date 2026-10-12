@@ -2631,9 +2631,11 @@ class Games extends Controller {
 
             session()->set('game_id', $game_id);
 
+            $targetUrl = in_array((int) ($game['type'] ?? 0), [3, 4], true) ? site_url('/live') : site_url('/board');
+
             return $this->response->setJSON([
                 'success' => true,
-                'redirect' => site_url('/board'),
+                'redirect' => $targetUrl,
             ]);
         }
 
@@ -3657,9 +3659,11 @@ class Games extends Controller {
 
         session()->set('game_id', $gameId);
 
+        $targetUrl = ($game && in_array((int) ($game['type'] ?? 0), [3, 4], true)) ? site_url('/live') : site_url('/board');
+
         return $this->response->setJSON([
             'success' => true,
-            'redirect' => site_url('/board')
+            'redirect' => $targetUrl
         ]);
     }
 
