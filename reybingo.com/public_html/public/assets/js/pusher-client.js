@@ -95,7 +95,6 @@ class PusherClient {
                 this.userChannel = this.pusher.subscribe(userChannelName);
                 this.userChannel.bind('notification:new', (data) => {
                     console.log('WS Notificación personal recibida:', data);
-                    this._triggerEvent('notification:new', data);
                     if (typeof window.showNotification === 'function') {
                         window.showNotification(data);
                     }
@@ -104,13 +103,11 @@ class PusherClient {
 
             // Escuchar notificaciones de la partida
             this.channel.bind('game:notification', (data) => {
-                this._triggerEvent('game:notification', data);
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
                 }
             });
             this.channel.bind('notification:new', (data) => {
-                this._triggerEvent('notification:new', data);
                 if (typeof window.showNotification === 'function') {
                     window.showNotification(data);
                 }
@@ -237,9 +234,7 @@ class PusherClient {
             'game:message',
             'game:chat_message',
             'game:postponed',
-            'game:started',
-            'game:notification',
-            'notification:new'
+            'game:started'
         ];
 
         gameEvents.forEach(eventName => {

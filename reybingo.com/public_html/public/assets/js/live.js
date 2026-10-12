@@ -979,34 +979,9 @@ function showOtherPlayerBingoNotice(data, callback) {
             cartonId: data.cartonId || data.carton,
             title: '🎉 ¡BINGO CANTADO!',
             message: `${modalityLabel}: ${pName}${cartonInfo}`,
-            created_at: data.created_at || new Date().toISOString()
+            created_at: data.created_at || new Date().toISOString(),
+            __fromLiveNotice: true
         });
-    }
-
-    // 2b. Toast flotante Toastify garantizado en pantalla para el administrador
-    try {
-        if (typeof Toastify === 'function') {
-            Toastify({
-                text: `🎉 ¡BINGO CANTADO!\n${modalityLabel}: ${pName}${cartonInfo}`,
-                duration: 9000,
-                gravity: 'top',
-                position: 'right',
-                style: {
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-                    borderRadius: '14px',
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#ffffff',
-                    border: '2px solid rgba(255,255,255,0.4)',
-                    padding: '16px 22px',
-                    zIndex: 999999
-                },
-                stopOnFocus: true
-            }).showToast();
-        }
-    } catch (te) {
-        console.warn('Error al mostrar Toastify de ganador en LIVE:', te);
     }
 
     // 3. Efectos visuales de confeti
@@ -1336,7 +1311,8 @@ function generateNumber(number) {
             if (data.status === 'pause') {
                 const pKey = getBingoDedupeKey(data);
                 if (!pKey || !window.seenBingoNotices.has(pKey)) {
-                    showOtherPlayerBingoNotice(data, startAutomaticLast);
+                    if (pKey) window.seenBingoNotices.add(pKey);
+                    showCountdown(data, startAutomaticLast);
                 }
             } else if (data.status === 'completed') {
                 let winnerData = data;
@@ -2536,40 +2512,6 @@ function initializeApp() {
                 }
             });
 
-            // Notificaciones en tiempo real para el administrador en LIVE
-            function handleLiveSingNotification(data) {
-                console.log('LIVE WS: notificación de ganador recibida', data);
-                if (!data) return;
-                const isNewGame = data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title));
-                const isSing = !isNewGame && (data.type === 'sing' || data.type === 'own_sing' || (data.title && /bingo/i.test(data.title)) || (data.message && /ganador/i.test(data.message)));
-                if (isSing) {
-                    const noticeKey = getBingoDedupeKey(data) || data.id || ('sing_' + (data.singId || (data.modalityId || 'mod') + '_' + (data.cartonId || data.carton || data.player || '')));
-                    if (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) {
-                        return;
-                    }
-                    const singPayload = {
-                        singId: data.singId || data.id,
-                        userId: data.userId || data.winnerUserId,
-                        winnerUserId: data.winnerUserId || data.userId,
-                        player: data.player || data.userName || 'Jugador',
-                        userName: data.userName || data.player || 'Jugador',
-                        modality: data.modality || data.modalityName || 'Bingo',
-                        modalityName: data.modalityName || data.modality || 'Bingo',
-                        modalityId: data.modalityId || data.modality,
-                        cartonId: data.cartonId || data.carton,
-                        created_at: data.created_at || new Date().toISOString()
-                    };
-                    if (singPayload.modalityId || singPayload.modality) {
-                        markModalityCardWon(singPayload.modalityId || singPayload.modality, singPayload.modalityName || singPayload.modality);
-                    }
-                    showOtherPlayerBingoNotice(singPayload, function() {
-                        startAutomaticLast();
-                    });
-                }
-            }
-
-            pusherHelper.on('game:notification', handleLiveSingNotification);
-            pusherHelper.on('notification:new', handleLiveSingNotification);
 
             // Evento de finalización oficial del Live por el admin
             pusherHelper.on('game:live_finalized', function(data) {
@@ -2645,57 +2587,20 @@ function initializeApp() {
         }
     }
 
-    // Asegurar definición de showNotification para tablero LIVE con toast sonoro
-    if (typeof window.showNotification !== 'function') {
-        window.showNotification = function(payload) {
-            if (!payload) return;
-            const modalityClean = (payload.modality || payload.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
-            const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
-                ? `Ganadores de la modalidad ${modalityClean}`
-                : `Ganadores de la ${modalityClean}`;
-            const pName = payload.player || payload.userName || 'Jugador';
-            const carton = payload.cartonId || payload.carton || '';
-            const cartonText = carton ? ` (Cartón #${carton})` : '';
-
-            if (typeof Toastify === 'function') {
-                Toastify({
-                    text: `🎉 ¡BINGO CANTADO!\n${modalityLabel}: ${pName}${cartonText}`,
-                    duration: 8000,
-                    gravity: 'top',
-                    position: 'right',
-                    style: {
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-                        borderRadius: '12px',
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        color: '#ffffff'
-                    },
-                    stopOnFocus: true
-                }).showToast();
-            }
-            try {
-                if (typeof audioManager !== 'undefined' && audioManager.play) {
-                    audioManager.play(audioPath + 'winner.mp3');
-                } else if (typeof playNotificationSound === 'function') {
-                    playNotificationSound('winner', true);
-                }
-            } catch (e) {}
-        };
-    }
-
     // Interceptar notificaciones duplicadas de sings desde pusher-client o polling
     if (typeof window.showNotification === 'function' && !window.__liveShowNotificationWrapped) {
         window.__liveShowNotificationWrapped = true;
         const originalShowNotification = window.showNotification;
         window.showNotification = function(payload) {
             if (payload && (payload.type === 'sing' || (payload.title && /BINGO/i.test(payload.title)) || (payload.message && /ganador/i.test(payload.message)))) {
-                const nKey = getBingoDedupeKey(payload) || (payload.id ? String(payload.id) : '');
-                if (nKey && window.seenBingoNotices && window.seenBingoNotices.has(nKey)) {
-                    return; // Ignorar notificación duplicada de cante
-                }
-                if (payload.player && payload.modality) {
-                    showOtherPlayerBingoNotice(payload);
+                if (!payload.__fromLiveNotice) {
+                    const nKey = getBingoDedupeKey(payload) || (payload.id ? String(payload.id) : '');
+                    if (nKey && window.seenBingoNotices && window.seenBingoNotices.has(nKey)) {
+                        return; // Ignorar notificación duplicada de cante
+                    }
+                    if (nKey && window.seenBingoNotices) {
+                        window.seenBingoNotices.add(nKey);
+                    }
                 }
             }
             return originalShowNotification.apply(this, arguments);
