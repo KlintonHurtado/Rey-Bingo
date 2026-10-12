@@ -3,89 +3,85 @@ $isLiveGameType = isset($game) && in_array((int)($game['type'] ?? 0), [3, 4], tr
 $isLiveGameOpen = $isLiveGameType && ((int)($game['status'] ?? 0) !== 0);
 $isPlayerViewer = !empty($isPlayerRoute) || ((int) session()->get('group') === 0);
 $isAdminViewer = (!$isPlayerViewer) && (((int) session()->get('group') === 1) || (function_exists('bingo_is_admin') && bingo_is_admin()));
-$isLivePlayerLocked = $isLiveGameType && $isPlayerViewer;
+$isLivePlayerLocked = $isLiveGameType && $isPlayerViewer && $isLiveGameOpen;
 $showWaitingNotice = $isLivePlayerLocked;
 ?>
-<div class="modal-dialog modal-dialog-centered max-w-70">
+<div class="modal-dialog modal-dialog-centered max-w-70" data-live-finalized="<?= ($isLiveGameType && !$isLiveGameOpen) ? '1' : '0' ?>">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2"><i class="fa-duotone fa-solid fa-trophy-star"></i> <?= translate('winners'); ?> <br /> <small><?= $game['description']; ?></small></h6>
-            <button class="btn-close me-1 btn-close-awards" type="button" aria-label="close" data-bs-dismiss="modal" style="<?= $showWaitingNotice ? 'display: none !important;' : '' ?>"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <button class="btn-close me-1 btn-close-awards" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body pt-0">
             <div class="card">
                 <div class="card-body">
-                    <?php if ($isLiveGameType && $isPlayerViewer) : ?>
-                        <!-- Modalidad LIVE para jugadores: SE QUITA LA TABLA -->
-                        <div class="text-center py-4 px-2">
-                            <div class="mb-3">
-                                <i class="fa-solid fa-trophy text-warning fa-3x"></i>
-                            </div>
-                            <h4 class="fw-bold text-dark mb-2">¡Partida en Vivo Concluida!</h4>
-                            <p class="text-muted mb-0" style="font-size: 0.95rem;">
-                                Esperando a que el administrador finalice la transmisión oficial...
-                            </p>
-                        </div>
-                    <?php else : ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th><?= translate('player'); ?></th>
-                                        <th class="text-center"><?= translate('carton'); ?></th>
-                                        <th class="text-center"><?= translate('modality'); ?></th>
-                                        <th class="text-center"><?= translate('award'); ?></th>
-                                        <th class="text-center"><?= translate('status'); ?></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (!empty($sings)) : ?>
-                                        <?php foreach ($sings as $sing) : ?>
-                                            <tr>
-                                                <td>
-                                                    <strong><?= esc($sing['user_code']) ?></strong>
-                                                    <br>
-                                                    <small class="text-muted"><?= esc($sing['user_name']) ?></small>
-                                                </td>
-                                                <td class="text-center">C<?= esc($sing['serial']) ?></td>
-                                                <td class="text-center"><?= esc($sing['modality_name']) ?></td>
-                                                <td class="text-center"><?= systemGet('currency'); ?> <?= esc($sing['award_amount']) ?></td>
-                                                <td class="text-center" id="award-<?= $sing['id'] ?>"><?= $sing['status'] ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php else : ?>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th><?= translate('player'); ?></th>
+                                    <th class="text-center"><?= translate('carton'); ?></th>
+                                    <th class="text-center"><?= translate('modality'); ?></th>
+                                    <th class="text-center"><?= translate('award'); ?></th>
+                                    <th class="text-center"><?= translate('status'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($sings)) : ?>
+                                    <?php foreach ($sings as $sing) : ?>
                                         <tr>
-                                            <td colspan="5" class="text-center"><?= translate('no data available'); ?></td>
+                                            <td>
+                                                <strong><?= esc($sing['user_code']) ?></strong>
+                                                <br>
+                                                <small class="text-muted"><?= esc($sing['user_name']) ?></small>
+                                            </td>
+                                            <td class="text-center">C<?= esc($sing['serial']) ?></td>
+                                            <td class="text-center"><?= esc($sing['modality_name']) ?></td>
+                                            <td class="text-center"><?= systemGet('currency'); ?> <?= esc($sing['award_amount']) ?></td>
+                                            <td class="text-center" id="award-<?= $sing['id'] ?>"><?= $sing['status'] ?></td>
                                         </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <tr>
+                                        <td colspan="5" class="text-center"><?= translate('no data available'); ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
 
-                        <?php if (session()->get('group') == 0) : ?>
-                            <?php if (isset($lastGame) && count($lastGame) > 0 && !$isLiveGameType): ?>
-                                <h5 class="text-center continue-text">Quieres continuar jugando?</h5>
-                                <h6 class="text-center next-game-play mt-2 text-uppercase" data-game-date="<?= $lastGame["date"] ?> <?= $lastGame["time"] ?>"></h6>
-                                <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo bingo-bg-success card-button-buy continue-button-buy mb-1" id="card-button-buy-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
-                                <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo card-button-buy-bonus continue-button-buy" id="card-button-buy-bonus-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'bonus');">Comprar con bono</button>
-                            <?php endif; ?>
+                    <?php if (session()->get('group') == 0) : ?>
+                        <?php if (isset($lastGame) && count($lastGame) > 0 && !$isLiveGameType): ?>
+                            <h5 class="text-center continue-text">Quieres continuar jugando?</h5>
+                            <h6 class="text-center next-game-play mt-2 text-uppercase" data-game-date="<?= $lastGame["date"] ?> <?= $lastGame["time"] ?>"></h6>
+                            <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo bingo-bg-success card-button-buy continue-button-buy mb-1" id="card-button-buy-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'real');"><?= translate('buy cartons'); ?></button>
+                            <button type="button" class="btn btn-small btn-primary d-block w-50 btn-bingo card-button-buy-bonus continue-button-buy" id="card-button-buy-bonus-<?= $lastGame['id'] ?>" onclick="generateCartonsGet(<?= $lastGame['id'] ?>, 'bonus');">Comprar con bono</button>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
         <div class="modal-footer justify-content-center pt-2 pb-2 flex-column">
-            <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="<?= $showWaitingNotice ? 'display: inline-block;' : 'display: none;' ?> font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
-                <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
-            </div>
-            <?php if ($isLiveGameType && $isAdminViewer && $isLiveGameOpen) : ?>
-            <button type="button" class="btn btn-danger btn-finalizar-live px-4 py-2 my-2 fw-bold" id="btnModalFinalizarLive" onclick="if (typeof confirmarFinalizarLive === 'function') { confirmarFinalizarLive(); } else if (typeof window.confirmarFinalizarLive === 'function') { window.confirmarFinalizarLive(); }">
-                <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
-            </button>
+            <?php if ($isLivePlayerLocked) : ?>
+                <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="display: inline-block; font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
+                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
+                </div>
+                <button type="button" class="btn btn-primary w-50 btn-bingo my-1" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-eye me-1"></i> <?= translate('Seguir viendo Live'); ?>
+                </button>
+            <?php else : ?>
+                <div id="live-waiting-admin-notice" class="text-center py-2 px-3 my-1 rounded-pill fw-bold" style="display: none; font-size: 0.95rem; background: rgba(0, 0, 0, 0.75); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4);">
+                    <i class="fa-solid fa-spinner fa-spin me-2"></i> Esperando a que el administrador finalice el Live...
+                </div>
+                <?php if ($isLiveGameType && $isAdminViewer && $isLiveGameOpen) : ?>
+                <button type="button" class="btn btn-danger btn-finalizar-live px-4 py-2 my-2 fw-bold" id="btnModalFinalizarLive" onclick="if (typeof confirmarFinalizarLive === 'function') { confirmarFinalizarLive(); } else if (typeof window.confirmarFinalizarLive === 'function') { window.confirmarFinalizarLive(); }">
+                    <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
+                </button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'play'; }">
+                    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
+                </button>
             <?php endif; ?>
-            <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" style="<?= $showWaitingNotice ? 'display: none !important;' : '' ?>">
-                <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
-            </button>
         </div>
     </div>
 </div>

@@ -1101,8 +1101,14 @@ class Playings extends Controller
         $awardsCountFinished = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
         $isGameCompleted = ($totalNumbersGenerated >= 75)
             || ($awardsCountFinished > 0 && $singsCountFinished >= $awardsCountFinished);
+        $isLiveGame = ((int) ($game['type'] ?? 0)) === 3 || ((int) ($game['type'] ?? 0)) === 4;
         $isLiveFinalized = ((int) ($game['status'] ?? 0) === 0);
         $gameIsFinished = $isLiveFinalized || $isGameCompleted;
+
+        // Si es una partida Live y ya está finalizada, redirigir automáticamente a la sala de juegos
+        if ($isLiveGame && $isLiveFinalized) {
+            return redirect()->to('/play');
+        }
 
         // Solo el cron (o llegar la hora + mínimos) inicia la partida: no activar solo por entrar a /playing
         if ((int) ($game['status'] ?? 0) === 2 && ! $gameIsFinished) {
@@ -3158,7 +3164,7 @@ class Playings extends Controller
             return $this->response->setJSON(['status' => 'error', 'message' => 'Not logged in']);
         }
 
-        $gameId = session()->get('game_id');
+        $gameId = (int) ($this->request->getGet('game_id') ?: session()->get('game_id'));
         if (!$gameId) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'No active game session']);
         }
@@ -3170,13 +3176,18 @@ class Playings extends Controller
             return $this->response->setJSON(['status' => 'error', 'message' => 'Game not found']);
         }
 
+        $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
+        $isLiveFinalized = $isLiveGame && ((int) ($game['status'] ?? 0) === 0);
+
         return $this->response->setJSON([
-            'status' => 'success',
-            'game_status' => (int) $game['status'],
-            'date' => $game['date'],
-            'time' => $game['time'],
-            'min_players' => (int) ($game['min_players'] ?? 10),
-            'min_cartons' => (int) ($game['min_cartons'] ?? 10)
+            'status'          => 'success',
+            'game_status'     => (int) $game['status'],
+            'is_live'         => $isLiveGame,
+            'live_finalized'  => $isLiveFinalized,
+            'date'            => $game['date'],
+            'time'            => $game['time'],
+            'min_players'     => (int) ($game['min_players'] ?? 10),
+            'min_cartons'     => (int) ($game['min_cartons'] ?? 10)
         ]);
     }
 }

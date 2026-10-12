@@ -3010,14 +3010,17 @@ function showGameFinalized() {
         });
 
         // Al cerrar cualquiera de los modales, salir a la sala principal solo si no es Live abierto
-        $('#modalAwards, #modalGameFinalized').on('hidden.bs.modal', function () {
+        $('#modalAwards, #modalGameFinalized').off('hidden.bs.modal').on('hidden.bs.modal', function () {
             cancelAutoExit();
             if (window.isLiveGame && !window.isLiveFinalized) {
+                // El usuario cerró la tabla para seguir viendo el live:
+                // Mostrar botón flotante para volver a ver los ganadores cuando desee
                 const btnVer = document.getElementById('btn-ver-ganadores-player');
-                if (btnVer) btnVer.style.display = 'none';
-                let modalAwardsEl = document.getElementById('modalAwards');
-                if (modalAwardsEl && !window.__userLeavingGame) {
-                    bootstrap.Modal.getOrCreateInstance(modalAwardsEl, { backdrop: 'static', keyboard: false }).show();
+                if (btnVer) {
+                    btnVer.style.display = 'inline-flex';
+                }
+                if (typeof startLiveFinalizedPoller === 'function') {
+                    startLiveFinalizedPoller();
                 }
                 return;
             }
@@ -3087,14 +3090,25 @@ function showGameFinalized() {
 
             const btnVer = document.getElementById('btn-ver-ganadores-player');
             if (btnVer) {
-                btnVer.style.display = window.isLiveGame ? 'none' : 'inline-flex';
+                btnVer.style.display = 'none';
+            }
+
+            const dialogEl = modalAwardsEl.querySelector('.modal-dialog');
+            if (dialogEl && dialogEl.getAttribute('data-live-finalized') === '1') {
+                window.isLiveFinalized = true;
             }
 
             if (window.isLiveGame && !window.isLiveFinalized) {
+                if (typeof startLiveFinalizedPoller === 'function') {
+                    startLiveFinalizedPoller();
+                }
                 cancelAutoExit();
 
-                // En Live no finalizado: bloquear salida del jugador y mostrar mensaje de espera
-                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game, .btn-close-awards, [data-bs-dismiss="modal"]').hide();
+                // En Live no finalizado: permitir cerrar el modal (X o botón Ver Live) sin salir de la sala
+                $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"]').show();
+                // Ocultar cualquier botón que intente salir de la sala
+                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').hide();
+
                 let waitNotice = modalAwardsEl.querySelector('#live-waiting-admin-notice');
                 if (!waitNotice) {
                     const footer = modalAwardsEl.querySelector('.modal-footer');
@@ -3110,6 +3124,10 @@ function showGameFinalized() {
                     waitNotice.style.display = 'inline-block';
                 }
             } else {
+                // Live ya finalizado o partida regular: permitir salir y mostrar botón de salir
+                $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').show();
+                $(modalAwardsEl).find('#live-waiting-admin-notice').hide();
+
                 // Al cerrar la tabla por el botón de cerrar (X)
                 $(modalAwardsEl).find('[data-bs-dismiss="modal"]').off('click').on('click', function () {
                     cancelAutoExit();
@@ -3788,6 +3806,41 @@ function pollGameStatusBeforeStart() {
     }, 10000); // Cada 10 segundos
 }
 
+let liveFinalizedPollInterval = null;
+function startLiveFinalizedPoller() {
+    if (!window.isLiveGame || window.isLiveFinalized || liveFinalizedPollInterval) {
+        return;
+    }
+    const gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '');
+    if (!gid) return;
+
+    liveFinalizedPollInterval = setInterval(function () {
+        if (window.isLiveFinalized || window.__liveFinalizedHandled || window.__userLeavingGame) {
+            if (liveFinalizedPollInterval) {
+                clearInterval(liveFinalizedPollInterval);
+                liveFinalizedPollInterval = null;
+            }
+            return;
+        }
+
+        $.get((typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid)
+            .done(function (data) {
+                if (data && data.status === 'success') {
+                    if (parseInt(data.game_status, 10) === 0 || data.live_finalized === true) {
+                        console.log('Poller detectó Live finalizado por el admin');
+                        if (liveFinalizedPollInterval) {
+                            clearInterval(liveFinalizedPollInterval);
+                            liveFinalizedPollInterval = null;
+                        }
+                        handleLiveFinalizedByAdmin(data);
+                    }
+                }
+            })
+            .fail(function () {});
+    }, 2000); // Polling cada 2 segundos
+}
+window.startLiveFinalizedPoller = startLiveFinalizedPoller;
+
 function handleGamePostponed(newTimeStr, messageText) {
     console.log("Game postponed received:", newTimeStr);
 
@@ -4286,9 +4339,9 @@ function initializeApp() {
     // Limpiar mensajes antiguos periódicamente
     intervalManager.set('messageCleanup', cleanupOldMessages, 60000); // Cada minuto
 
-    // Iniciar el poller de estado si el juego no ha empezado
-    if (!hasGameStarted()) {
-        pollGameStatusBeforeStart();
+    // Iniciar poller de finalización para Live si aplica
+    if (window.isLiveGame && !window.isLiveFinalized) {
+        startLiveFinalizedPoller();
     }
 
     // Inicializar WebSocket (Soketi self-hosted o Pusher Cloud)
@@ -4588,9 +4641,21 @@ function handleLiveFinalizedByAdmin(data) {
         return;
     }
     window.__liveFinalizedHandled = true;
+    window.__userLeavingGame = true;
     window.isLiveFinalized = true;
     window.gameIsFinished = true;
     window.allowGameUnload = true;
+    window.onbeforeunload = null;
+    window.onpopstate = null;
+
+    if (window.awardsModalTimeoutId) {
+        clearTimeout(window.awardsModalTimeoutId);
+        window.awardsModalTimeoutId = null;
+    }
+    if (typeof liveFinalizedPollInterval !== 'undefined' && liveFinalizedPollInterval) {
+        clearInterval(liveFinalizedPollInterval);
+        liveFinalizedPollInterval = null;
+    }
 
     ballPlaybackQueue = [];
     isBallPlaybackActive = false;
@@ -4605,10 +4670,6 @@ function handleLiveFinalizedByAdmin(data) {
     const nextGameSpan = document.querySelector('.next-game');
     if (nextGameSpan) {
         nextGameSpan.textContent = 'LIVE FINALIZADO';
-    }
-
-    if (!isGameFinishedShown) {
-        showGameFinalized();
     }
 
     const modalAwardsEl = document.getElementById('modalAwards');
@@ -4629,6 +4690,10 @@ function handleLiveFinalizedByAdmin(data) {
         if (bsExitModal) bsExitModal.hide();
     }
 
+    if (typeof audioManager !== 'undefined' && audioManager.stopAll) {
+        audioManager.stopAll();
+    }
+
     const playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
     const msg = (data && data.message) ? data.message : 'La transmisión en vivo ha finalizado.';
 
@@ -4638,7 +4703,7 @@ function handleLiveFinalizedByAdmin(data) {
             title: '📢 Transmisión Finalizada',
             text: msg + ' Redirigiendo a la sala...',
             icon: 'info',
-            timer: 1800,
+            timer: 1500,
             timerProgressBar: true,
             showConfirmButton: false,
             allowOutsideClick: false,
@@ -4648,7 +4713,7 @@ function handleLiveFinalizedByAdmin(data) {
         });
         setTimeout(function () {
             window.location.replace(playUrl);
-        }, 2000);
+        }, 1600);
     } else {
         window.location.replace(playUrl);
     }

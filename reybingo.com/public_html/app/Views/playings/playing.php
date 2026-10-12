@@ -1533,11 +1533,23 @@
             el.setAttribute('data-bs-keyboard', 'false');
             document.body.appendChild(el);
         }
+        const btnVer = document.getElementById('btn-ver-ganadores-player');
+        if (btnVer) {
+            btnVer.style.display = 'none';
+        }
         $(el).load(url, function() {
             bootstrap.Modal.getOrCreateInstance(el, { backdrop: 'static', keyboard: false }).show();
             $('#game-finalized').hide();
         });
     };
+    $(document).on('hidden.bs.modal', '#modalAwards', function () {
+        if (window.isLiveGame && !window.isLiveFinalized) {
+            const btnVer = document.getElementById('btn-ver-ganadores-player');
+            if (btnVer) {
+                btnVer.style.display = 'inline-flex';
+            }
+        }
+    });
     window.audioPath = "<?= site_url('assets/sounds/'); ?>";
     window.narrationPlaying = <?= (!isset($user['narration']) || (int)$user['narration'] !== 0) ? 'true' : 'false' ?>;
     window.soundPlaying = <?= (!isset($user['sounds']) || (int)$user['sounds'] !== 0) ? 'true' : 'false' ?>;

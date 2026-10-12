@@ -236,10 +236,13 @@ if (!function_exists('bingo_broadcast_game_status')) {
         }
 
         try {
-            $client  = bingo_get_broadcast_client();
-            $channel = 'private-game-' . $gameId;
+            $client   = bingo_get_broadcast_client();
+            $channels = [
+                'private-game-' . $gameId,
+                'game-' . $gameId,
+            ];
 
-            $client->trigger($channel, $statusEvent, array_merge([
+            $client->trigger($channels, $statusEvent, array_merge([
                 'gameId'    => $gameId,
                 'timestamp' => date('c'),
             ], $extraData));

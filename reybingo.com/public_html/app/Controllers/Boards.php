@@ -835,33 +835,25 @@ class Boards extends Controller {
             ]);
         }
 
-        // Idempotencia: si ya estaba finalizada en BD
-        if ((int) ($game['status'] ?? 0) === 0) {
-            return $this->response->setJSON([
-                'success' => true,
-                'alreadyFinalized' => true,
-                'message' => 'El Live ya ha sido finalizado previamente.',
-                'redirect' => site_url('games'),
-            ]);
-        }
-
         // 1. Asegurar registro oficial de ganadores y pago de premios pendientes
         bingo_ensure_winners_registered($gameId);
         bingo_pay_pending_awards_for_game($gameId);
 
-        // 2. Finalizar oficialmente la partida en base de datos (status = 0)
-        $modelGames->update($gameId, [
-            'status' => 0,
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        // 2. Finalizar oficialmente la partida en base de datos (status = 0) si aún no lo estaba
+        if ((int) ($game['status'] ?? 0) !== 0) {
+            $modelGames->update($gameId, [
+                'status' => 0,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
 
-        if (function_exists('bingo_on_game_finished')) {
-            bingo_on_game_finished($gameId, (int) session()->get('id'));
+            if (function_exists('bingo_on_game_finished')) {
+                bingo_on_game_finished($gameId, (int) session()->get('id'));
+            }
         }
 
         $officialWinners = bingo_get_official_sings_for_game($gameId, true);
 
-        // 3. Notificar a todos los jugadores conectados vía WebSocket/Soketi
+        // 3. Notificar a todos los jugadores conectados vía WebSocket/Soketi SIEMPRE
         bingo_broadcast_game_status($gameId, 'game:live_finalized', [
             'status'        => 0,
             'gameId'        => $gameId,
