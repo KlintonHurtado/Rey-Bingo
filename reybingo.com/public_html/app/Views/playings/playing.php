@@ -1519,6 +1519,86 @@
     window.currentUserId = <?= (int) session()->get('id') ?>;
     window.allowGameUnload = window.gameIsFinished;
     window.playerGroup = 0;
+
+    // Auto-expulsión en tiempo real al finalizar Live:
+    // Monitorea continuamente el estado del juego para expulsar/redirigir a los jugadores a /play
+    // en cuanto el administrador finalice el Live, sin necesidad de recargar manualmente.
+    if (window.isLiveGame && !window.isLiveFinalized) {
+        (function() {
+            var gid = window.gameId || '<?= $game["id"] ?>';
+            var checkLiveFinalized = function() {
+                if (window.isLiveFinalized || window.__liveAutoKickExecuted) {
+                    if (window.__liveKickIntervalId) {
+                        clearInterval(window.__liveKickIntervalId);
+                        window.__liveKickIntervalId = null;
+                    }
+                    return;
+                }
+                var statusUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid;
+                $.ajax({
+                    url: statusUrl,
+                    type: 'GET',
+                    dataType: 'json',
+                    cache: false,
+                    success: function(res) {
+                        if (res && res.status === 'success') {
+                            if (parseInt(res.game_status, 10) === 0 || res.live_finalized === true) {
+                                window.isLiveFinalized = true;
+                                window.allowGameUnload = true;
+                                window.__userLeavingGame = true;
+                                window.__liveAutoKickExecuted = true;
+                                window.onbeforeunload = null;
+                                window.onpopstate = null;
+
+                                if (window.__liveKickIntervalId) {
+                                    clearInterval(window.__liveKickIntervalId);
+                                    window.__liveKickIntervalId = null;
+                                }
+
+                                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                    ['modalAwards', 'modalGameFinalized', 'modalExit'].forEach(function(mId) {
+                                        var mEl = document.getElementById(mId);
+                                        if (mEl) {
+                                            var bsM = bootstrap.Modal.getInstance(mEl);
+                                            if (bsM) bsM.hide();
+                                        }
+                                    });
+                                }
+
+                                if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+                                    Swal.close();
+                                }
+
+                                var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+
+                                if (typeof Swal !== 'undefined') {
+                                    Swal.fire({
+                                        title: '📢 Transmisión Finalizada',
+                                        text: 'La transmisión en vivo ha finalizado. Redirigiendo a la sala...',
+                                        icon: 'info',
+                                        timer: 1200,
+                                        timerProgressBar: true,
+                                        showConfirmButton: false,
+                                        allowOutsideClick: false,
+                                        allowEscapeKey: false
+                                    }).then(function() {
+                                        window.location.replace(playUrl);
+                                    });
+                                    setTimeout(function() {
+                                        window.location.replace(playUrl);
+                                    }, 1300);
+                                } else {
+                                    window.location.replace(playUrl);
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            window.__liveKickIntervalId = setInterval(checkLiveFinalized, 1500);
+        })();
+    }
     window.awardsGet = function() {
         const gid = window.gameId || '<?= $game["id"] ?>';
         const url = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/awardsGet?game_id=' + gid;
@@ -1583,21 +1663,69 @@
 
         // Botones de salida - Mostrar modal al hacer clic
         $('.btn-home, .btn-exit, .btn-back').on('click', function (e) {
+            var $btn = $(this);
+            var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+            var targetUrl = $btn.attr('href') || $btn.data('href') || playUrl;
+
+            // Si es un Live que ya está finalizado, permitir salir inmediatamente
+            if (window.isLiveGame && window.isLiveFinalized) {
+                allowUnload = true;
+                window.allowGameUnload = true;
+                window.__userLeavingGame = true;
+                window.location.replace(targetUrl);
+                return false;
+            }
+
             if (window.isLiveGame && !window.isLiveFinalized) {
                 e.preventDefault();
                 e.stopPropagation();
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: 'Transmisión en vivo',
-                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                        icon: 'info',
-                        confirmButtonText: 'Entendido',
-                        customClass: {
-                            confirmButton: 'btn btn-primary btn-bingo'
-                        },
-                        buttonsStyling: false
-                    });
-                }
+
+                // Verificar en tiempo real con el servidor por si el administrador ya finalizó el Live
+                var gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '<?= $game["id"] ?>');
+                var statusUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid;
+
+                $.ajax({
+                    url: statusUrl,
+                    type: 'GET',
+                    dataType: 'json',
+                    cache: false,
+                    success: function (res) {
+                        if (res && res.status === 'success' && (parseInt(res.game_status, 10) === 0 || res.live_finalized === true)) {
+                            window.isLiveFinalized = true;
+                            window.allowGameUnload = true;
+                            window.__userLeavingGame = true;
+                            window.__liveAutoKickExecuted = true;
+                            window.location.replace(targetUrl);
+                        } else {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: 'Transmisión en vivo',
+                                    text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                                    icon: 'info',
+                                    confirmButtonText: 'Entendido',
+                                    customClass: {
+                                        confirmButton: 'btn btn-primary btn-bingo'
+                                    },
+                                    buttonsStyling: false
+                                });
+                            }
+                        }
+                    },
+                    error: function () {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                title: 'Transmisión en vivo',
+                                text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                                icon: 'info',
+                                confirmButtonText: 'Entendido',
+                                customClass: {
+                                    confirmButton: 'btn btn-primary btn-bingo'
+                                },
+                                buttonsStyling: false
+                            });
+                        }
+                    }
+                });
                 return false;
             }
 
@@ -1685,18 +1813,36 @@
             }
             if (window.isLiveGame && !window.isLiveFinalized) {
                 history.pushState({ reybingoPlaying: 1 }, null, location.href);
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: 'Transmisión en vivo',
-                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                        icon: 'info',
-                        confirmButtonText: 'Entendido',
-                        customClass: {
-                            confirmButton: 'btn btn-primary btn-bingo'
-                        },
-                        buttonsStyling: false
-                    });
-                }
+                var gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '<?= $game["id"] ?>');
+                var statusUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid;
+                $.ajax({
+                    url: statusUrl,
+                    type: 'GET',
+                    dataType: 'json',
+                    cache: false,
+                    success: function (res) {
+                        if (res && res.status === 'success' && (parseInt(res.game_status, 10) === 0 || res.live_finalized === true)) {
+                            window.isLiveFinalized = true;
+                            window.allowGameUnload = true;
+                            window.onpopstate = null;
+                            var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+                            window.location.replace(playUrl);
+                        } else {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: 'Transmisión en vivo',
+                                    text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                                    icon: 'info',
+                                    confirmButtonText: 'Entendido',
+                                    customClass: {
+                                        confirmButton: 'btn btn-primary btn-bingo'
+                                    },
+                                    buttonsStyling: false
+                                });
+                            }
+                        }
+                    }
+                });
                 return;
             }
             if (canLeaveGameWithoutWarning()) {
@@ -1745,7 +1891,7 @@
 </script>
 
 <!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
-<script src="<?= site_url('assets/js/pusher.min.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/pusher.min.js') : (site_url('assets/js/pusher.min.js') . '?v=' . time()) ?>"></script>
 <script>
     // Configuracion de WebSocket (Soketi self-hosted o Pusher Cloud)
     const GAME_ID        = '<?= $game["id"] ?>';
@@ -1759,6 +1905,7 @@
     const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER") ?>';
     const USER_ID        = '<?= session()->get('id') ?>';
 </script>
-<script src="<?= site_url('assets/js/pusher-client.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/pusher-client.js') : (site_url('assets/js/pusher-client.js') . '?v=' . time()) ?>"></script>
 
-<script src="<?= site_url('assets/js/playing.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/playing.js') : (site_url('assets/js/playing.js') . '?v=' . time()) ?>"></script>
+

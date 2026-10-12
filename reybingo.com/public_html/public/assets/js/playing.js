@@ -3815,7 +3815,7 @@ function startLiveFinalizedPoller() {
     if (!gid) return;
 
     liveFinalizedPollInterval = setInterval(function () {
-        if (window.isLiveFinalized || window.__liveFinalizedHandled || window.__userLeavingGame) {
+        if (window.isLiveFinalized || window.__liveFinalizedHandled) {
             if (liveFinalizedPollInterval) {
                 clearInterval(liveFinalizedPollInterval);
                 liveFinalizedPollInterval = null;
@@ -3837,7 +3837,7 @@ function startLiveFinalizedPoller() {
                 }
             })
             .fail(function () {});
-    }, 2000); // Polling cada 2 segundos
+    }, 1500); // Polling cada 1.5 segundos
 }
 window.startLiveFinalizedPoller = startLiveFinalizedPoller;
 
@@ -4641,6 +4641,7 @@ function handleLiveFinalizedByAdmin(data) {
         return;
     }
     window.__liveFinalizedHandled = true;
+    window.__liveAutoKickExecuted = true;
     window.__userLeavingGame = true;
     window.isLiveFinalized = true;
     window.gameIsFinished = true;
@@ -4655,6 +4656,14 @@ function handleLiveFinalizedByAdmin(data) {
     if (typeof liveFinalizedPollInterval !== 'undefined' && liveFinalizedPollInterval) {
         clearInterval(liveFinalizedPollInterval);
         liveFinalizedPollInterval = null;
+    }
+    if (window.__liveKickIntervalId) {
+        clearInterval(window.__liveKickIntervalId);
+        window.__liveKickIntervalId = null;
+    }
+
+    if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+        Swal.close();
     }
 
     ballPlaybackQueue = [];
@@ -4870,6 +4879,9 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
 
 // Manejo prioritario del botón home (casita) para salir inmediatamente sin trabas ni cuadros de ganadores
 $(document).on('click', '.btn-home', function (e) {
+    if (window.isLiveGame && !window.isLiveFinalized) {
+        return;
+    }
     window.__userLeavingGame = true;
     if (window.awardsModalTimeoutId) {
         clearTimeout(window.awardsModalTimeoutId);
