@@ -1546,6 +1546,9 @@
     var soundPlaying = window.soundPlaying;
 
     function canLeaveGameWithoutWarning() {
+        if (window.isLiveGame && !window.isLiveFinalized) {
+            return false;
+        }
         return window.allowGameUnload === true
             || window.gameIsFinished === true
             || (typeof window.BingoApp !== 'undefined' && window.BingoApp.isGameFinished);
@@ -1568,6 +1571,24 @@
 
         // Botones de salida - Mostrar modal al hacer clic
         $('.btn-home, .btn-exit, .btn-back').on('click', function (e) {
+            if (window.isLiveGame && !window.isLiveFinalized) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: 'Transmisión en vivo',
+                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                        icon: 'info',
+                        confirmButtonText: 'Entendido',
+                        customClass: {
+                            confirmButton: 'btn btn-primary btn-bingo'
+                        },
+                        buttonsStyling: false
+                    });
+                }
+                return false;
+            }
+
             window.__userLeavingGame = true;
             if (window.awardsModalTimeoutId) {
                 clearTimeout(window.awardsModalTimeoutId);
@@ -1593,6 +1614,24 @@
 
         // Confirmar salida desde el modal
         $('#confirmExit').on('click', function (e) {
+            if (window.isLiveGame && !window.isLiveFinalized) {
+                e.preventDefault();
+                if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: 'Transmisión en vivo',
+                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                        icon: 'info',
+                        confirmButtonText: 'Entendido',
+                        customClass: {
+                            confirmButton: 'btn btn-primary btn-bingo'
+                        },
+                        buttonsStyling: false
+                    });
+                }
+                return false;
+            }
+
             e.preventDefault();
             if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
 
@@ -1630,6 +1669,22 @@
             // Si la billetera está abierta, app.js cierra el modal (no mostrar salida)
             var walletEl = document.getElementById('modalPayments');
             if (walletEl && walletEl.classList.contains('show')) {
+                return;
+            }
+            if (window.isLiveGame && !window.isLiveFinalized) {
+                history.pushState({ reybingoPlaying: 1 }, null, location.href);
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: 'Transmisión en vivo',
+                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
+                        icon: 'info',
+                        confirmButtonText: 'Entendido',
+                        customClass: {
+                            confirmButton: 'btn btn-primary btn-bingo'
+                        },
+                        buttonsStyling: false
+                    });
+                }
                 return;
             }
             if (canLeaveGameWithoutWarning()) {

@@ -2776,6 +2776,7 @@ class Playings extends Controller
         $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
         $game = $modelGames->find($gameId);
         $data['game'] = $game;
+        $data['isPlayerRoute'] = true;
 
         if (!$game) {
             $data['sings'] = [];

@@ -3014,7 +3014,11 @@ function showGameFinalized() {
             cancelAutoExit();
             if (window.isLiveGame && !window.isLiveFinalized) {
                 const btnVer = document.getElementById('btn-ver-ganadores-player');
-                if (btnVer) btnVer.style.display = 'inline-flex';
+                if (btnVer) btnVer.style.display = 'none';
+                let modalAwardsEl = document.getElementById('modalAwards');
+                if (modalAwardsEl && !window.__userLeavingGame) {
+                    bootstrap.Modal.getOrCreateInstance(modalAwardsEl, { backdrop: 'static', keyboard: false }).show();
+                }
                 return;
             }
             exitToPlay();
@@ -3082,7 +3086,9 @@ function showGameFinalized() {
             bsAwardsModal.show();
 
             const btnVer = document.getElementById('btn-ver-ganadores-player');
-            if (btnVer) btnVer.style.display = 'inline-flex';
+            if (btnVer) {
+                btnVer.style.display = window.isLiveGame ? 'none' : 'inline-flex';
+            }
 
             if (window.isLiveGame && !window.isLiveFinalized) {
                 cancelAutoExit();
@@ -4606,70 +4612,45 @@ function handleLiveFinalizedByAdmin(data) {
     }
 
     const modalAwardsEl = document.getElementById('modalAwards');
-    if (modalAwardsEl) {
-        const waitNotice = modalAwardsEl.querySelector('#live-waiting-admin-notice');
-        if (waitNotice) waitNotice.style.display = 'none';
-
-        const exitBtns = $(modalAwardsEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game, .btn-close-awards');
-        exitBtns.show().prop('disabled', false).off('click').on('click', function () {
-            const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
-            if (bsAwardsModal) bsAwardsModal.hide();
-            if (typeof window.exitToPlay === 'function') {
-                window.exitToPlay();
-            } else {
-                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
-            }
-        });
+    if (modalAwardsEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const bsAwardsModal = bootstrap.Modal.getInstance(modalAwardsEl);
+        if (bsAwardsModal) bsAwardsModal.hide();
     }
 
     const modalGameFinalizedEl = document.getElementById('modalGameFinalized');
-    if (modalGameFinalizedEl) {
-        $(modalGameFinalizedEl).find('[data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
-            const bsFinModal = bootstrap.Modal.getInstance(modalGameFinalizedEl);
-            if (bsFinModal) bsFinModal.hide();
-            if (typeof window.exitToPlay === 'function') {
-                window.exitToPlay();
-            } else {
-                window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
-            }
-        });
+    if (modalGameFinalizedEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const bsFinModal = bootstrap.Modal.getInstance(modalGameFinalizedEl);
+        if (bsFinModal) bsFinModal.hide();
     }
 
-    const msg = (data && data.message) ? data.message : 'El administrador ha dado por finalizada la transmisión en vivo.';
+    const modalExitEl = document.getElementById('modalExit');
+    if (modalExitEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const bsExitModal = bootstrap.Modal.getInstance(modalExitEl);
+        if (bsExitModal) bsExitModal.hide();
+    }
+
+    const playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
+    const msg = (data && data.message) ? data.message : 'La transmisión en vivo ha finalizado.';
+
+    // En modalidad Live: Al finalizar el admin, automáticamente bota a todos los jugadores a la sala principal
     if (typeof Swal !== 'undefined') {
         Swal.fire({
             title: '📢 Transmisión Finalizada',
-            text: msg,
+            text: msg + ' Redirigiendo a la sala...',
             icon: 'info',
-            confirmButtonText: 'Volver a la Sala',
-            showCancelButton: true,
-            cancelButtonText: 'Ver Ganadores',
-            allowOutsideClick: true,
-            customClass: {
-                confirmButton: 'btn btn-primary btn-bingo me-2',
-                cancelButton: 'btn btn-secondary'
-            },
-            buttonsStyling: false
-        }).then((result) => {
-            if (result.isConfirmed) {
-                if (typeof window.exitToPlay === 'function') {
-                    window.exitToPlay();
-                } else {
-                    window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
-                }
-            } else {
-                if (typeof window.awardsGet === 'function') {
-                    window.awardsGet();
-                }
-            }
+            timer: 1800,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false
+        }).then(() => {
+            window.location.replace(playUrl);
         });
+        setTimeout(function () {
+            window.location.replace(playUrl);
+        }, 2000);
     } else {
-        alert(msg);
-        if (typeof window.exitToPlay === 'function') {
-            window.exitToPlay();
-        } else {
-            window.location.replace(typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
-        }
+        window.location.replace(playUrl);
     }
 }
 

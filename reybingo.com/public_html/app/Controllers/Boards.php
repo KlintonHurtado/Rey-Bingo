@@ -1098,6 +1098,7 @@ class Boards extends Controller {
         $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
         $game = $modelGames->find($gameId);
         $data['game'] = $game;
+        $data['isPlayerRoute'] = false;
 
         if ($game) {
             bingo_ensure_winners_registered((int) $game['id']);

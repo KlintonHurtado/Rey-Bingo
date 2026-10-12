@@ -234,7 +234,8 @@ class PusherClient {
             'game:message',
             'game:chat_message',
             'game:postponed',
-            'game:started'
+            'game:started',
+            'game:live_finalized'
         ];
 
         gameEvents.forEach(eventName => {
