@@ -1689,11 +1689,9 @@
     var soundPlaying = window.soundPlaying;
 
     function canLeaveGameWithoutWarning() {
-        if (window.isLiveGame && !window.isLiveFinalized) {
-            return false;
-        }
         return window.allowGameUnload === true
             || window.gameIsFinished === true
+            || window.isGameCompleted === true
             || (typeof window.BingoApp !== 'undefined' && window.BingoApp.isGameFinished);
     }
 
@@ -1712,73 +1710,11 @@
         document.addEventListener('keydown', () => { lastActivity = Date.now(); });
         document.addEventListener('click', () => { lastActivity = Date.now(); });
 
-        // Botones de salida - Mostrar modal al hacer clic
+        // Botones de salida - Mostrar modal al hacer clic o salir directamente si ya terminó
         $('.btn-home, .btn-exit, .btn-back').on('click', function (e) {
             var $btn = $(this);
             var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
             var targetUrl = $btn.attr('href') || $btn.data('href') || playUrl;
-
-            // Si es un Live que ya está finalizado, permitir salir inmediatamente
-            if (window.isLiveGame && window.isLiveFinalized) {
-                allowUnload = true;
-                window.allowGameUnload = true;
-                window.__userLeavingGame = true;
-                window.location.replace(targetUrl);
-                return false;
-            }
-
-            if (window.isLiveGame && !window.isLiveFinalized) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                // Verificar en tiempo real con el servidor por si el administrador ya finalizó el Live
-                var gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '<?= $game["id"] ?>');
-                var statusUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid;
-
-                $.ajax({
-                    url: statusUrl,
-                    type: 'GET',
-                    dataType: 'json',
-                    cache: false,
-                    success: function (res) {
-                        if (res && res.status === 'success' && (parseInt(res.game_status, 10) === 0 || res.live_finalized === true)) {
-                            window.isLiveFinalized = true;
-                            window.allowGameUnload = true;
-                            window.__userLeavingGame = true;
-                            window.__liveAutoKickExecuted = true;
-                            window.location.replace(targetUrl);
-                        } else {
-                            if (typeof Swal !== 'undefined') {
-                                Swal.fire({
-                                    title: 'Transmisión en vivo',
-                                    text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                                    icon: 'info',
-                                    confirmButtonText: 'Entendido',
-                                    customClass: {
-                                        confirmButton: 'btn btn-primary btn-bingo'
-                                    },
-                                    buttonsStyling: false
-                                });
-                            }
-                        }
-                    },
-                    error: function () {
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                title: 'Transmisión en vivo',
-                                text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                                icon: 'info',
-                                confirmButtonText: 'Entendido',
-                                customClass: {
-                                    confirmButton: 'btn btn-primary btn-bingo'
-                                },
-                                buttonsStyling: false
-                            });
-                        }
-                    }
-                });
-                return false;
-            }
 
             window.__userLeavingGame = true;
             if (window.awardsModalTimeoutId) {
@@ -1793,42 +1729,23 @@
                     const bsModal = bootstrap.Modal.getInstance(modalAwardsEl);
                     if (bsModal) bsModal.hide();
                 }
-                const playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
-                const targetUrl = $(this).attr('href') || $(this).data('href') || playUrl;
                 window.location.replace(targetUrl);
                 return false;
             }
             e.preventDefault();
-            exitUrl = $(this).attr('href') || $(this).data('href');
+            exitUrl = targetUrl;
             if (typeof showBsModal === 'function') showBsModal('#modalExit');
         });
 
         // Confirmar salida desde el modal
         $('#confirmExit').on('click', function (e) {
-            if (window.isLiveGame && !window.isLiveFinalized) {
-                e.preventDefault();
-                if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
-                if (typeof Swal !== 'undefined') {
-                    Swal.fire({
-                        title: 'Transmisión en vivo',
-                        text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                        icon: 'info',
-                        confirmButtonText: 'Entendido',
-                        customClass: {
-                            confirmButton: 'btn btn-primary btn-bingo'
-                        },
-                        buttonsStyling: false
-                    });
-                }
-                return false;
-            }
-
             e.preventDefault();
             if (typeof hideBsModal === 'function') hideBsModal('#modalExit');
 
             // Permitir la salida/recarga
             allowUnload = true;
             window.allowGameUnload = true;
+            window.__userLeavingGame = true;
             window.onpopstate = null;
 
             var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
@@ -1860,40 +1777,6 @@
             // Si la billetera está abierta, app.js cierra el modal (no mostrar salida)
             var walletEl = document.getElementById('modalPayments');
             if (walletEl && walletEl.classList.contains('show')) {
-                return;
-            }
-            if (window.isLiveGame && !window.isLiveFinalized) {
-                history.pushState({ reybingoPlaying: 1 }, null, location.href);
-                var gid = (typeof GAME_ID !== 'undefined' && GAME_ID) ? GAME_ID : (window.gameId || '<?= $game["id"] ?>');
-                var statusUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'playings/getGameStatus?game_id=' + gid;
-                $.ajax({
-                    url: statusUrl,
-                    type: 'GET',
-                    dataType: 'json',
-                    cache: false,
-                    success: function (res) {
-                        if (res && res.status === 'success' && (parseInt(res.game_status, 10) === 0 || res.live_finalized === true)) {
-                            window.isLiveFinalized = true;
-                            window.allowGameUnload = true;
-                            window.onpopstate = null;
-                            var playUrl = (typeof site_url !== 'undefined' ? site_url : '/') + 'play';
-                            window.location.replace(playUrl);
-                        } else {
-                            if (typeof Swal !== 'undefined') {
-                                Swal.fire({
-                                    title: 'Transmisión en vivo',
-                                    text: 'Debes esperar a que el administrador finalice el Live para salir.',
-                                    icon: 'info',
-                                    confirmButtonText: 'Entendido',
-                                    customClass: {
-                                        confirmButton: 'btn btn-primary btn-bingo'
-                                    },
-                                    buttonsStyling: false
-                                });
-                            }
-                        }
-                    }
-                });
                 return;
             }
             if (canLeaveGameWithoutWarning()) {

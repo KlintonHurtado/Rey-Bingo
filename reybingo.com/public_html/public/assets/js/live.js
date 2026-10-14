@@ -1617,7 +1617,7 @@ function confirmarFinalizarLive() {
     if (typeof Swal !== 'undefined') {
         Swal.fire({
             title: '¿Estás seguro de que deseas finalizar el Live?',
-            text: 'Los jugadores podrán salir de la partida.',
+            text: 'Se finalizará la transmisión y todos los jugadores restantes serán redirigidos a la sala principal.',
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sí, finalizar Live',
@@ -1633,7 +1633,7 @@ function confirmarFinalizarLive() {
             }
         });
     } else {
-        if (confirm('¿Estás seguro de que deseas finalizar el Live? Los jugadores podrán salir de la partida.')) {
+        if (confirm('¿Estás seguro de que deseas finalizar el Live? Se finalizará la transmisión y todos los jugadores restantes serán redirigidos a la sala principal.')) {
             ejecutarFinalizarLive();
         }
     }

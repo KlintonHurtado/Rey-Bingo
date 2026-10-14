@@ -3104,11 +3104,16 @@ function showGameFinalized() {
                 }
                 cancelAutoExit();
 
-                // En Live no finalizado: permitir cerrar el modal (X o botón Ver Live) sin salir de la sala
-                $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"]').show();
-                // Ocultar cualquier botón que intente salir de la sala
-                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').hide();
+                // En Live no finalizado: permitir cerrar el modal (X o botón Ver Live) y también salir de la sala
+                $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').show();
                 $(modalAwardsEl).find('#live-waiting-admin-notice').remove();
+
+                // Al hacer clic en salir explícitamente desde el modal de premios
+                $(modalAwardsEl).find('.btn-volver-inicio, #btnVolverInicio, .btn-exit-game').off('click').on('click', function () {
+                    cancelAutoExit();
+                    bsAwardsModal.hide();
+                    exitToPlay();
+                });
             } else {
                 // Live ya finalizado o partida regular: permitir salir y mostrar botón de salir
                 $(modalAwardsEl).find('.btn-close-awards, [data-bs-dismiss="modal"], .btn-volver-inicio, #btnVolverInicio, .btn-exit-game').show();
@@ -4865,9 +4870,6 @@ if (typeof DEBUG !== 'undefined' && DEBUG) {
 
 // Manejo prioritario del botón home (casita) para salir inmediatamente sin trabas ni cuadros de ganadores
 $(document).on('click', '.btn-home', function (e) {
-    if (window.isLiveGame && !window.isLiveFinalized) {
-        return;
-    }
     window.__userLeavingGame = true;
     if (window.awardsModalTimeoutId) {
         clearTimeout(window.awardsModalTimeoutId);

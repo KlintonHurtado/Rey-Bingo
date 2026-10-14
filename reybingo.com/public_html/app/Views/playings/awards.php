@@ -66,6 +66,9 @@ $showWaitingNotice = $isLivePlayerLocked;
                 <button type="button" class="btn btn-primary w-50 btn-bingo my-1" data-bs-dismiss="modal">
                     <i class="fa-solid fa-eye me-1"></i> <?= translate('Seguir viendo Live'); ?>
                 </button>
+                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio my-1" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'play'; }">
+                    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
+                </button>
             <?php else : ?>
                 <?php if ($isLiveGameType && $isAdminViewer && $isLiveGameOpen) : ?>
                 <button type="button" class="btn btn-danger btn-finalizar-live px-4 py-2 my-2 fw-bold" id="btnModalFinalizarLive" onclick="if (typeof confirmarFinalizarLive === 'function') { confirmarFinalizarLive(); } else if (typeof window.confirmarFinalizarLive === 'function') { window.confirmarFinalizarLive(); }">
