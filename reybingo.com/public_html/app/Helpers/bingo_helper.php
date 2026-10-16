@@ -3116,6 +3116,36 @@ if (!function_exists('bingo_generate_player_username')) {
     }
 }
 
+if (!function_exists('bingo_is_email_verification_required')) {
+    function bingo_is_email_verification_required(): bool
+    {
+        // 1. Variable de entorno en .env o contenedor (ej. REQUIRE_EMAIL_VERIFICATION=false)
+        $env = getenv('REQUIRE_EMAIL_VERIFICATION');
+        if ($env === false || $env === null || $env === '') {
+            $env = getenv('EMAIL_VERIFICATION_REQUIRED');
+        }
+        if ($env !== false && $env !== null && $env !== '') {
+            $filtered = filter_var($env, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($filtered !== null) {
+                return $filtered;
+            }
+        }
+
+        // 2. Variable en tabla system si existe
+        if (function_exists('systemGet')) {
+            $sysVal = systemGet('require_email_verification');
+            if ($sysVal !== null && $sysVal !== '') {
+                $filtered = filter_var($sysVal, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($filtered !== null) {
+                    return $filtered;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
 if (!function_exists('bingo_player_email_is_verified')) {
     function bingo_player_email_is_verified(?array $user): bool
     {
@@ -3125,6 +3155,11 @@ if (!function_exists('bingo_player_email_is_verified')) {
 
         // Admin / PV / operador no requieren verificación de correo de jugador
         if ((int) ($user['group'] ?? 0) !== 0) {
+            return true;
+        }
+
+        // Si la verificación de correo está desactivada globalmente, permitir ingreso
+        if (! bingo_is_email_verification_required()) {
             return true;
         }
 

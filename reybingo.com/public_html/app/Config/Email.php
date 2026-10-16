@@ -118,4 +118,53 @@ class Email extends BaseConfig
      * Enable notify message from server
      */
     public bool $DSN = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        // Soporte para variables de entorno (directas o con prefijo CodeIgniter)
+        $host = getenv('SMTP_HOST') ?: getenv('email.SMTPHost');
+        if ($host) {
+            $this->SMTPHost = (string) $host;
+        }
+
+        $user = getenv('SMTP_USER') ?: getenv('email.SMTPUser');
+        if ($user) {
+            $this->SMTPUser = (string) $user;
+        }
+
+        $pass = getenv('SMTP_PASS') ?: getenv('email.SMTPPass');
+        if ($pass) {
+            $this->SMTPPass = (string) $pass;
+        }
+
+        $port = getenv('SMTP_PORT') ?: getenv('email.SMTPPort');
+        if ($port) {
+            $this->SMTPPort = (int) $port;
+        }
+
+        $crypto = getenv('SMTP_CRYPTO');
+        if ($crypto === false || $crypto === null) {
+            $crypto = getenv('email.SMTPCrypto');
+        }
+        if ($crypto !== false && $crypto !== null) {
+            $this->SMTPCrypto = (string) $crypto;
+        }
+
+        $fromEmail = getenv('SMTP_FROM_EMAIL') ?: getenv('email.fromEmail');
+        if ($fromEmail) {
+            $this->fromEmail = (string) $fromEmail;
+        }
+
+        $fromName = getenv('SMTP_FROM_NAME') ?: getenv('email.fromName');
+        if ($fromName) {
+            $this->fromName = (string) $fromName;
+        }
+
+        $protocol = getenv('SMTP_PROTOCOL') ?: getenv('email.protocol');
+        if ($protocol) {
+            $this->protocol = (string) $protocol;
+        }
+    }
 }
