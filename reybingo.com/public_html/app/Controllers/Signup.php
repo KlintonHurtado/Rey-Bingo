@@ -1170,7 +1170,7 @@ class Signup extends Controller {
 
         $email = trim((string) $this->request->getPost('email'));
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(422)->setJSON([
                 'success' => false,
                 'message' => translate('email') . ' ' . strtolower(translate('it is mandatory')),
             ]);
@@ -1199,7 +1199,7 @@ class Signup extends Controller {
             $diff = time() - strtotime($user['email_verification_sent_at']);
             if ($diff < 60) {
                 $remaining = 60 - $diff;
-                return $this->response->setJSON([
+                return $this->response->setStatusCode(429)->setJSON([
                     'success' => false,
                     'rate_limited' => true,
                     'remaining' => $remaining,
@@ -1232,7 +1232,7 @@ class Signup extends Controller {
         $sent = $this->sendVerificationEmail($user, $rawToken);
 
         if (! $sent) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(500)->setJSON([
                 'success' => false,
                 'message' => 'No se pudo enviar el correo de verificación en este momento por un error temporal del servidor. Por favor intenta de nuevo en unos minutos.',
             ]);
