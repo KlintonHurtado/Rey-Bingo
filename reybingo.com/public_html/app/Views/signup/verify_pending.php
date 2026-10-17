@@ -139,24 +139,17 @@
                 btn.prop('disabled', false);
                 $('#resend-btn-text').text(defaultBtnText);
             }
-        }).fail(function (xhr) {
-            var errData = xhr.responseJSON || {};
-            var msg = errData.message || '<?= esc(translate('there was an error in the request to the server'), 'js'); ?>';
+        }).fail(function () {
             Toastify({
-                text: msg,
-                duration: 4500,
+                text: '<?= esc(translate('there was an error in the request to the server'), 'js'); ?>',
+                duration: 3500,
                 gravity: 'top',
                 position: 'right',
                 style: { background: '#dc3545' },
                 stopOnFocus: true
             }).showToast();
-
-            if (errData.rate_limited && errData.remaining) {
-                setCooldownTimer(errData.remaining);
-            } else {
-                btn.prop('disabled', false);
-                $('#resend-btn-text').text(defaultBtnText);
-            }
+            btn.prop('disabled', false);
+            $('#resend-btn-text').text(defaultBtnText);
         });
     });
 })();

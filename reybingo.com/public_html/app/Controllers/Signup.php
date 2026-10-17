@@ -686,12 +686,6 @@ class Signup extends Controller {
             bingo_apply_signup_referral((int) $id);
 
             helper('bingo');
-            $requireVerification = function_exists('bingo_is_email_verification_required')
-                ? bingo_is_email_verification_required()
-                : true;
-
-            $data['verified_email'] = $requireVerification ? 0 : 1;
-
             if (function_exists('bingo_ensure_email_verification_schema')) {
                 bingo_ensure_email_verification_schema();
             }
@@ -701,22 +695,16 @@ class Signup extends Controller {
             $now = date('Y-m-d H:i:s');
             $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 horas
 
-            $updateUser = [
+            $model->update($id, [
                 'verification_token' => $tokenHash,
                 'verification_token_expires_at' => $expiresAt,
                 'verification_token_prev' => null,
                 'verification_token_prev_expires_at' => null,
                 'email_verification_sent_at' => $now,
-                'verified_email' => $data['verified_email'],
-            ];
-
-            $model->update($id, $updateUser);
+            ]);
 
             $user = $model->find($id);
-
-            if ($requireVerification) {
-                $this->sendVerificationEmail($user, $rawToken);
-            }
+            $this->sendVerificationEmail($user, $rawToken);
 
             $modelLogs = new LogsModel();
             $ip = (string) ($this->request->getIPAddress() ?: ($_SERVER['REMOTE_ADDR'] ?? ''));
@@ -725,9 +713,7 @@ class Signup extends Controller {
             $log = [
                 'id_user'    => $id,
                 'action'     => 'account',
-                'details'    => $requireVerification
-                    ? 'user account created successfully. pending email verification.'
-                    : 'user account created successfully.',
+                'details'    => 'user account created successfully. pending email verification.',
                 'ip_address' => $ip,
                 'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
                 'country'    => $country,
@@ -741,15 +727,6 @@ class Signup extends Controller {
                 ];
 
                 return $this->response->setJSON($response);
-            }
-
-            if (! $requireVerification) {
-                $this->setSession($user);
-                return $this->response->setJSON([
-                    'success' => true,
-                    'redirect' => site_url('/play'),
-                    'message' => '¡Bienvenido! Tu cuenta ha sido creada exitosamente.',
-                ]);
             }
 
             // No iniciar sesión hasta confirmar el correo
@@ -968,10 +945,6 @@ class Signup extends Controller {
         $now = date('Y-m-d H:i:s');
         $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 horas
 
-        $requireVerification = function_exists('bingo_is_email_verification_required')
-            ? bingo_is_email_verification_required()
-            : true;
-
         $data = [
             'group' => 0,
             'firstname' => $pending['firstname'] ?? 'Jugador',
@@ -979,7 +952,7 @@ class Signup extends Controller {
             'username'  => $username,
             'email'     => $pending['email'],
             'password'  => password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
-            'verified_email' => $requireVerification ? 0 : 1,
+            'verified_email' => 0,
             'verification_token' => $tokenHash,
             'verification_token_expires_at' => $expiresAt,
             'verification_token_prev' => null,
@@ -1051,10 +1024,7 @@ class Signup extends Controller {
         bingo_apply_signup_referral((int) $id);
 
         $user = $model->find($id);
-
-        if ($requireVerification) {
-            $this->sendVerificationEmail($user, $rawToken);
-        }
+        $this->sendVerificationEmail($user, $rawToken);
 
         session()->remove('google_signup_pending');
 
@@ -1064,19 +1034,11 @@ class Signup extends Controller {
         $modelLogs->insert([
             'id_user' => $id,
             'action' => 'account',
-            'details' => $requireVerification
-                ? 'user google account created successfully. pending email verification.'
-                : 'user google account created successfully.',
+            'details' => 'user google account created successfully. pending email verification.',
             'ip_address' => $ip,
             'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
             'country' => $country,
         ]);
-
-        if (! $requireVerification) {
-            $this->setSession($user);
-            return redirect()->to(site_url('/play'))
-                ->with('success', '¡Bienvenido! Tu cuenta ha sido creada exitosamente.');
-        }
 
         return redirect()->to(site_url('signup/verifyPending?email=' . rawurlencode((string) $pending['email'])))
             ->with('success', 'Te enviamos un correo de verificación. Revisa tu bandeja de entrada y la carpeta de spam.');
@@ -1124,17 +1086,9 @@ class Signup extends Controller {
         if ($email !== '') {
             $model = new UsersModel();
             $user = $model->where('email', $email)->where('group', 0)->first();
-            if ($user) {
-                if (function_exists('bingo_is_email_verification_required') && ! bingo_is_email_verification_required()) {
-                    return redirect()->to(site_url('signin'))->with('info', 'La verificación de correo no es requerida actualmente. Ya puedes iniciar sesión.');
-                }
-                if ((int) ($user['verified_email'] ?? 0) === 1) {
-                    return redirect()->to(site_url('signin'))->with('info', 'Tu correo ya está verificado. Puedes iniciar sesión y continuar jugando.');
-                }
-                if (!empty($user['email_verification_sent_at'])) {
-                    $diff = time() - strtotime($user['email_verification_sent_at']);
-                    $cooldownRemaining = max(0, 60 - $diff);
-                }
+            if ($user && !empty($user['email_verification_sent_at'])) {
+                $diff = time() - strtotime($user['email_verification_sent_at']);
+                $cooldownRemaining = max(0, 60 - $diff);
             }
         }
 
@@ -1160,17 +1114,9 @@ class Signup extends Controller {
             bingo_ensure_email_verification_schema();
         }
 
-        if (function_exists('bingo_is_email_verification_required') && ! bingo_is_email_verification_required()) {
-            return $this->response->setJSON([
-                'success' => true,
-                'message' => 'La verificación de correo no es requerida actualmente. Ya puedes iniciar sesión.',
-                'redirect' => site_url('signin'),
-            ]);
-        }
-
         $email = trim((string) $this->request->getPost('email'));
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return $this->response->setStatusCode(422)->setJSON([
+            return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('email') . ' ' . strtolower(translate('it is mandatory')),
             ]);
@@ -1199,7 +1145,7 @@ class Signup extends Controller {
             $diff = time() - strtotime($user['email_verification_sent_at']);
             if ($diff < 60) {
                 $remaining = 60 - $diff;
-                return $this->response->setStatusCode(429)->setJSON([
+                return $this->response->setJSON([
                     'success' => false,
                     'rate_limited' => true,
                     'remaining' => $remaining,
@@ -1232,7 +1178,7 @@ class Signup extends Controller {
         $sent = $this->sendVerificationEmail($user, $rawToken);
 
         if (! $sent) {
-            return $this->response->setStatusCode(500)->setJSON([
+            return $this->response->setJSON([
                 'success' => false,
                 'message' => 'No se pudo enviar el correo de verificación en este momento por un error temporal del servidor. Por favor intenta de nuevo en unos minutos.',
             ]);

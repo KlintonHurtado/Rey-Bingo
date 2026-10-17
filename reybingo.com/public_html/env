@@ -82,22 +82,3 @@ REQUIRED_MATCHES = 24
 #--------------------------------------------------------------------
 # push.vapid.publicKey =
 # push.vapid.privateKey =
-
-#--------------------------------------------------------------------
-# VERIFICACIÓN DE CORREO ELECTRÓNICO
-#--------------------------------------------------------------------
-# true: Obligatorio confirmar correo antes de jugar (por defecto)
-# false: Desactiva la verificación obligatoria (permite jugar de inmediato ante fallas de SMTP)
-REQUIRE_EMAIL_VERIFICATION = true
-
-#--------------------------------------------------------------------
-# SERVIDOR DE CORREO SMTP
-#--------------------------------------------------------------------
-# SMTP_HOST = smtp.hostinger.com
-# SMTP_PORT = 465
-# SMTP_CRYPTO = ssl
-# SMTP_USER = contacto@reybingo.com
-# SMTP_PASS =
-# SMTP_FROM_EMAIL = contacto@reybingo.com
-# SMTP_FROM_NAME = Rey Bingo
-
