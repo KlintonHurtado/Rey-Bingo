@@ -259,7 +259,8 @@ class EmailMarketing extends BaseController
                 // Send test email
                 $email = \Config\Services::email();
                 
-                $email->setFrom('noreply@bingofamily.com', 'Bingo Family');
+                $emailConfig = config(\Config\Email::class);
+                $email->setFrom($emailConfig->fromEmail, $emailConfig->fromName);
                 $email->setTo($testEmail);
                 $email->setSubject($campaign['subject']);
                 $email->setMessage($campaign['content']);
@@ -319,7 +320,8 @@ class EmailMarketing extends BaseController
         $pendingEmails = $this->emailStatsModel->getPendingEmails($id, 10);
         
         $email = \Config\Services::email();
-        $email->setFrom('noreply@bingofamily.com', 'Bingo Family');
+        $emailConfig = config(\Config\Email::class);
+        $email->setFrom($emailConfig->fromEmail, $emailConfig->fromName);
         
         $sentCount = 0;
         foreach ($pendingEmails as $recipient) {
@@ -511,7 +513,8 @@ class EmailMarketing extends BaseController
             }
             
             $email = \Config\Services::email();
-            $email->setFrom('noreply@bingofamily.com', 'Bingo Family');
+            $emailConfig = config(\Config\Email::class);
+            $email->setFrom($emailConfig->fromEmail, $emailConfig->fromName);
             
             foreach ($pendingEmails as $recipient) {
                 $email->setTo($recipient['email']);

@@ -20,6 +20,7 @@ return [
     'sendFailurePHPMail'   => 'Incapaz de enviar email usando PHP mail(). Su servidor puede no estar configurado para enviar correos usando este método.',
     'sendFailureSendmail'  => 'Incapaz de enviar email usando PHP Sendmail. Su servidor puede no estar configurado para enviar correos usando este método.',
     'sendFailureSmtp'      => 'Incapaz de enviar email usando PHP SMTP. Su servidor puede no estar configurado para enviar correos usando este método.',
+    'sendFailureResend'    => 'Incapaz de enviar email usando la API de Resend. Compruebe su API Key y configuración.',
     'sent'                 => 'Su mensaje ha sido enviado correctamente utilizando el siguiente protocolo: {0}',
     'noSocket'             => 'Incapaz de abrir un socket a Sendmail. Compruebe la configuración.',
     'noHostname'           => 'No ha especificado un nombre de host SMTP.',
