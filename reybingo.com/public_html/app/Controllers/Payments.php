@@ -1390,161 +1390,227 @@ class Payments extends Controller {
             $observation = '';
         }
 
-        // Todo depósito manual queda pendiente hasta que un admin lo apruebe.
-        $status = 1;
-
-        $data = [
-            'user'      => $depositUserId,
-            'account'   => $this->request->getPost('deposit-account'),
-            'method'    => $this->request->getPost('deposit-method'),
-            'bank'      => $this->request->getPost('deposit-bank'),
-            'document'  => $this->request->getPost('deposit-document'),
-            'phone'     => $this->request->getPost('deposit-phone'),
-            'date'      => $this->request->getPost('deposit-date'),
-            'amount'    => $this->request->getPost('deposit-amount'),
-            'reference' => $this->request->getPost('deposit-reference'),
-            'observation' => $observation,
-            'status'    => $status
-        ];
-
-        // Preferir archivo multipart (más fiable que base64 grande)
-        if ($hasUpload) {
-            $saved = bingo_save_voucher_upload($voucherFile);
-        } else {
-            $saved = bingo_save_voucher_base64($voucherImage);
-        }
-
-        if (! $saved['success']) {
-            $msg = translate('voucher') . ' ' . strtolower(translate('it is mandatory'));
-            if (($saved['error'] ?? '') === 'write') {
-                $msg = 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.';
-            }
-
+        $reference = trim((string) $this->request->getPost('deposit-reference'));
+        if ($reference === '') {
             return $this->response->setJSON([
                 'success' => false,
                 'errors' => [
-                    'deposit-voucher' => $msg,
-                ],
-            ]);
-        }
-        $data['voucher'] = $saved['filename'];
-
-        if (systemGet('activateDeposit') == 1) {
-            if ($data['amount'] < systemGet('minimumDeposit')) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'minMax' => true,
-                    'message' => 'El monto mínimo de depósito es ' . systemGet('minimumDeposit') . ' ' . systemGet('currency')
-                ]);
-            }
-            if ($data['amount'] > systemGet('maximumDeposit')) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'minMax' => true,
-                    'message' => 'El monto máximo de depósito es ' . systemGet('maximumDeposit') . ' ' . systemGet('currency')
-                ]);
-            }
-        }
-
-        $inserted = $modelDeposits->insert($data);
-        $depositId = $inserted ? (int) $modelDeposits->insertID() : 0;
-
-        if (! $depositId) {
-            log_message('error', 'depositSubmit insert failed: ' . json_encode($modelDeposits->errors()));
-            return $this->response->setJSON([
-                'success' => false,
-                'error' => translate('error saving payment'),
-            ]);
-        }
-
-        // Asegurar que el archivo exista con el nombre real guardado en BD (evita truncados)
-        if (! bingo_voucher_sync_after_insert($depositId, $saved['filename'])) {
-            log_message('error', 'depositSubmit voucher missing after insert id=' . $depositId . ' file=' . $saved['filename']);
-            try {
-                $modelDeposits->delete($depositId);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-
-            return $this->response->setJSON([
-                'success' => false,
-                'errors' => [
-                    'deposit-voucher' => 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.',
+                    'deposit-reference' => translate('reference') . ' ' . strtolower(translate('it is mandatory')),
                 ],
             ]);
         }
 
-        $user = $modelUsers->find($depositUserId);
-        $currentUserId = session()->get('id');
-        $modelNotifications = new NotificationsModel();
-
-        $admins = $modelUsers->select('id')->where('group', 1)->findAll();
-        $creator = $modelUsers->find($currentUserId);
-        $creatorName = $creator ? trim($creator['firstname'] . ' ' . $creator['lastname']) : translate('user');
+        // Lock con MySQL GET_LOCK para evitar inserciones simultáneas concurrentes (doble clic)
+        $db = \Config\Database::connect();
+        $lockKey = 'dep_lock_' . md5($depositUserId . '_' . $reference);
+        $lockAcquired = false;
 
         try {
-            foreach ($admins as $admin) {
-                $notificationData = [
-                    'user' => $admin['id'],
-                    'from' => $currentUserId,
-                    'type' => 'deposit',
-                    'type_id' => $depositId,
-                    'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
-                    'message' => ($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '') . ' ha registrado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
-                ];
-
-                $modelNotifications->insert($notificationData);
-            }
-
-            if ((int) $depositUserId !== (int) $currentUserId) {
-                $notificationData = [
-                    'user' => $depositUserId,
-                    'from' => $currentUserId,
-                    'type' => 'deposit',
-                    'type_id' => $depositId,
-                    'title' => '📥 DEPÓSITO EN REVISIÓN',
-                    'message' => $creatorName . ' registró un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . '. Está pendiente de verificación; el saldo se acreditará cuando sea aprobado.',
-                ];
-
-                $modelNotifications->insert($notificationData);
-            } elseif (! $isAdmin) {
-                $notificationData = [
-                    'user' => $depositUserId,
-                    'from' => $currentUserId,
-                    'type' => 'deposit',
-                    'type_id' => $depositId,
-                    'title' => '📥 DEPÓSITO EN REVISIÓN',
-                    'message' => 'Su solicitud de depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' fue recibida y está pendiente de verificación.',
-                ];
-
-                $modelNotifications->insert($notificationData);
-            }
+            $lockRow = $db->query("SELECT GET_LOCK(?, 5) AS `is_locked`", [$lockKey])->getRow();
+            $lockAcquired = ! empty($lockRow->is_locked);
         } catch (\Throwable $e) {
-            log_message('error', 'depositSubmit notification failed: ' . $e->getMessage());
+            $lockAcquired = false;
         }
 
-        $response = [
-            'success' => true,
-            'newRecharge' => [
-                'id' => $depositId,
-                'type' => 'deposit',
-                'type_Tra' => translate('deposit'),
-                'user_id' => $data['user'],
-                'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
-                'user_code' => $user ? $user['code'] : 'N/A',
-                'bank' => $this->formatBankInfo('deposit', $user, $data['bank']),
-                'reference' => $data['reference'],
-                'amount' => $data['amount'],
-                'date' => date('Y-m-d H:i:s'),
-                'date_formatted' => date('d/m/Y', strtotime($data['date'])),
-                'status' => $data['status'],
-                'status_raw' => $data['status'],
-                'status_formatted' => $this->formatStatusDeposit($data['status']),
-                'created_at' => date('d/m/Y')
-            ]
-        ];
-        
-        return $this->response->setJSON($response);
+        try {
+            // 1. Evitar reenvío rápido / doble clic del mismo usuario en los últimos 30 segundos
+            $recentDuplicate = $modelDeposits
+                ->where('user', $depositUserId)
+                ->where('reference', $reference)
+                ->where('created_at >=', date('Y-m-d H:i:s', time() - 30))
+                ->first();
+
+            if ($recentDuplicate) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'deposit-reference' => 'Su solicitud ya fue enviada y se encuentra en procesamiento. Por favor espere.',
+                    ],
+                ]);
+            }
+
+            // 2. Evitar referencias duplicadas activas (status 1 = pendiente, status 2 = aprobado)
+            $existingDeposit = $modelDeposits
+                ->where('reference', $reference)
+                ->whereIn('status', [1, 2])
+                ->first();
+
+            if ($existingDeposit) {
+                $statusMsg = ((int) $existingDeposit['status'] === 1)
+                    ? 'pendiente de aprobación'
+                    : 'aprobado anteriormente';
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'deposit-reference' => 'Ya existe un depósito ' . $statusMsg . ' con esta referencia (# ' . esc($reference) . ').',
+                    ],
+                ]);
+            }
+
+            // Todo depósito manual queda pendiente hasta que un admin lo apruebe.
+            $status = 1;
+
+            $data = [
+                'user'      => $depositUserId,
+                'account'   => $this->request->getPost('deposit-account'),
+                'method'    => $this->request->getPost('deposit-method'),
+                'bank'      => $this->request->getPost('deposit-bank'),
+                'document'  => $this->request->getPost('deposit-document'),
+                'phone'     => $this->request->getPost('deposit-phone'),
+                'date'      => $this->request->getPost('deposit-date'),
+                'amount'    => $this->request->getPost('deposit-amount'),
+                'reference' => $reference,
+                'observation' => $observation,
+                'status'    => $status
+            ];
+
+            // Preferir archivo multipart (más fiable que base64 grande)
+            if ($hasUpload) {
+                $saved = bingo_save_voucher_upload($voucherFile);
+            } else {
+                $saved = bingo_save_voucher_base64($voucherImage);
+            }
+
+            if (! $saved['success']) {
+                $msg = translate('voucher') . ' ' . strtolower(translate('it is mandatory'));
+                if (($saved['error'] ?? '') === 'write') {
+                    $msg = 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.';
+                }
+
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'deposit-voucher' => $msg,
+                    ],
+                ]);
+            }
+            $data['voucher'] = $saved['filename'];
+
+            if (systemGet('activateDeposit') == 1) {
+                if ($data['amount'] < systemGet('minimumDeposit')) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'minMax' => true,
+                        'message' => 'El monto mínimo de depósito es ' . systemGet('minimumDeposit') . ' ' . systemGet('currency')
+                    ]);
+                }
+                if ($data['amount'] > systemGet('maximumDeposit')) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'minMax' => true,
+                        'message' => 'El monto máximo de depósito es ' . systemGet('maximumDeposit') . ' ' . systemGet('currency')
+                    ]);
+                }
+            }
+
+            $inserted = $modelDeposits->insert($data);
+            $depositId = $inserted ? (int) $modelDeposits->insertID() : 0;
+
+            if (! $depositId) {
+                log_message('error', 'depositSubmit insert failed: ' . json_encode($modelDeposits->errors()));
+                return $this->response->setJSON([
+                    'success' => false,
+                    'error' => translate('error saving payment'),
+                ]);
+            }
+
+            // Asegurar que el archivo exista con el nombre real guardado en BD (evita truncados)
+            if (! bingo_voucher_sync_after_insert($depositId, $saved['filename'])) {
+                log_message('error', 'depositSubmit voucher missing after insert id=' . $depositId . ' file=' . $saved['filename']);
+                try {
+                    $modelDeposits->delete($depositId);
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+
+                return $this->response->setJSON([
+                    'success' => false,
+                    'errors' => [
+                        'deposit-voucher' => 'No se pudo guardar el comprobante en el servidor. Verifique permisos de public/uploads/vouchers/.',
+                    ],
+                ]);
+            }
+
+            $user = $modelUsers->find($depositUserId);
+            $currentUserId = session()->get('id');
+            $modelNotifications = new NotificationsModel();
+
+            $admins = $modelUsers->select('id')->where('group', 1)->findAll();
+            $creator = $modelUsers->find($currentUserId);
+            $creatorName = $creator ? trim($creator['firstname'] . ' ' . $creator['lastname']) : translate('user');
+
+            try {
+                foreach ($admins as $admin) {
+                    $notificationData = [
+                        'user' => $admin['id'],
+                        'from' => $currentUserId,
+                        'type' => 'deposit',
+                        'type_id' => $depositId,
+                        'title' => '📥 NUEVA SOLICITUD DE DEPÓSITO',
+                        'message' => ($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '') . ' ha registrado un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' | Ref: #' . $data['reference'] . ' | Fecha: ' . date('d/m/Y', strtotime($data['date'])) . '.',
+                    ];
+
+                    $modelNotifications->insert($notificationData);
+                }
+
+                if ((int) $depositUserId !== (int) $currentUserId) {
+                    $notificationData = [
+                        'user' => $depositUserId,
+                        'from' => $currentUserId,
+                        'type' => 'deposit',
+                        'type_id' => $depositId,
+                        'title' => '📥 DEPÓSITO EN REVISIÓN',
+                        'message' => $creatorName . ' registró un depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . '. Está pendiente de verificación; el saldo se acreditará cuando sea aprobado.',
+                    ];
+
+                    $modelNotifications->insert($notificationData);
+                } elseif (! $isAdmin) {
+                    $notificationData = [
+                        'user' => $depositUserId,
+                        'from' => $currentUserId,
+                        'type' => 'deposit',
+                        'type_id' => $depositId,
+                        'title' => '📥 DEPÓSITO EN REVISIÓN',
+                        'message' => 'Su solicitud de depósito por ' . systemGet('currency') . ' ' . number_format($data['amount'], 2) . ' fue recibida y está pendiente de verificación.',
+                    ];
+
+                    $modelNotifications->insert($notificationData);
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'depositSubmit notification failed: ' . $e->getMessage());
+            }
+
+            $response = [
+                'success' => true,
+                'newRecharge' => [
+                    'id' => $depositId,
+                    'type' => 'deposit',
+                    'type_Tra' => translate('deposit'),
+                    'user_id' => $data['user'],
+                    'user_name' => $user ? $user['firstname'] . ' ' . $user['lastname'] : 'N/A',
+                    'user_code' => $user ? $user['code'] : 'N/A',
+                    'bank' => $this->formatBankInfo('deposit', $user, $data['bank']),
+                    'reference' => $data['reference'],
+                    'amount' => $data['amount'],
+                    'date' => date('Y-m-d H:i:s'),
+                    'date_formatted' => date('d/m/Y', strtotime($data['date'])),
+                    'status' => $data['status'],
+                    'status_raw' => $data['status'],
+                    'status_formatted' => $this->formatStatusDeposit($data['status']),
+                    'created_at' => date('d/m/Y')
+                ]
+            ];
+            
+            return $this->response->setJSON($response);
+        } finally {
+            if ($lockAcquired) {
+                try {
+                    $db->query("SELECT RELEASE_LOCK(?)", [$lockKey]);
+                } catch (\Throwable $e) {
+                    // ignore
+                }
+            }
+        }
     }
 
     public function depositPaypalSubmit() {
@@ -1987,10 +2053,44 @@ class Payments extends Controller {
             return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
         }
 
+        $senderId = (int) session()->get('id');
+        $user = $modelUsers->find($senderId);
+        if (!$user) {
+            return $this->response->setJSON(['success' => false, 'error' => translate('user not found')]);
+        }
+
+        $amount = (float) $this->request->getPost('amount');
+
+        // Evitar transferencia duplicada inmediata (mismo emisor, mismo receptor, mismo monto en últimos 10 segundos)
+        $recentTransfer = $modelTransfers
+            ->where('from', $senderId)
+            ->where('user', $receiver['id'])
+            ->where('amount', $amount)
+            ->where('created_at >=', date('Y-m-d H:i:s', time() - 10))
+            ->first();
+
+        if ($recentTransfer) {
+            return $this->response->setJSON([
+                'success' => false,
+                'error' => 'Ya se procesó una transferencia recientemente. Por favor revise su historial.',
+            ]);
+        }
+
+        $userNormalized = wallet_service()->normalizeUser($user);
+        $withdrawable = wallet_withdrawable($userNormalized);
+        if ($amount > $withdrawable) {
+            return $this->response->setJSON([
+                'success' => false,
+                'errors' => [
+                    'amount' => translate('the amount cannot exceed what is available') . ': ' . systemGet('currency') . ' ' . number_format($withdrawable, 2)
+                ]
+            ]);
+        }
+
         $data = [
             'user' => $receiver['id'],
-            'from' => session()->get('id'),
-            'amount' => $this->request->getPost('amount'),
+            'from' => $senderId,
+            'amount' => $amount,
             'note' => $this->request->getPost('note'),
             'status' => 2
         ];

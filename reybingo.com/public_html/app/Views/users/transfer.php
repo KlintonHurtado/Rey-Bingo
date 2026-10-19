@@ -46,13 +46,22 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
-        $('#transfer-form').on('submit', function (e) {
+        var isSubmittingTransfer = false;
+
+        $('#transfer-form').off('submit').on('submit', function (e) {
             e.preventDefault();
 
-            var available = $('#available-wallet');
+            if (isSubmittingTransfer) {
+                return false;
+            }
 
+            var available = $('#available-wallet');
             var button = $('#transfer-button');
-            button.prop("disabled", true);
+            var originalButtonHtml = button.html();
+
+            isSubmittingTransfer = true;
+            button.prop("disabled", true).addClass('disabled');
+            button.html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + '<?= translate('sending') !== 'sending' ? translate('sending') : 'Enviando...'; ?>');
 
             $('.text-danger').addClass('d-none').text('');
             $('.form-control').removeClass('is-invalid');
@@ -64,7 +73,6 @@
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-                        
                         $('#modalTransfer').modal('hide');
 
                         available.html(response.wallet);
@@ -81,25 +89,40 @@
                             style: { background: "#198754" },
                             stopOnFocus: true
                         }).showToast();
-                    } else if (response.minMax) {
-                        Toastify({
-                            text: response.message,
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            style: { background: "#dc3545" },
-                            stopOnFocus: true
-                        }).showToast();
                     } else {
-                        if (response.errors) {
+                        isSubmittingTransfer = false;
+                        button.prop("disabled", false).removeClass('disabled').html(originalButtonHtml);
+
+                        if (response.minMax) {
+                            Toastify({
+                                text: response.message,
+                                duration: 3000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#dc3545" },
+                                stopOnFocus: true
+                            }).showToast();
+                        } else if (response.errors) {
                             $.each(response.errors, function(field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
                                 $('#' + field).addClass('is-invalid');
                             });
+                        } else if (response.error) {
+                            Toastify({
+                                text: response.error,
+                                duration: 3000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#dc3545" },
+                                stopOnFocus: true
+                            }).showToast();
                         }
                     }
                 },
                 error: function() {
+                    isSubmittingTransfer = false;
+                    button.prop("disabled", false).removeClass('disabled').html(originalButtonHtml);
+
                     Toastify({
                         text: "<?= translate('there was an error in the request to the server'); ?>",
                         duration: 3000,
@@ -108,9 +131,6 @@
                         style: { background: "#dc3545" },
                         stopOnFocus: true
                     }).showToast();
-                },
-                complete: function() {
-                    button.prop("disabled", false);
                 }
             });
         });

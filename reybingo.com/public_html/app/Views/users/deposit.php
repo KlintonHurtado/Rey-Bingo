@@ -377,10 +377,17 @@
 
         $('#deposit-step-button').off('click').on('click', depositStepContinue);
 
-        $('#deposit-form').on('submit', function (e) {
+        var isSubmittingDeposit = false;
+
+        $('#deposit-form').off('submit').on('submit', function (e) {
             e.preventDefault();
 
+            if (isSubmittingDeposit) {
+                return false;
+            }
+
             var button = $('#deposit-button');
+            var backBtn = $('#step-deposit-2 button[onclick*="depositStepBack"]');
             $('.text-danger').addClass('d-none').text('');
             $('.form-control').removeClass('is-invalid');
 
@@ -403,10 +410,14 @@
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
-                return;
+                return false;
             }
 
-            button.prop("disabled", true);
+            isSubmittingDeposit = true;
+            var originalButtonHtml = button.html();
+            button.prop("disabled", true).addClass('disabled');
+            button.html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + '<?= translate('sending') !== 'sending' ? translate('sending') : 'Enviando...'; ?>');
+            backBtn.prop("disabled", true).addClass('disabled');
 
             var formEl = this;
             var formData = new FormData(formEl);
@@ -431,7 +442,6 @@
                 dataType: 'json',
                 success: function (response) {
                     if (response.success) {
-
                         $('#modalDeposit').modal('hide');
 
                         if (response.newRecharge) {
@@ -446,17 +456,21 @@
                             style: { background: "#198754" },
                             stopOnFocus: true
                         }).showToast();
-                    } else if (response.minMax) {
-                        Toastify({
-                            text: response.message,
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            style: { background: "#dc3545" },
-                            stopOnFocus: true
-                        }).showToast();
                     } else {
-                        if (response.errors) {
+                        isSubmittingDeposit = false;
+                        button.prop("disabled", false).removeClass('disabled').html(originalButtonHtml);
+                        backBtn.prop("disabled", false).removeClass('disabled');
+
+                        if (response.minMax) {
+                            Toastify({
+                                text: response.message,
+                                duration: 3000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#dc3545" },
+                                stopOnFocus: true
+                            }).showToast();
+                        } else if (response.errors) {
                             var labels = [];
                             $.each(response.errors, function (field, message) {
                                 $('#' + field + '-error').text(message).removeClass('d-none');
@@ -473,10 +487,23 @@
                                     stopOnFocus: true
                                 }).showToast();
                             }
+                        } else if (response.error) {
+                            Toastify({
+                                text: response.error,
+                                duration: 4000,
+                                gravity: "top",
+                                position: "right",
+                                style: { background: "#dc3545" },
+                                stopOnFocus: true
+                            }).showToast();
                         }
                     }
                 },
                 error: function () {
+                    isSubmittingDeposit = false;
+                    button.prop("disabled", false).removeClass('disabled').html(originalButtonHtml);
+                    backBtn.prop("disabled", false).removeClass('disabled');
+
                     Toastify({
                         text: "<?= translate('there was an error in the request to the server'); ?>",
                         duration: 3000,
@@ -485,9 +512,6 @@
                         style: { background: "#dc3545" },
                         stopOnFocus: true
                     }).showToast();
-                },
-                complete: function () {
-                    button.prop("disabled", false);
                 }
             });
         });

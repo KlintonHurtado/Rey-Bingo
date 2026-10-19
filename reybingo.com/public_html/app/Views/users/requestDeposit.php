@@ -148,7 +148,12 @@ $voucherUrl = ($voucherOk && function_exists('bingo_voucher_url')) ? bingo_vouch
 
 <?php if ($isPending) : ?>
 <script type="text/javascript">
+    var isSubmittingStatus = false;
     function statusSubmit(type, id, action) {
+        if (isSubmittingStatus) {
+            return;
+        }
+
         const statusElement = document.getElementById(`${type}-${id}`);
         const observationEl = document.getElementById('observation');
         const observation = observationEl ? observationEl.value : '';
@@ -156,6 +161,13 @@ $voucherUrl = ($voucherOk && function_exists('bingo_voucher_url')) ? bingo_vouch
             console.error(`element with ID ${type}-${id} not found`);
             return;
         }
+
+        const buttons = document.querySelectorAll('#modalRequest button[onclick*="statusSubmit"]');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.classList.add('disabled');
+        });
+        isSubmittingStatus = true;
 
         fetch('<?= site_url('payments/statusSubmit') ?>', {
             method: 'POST',
@@ -198,6 +210,12 @@ $voucherUrl = ($voucherOk && function_exists('bingo_voucher_url')) ? bingo_vouch
                     }
                 }
             } else {
+                isSubmittingStatus = false;
+                buttons.forEach(btn => {
+                    btn.disabled = false;
+                    btn.classList.remove('disabled');
+                });
+
                 if (data.refuse) {
                     $('#modalRequest').modal('hide');
                     statusElement.innerHTML = '<span class="status-badge" data-status="0"><span class="badge bg-danger"><i class="fa-duotone fa-solid fa-xmark"></i> <?= translate('rejected'); ?></span></span>';
@@ -222,6 +240,11 @@ $voucherUrl = ($voucherOk && function_exists('bingo_voucher_url')) ? bingo_vouch
             }
         })
         .catch(error => {
+            isSubmittingStatus = false;
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+            });
             console.error('request error:', error);
         });
     }
