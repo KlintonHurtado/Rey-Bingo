@@ -204,7 +204,7 @@ class NotificationsModel extends Model
         }
         
         // Send via Web Push
-        $pushService = new \App\Libraries\SimplePushService();
+        $pushService = new \App\Libraries\PushNotificationService();
         $payload = [
             'title' => $notification['title'],
             'message' => $notification['message'],

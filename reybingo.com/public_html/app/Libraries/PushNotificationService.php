@@ -96,11 +96,25 @@ class PushNotificationService
     }
 
     /**
+     * Envia notificación push directamente a una suscripción específica
+     */
+    public function sendToSubscription(array $sub, $payload)
+    {
+        $formatted = $this->formatPayload($payload);
+        $payloadJson = json_encode($formatted);
+
+        $this->queueSubscription($sub, $payloadJson);
+
+        return $this->sendQueued();
+    }
+
+    /**
      * Envia notificación push a un usuario específico
      */
     public function sendToUser($userId, $payload)
     {
-        $subscriptions = $this->subscriptionModel->where('user_id', $userId)->findAll();
+        $model = new PushSubscriptionModel();
+        $subscriptions = $model->where('user_id', $userId)->findAll();
         if (empty($subscriptions)) {
             return [
                 'success' => false,
@@ -124,12 +138,16 @@ class PushNotificationService
      */
     public function sendToAll($payload, $excludeUsers = [])
     {
-        $builder = $this->subscriptionModel;
-        if (!empty($excludeUsers)) {
-            $builder = $builder->whereNotIn('user_id', $excludeUsers);
+        $model = new PushSubscriptionModel();
+        $subscriptions = $model->findAll();
+
+        if (!empty($excludeUsers) && is_array($excludeUsers)) {
+            $excludeIds = array_map('intval', $excludeUsers);
+            $subscriptions = array_filter($subscriptions, function($s) use ($excludeIds) {
+                return !in_array((int)($s['user_id'] ?? 0), $excludeIds, true);
+            });
         }
 
-        $subscriptions = $builder->findAll();
         if (empty($subscriptions)) {
             return [
                 'success' => false,

@@ -16,8 +16,11 @@ class NotificationManager {
         }
 
         try {
-            // Registrar service worker en la raíz
-            this.registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+            const baseUrl = (typeof site_url !== 'undefined' ? site_url : '/').replace(/\/$/, '') + '/';
+            const swUrl = baseUrl + 'sw.js';
+
+            // Registrar service worker
+            this.registration = await navigator.serviceWorker.register(swUrl);
             console.log('✅ Service Worker registrado para notificaciones');
 
             await navigator.serviceWorker.ready;
@@ -43,16 +46,14 @@ class NotificationManager {
                     console.log('🔄 Permiso otorgado pero sin suscripción activa, creando...');
                     await this.subscribe();
                 } else {
-                    console.log('✅ Suscripción push activa encontrada, sincronizando...');
+                    console.log('✅ Suscripción push activa encontrada, sincronizando con servidor...');
                     await this.saveSubscriptionToServer(subscription);
                 }
                 this.hideBanner();
             } else if (permission === 'default') {
-                // Verificar si no se ha descartado recientemente
                 const dismissedTime = localStorage.getItem('push-banner-dismissed');
                 const now = Date.now();
-                // Mostrar banner cada 24 horas si no ha aceptado
-                if (!dismissedTime || (now - parseInt(dismissedTime, 10)) > (24 * 60 * 60 * 1000)) {
+                if (!dismissedTime || (now - parseInt(dismissedTime, 10)) > (12 * 60 * 60 * 1000)) {
                     this.showBanner();
                 }
             } else if (permission === 'denied') {
@@ -67,7 +68,6 @@ class NotificationManager {
         const banner = document.getElementById('rey-push-banner');
         if (banner) {
             banner.style.display = 'block';
-            banner.classList.add('show');
         }
     }
 
@@ -75,19 +75,22 @@ class NotificationManager {
         const banner = document.getElementById('rey-push-banner');
         if (banner) {
             banner.style.display = 'none';
-            banner.classList.remove('show');
         }
     }
 
     async requestPermission() {
         if (!this.isSupported) {
-            alert('Tu navegador no admite notificaciones push.');
+            alert('Tu navegador no admite notificaciones push nativas.');
             return false;
         }
 
         try {
             console.log('🔔 Solicitando permiso al usuario...');
-            const permission = await Notification.requestPermission();
+            let permission = Notification.permission;
+
+            if (permission !== 'granted') {
+                permission = await Notification.requestPermission();
+            }
             console.log('Respuesta de permiso:', permission);
 
             if (permission === 'granted') {
@@ -95,11 +98,13 @@ class NotificationManager {
                 const success = await this.subscribe();
                 if (success) {
                     this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
+                } else {
+                    this.showToast('Permiso concedido, pero ocurrió un problema al registrar el teléfono.', 'warning');
                 }
                 return success;
             } else if (permission === 'denied') {
                 this.hideBanner();
-                this.showToast('Notificaciones bloqueadas. Para activarlas, habilítalas en los ajustes de tu navegador.', 'warning');
+                this.showToast('Las notificaciones están bloqueadas en tu navegador. Toca el candado junto a la URL para permitirlas.', 'warning');
                 return false;
             } else {
                 return false;
@@ -112,20 +117,29 @@ class NotificationManager {
 
     async subscribe() {
         if (!this.registration) {
-            console.warn('Service Worker aún no registrado');
-            return false;
+            try {
+                this.registration = await navigator.serviceWorker.ready;
+            } catch (e) {
+                console.warn('Service Worker aún no listo:', e);
+                return false;
+            }
         }
 
         try {
             console.log('🔄 Creando suscripción Push con clave VAPID...');
             const convertedKey = this.urlBase64ToUint8Array(this.vapidPublicKey);
 
-            const subscription = await this.registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: convertedKey
-            });
+            // Verificar si ya existe una suscripción
+            let subscription = await this.registration.pushManager.getSubscription();
 
-            console.log('✅ Suscripción WebPush obtenida:', subscription);
+            if (!subscription) {
+                subscription = await this.registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedKey
+                });
+            }
+
+            console.log('✅ Suscripción WebPush lista:', subscription);
             return await this.saveSubscriptionToServer(subscription);
         } catch (error) {
             console.error('❌ Error suscribiendo a WebPush:', error);
@@ -133,10 +147,55 @@ class NotificationManager {
         }
     }
 
+    formatSubscriptionData(subscription) {
+        if (!subscription) return null;
+
+        let p256dh = '';
+        let auth = '';
+
+        try {
+            if (subscription.getKey) {
+                const rawP256dh = subscription.getKey('p256dh');
+                const rawAuth = subscription.getKey('auth');
+
+                if (rawP256dh) {
+                    p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(rawP256dh)));
+                }
+                if (rawAuth) {
+                    auth = btoa(String.fromCharCode.apply(null, new Uint8Array(rawAuth)));
+                }
+            }
+        } catch (err) {
+            console.warn('Error leyendo getKey(), usando toJSON():', err);
+        }
+
+        const json = subscription.toJSON ? subscription.toJSON() : {};
+        if (!p256dh && json.keys && json.keys.p256dh) {
+            p256dh = json.keys.p256dh;
+        }
+        if (!auth && json.keys && json.keys.auth) {
+            auth = json.keys.auth;
+        }
+
+        return {
+            endpoint: subscription.endpoint,
+            keys: {
+                p256dh: p256dh,
+                auth: auth
+            }
+        };
+    }
+
     async saveSubscriptionToServer(subscription) {
         try {
             const baseUrl = (typeof site_url !== 'undefined' ? site_url : '/').replace(/\/$/, '') + '/';
             const endpoint = baseUrl + 'notifications/subscribe';
+
+            const payloadData = this.formatSubscriptionData(subscription);
+            if (!payloadData || !payloadData.keys.p256dh || !payloadData.keys.auth) {
+                console.error('❌ No se pudieron extraer las claves criptográficas de la suscripción');
+                return false;
+            }
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -144,11 +203,11 @@ class NotificationManager {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify(subscription)
+                body: JSON.stringify(payloadData)
             });
 
             const result = await response.json();
-            console.log('📡 Respuesta de guardado en servidor:', result);
+            console.log('📡 Respuesta del servidor al guardar suscripción:', result);
             return result && result.success;
         } catch (err) {
             console.error('Error enviando suscripción al servidor:', err);
@@ -187,7 +246,7 @@ class NotificationManager {
             padding: 14px 22px;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            z-index: 99999;
+            z-index: 999999;
             font-size: 14px;
             font-family: sans-serif;
             font-weight: 600;
@@ -200,7 +259,7 @@ class NotificationManager {
         setTimeout(() => {
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 300);
-        }, 5000);
+        }, 6000);
     }
 }
 

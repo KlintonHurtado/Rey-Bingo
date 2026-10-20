@@ -28,6 +28,24 @@ $routes->group('cron', ['namespace' => 'App\Controllers'], function($routes) {
     $routes->post('tick-auto-game', 'Cron::tickAutoGame');
 });
 
+$routes->get('sw.js', function() {
+    $paths = [
+        FCPATH . 'sw.js',
+        ROOTPATH . 'public/sw.js',
+        ROOTPATH . 'sw.js'
+    ];
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            return response()
+                ->setHeader('Content-Type', 'application/javascript; charset=UTF-8')
+                ->setHeader('Service-Worker-Allowed', '/')
+                ->setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+                ->setBody(file_get_contents($path));
+        }
+    }
+    return response()->setStatusCode(404);
+});
+
 $routes->get('/', 'Signin::index');
 $routes->head('/', 'Signin::index');
 $routes->get('signin', 'Signin::index');

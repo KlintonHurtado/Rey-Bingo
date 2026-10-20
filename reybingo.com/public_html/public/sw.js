@@ -35,11 +35,11 @@ self.addEventListener('push', function(event) {
     console.log('📨 PUSH EVENT RECIBIDO!', event);
     
     let defaultData = {
-        title: '🔴 ¡NUEVA PARTIDA EN VIVO!',
-        body: '¡Hay una nueva partida en vivo disponible en Rey Bingo! Entra a comprar tus cartones.',
-        icon: '/assets/img/logo.png',
-        badge: '/assets/img/badge.png',
-        tag: 'live-game-' + Date.now(),
+        title: 'Nueva partida',
+        body: 'Nueva partida disponible en Rey Bingo',
+        icon: self.location.origin + '/assets/img/logo.png',
+        badge: self.location.origin + '/assets/img/badge.png',
+        tag: 'game-' + Date.now(),
         requireInteraction: true,
         vibrate: [300, 100, 300, 100, 300],
         data: {

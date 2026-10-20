@@ -69,7 +69,7 @@ class Notifications extends Controller {
                 'url' => base_url('/')
             ];
             
-            $result = $this->pushService->sendToUser($userId > 0 ? $userId : 0, $testPayload);
+            $result = $this->pushService->sendToSubscription($data, $testPayload);
 
             return $this->response->setJSON([
                 'success' => true, 
@@ -205,12 +205,19 @@ class Notifications extends Controller {
 
         if ($game) {
             $currency = function_exists('systemGet') ? systemGet('currency') : '$';
-            $price = isset($game['price']) ? number_format((float)$game['price'], 2) : '';
+            $formattedPrice = number_format((float)($game['price'] ?? 0), 2);
+            $modelAwards = new \App\Models\AwardsModel();
+            $total = $modelAwards->where('game', $game['id'])->selectSum('amount')->get()->getRow()->amount ?? 0;
+            $awardText = ($game['award'] ?? 0) == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
+            helper(['system', 'text']);
+            $gameMessage = $game['description'] . ' 🗓️ ' . translate_day($game['date'] . ' ' . $game['time']) . ', ' . translate_date($game['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
+
             return $this->response->setJSON([
-                'title' => '🔴 ¡NUEVA PARTIDA EN VIVO!',
-                'message' => "¡Partida en vivo: {$game['description']}! Precio: {$currency} {$price}. ¡Toca para jugar!",
+                'title' => 'Nueva partida',
+                'message' => $gameMessage,
+                'body' => $gameMessage,
                 'url' => base_url('playings/availableCartonsGet/' . $game['id']),
-                'tag' => 'live-game-' . $game['id'],
+                'tag' => 'game-' . $game['id'],
                 'icon' => base_url('assets/img/logo.png'),
                 'badge' => base_url('assets/img/badge.png'),
                 'requireInteraction' => true

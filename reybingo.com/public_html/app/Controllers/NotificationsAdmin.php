@@ -7,7 +7,7 @@ use App\Models\NotificationTemplatesModel;
 use App\Models\UsersModel;
 use App\Models\PushSubscriptionModel;
 use App\Models\FirebaseTokenModel;
-use App\Libraries\SimplePushService;
+use App\Libraries\PushNotificationService;
 use App\Models\ContactsModel;
 use CodeIgniter\Controller;
 
@@ -27,7 +27,7 @@ class NotificationsAdmin extends Controller
         $this->usersModel = new UsersModel();
         $this->pushSubscriptionModel = new PushSubscriptionModel();
         $this->firebaseTokenModel = new FirebaseTokenModel();
-        $this->pushService = new SimplePushService();
+        $this->pushService = new PushNotificationService();
 
         helper(['form', 'url', 'cookie', 'text']);
         session();

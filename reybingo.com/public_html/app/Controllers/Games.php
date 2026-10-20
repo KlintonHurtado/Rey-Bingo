@@ -3245,8 +3245,8 @@ class Games extends Controller {
                     'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida',
-                    'message' => $isLive ? ('🔴 ¡Partida en vivo: ' . $gameData['description'] . '! ' . $gameMessage) : $gameMessage,
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
                 ];
 
                 $batchNotifications[] = $notificationData;
@@ -3255,24 +3255,17 @@ class Games extends Controller {
             // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
             try {
                 $pushService = new PushNotificationService();
-                $pushTitle = $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida de Bingo';
-                $pushMessage = $isLive
-                    ? "¡Se ha creado la partida en vivo \"{$gameData['description']}\"! Cartón: {$currency} {$formattedPrice}. ¡Entra ya a jugar!"
-                    : "Nueva partida \"{$gameData['description']}\". ¡Entra a comprar tus cartones!";
-                $pushUrl = base_url('playings/availableCartonsGet/' . $gameId);
-
                 $pushPayload = [
-                    'title' => $pushTitle,
-                    'message' => $pushMessage,
-                    'body' => $pushMessage,
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
+                    'body' => $gameMessage,
                     'game' => $gameId,
-                    'url' => $pushUrl,
-                    'tag' => ($isLive ? 'live-game-' : 'game-') . $gameId,
-                    'is_live' => $isLive,
+                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                    'tag' => 'game-' . $gameId,
                     'requireInteraction' => true
                 ];
 
-                $pushService->sendToAll($pushPayload, [$currentUserId]);
+                $pushService->sendToAll($pushPayload);
             } catch (\Throwable $e) {
                 log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
             }
@@ -3724,8 +3717,8 @@ class Games extends Controller {
                     'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida',
-                    'message' => $isLive ? ('🔴 ¡Partida en vivo: ' . $gameData['description'] . '! ' . $gameMessage) : $gameMessage,
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
                 ];
 
                 $batchNotifications[] = $notificationData;
@@ -3734,24 +3727,17 @@ class Games extends Controller {
             // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
             try {
                 $pushService = new PushNotificationService();
-                $pushTitle = $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida de Bingo';
-                $pushMessage = $isLive
-                    ? "¡Se ha creado la partida en vivo \"{$gameData['description']}\"! Cartón: {$currency} {$formattedPrice}. ¡Entra ya a jugar!"
-                    : "Nueva partida \"{$gameData['description']}\". ¡Entra a comprar tus cartones!";
-                $pushUrl = base_url('playings/availableCartonsGet/' . $gameId);
-
                 $pushPayload = [
-                    'title' => $pushTitle,
-                    'message' => $pushMessage,
-                    'body' => $pushMessage,
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
+                    'body' => $gameMessage,
                     'game' => $gameId,
-                    'url' => $pushUrl,
-                    'tag' => ($isLive ? 'live-game-' : 'game-') . $gameId,
-                    'is_live' => $isLive,
+                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                    'tag' => 'game-' . $gameId,
                     'requireInteraction' => true
                 ];
 
-                $pushService->sendToAll($pushPayload, [$currentUserId]);
+                $pushService->sendToAll($pushPayload);
             } catch (\Throwable $e) {
                 log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
             }
