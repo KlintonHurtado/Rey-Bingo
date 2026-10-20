@@ -65,6 +65,10 @@ class NotificationManager {
     }
 
     showBanner() {
+        if (!this.isSupported || (window.Notification && Notification.permission !== 'default')) {
+            this.hideBanner();
+            return;
+        }
         const banner = document.getElementById('rey-push-banner');
         if (banner) {
             banner.style.display = 'block';
