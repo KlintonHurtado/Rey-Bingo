@@ -26,6 +26,11 @@ class NotificationManager {
             });
             console.log('✅ Service Worker registrado para notificaciones');
 
+            // Forzar actualización inmediata en móviles si hay nueva versión de sw.js
+            if (this.registration && typeof this.registration.update === 'function') {
+                this.registration.update().catch(() => {});
+            }
+
             await navigator.serviceWorker.ready;
             await this.loadVapidPublicKey();
 
@@ -126,7 +131,13 @@ class NotificationManager {
 
     async requestPermission() {
         if (!this.isSupported) {
-            alert('Tu navegador no admite notificaciones push nativas.');
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+            if (isIOS && !isStandalone) {
+                alert('Para activar notificaciones en iPhone:\n\n1. Toca el botón Compartir (icono cuadrado con flecha hacia arriba) en Safari.\n2. Elige "Agregar a pantalla de inicio".\n3. Abre Rey Bingo desde tu pantalla de inicio y pulsa "Activar Notificaciones".');
+            } else {
+                alert('Tu navegador no admite notificaciones push nativas.');
+            }
             return false;
         }
 
@@ -142,12 +153,16 @@ class NotificationManager {
             if (permission === 'granted') {
                 this.hideBanner();
                 localStorage.setItem('push-banner-dismissed', Date.now().toString());
-                await this.subscribe();
-                this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
+                const subOk = await this.subscribe(true);
+                if (subOk) {
+                    this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
+                } else {
+                    this.showToast('Permiso concedido, pero hubo un problema registrando el dispositivo. Por favor recarga la página.', 'warning');
+                }
                 return true;
             } else if (permission === 'denied') {
                 this.hideBanner();
-                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador. Toca el icono de ajustes/candado junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
+                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador móvil. Toca el icono de ajustes/candado junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
                 return false;
             } else {
                 return false;
@@ -158,7 +173,7 @@ class NotificationManager {
         }
     }
 
-    async subscribe() {
+    async subscribe(forceRenew = false) {
         if (!this.registration) {
             try {
                 this.registration = await navigator.serviceWorker.ready;
@@ -173,26 +188,48 @@ class NotificationManager {
                 await this.loadVapidPublicKey();
             }
 
-            console.log('🔄 Creando suscripción Push con clave VAPID...');
+            console.log('🔄 Sincronizando suscripción Push con clave VAPID...');
             const convertedKey = this.urlBase64ToUint8Array(this.vapidPublicKey);
 
             let subscription = await this.registration.pushManager.getSubscription();
 
-            // Una suscripción creada con otra clave pública ya no puede recibir envíos del servidor.
+            // En dispositivos móviles (Android / iOS), subscription.options.applicationServerKey
+            // puede ser null o no coincidir con el getter por especificaciones anteriores del navegador.
+            // Para garantizar que el teléfono quede enlazado a la clave VAPID activa del servidor,
+            // validamos mediante almacenamiento local persistente y opciones de clave.
+            const STORAGE_VAPID_KEY = 'rey_push_active_vapid_v2';
+            const savedVapid = localStorage.getItem(STORAGE_VAPID_KEY);
             const existingKey = subscription && subscription.options && subscription.options.applicationServerKey;
-            if (subscription && existingKey && !this.areKeysEqual(existingKey, convertedKey)) {
-                await subscription.unsubscribe();
+
+            let needsRenewal = forceRenew;
+            if (subscription) {
+                if (savedVapid !== this.vapidPublicKey) {
+                    needsRenewal = true;
+                } else if (existingKey && !this.areKeysEqual(existingKey, convertedKey)) {
+                    needsRenewal = true;
+                }
+            }
+
+            if (subscription && needsRenewal) {
+                console.log('🔄 Renovando suscripción Push obsoleta en este dispositivo móvil...');
+                try {
+                    await subscription.unsubscribe();
+                } catch (unsubErr) {
+                    console.warn('Aviso al desuscribir token previo:', unsubErr);
+                }
                 subscription = null;
             }
 
             if (!subscription) {
+                console.log('📱 Creando nueva suscripción WebPush nativa en el dispositivo...');
                 subscription = await this.registration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: convertedKey
                 });
             }
 
-            console.log('✅ Suscripción WebPush lista:', subscription);
+            localStorage.setItem(STORAGE_VAPID_KEY, this.vapidPublicKey);
+            console.log('✅ Suscripción WebPush lista en dispositivo:', subscription);
             return await this.saveSubscriptionToServer(subscription);
         } catch (error) {
             console.error('❌ Error suscribiendo a WebPush:', error);

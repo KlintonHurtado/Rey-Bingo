@@ -135,7 +135,7 @@ class PushNotificationService
         $url = $payload['url'] ?? base_url('/');
         $tag = $payload['tag'] ?? 'rey-bingo-' . time();
         $icon = $payload['icon'] ?? base_url('assets/img/logo.png');
-        $badge = $payload['badge'] ?? base_url('assets/img/badge.png');
+        $badge = $payload['badge'] ?? base_url('assets/img/logo.png');
 
         return [
             'title' => $title,
@@ -155,11 +155,11 @@ class PushNotificationService
             'actions' => [
                 [
                     'action' => 'view',
-                    'title' => '🎮 Entrar a Jugar'
+                    'title' => 'Entrar a Jugar'
                 ],
                 [
                     'action' => 'close',
-                    'title' => '❌ Cerrar'
+                    'title' => 'Cerrar'
                 ]
             ]
         ];
@@ -404,9 +404,9 @@ class PushNotificationService
             return true;
         }
 
-        // Si la suscripción expiró (404 Not Found o 410 Gone), eliminar de la base de datos
-        if ($httpCode === 404 || $httpCode === 410) {
-            log_message('info', "Suscripción expirada (HTTP {$httpCode}), eliminando endpoint: {$endpoint}");
+        // Si la suscripción expiró o es inválida (400, 401, 403, 404, 410), eliminar de la base de datos
+        if (in_array($httpCode, [400, 401, 403, 404, 410], true)) {
+            log_message('info', "Suscripción expirada/inválida (HTTP {$httpCode}), eliminando endpoint: {$endpoint}");
             try {
                 $this->subscriptionModel->where('endpoint', $endpoint)->delete();
             } catch (\Throwable $e) {
@@ -595,7 +595,7 @@ class PushNotificationService
                 $reason = $report->getReason();
                 $response = $report->getResponse();
                 $statusCode = $response ? $response->getStatusCode() : 0;
-                $isExpired = $report->isSubscriptionExpired();
+                $isDead = $isExpired || in_array($statusCode, [400, 401, 403, 404, 410], true);
 
                 if ($isSuccess) {
                     $totalSent++;
@@ -604,10 +604,10 @@ class PushNotificationService
                     $totalFailed++;
                     log_message('error', "Push notification falló a {$endpoint} (HTTP {$statusCode}): {$reason}");
 
-                    if ($isExpired) {
+                    if ($isDead) {
                         try {
                             $this->subscriptionModel->where('endpoint', $endpoint)->delete();
-                            log_message('info', "Suscripción expirada eliminada (HTTP {$statusCode}): {$endpoint}");
+                            log_message('info', "Suscripción expirada/inválida eliminada (HTTP {$statusCode}): {$endpoint}");
                         } catch (\Throwable $ex) {
                             log_message('error', "Error eliminando suscripción expirada: " . $ex->getMessage());
                         }
@@ -619,7 +619,7 @@ class PushNotificationService
                     'endpoint' => $endpoint,
                     'reason' => $reason,
                     'status_code' => $statusCode,
-                    'expired' => $isExpired
+                    'expired' => $isDead
                 ];
             }
         } catch (\Throwable $e) {
