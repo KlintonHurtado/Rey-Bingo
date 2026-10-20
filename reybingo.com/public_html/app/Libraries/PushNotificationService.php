@@ -5,6 +5,62 @@ namespace App\Libraries;
 use App\Models\PushSubscriptionModel;
 use App\Config\Push as PushConfig;
 
+if (class_exists('\Minishlink\WebPush\WebPush')) {
+    class ParallelWebPush extends \Minishlink\WebPush\WebPush
+    {
+        public function flushParallel(int $batchSize = 1000): \Generator
+        {
+            if (empty($this->notifications)) {
+                return;
+            }
+
+            $batches = array_chunk($this->notifications, $batchSize);
+            $this->notifications = [];
+
+            foreach ($batches as $batch) {
+                $requests = $this->prepare($batch);
+
+                if (count($requests) <= 1 || !($this->client instanceof \GuzzleHttp\Client)) {
+                    foreach ($requests as $request) {
+                        try {
+                            $response = $this->client->sendRequest($request);
+                            yield $this->createReport($request, $response);
+                        } catch (\Psr\Http\Client\ClientExceptionInterface $reason) {
+                            yield $this->createRejectedReport($request, $reason);
+                        }
+                    }
+                    continue;
+                }
+
+                // Despacho 100% paralelo mediante Guzzle Promises y cURL Multi
+                $promises = [];
+                foreach ($requests as $idx => $request) {
+                    $promises[$idx] = $this->client->sendAsync($request);
+                }
+
+                $results = \GuzzleHttp\Promise\Utils::settle($promises)->wait();
+                foreach ($results as $idx => $result) {
+                    $request = $requests[$idx];
+                    if ($result['state'] === 'fulfilled') {
+                        yield $this->createReport($request, $result['value']);
+                    } else {
+                        $reason = $result['reason'];
+                        if ($reason instanceof \GuzzleHttp\Exception\RequestException && $reason->hasResponse()) {
+                            yield $this->createReport($request, $reason->getResponse());
+                        } else {
+                            yield $this->createRejectedReport($request, $reason);
+                        }
+                    }
+                }
+            }
+
+            if ($this->reuseVAPIDHeaders) {
+                $this->vapidHeaders = [];
+            }
+        }
+    }
+}
+
 class PushNotificationService
 {
     private $webPush = null;
@@ -35,17 +91,15 @@ class PushNotificationService
                     ]
                 ];
 
-                // En v11 el tiempo de espera pertenece al cliente HTTP, no a las opciones del push.
                 $client = new \GuzzleHttp\Client([
                     'connect_timeout' => 5,
                     'timeout' => 10,
                     'allow_redirects' => false,
                 ]);
-                $this->webPush = new \Minishlink\WebPush\WebPush(
+                $this->webPush = new ParallelWebPush(
                     auth: $auth,
                     defaultOptions: ['TTL' => 86400, 'urgency' => 'high'],
                     client: $client,
-                    // Evitar que CI convierta avisos de extensiones opcionales en excepciones.
                     logger: service('logger')
                 );
                 $this->webPush->setAutomaticPadding(true);
@@ -188,7 +242,7 @@ class PushNotificationService
      */
     public function sendToAll($payload, $excludeUsers = [])
     {
-        $subscriptions = $this->subscriptionModel->findAll();
+        $subscriptions = $this->subscriptionModel->orderBy('id', 'DESC')->findAll();
 
         if (!empty($excludeUsers) && is_array($excludeUsers)) {
             $excludeIds = array_map('intval', $excludeUsers);
@@ -509,7 +563,12 @@ class PushNotificationService
                 'contentEncoding' => 'aes128gcm'
             ]);
 
-            $this->webPush->queueNotification($subscription, $payloadJson);
+            $options = [
+                'TTL' => 86400,
+                'urgency' => 'high',
+                'topic' => 'livegame'
+            ];
+            $this->webPush->queueNotification($subscription, $payloadJson, $options);
         } catch (\Throwable $e) {
             log_message('error', 'Error creando suscripción WebPush: ' . $e->getMessage());
         }
@@ -526,7 +585,11 @@ class PushNotificationService
                 return ['success' => false, 'sent' => 0, 'failed' => 0];
             }
 
-            foreach ($this->webPush->flush() as $report) {
+            $generator = ($this->webPush instanceof ParallelWebPush)
+                ? $this->webPush->flushParallel()
+                : $this->webPush->flush();
+
+            foreach ($generator as $report) {
                 $endpoint = $report->getRequest()->getUri()->__toString();
                 $isSuccess = $report->isSuccess();
                 $reason = $report->getReason();
