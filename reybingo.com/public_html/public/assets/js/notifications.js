@@ -5,7 +5,8 @@ class NotificationManager {
     constructor() {
         this.isSupported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
         this.registration = null;
-        this.vapidPublicKey = 'BHdM69ue9dsb7wxXHWJrea_2F45sWLUd2hx33imtzLotBrIeqReJWcSHW48hCkL7iU5XGns96G7G6ViIC6MC8nI';
+        this.baseUrl = new URL((typeof site_url !== 'undefined' && site_url) ? site_url : '/', window.location.origin);
+        this.vapidPublicKey = null;
         this.init();
     }
 
@@ -16,14 +17,17 @@ class NotificationManager {
         }
 
         try {
-            const baseUrl = (typeof site_url !== 'undefined' ? site_url : '/').replace(/\/$/, '') + '/';
-            const swUrl = baseUrl + 'sw.js';
+            const swUrl = new URL('sw.js', this.baseUrl);
 
-            // Registrar service worker
-            this.registration = await navigator.serviceWorker.register(swUrl);
+            // Mantener un único service worker en el ámbito del sitio para todos los dispositivos.
+            this.registration = await navigator.serviceWorker.register(swUrl.href, {
+                scope: this.baseUrl.pathname,
+                updateViaCache: 'none'
+            });
             console.log('✅ Service Worker registrado para notificaciones');
 
             await navigator.serviceWorker.ready;
+            await this.loadVapidPublicKey();
 
             // Verificar y sincronizar estado
             await this.syncStatus();
@@ -31,6 +35,32 @@ class NotificationManager {
         } catch (error) {
             console.error('❌ Error inicializando Service Worker push:', error);
         }
+    }
+
+    buildUrl(path) {
+        const baseUrl = this.baseUrl.href.endsWith('/') ? this.baseUrl : new URL(this.baseUrl.href + '/');
+        return new URL(path.replace(/^\/+/, ''), baseUrl).href;
+    }
+
+    async loadVapidPublicKey() {
+        const response = await fetch(this.buildUrl('notifications/getPublicKey'), {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`No se pudo obtener la clave VAPID (HTTP ${response.status})`);
+        }
+
+        const result = await response.json();
+        if (!result || typeof result.publicKey !== 'string' || !result.publicKey.trim()) {
+            throw new Error('El servidor no devolvió una clave VAPID válida');
+        }
+
+        this.vapidPublicKey = result.publicKey.trim();
+        return this.vapidPublicKey;
     }
 
     async syncStatus() {
@@ -41,14 +71,7 @@ class NotificationManager {
             console.log('🔔 Estado de permisos de notificación:', permission);
 
             if (permission === 'granted') {
-                let subscription = await this.registration.pushManager.getSubscription();
-                if (!subscription) {
-                    console.log('🔄 Permiso otorgado pero sin suscripción activa, creando...');
-                    await this.subscribe();
-                } else {
-                    console.log('✅ Suscripción push activa encontrada, sincronizando con servidor...');
-                    await this.saveSubscriptionToServer(subscription);
-                }
+                await this.subscribe();
                 this.hideBanner();
             } else if (permission === 'default') {
                 const dismissedTime = localStorage.getItem('push-banner-dismissed');
@@ -130,11 +153,21 @@ class NotificationManager {
         }
 
         try {
+            if (!this.vapidPublicKey) {
+                await this.loadVapidPublicKey();
+            }
+
             console.log('🔄 Creando suscripción Push con clave VAPID...');
             const convertedKey = this.urlBase64ToUint8Array(this.vapidPublicKey);
 
-            // Verificar si ya existe una suscripción
             let subscription = await this.registration.pushManager.getSubscription();
+
+            // Una suscripción creada con otra clave pública ya no puede recibir envíos del servidor.
+            const existingKey = subscription && subscription.options && subscription.options.applicationServerKey;
+            if (subscription && existingKey && !this.areKeysEqual(existingKey, convertedKey)) {
+                await subscription.unsubscribe();
+                subscription = null;
+            }
 
             if (!subscription) {
                 subscription = await this.registration.pushManager.subscribe({
@@ -156,29 +189,27 @@ class NotificationManager {
 
         let p256dh = '';
         let auth = '';
+        const json = subscription.toJSON ? subscription.toJSON() : {};
+
+        if (json.keys) {
+            p256dh = json.keys.p256dh || '';
+            auth = json.keys.auth || '';
+        }
 
         try {
-            if (subscription.getKey) {
+            if (subscription.getKey && (!p256dh || !auth)) {
                 const rawP256dh = subscription.getKey('p256dh');
                 const rawAuth = subscription.getKey('auth');
 
-                if (rawP256dh) {
-                    p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(rawP256dh)));
+                if (!p256dh && rawP256dh) {
+                    p256dh = this.arrayBufferToBase64Url(rawP256dh);
                 }
-                if (rawAuth) {
-                    auth = btoa(String.fromCharCode.apply(null, new Uint8Array(rawAuth)));
+                if (!auth && rawAuth) {
+                    auth = this.arrayBufferToBase64Url(rawAuth);
                 }
             }
         } catch (err) {
             console.warn('Error leyendo getKey(), usando toJSON():', err);
-        }
-
-        const json = subscription.toJSON ? subscription.toJSON() : {};
-        if (!p256dh && json.keys && json.keys.p256dh) {
-            p256dh = json.keys.p256dh;
-        }
-        if (!auth && json.keys && json.keys.auth) {
-            auth = json.keys.auth;
         }
 
         return {
@@ -192,8 +223,7 @@ class NotificationManager {
 
     async saveSubscriptionToServer(subscription) {
         try {
-            const baseUrl = (typeof site_url !== 'undefined' ? site_url : '/').replace(/\/$/, '') + '/';
-            const endpoint = baseUrl + 'notifications/subscribe';
+            const endpoint = this.buildUrl('notifications/subscribe');
 
             const payloadData = this.formatSubscriptionData(subscription);
             if (!payloadData || !payloadData.keys.p256dh || !payloadData.keys.auth) {
@@ -207,8 +237,14 @@ class NotificationManager {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify(payloadData)
             });
+
+            if (!response.ok) {
+                console.error(`❌ El servidor rechazó la suscripción push (HTTP ${response.status})`);
+                return false;
+            }
 
             const result = await response.json();
             console.log('📡 Respuesta del servidor al guardar suscripción:', result);
@@ -232,6 +268,24 @@ class NotificationManager {
             outputArray[i] = rawData.charCodeAt(i);
         }
         return outputArray;
+    }
+
+    areKeysEqual(firstKey, secondKey) {
+        const first = new Uint8Array(firstKey);
+        const second = new Uint8Array(secondKey);
+
+        if (first.length !== second.length) return false;
+        return first.every((value, index) => value === second[index]);
+    }
+
+    arrayBufferToBase64Url(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+        return btoa(binary)
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
     }
 
     showToast(message, type = 'info') {

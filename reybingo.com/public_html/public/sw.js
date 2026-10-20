@@ -1,182 +1,150 @@
 /**
- * Service Worker de Rey Bingo para notificaciones push
- * Versión: 4.0
+ * Service Worker de Rey Bingo para notificaciones push.
  */
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = `reybingo-cache-${CACHE_VERSION}`;
+const DEFAULT_NOTIFICATION = {
+    title: 'Nueva notificación',
+    body: 'Tienes una nueva notificación de Rey Bingo',
+    icon: `${self.location.origin}/assets/img/logo.png`,
+    badge: `${self.location.origin}/assets/img/badge.png`,
+    requireInteraction: true,
+    vibrate: [300, 100, 300]
+};
 
-console.log('🔧 Service Worker cargado - Versión 4.0');
-
-// Instalación
-self.addEventListener('install', function(event) {
-    console.log('⚙️ Service Worker instalando...');
-    self.skipWaiting();
+self.addEventListener('install', event => {
+    event.waitUntil(self.skipWaiting());
 });
 
-// Activación
-self.addEventListener('activate', function(event) {
-    console.log('🚀 Service Worker activado');
+self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.filter(cacheName => {
-                    return cacheName.startsWith('reybingo-cache-') && cacheName !== CACHE_NAME;
-                }).map(cacheName => {
-                    return caches.delete(cacheName);
-                })
-            );
-        }).then(() => self.clients.claim())
+        caches.keys()
+            .then(cacheNames => Promise.all(
+                cacheNames
+                    .filter(cacheName => cacheName.startsWith('reybingo-cache-') && cacheName !== CACHE_NAME)
+                    .map(cacheName => caches.delete(cacheName))
+            ))
+            .then(() => self.clients.claim())
     );
 });
 
-// Evento PUSH para recibir notificaciones en segundo plano
-self.addEventListener('push', function(event) {
-    console.log('📨 PUSH EVENT RECIBIDO!', event);
-    
-    let defaultData = {
-        title: 'Nueva partida',
-        body: 'Nueva partida disponible en Rey Bingo',
-        icon: self.location.origin + '/assets/img/logo.png',
-        badge: self.location.origin + '/assets/img/badge.png',
-        tag: 'game-' + Date.now(),
-        requireInteraction: true,
-        vibrate: [300, 100, 300, 100, 300],
-        data: {
-            url: '/',
-            timestamp: Date.now()
-        },
-        actions: [
-            {
-                action: 'view',
-                title: '🎮 Entrar a Jugar'
-            },
-            {
-                action: 'close',
-                title: '❌ Cerrar'
-            }
-        ]
-    };
+function asObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
 
-    if (event.data) {
-        try {
-            const data = event.data.json();
-            console.log('📋 Datos recibidos en push:', data);
+function normalizeNotification(payload) {
+    const source = asObject(payload);
+    const notification = asObject(source.notification);
+    const data = asObject(source.data);
+    const nestedData = asObject(data.data);
+    const url = notification.click_action
+        || notification.clickAction
+        || source.click_action
+        || source.url
+        || data.url
+        || nestedData.url
+        || (source.fcmOptions && source.fcmOptions.link)
+        || '/';
 
-            const title = data.title || defaultData.title;
-            const body = data.message || data.body || defaultData.body;
-            const url = data.url || (data.data && data.data.url) || '/';
-            const icon = data.icon || defaultData.icon;
-            const badge = data.badge || defaultData.badge;
-            const tag = data.tag || defaultData.tag;
-            const vibrate = data.vibrate || defaultData.vibrate;
-
-            const options = {
-                body: body,
-                icon: icon,
-                badge: badge,
-                tag: tag,
-                requireInteraction: true,
-                vibrate: vibrate,
-                data: {
-                    url: url,
-                    timestamp: Date.now()
-                },
-                actions: data.actions || defaultData.actions,
-                timestamp: Date.now()
-            };
-
-            event.waitUntil(self.registration.showNotification(title, options));
-            return;
-        } catch (e) {
-            console.warn('Push payload no era JSON, probando texto...', e);
-            try {
-                const text = event.data.text();
-                if (text) {
-                    defaultData.body = text;
-                }
-            } catch (err) {
-                console.error('Error leyendo texto:', err);
-            }
+    return {
+        title: notification.title || source.title || data.title || DEFAULT_NOTIFICATION.title,
+        options: {
+            body: notification.body || source.body || source.message || data.body || data.message || DEFAULT_NOTIFICATION.body,
+            icon: notification.icon || source.icon || data.icon || DEFAULT_NOTIFICATION.icon,
+            badge: notification.badge || source.badge || data.badge || DEFAULT_NOTIFICATION.badge,
+            tag: notification.tag || source.tag || data.tag || `rey-bingo-${Date.now()}`,
+            requireInteraction: typeof notification.requireInteraction === 'boolean'
+                ? notification.requireInteraction
+                : (typeof source.requireInteraction === 'boolean'
+                    ? source.requireInteraction
+                    : DEFAULT_NOTIFICATION.requireInteraction),
+            vibrate: source.vibrate || data.vibrate || DEFAULT_NOTIFICATION.vibrate,
+            actions: notification.actions || source.actions || data.actions,
+            timestamp: Date.now(),
+            data: Object.assign({}, data, nestedData, { url, timestamp: Date.now() })
         }
+    };
+}
+
+async function getLatestNotification() {
+    const response = await fetch(new URL('/notifications/getLatestPush', self.location.origin), {
+        cache: 'no-store',
+        credentials: 'same-origin'
+    });
+
+    if (!response.ok) {
+        throw new Error(`No se pudo recuperar la notificación (HTTP ${response.status})`);
     }
 
-    // Si no vino payload, consultar la API para la partida más reciente
-    event.waitUntil(
-        fetch('/notifications/getLatestPush')
-            .then(res => res.json())
-            .then(apiData => {
-                const title = apiData.title || defaultData.title;
-                const body = apiData.message || apiData.body || defaultData.body;
-                const url = apiData.url || '/';
+    return response.json();
+}
 
-                return self.registration.showNotification(title, {
-                    body: body,
-                    icon: apiData.icon || defaultData.icon,
-                    badge: apiData.badge || defaultData.badge,
-                    tag: apiData.tag || defaultData.tag,
-                    requireInteraction: true,
-                    vibrate: defaultData.vibrate,
-                    data: {
-                        url: url,
-                        timestamp: Date.now()
-                    },
-                    actions: defaultData.actions
-                });
-            })
-            .catch(() => {
-                return self.registration.showNotification(defaultData.title, defaultData);
-            })
-    );
+self.addEventListener('push', event => {
+    event.waitUntil((async () => {
+        let payload = null;
+
+        if (event.data) {
+            try {
+                payload = event.data.json();
+            } catch (error) {
+                const body = event.data.text();
+                payload = body ? { body } : null;
+            }
+        } else {
+            try {
+                payload = await getLatestNotification();
+            } catch (error) {
+                console.error('[sw.js] No se pudo recuperar el contenido del push:', error);
+            }
+        }
+
+        const normalized = normalizeNotification(payload);
+        await self.registration.showNotification(normalized.title, normalized.options);
+    })());
 });
 
-// Manejo de clic en la notificación
-self.addEventListener('notificationclick', function(event) {
-    console.log('🖱️ Clic en notificación push:', event);
+self.addEventListener('notificationclick', event => {
     event.notification.close();
 
     if (event.action === 'close') {
         return;
     }
 
-    let targetUrl = '/';
-    if (event.notification.data && event.notification.data.url) {
-        targetUrl = event.notification.data.url;
-    }
+    event.waitUntil((async () => {
+        let targetUrl = '/';
+        try {
+            const requestedUrl = event.notification.data && event.notification.data.url;
+            const parsedUrl = new URL(requestedUrl || '/', self.location.origin);
+            targetUrl = parsedUrl.origin === self.location.origin ? parsedUrl.href : `${self.location.origin}/`;
+        } catch (error) {
+            targetUrl = `${self.location.origin}/`;
+        }
 
-    event.waitUntil(
-        clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-        })
-        .then(clientList => {
-            const targetUrlObj = new URL(targetUrl, self.location.origin);
-            const targetHref = targetUrlObj.href;
-
-            for (const client of clientList) {
-                if ('focus' in client) {
-                    // Si ya hay ventana abierta, dirigir a la partida y enfocar
-                    if ('navigate' in client) {
-                        client.navigate(targetHref);
-                    }
-                    return client.focus();
-                }
+        const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const sameOriginClient = windowClients.find(client => {
+            try {
+                return new URL(client.url).origin === self.location.origin;
+            } catch (error) {
+                return false;
             }
+        });
 
-            // Si no hay ventana abierta, abrir nueva ventana en el navegador
-            if (clients.openWindow) {
-                return clients.openWindow(targetHref);
+        if (sameOriginClient) {
+            if ('navigate' in sameOriginClient) {
+                await sameOriginClient.navigate(targetUrl);
             }
-        })
-        .catch(err => {
-            console.error('Error abriendo ventana desde notificación:', err);
-        })
-    );
+            return sameOriginClient.focus();
+        }
+
+        if (self.clients.openWindow) {
+            return self.clients.openWindow(targetUrl);
+        }
+    })());
 });
 
-// Mensajes internos
-self.addEventListener('message', function(event) {
+self.addEventListener('message', event => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+        event.waitUntil(self.skipWaiting());
     }
 });

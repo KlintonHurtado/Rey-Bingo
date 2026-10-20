@@ -3265,7 +3265,12 @@ class Games extends Controller {
                     'requireInteraction' => true
                 ];
 
-                $pushService->sendToAll($pushPayload);
+                $pushResult = $pushService->sendToAll($pushPayload);
+                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                    log_message('warning', 'Push Web parcial o fallido al crear partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                }
             } catch (\Throwable $e) {
                 log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
             }
@@ -3737,7 +3742,12 @@ class Games extends Controller {
                     'requireInteraction' => true
                 ];
 
-                $pushService->sendToAll($pushPayload);
+                $pushResult = $pushService->sendToAll($pushPayload);
+                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                    log_message('warning', 'Push Web parcial o fallido al iniciar partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                }
             } catch (\Throwable $e) {
                 log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
             }
