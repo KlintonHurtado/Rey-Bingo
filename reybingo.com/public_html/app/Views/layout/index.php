@@ -588,7 +588,10 @@ $isNoMusicRole = session()->get('logged_in') && (
 
         <?php if (session()->get('logged_in')) : ?>
             const notificationConfig = {
-                checkInterval: 10000,
+                // Administradores y operadores usan intervalo corto (3 s) para recibir
+                // notificaciones de ganadores casi en tiempo real aunque el WebSocket falle.
+                // Jugadores usan 10 s porque ya reciben todo por WebSocket en la partida.
+                checkInterval: <?= (function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator()) ? 3000 : 10000 ?>,
                 displayTime: 15000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
@@ -2531,6 +2534,18 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (notifId && typeof markAsRead === 'function') {
                     markAsRead([notifId]);
                 }
+
+                // Para admins y operadores: forzar recarga inmediata del endpoint de notificaciones
+                // para obtener la lista canónica completa del servidor (con officialWinners).
+                // Esto elimina el retraso del polling cuando el WebSocket entrega el evento.
+                <?php if ((function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator())) : ?>
+                if (isSingEvent && typeof window.loadNotifications === 'function') {
+                    // Pequeño delay para que el servidor haya completado la escritura en BD
+                    setTimeout(function() {
+                        window.loadNotifications();
+                    }, 400);
+                }
+                <?php endif; ?>
             });
 
             window.__userNotifPusher = uPusher;
