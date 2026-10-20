@@ -37,8 +37,8 @@ class PushNotificationService
 
                 // En v11 el tiempo de espera pertenece al cliente HTTP, no a las opciones del push.
                 $client = new \GuzzleHttp\Client([
-                    'connect_timeout' => 8,
-                    'timeout' => 20,
+                    'connect_timeout' => 5,
+                    'timeout' => 10,
                     'allow_redirects' => false,
                 ]);
                 $this->webPush = new \Minishlink\WebPush\WebPush(
@@ -219,10 +219,13 @@ class PushNotificationService
                 }
 
                 $queuedResult = $this->sendQueued();
+                $expiredEndpoints = [];
                 if (!empty($queuedResult['results'])) {
                     foreach ($queuedResult['results'] as $r) {
                         if (!empty($r['success']) && !empty($r['endpoint'])) {
                             $sentEndpoints[$r['endpoint']] = true;
+                        } elseif (!empty($r['expired']) && !empty($r['endpoint'])) {
+                            $expiredEndpoints[$r['endpoint']] = true;
                         }
                     }
                 }
@@ -231,7 +234,9 @@ class PushNotificationService
             }
 
             foreach ($subscriptions as $sub) {
-                if (empty($sentEndpoints[$sub['endpoint']])) {
+                $ep = $sub['endpoint'] ?? '';
+                // No intentar tickle fallback en endpoints que FCM ya confirmó como expirados/eliminados
+                if (!empty($ep) && empty($sentEndpoints[$ep]) && empty($expiredEndpoints[$ep])) {
                     $failedSubscriptions[] = $sub;
                 }
             }
@@ -331,7 +336,8 @@ class PushNotificationService
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
         $response = curl_exec($ch);
@@ -524,18 +530,21 @@ class PushNotificationService
                 $endpoint = $report->getRequest()->getUri()->__toString();
                 $isSuccess = $report->isSuccess();
                 $reason = $report->getReason();
+                $response = $report->getResponse();
+                $statusCode = $response ? $response->getStatusCode() : 0;
+                $isExpired = $report->isSubscriptionExpired();
 
                 if ($isSuccess) {
                     $totalSent++;
-                    log_message('info', "Push notification enviada con éxito a: {$endpoint}");
+                    log_message('info', "Push notification enviada con éxito (HTTP {$statusCode}) a: {$endpoint}");
                 } else {
                     $totalFailed++;
-                    log_message('error', "Push notification falló a {$endpoint}: {$reason}");
+                    log_message('error', "Push notification falló a {$endpoint} (HTTP {$statusCode}): {$reason}");
 
-                    if ($report->isSubscriptionExpired()) {
+                    if ($isExpired) {
                         try {
                             $this->subscriptionModel->where('endpoint', $endpoint)->delete();
-                            log_message('info', "Suscripción expirada eliminada: {$endpoint}");
+                            log_message('info', "Suscripción expirada eliminada (HTTP {$statusCode}): {$endpoint}");
                         } catch (\Throwable $ex) {
                             log_message('error', "Error eliminando suscripción expirada: " . $ex->getMessage());
                         }
@@ -545,7 +554,9 @@ class PushNotificationService
                 $results[] = [
                     'success' => $isSuccess,
                     'endpoint' => $endpoint,
-                    'reason' => $reason
+                    'reason' => $reason,
+                    'status_code' => $statusCode,
+                    'expired' => $isExpired
                 ];
             }
         } catch (\Throwable $e) {
