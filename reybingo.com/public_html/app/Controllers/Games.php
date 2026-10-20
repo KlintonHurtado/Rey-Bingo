@@ -3272,8 +3272,34 @@ class Games extends Controller {
 
             if (!empty($batchNotifications)) {
                 $modelNotifications->insertBatch($batchNotifications);
+
+                // BROADCAST WEBSOCKET INMEDIATO — popup de notificación sincronizado con la card
+                // Sin esto el popup esperaba hasta el siguiente ciclo de polling (hasta 10 segundos).
+                helper('bingo');
+                if (function_exists('bingo_broadcast_user_notification')) {
+                    try {
+                        $wsBroadcastTime = date('Y-m-d H:i:s');
+                        foreach ($batchNotifications as $notifItem) {
+                            $targetUid = (int) ($notifItem['user'] ?? 0);
+                            if ($targetUid < 1) {
+                                continue;
+                            }
+                            bingo_broadcast_user_notification($targetUid, [
+                                'type'       => 'game',
+                                'title'      => $notifItem['title'] ?? 'Nueva partida',
+                                'message'    => $notifItem['message'] ?? '',
+                                'game'       => $gameId,
+                                'gameId'     => $gameId,
+                                'created_at' => $wsBroadcastTime,
+                            ]);
+                        }
+                    } catch (\Throwable $bwe) {
+                        log_message('error', 'WebSocket broadcast for new game failed: ' . $bwe->getMessage());
+                    }
+                }
             }
         }
+
 
         // Al agregar/actualizar: si ya es hora y no hay mínimos, posponer 5 minutos.
         // Nunca tumbar la creación si la posposición falla (Pusher/DB/etc).
@@ -3717,8 +3743,32 @@ class Games extends Controller {
 
             if (!empty($batchNotifications)) {
                 $modelNotifications->insertBatch($batchNotifications);
+
+                // BROADCAST WEBSOCKET INMEDIATO — igual que el primer flujo de creación
+                if (function_exists('bingo_broadcast_user_notification')) {
+                    try {
+                        $wsBroadcastTime = date('Y-m-d H:i:s');
+                        foreach ($batchNotifications as $notifItem) {
+                            $targetUid = (int) ($notifItem['user'] ?? 0);
+                            if ($targetUid < 1) {
+                                continue;
+                            }
+                            bingo_broadcast_user_notification($targetUid, [
+                                'type'       => 'game',
+                                'title'      => $notifItem['title'] ?? 'Nueva partida',
+                                'message'    => $notifItem['message'] ?? '',
+                                'game'       => $gameId,
+                                'gameId'     => $gameId,
+                                'created_at' => $wsBroadcastTime,
+                            ]);
+                        }
+                    } catch (\Throwable $bwe) {
+                        log_message('error', 'WebSocket broadcast for updated game failed: ' . $bwe->getMessage());
+                    }
+                }
             }
         }
+
 
         $game = $model->find($gameId);
 

@@ -1627,6 +1627,30 @@ class Cron extends Controller
 
         if (!empty($batchNotifications)) {
             $modelNotifications->insertBatch($batchNotifications);
+
+            // BROADCAST WEBSOCKET INMEDIATO — el popup de notificación llega al mismo
+            // tiempo que la card de la partida, sin esperar el ciclo de polling (hasta 10s).
+            helper('bingo');
+            if (function_exists('bingo_broadcast_user_notification')) {
+                try {
+                    foreach ($batchNotifications as $notifItem) {
+                        $targetUid = (int) ($notifItem['user'] ?? 0);
+                        if ($targetUid < 1) {
+                            continue;
+                        }
+                        bingo_broadcast_user_notification($targetUid, [
+                            'type'       => 'game',
+                            'title'      => $notifItem['title'] ?? 'Nueva partida',
+                            'message'    => $notifItem['message'] ?? '',
+                            'game'       => $gameId,
+                            'gameId'     => $gameId,
+                            'created_at' => $notifItem['created_at'] ?? date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                } catch (\Throwable $bwe) {
+                    log_message('error', 'Cron WebSocket broadcast for new game failed: ' . $bwe->getMessage());
+                }
+            }
         }
     }
 
