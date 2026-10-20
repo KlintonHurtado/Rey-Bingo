@@ -1841,5 +1841,6 @@
 </script>
 <script src="<?= function_exists('asset_url') ? asset_url('js/pusher-client.js') : (site_url('assets/js/pusher-client.js') . '?v=' . time()) ?>"></script>
 
+<script src="<?= function_exists('asset_url') ? asset_url('js/modality-winners.js') : (site_url('assets/js/modality-winners.js') . '?v=' . time()) ?>"></script>
 <script src="<?= function_exists('asset_url') ? asset_url('js/playing.js') : (site_url('assets/js/playing.js') . '?v=' . time()) ?>"></script>
 

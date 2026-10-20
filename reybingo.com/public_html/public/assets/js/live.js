@@ -855,8 +855,12 @@ function mergeWinnersFromServer(serverWinners) {
     const limit = parseInt(window.numberSingsLimit, 10) || 1;
 
     serverWinners.forEach(function (winner) {
+        if (!winner) return;
         const player = winner.player || winner.userName || '';
-        const modality = winner.modality || winner.modalityName || '';
+        const modality = winner.modalityName || winner.modality_name || winner.modality || '';
+
+        // El estado visual no depende de que se vuelva a mostrar el aviso.
+        markModalityCardWon(winner.modalityId || winner.modality, modality);
 
         if (!player) {
             return;
@@ -873,44 +877,6 @@ function mergeWinnersFromServer(serverWinners) {
         if (!alreadyExists && currentModalityWinners.length < limit) {
             winners.push({ player: player, modality: modality });
         }
-
-        const modId = winner.modalityId || winner.modality;
-        markModalityCardWon(modId, winner.modality || winner.modalityName);
-    });
-}
-
-function markModalityCardWon(modalityId, modalityName) {
-    let targets = [];
-    if (modalityId) {
-        const byId = document.querySelectorAll(`[id="modality-${modalityId}"]`);
-        if (byId.length) {
-            targets = Array.from(byId);
-        }
-    }
-    if (targets.length === 0 && modalityName) {
-        const cleanName = String(modalityName).toLowerCase().replace(/^la\s+/i, '').trim();
-        document.querySelectorAll('.container-cartons-modalities .border-carton, .border-carton').forEach(border => {
-            const label = border.querySelector('small');
-            if (label) {
-                const text = label.textContent.toLowerCase().replace(/^la\s+/i, '').trim();
-                if (text === cleanName || cleanName.includes(text) || text.includes(cleanName)) {
-                    const cartn = border.querySelector('.carton');
-                    if (cartn) targets.push(cartn);
-                }
-            }
-        });
-    }
-
-    targets.forEach(cartn => {
-        cartn.classList.add('cartn-sing');
-        const parentBorder = cartn.closest('.border-carton');
-        if (parentBorder) {
-            parentBorder.classList.add('modality-won');
-        }
-        cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-            el.classList.add('sing');
-            el.innerText = '⭐️';
-        });
     });
 }
 
@@ -919,8 +885,8 @@ function showOtherPlayerBingoNotice(data, callback) {
         return;
     }
 
-    // Asegurar que la card de modalidad siempre se actualice visualmente con estrellas
-    markModalityCardWon(data.modalityId, data.modality || data.modalityName);
+    mergeWinnersFromServer(data.winners);
+    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
 
     const noticeKey = getBingoDedupeKey(data);
 
@@ -935,10 +901,6 @@ function showOtherPlayerBingoNotice(data, callback) {
     }
     if (data.player && data.modality && window.seenBingoNotices) {
         window.seenBingoNotices.add(String(data.player).trim() + '_' + String(data.modality).trim());
-    }
-
-    if (Array.isArray(data.winners)) {
-        mergeWinnersFromServer(data.winners);
     }
 
     if (data.player && data.modality) {
@@ -1014,11 +976,11 @@ function showOtherPlayerBingoNotice(data, callback) {
 }
 
 function showCountdown(data, callback) {
-    if (isGameFinishedShown) return;
-
+    mergeWinnersFromServer(data && data.winners);
     if (data) {
         markModalityCardWon(data.modalityId, data.modality || data.modalityName);
     }
+    if (isGameFinishedShown) return;
 
     const isFinished = (data && (data.gameCompleted === true || data.status === 'completed')) || window.gameIsFinished || window.isGameCompleted;
 
@@ -1061,15 +1023,6 @@ function showCountdown(data, callback) {
     const container = $id('countdown-container');
     if (container) {
         container.style.display = 'none';
-    }
-
-    const cartn = data && data.modalityId ? $id(`modality-${data.modalityId}`) : null;
-    if (cartn) {
-        cartn.classList.add('cartn-sing');
-        cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-            el.classList.add('sing');
-            el.innerText = '⭐️';
-        });
     }
 
     setTimeout(function () {
@@ -1479,6 +1432,8 @@ function lastNumberGet() {
             if (!data) {
                 return;
             }
+
+            mergeWinnersFromServer(data.winners);
 
             // Sincronizar bolas ya cantadas (sin auto-generar)
             if (Array.isArray(data.drawnNumbers) && data.drawnNumbers.length) {
@@ -2474,12 +2429,11 @@ function initializeApp() {
                 console.log('LIVE WS: bingo_accepted recibido', data);
                 if (!data) return;
 
+                mergeWinnersFromServer(data.winners);
+                markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+
                 stopAutomaticGeneration();
                 stopAutomaticLast();
-
-                if (data.modalityId || data.modality) {
-                    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
-                }
 
                 const isCompleted = (data.gameCompleted === true || window.gameIsFinished || isGameFinishedShown);
                 if (isCompleted) {
@@ -2525,6 +2479,7 @@ function initializeApp() {
 
             // Fin de partida
             function handleLiveGameFinished(data) {
+                mergeWinnersFromServer(data && data.winners);
                 console.log('LIVE WS: game_finished / game_completed recibido', data);
                 stopAutomaticGeneration();
                 stopAutomaticLast();

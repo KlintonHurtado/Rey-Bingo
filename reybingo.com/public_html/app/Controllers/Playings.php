@@ -1185,12 +1185,10 @@ class Playings extends Controller
         $fiveNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->limit(5)->findAll();
         $fiveNumbers = array_reverse(array_column($fiveNumbers, 'number'));
 
-        $singsModalities = $modelSings->where('game', $game['id'])->findAll();
-        $singsModalities = array_column($singsModalities, 'modality');
-
         $singsUser = $modelSings->where('user', session()->get('id'))->where('game', $game['id'])->findAll();
 
         $officialSings = bingo_get_official_sings_for_game((int) $game['id'], true);
+        $singsModalities = array_column($officialSings, 'modality');
         $winners = [];
         foreach ($officialSings as $officialSing) {
             $user = $modelUsers->find($officialSing['user']);
@@ -1202,6 +1200,8 @@ class Playings extends Controller
                 'game'          => (int) $officialSing['game'],
                 'carton'        => (int) $officialSing['carton'],
                 'modality'      => (int) $officialSing['modality'],
+                'modalityId'    => (int) $officialSing['modality'],
+                'modalityName'  => $wmodality ? translate($wmodality['name'] ?? '') : 'Bingo',
                 'player'        => $user ? trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')) : ('Jugador #' . $officialSing['user']),
                 'modality_name' => $wmodality ? translate($wmodality['name'] ?? '') : 'Bingo',
                 'image'         => !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg'),

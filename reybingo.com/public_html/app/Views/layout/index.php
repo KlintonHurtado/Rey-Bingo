@@ -808,7 +808,77 @@ $isNoMusicRole = session()->get('logged_in') && (
                     const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
 
-                    // Extraer nombre del jugador y cartón
+                    // ── LISTA CANÓNICA DE GANADORES ───────────────────────────────────────────────
+                    // Si el servidor envió 'officialWinners' (lista completa y autorizada), la usamos
+                    // directamente para reconstruir la UI. Esto resuelve la desincronización entre
+                    // dispositivos: aunque un dispositivo haya perdido mensajes anteriores, recibe la
+                    // lista definitiva en el siguiente evento y la muestra completa y correcta.
+                    if (Array.isArray(notification.officialWinners) && notification.officialWinners.length > 0) {
+                        // Agrupar todos los ganadores por modalidad
+                        const byModality = {};
+                        notification.officialWinners.forEach(w => {
+                            const mId = w.modalityId || w.modality_id || 0;
+                            const mKey = 'modality_' + (mId || (w.modalityName ? String(w.modalityName).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                            if (!byModality[mKey]) {
+                                byModality[mKey] = {
+                                    modalityName: w.modalityName || w.modality || 'Bingo',
+                                    winners: []
+                                };
+                            }
+                            const wName = w.userName || w.player || w.name || '';
+                            if (wName && !byModality[mKey].winners.some(x => x.player.toLowerCase() === wName.toLowerCase())) {
+                                byModality[mKey].winners.push({ player: wName, carton: w.cartonId || w.carton || '' });
+                            }
+                        });
+
+                        // Actualizar o crear tarjeta de notificación para cada modalidad
+                        Object.keys(byModality).forEach(mKey => {
+                            const mData = byModality[mKey];
+                            const mClean = escapeHtml(String(mData.modalityName).replace(/^la\s+/i, '').trim()) || 'Bingo';
+                            const mLabel = (/^bingo/i.test(mClean) || /^pleno/i.test(mClean))
+                                ? `Ganadores de la modalidad ${mClean}`
+                                : `Ganadores de la ${mClean}`;
+                            const winnersFormatted = mData.winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ');
+                            const existingEl = container.querySelector(`[data-modality-key="${mKey}"]`);
+
+                            if (existingEl) {
+                                // Actualizar tarjeta existente con la lista completa
+                                existingEl._winners = mData.winners;
+                                const msgEl = existingEl.querySelector('.notification-message');
+                                if (msgEl) msgEl.innerHTML = `${mLabel}: ${winnersFormatted}`;
+                                if (existingEl._autoHideTimer) clearTimeout(existingEl._autoHideTimer);
+                                existingEl._autoHideTimer = setTimeout(() => { hideNotification(existingEl); }, notificationConfig.displayTime);
+                                existingEl.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+                                existingEl.style.transform = 'scale(1.02)';
+                                setTimeout(() => { existingEl.style.transform = ''; }, 250);
+                            } else if (mKey === modalityKey) {
+                                // Crear nueva tarjeta solo para la modalidad del evento actual
+                                const newEl = document.createElement('div');
+                                newEl.className = `notification notification-${notification.type || 'sing'}`;
+                                newEl.dataset.modalityKey = mKey;
+                                if (notification.id) newEl.dataset.notificationId = notification.id;
+                                newEl._winners = mData.winners;
+                                newEl.innerHTML = `
+                                    <div class="notification-header">
+                                        <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
+                                    </div>
+                                    <div class="notification-message">${mLabel}: ${winnersFormatted}</div>
+                                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                                    <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
+                                `;
+                                container.appendChild(newEl);
+                                setTimeout(() => { newEl.classList.add('show'); }, 100);
+                                if (typeof attachNotificationSwipeDismiss === 'function') {
+                                    attachNotificationSwipeDismiss(newEl, hideNotification);
+                                }
+                                newEl._autoHideTimer = setTimeout(() => { hideNotification(newEl); }, notificationConfig.displayTime);
+                            }
+                        });
+                        return; // Lista oficial procesada: no continuar con el flujo individual
+                    }
+                    // ── FIN LISTA CANÓNICA ──────────────────────────────────────────────────────
+
+                    // Extraer nombre del jugador y cartón (fallback cuando no hay officialWinners)
                     let playerName = notification.player || notification.userName || '';
                     let cartonNumber = notification.cartonId || notification.carton || '';
                     if (!playerName && notification.message) {

@@ -733,4 +733,5 @@
 <script src="<?= site_url('assets/js/pusher-client.js'); ?>?v=<?= APP_VERSION ?>"></script>
 
 <script src="<?= site_url('assets/js/app.js'); ?>?v=<?= APP_VERSION ?>"></script>
-<script src="<?= site_url('assets/js/live.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/modality-winners.js') : (site_url('assets/js/modality-winners.js') . '?v=' . time()) ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/live.js') : (site_url('assets/js/live.js') . '?v=' . time()) ?>"></script>

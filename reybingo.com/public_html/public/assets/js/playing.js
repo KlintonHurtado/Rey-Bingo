@@ -1350,12 +1350,12 @@ function isCardWinningPattern(cartonEl) {
     return markedPositions.size >= 25;
 }
 
-function registerWinner(player, modality) {
+function registerWinner(player, modality, modalityId) {
     if (!player) {
         return;
     }
 
-    mergeWinnersFromServer([{ player: player, modality: modality || '' }]);
+    mergeWinnersFromServer([{ player: player, modality: modality || '', modalityId: modalityId }]);
 }
 
 function buildWinnersFinalText() {
@@ -1406,7 +1406,7 @@ function handleBingoSuccess(data, resumeCallback) {
         });
     }
 
-    registerWinner(data.player, data.modality);
+    registerWinner(data.player, data.modality, data.modalityId);
 
     if (Array.isArray(data.winners) && data.winners.length) {
         mergeWinnersFromServer(data.winners);
@@ -1482,7 +1482,7 @@ function handleBingoSuccess(data, resumeCallback) {
     }
 
     if (data.player && data.modality) {
-        registerWinner(data.player, data.modality);
+        registerWinner(data.player, data.modality, data.modalityId);
     }
     if (Array.isArray(data.winners)) {
         mergeWinnersFromServer(data.winners);
@@ -1524,53 +1524,6 @@ function handleBingoSuccess(data, resumeCallback) {
     }, afterCountdown);
 }
 
-function applyWonStylesToCard(cartn) {
-    if (!cartn) return;
-    cartn.classList.add('cartn-sing');
-
-    let borderCarton = cartn.parentElement;
-    while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-        borderCarton = borderCarton.parentElement;
-    }
-    if (borderCarton) {
-        borderCarton.classList.add('modality-won');
-    }
-
-    cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-        el.classList.add('sing');
-        el.innerText = '⭐️';
-    });
-}
-
-function markModalityCardWon(modalityId, modalityName) {
-    try {
-        let found = false;
-        if (modalityId) {
-            const byId = document.querySelectorAll(`[id="modality-${modalityId}"]`);
-            if (byId && byId.length) {
-                byId.forEach(cartn => {
-                    found = true;
-                    applyWonStylesToCard(cartn);
-                });
-            }
-        }
-        if (!found && modalityName) {
-            const cleanTarget = String(modalityName).trim().toLowerCase();
-            const allCards = document.querySelectorAll('[id^="modality-"], .cartn-modalidad, .border-carton');
-            allCards.forEach(card => {
-                const titleEl = card.querySelector('.title-modality, .modality-title, h4, h5, h6, strong, span');
-                const text = (titleEl ? titleEl.textContent : card.textContent || '').trim().toLowerCase();
-                if (text && (text === cleanTarget || text.includes(cleanTarget) || cleanTarget.includes(text))) {
-                    const cartn = card.classList.contains('cartn-modalidad') ? card : (card.querySelector('.cartn-modalidad') || card);
-                    applyWonStylesToCard(cartn);
-                }
-            });
-        }
-    } catch (e) {
-        console.warn('Error marking modality card won in playing.js:', e);
-    }
-}
-
 function mergeWinnersFromServer(serverWinners) {
     if (!Array.isArray(serverWinners)) {
         return;
@@ -1579,8 +1532,12 @@ function mergeWinnersFromServer(serverWinners) {
     const limit = parseInt(window.numberSingsLimit, 10) || 1;
 
     serverWinners.forEach(function (winner) {
+        if (!winner) return;
         const player = winner.player || winner.userName || '';
-        const modality = winner.modality || winner.modalityName || '';
+        const modality = winner.modalityName || winner.modality_name || winner.modality || '';
+
+        // El estado visual no depende de que se vuelva a mostrar el aviso.
+        markModalityCardWon(winner.modalityId || winner.modality, modality);
 
         if (!player) {
             return;
@@ -1597,9 +1554,6 @@ function mergeWinnersFromServer(serverWinners) {
         if (!alreadyExists && currentModalityWinners.length < limit) {
             winners.push({ player: player, modality: modality });
         }
-
-        // Apply won styling to modality in real-time
-        markModalityCardWon(winner.modalityId || winner.modality, winner.modalityName || winner.modality);
     });
 }
 
@@ -2398,7 +2352,7 @@ function showCountdown(data, callback) {
     }
 
     if (data && data.player) {
-        registerWinner(data.player, data.modality);
+        registerWinner(data.player, data.modality, data.modalityId);
     }
     if (data && Array.isArray(data.winners)) {
         mergeWinnersFromServer(data.winners);
@@ -2465,6 +2419,9 @@ function showOtherPlayerBingoNotice(data, callback) {
         return;
     }
 
+    mergeWinnersFromServer(data.winners);
+    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+
     const noticeKey = (data.singId ? 'sing_' + data.singId : '') ||
                       (data.cartonId ? 'carton_' + data.cartonId + '_' + (data.modalityId || '') : '') ||
                       ((data.player || '') + '_' + (data.modality || ''));
@@ -2490,12 +2447,8 @@ function showOtherPlayerBingoNotice(data, callback) {
     window.__lastWinnerNoticeTime = Date.now();
     // No limpiar lastNumber aquí para no congelar la pantalla de los demás jugadores
 
-    if (Array.isArray(data.winners)) {
-        mergeWinnersFromServer(data.winners);
-    }
-
     if (data.player && data.modality) {
-        registerWinner(data.player, data.modality);
+        registerWinner(data.player, data.modality, data.modalityId);
     }
 
     // Convertir visualmente la modalidad a "ganada" en tiempo real para todos los jugadores
@@ -2594,6 +2547,8 @@ function processNumberGetResponse(data) {
         return;
     }
 
+    mergeWinnersFromServer(data.winners);
+
     // Partida finalizada: detener inmediatamente intervalos y vaciar cola de balotas
     if (window.gameIsFinished || isGameFinishedShown || data.status === 'completed' || data.gameCompleted === true) {
         window.gameIsFinished = true;
@@ -2605,12 +2560,8 @@ function processNumberGetResponse(data) {
         applyNumberGetMeta(data);
         applyAutoMarkPreferenceFromServer(data.autodial);
 
-        if (Array.isArray(data.winners)) {
-            mergeWinnersFromServer(data.winners);
-        }
-
         if (data.player && data.modality) {
-            registerWinner(data.player, data.modality);
+            registerWinner(data.player, data.modality, data.modalityId);
         }
 
         // Sincronizar números en el tablero de forma estática sin animar ni cantar balota
@@ -2693,10 +2644,6 @@ function processNumberGetResponse(data) {
     }
 
     if (data.status === 'pause') {
-        if (Array.isArray(data.winners)) {
-            mergeWinnersFromServer(data.winners);
-        }
-
         if (data.player && data.modality) {
             if (isOwnBingoEvent(data)) {
                 if (!bingoInProgress) {
@@ -2724,21 +2671,7 @@ function processNumberGetResponse(data) {
                     const isInitialSync = (Date.now() - (window.__gameSessionJoinedAt || 0)) < 4000;
                     if (isInitialSync) {
                         window.seenBingoNotices.add(noticeKey);
-                        if (data.modalityId) {
-                            const cartns = document.querySelectorAll(`[id="modality-${data.modalityId}"]`);
-                            cartns.forEach(cartn => {
-                                cartn.classList.add('cartn-sing');
-                                let borderCarton = cartn.parentElement;
-                                while (borderCarton && !borderCarton.classList.contains('border-carton')) {
-                                    borderCarton = borderCarton.parentElement;
-                                }
-                                if (borderCarton) borderCarton.classList.add('modality-won');
-                                cartn.querySelectorAll('.card-number.modality-sing').forEach(el => {
-                                    el.classList.add('sing');
-                                    el.innerText = '⭐️';
-                                });
-                            });
-                        }
+                        markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
                     } else {
                         showOtherPlayerBingoNotice(data);
                     }
@@ -4445,6 +4378,9 @@ function initializeApp() {
                 console.log('WS game:bingo_accepted received', data);
                 if (!data) return;
 
+                mergeWinnersFromServer(data.winners);
+                markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+
                 const noticeKey = (data.singId ? 'sing_' + data.singId : '') ||
                                   (data.cartonId ? 'carton_' + data.cartonId + '_' + (data.modalityId || '') : '') ||
                                   ((data.player || '') + '_' + (data.modality || ''));
@@ -4452,11 +4388,8 @@ function initializeApp() {
                     return;
                 }
 
-                if (Array.isArray(data.winners)) {
-                    mergeWinnersFromServer(data.winners);
-                }
                 if (data.player && data.modality) {
-                    registerWinner(data.player, data.modality);
+                    registerWinner(data.player, data.modality, data.modalityId);
                 }
 
                 const isCompleted = (data.gameCompleted === true || data.stopped === true);
@@ -4553,6 +4486,7 @@ function initializeApp() {
 
             // Fin de partida en tiempo real
             function handlePlayingGameFinished(data) {
+                mergeWinnersFromServer(data && data.winners);
                 console.log('WS game:game_finished / game:completed received', data);
                 if (window.isLiveGame && data && data.liveFinalized === true) {
                     handleLiveFinalizedByAdmin(data);

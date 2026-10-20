@@ -469,6 +469,99 @@ if (!function_exists('bingo_get_official_sings_for_game')) {
     }
 }
 
+if (!function_exists('bingo_get_enriched_winners_for_broadcast')) {
+    /**
+     * Retorna la lista canónica de ganadores del juego con todos los campos que el cliente
+     * necesita para reconstruir la notificación de forma autónoma:
+     *   - userName      (nombre completo del ganador)
+     *   - modalityName  (nombre de la modalidad)
+     *   - modalityId    (ID de la modalidad)
+     *   - cartonId      (ID del cartón ganador)
+     *
+     * Hace un único JOIN en BD para ser eficiente y evitar N+1 queries.
+     * Usado exclusivamente en los broadcasts de notificación para sincronizar
+     * todos los dispositivos con una lista canónica y completa.
+     */
+    function bingo_get_enriched_winners_for_broadcast(int $gameId, bool $includePending = false): array
+    {
+        if ($gameId < 1) {
+            return [];
+        }
+
+        try {
+            $rawSings = bingo_get_official_sings_for_game($gameId, $includePending);
+            if (empty($rawSings)) {
+                return [];
+            }
+
+            // Recopilar IDs únicos de usuarios y modalidades para hacer queries en bloque
+            $userIds     = array_unique(array_filter(array_column($rawSings, 'user'),     fn($v) => (int)$v > 0));
+            $modalityIds = array_unique(array_filter(array_column($rawSings, 'modality'), fn($v) => (int)$v > 0));
+
+            // Cargar usuarios en un mapa userId => nombre
+            $userNames = [];
+            if (!empty($userIds)) {
+                $db   = \Config\Database::connect();
+                $rows = $db->table('users')
+                    ->select('id, firstname, lastname, username')
+                    ->whereIn('id', $userIds)
+                    ->get()->getResultArray();
+                foreach ($rows as $row) {
+                    $name = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
+                    if ($name === '') {
+                        $name = $row['username'] ?? ('Jugador #' . $row['id']);
+                    }
+                    $userNames[(int) $row['id']] = $name;
+                }
+            }
+
+            // Cargar modalidades en un mapa modalityId => nombre
+            $modalityNames = [];
+            if (!empty($modalityIds)) {
+                $db   = \Config\Database::connect();
+                $rows = $db->table('modalities')
+                    ->select('id, name')
+                    ->whereIn('id', $modalityIds)
+                    ->get()->getResultArray();
+                foreach ($rows as $row) {
+                    $modalityNames[(int) $row['id']] = $row['name'] ?? '';
+                }
+            }
+
+            // Construir la lista enriquecida
+            $enriched = [];
+            foreach ($rawSings as $sing) {
+                $userId     = (int) ($sing['user']     ?? 0);
+                $modalityId = (int) ($sing['modality'] ?? 0);
+                $cartonId   = (int) ($sing['carton']   ?? 0);
+                $rawModName = $modalityNames[$modalityId] ?? 'Bingo';
+                $modalityClean = trim(preg_replace('/^la\s+/i', '', $rawModName));
+                if ($modalityClean === '') {
+                    $modalityClean = 'Bingo';
+                }
+
+                $enriched[] = [
+                    'singId'       => (int) ($sing['id'] ?? 0),
+                    'userId'       => $userId,
+                    'userName'     => $userNames[$userId] ?? ('Jugador #' . $userId),
+                    'player'       => $userNames[$userId] ?? ('Jugador #' . $userId),
+                    'modalityId'   => $modalityId,
+                    'modalityName' => $modalityClean,
+                    'modality'     => $modalityClean,
+                    'cartonId'     => $cartonId,
+                    'carton'       => $cartonId,
+                    'status'       => (int) ($sing['status'] ?? 0),
+                ];
+            }
+
+            return $enriched;
+        } catch (\Throwable $e) {
+            log_message('error', 'bingo_get_enriched_winners_for_broadcast error: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
 if (!function_exists('bingo_count_won_modalities')) {
     function bingo_count_won_modalities(int $gameId): int
     {
@@ -1217,6 +1310,20 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 }
             }
 
+            // Obtener la lista completa y ENRIQUECIDA de ganadores del juego hasta este momento.
+            // Se usa bingo_get_enriched_winners_for_broadcast (en lugar del raw get_official_sings)
+            // porque ya incluye los campos que el cliente necesita: userName, modalityName, modalityId,
+            // cartonId. Así todos los dispositivos pueden reconstruir la notificación completa con un
+            // solo evento, sin necesidad de haber recibido todos los eventos anteriores.
+            $officialWinners = [];
+            if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
+                try {
+                    $officialWinners = bingo_get_enriched_winners_for_broadcast($gameId, true) ?: [];
+                } catch (\Throwable $we) {
+                    log_message('error', 'Error fetching enriched officialWinners for broadcast: ' . $we->getMessage());
+                }
+            }
+
             // Inserción en base de datos
             if (!empty($batchInsert)) {
                 $modelNotifications->insertBatch($batchInsert);
@@ -1226,20 +1333,22 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                     $targetUserId = (int) ($item['user'] ?? 0);
                     if ($targetUserId > 0) {
                         bingo_broadcast_user_notification($targetUserId, [
-                            'id'           => 'sing_' . $singId . '_' . $modalityId,
-                            'title'        => $item['title'] ?? $unifiedSingTitle,
-                            'message'      => $item['message'] ?? $unifiedSingMessage,
-                            'type'         => $item['type'] ?? 'sing',
-                            'game'         => $gameId,
-                            'gameId'       => $gameId,
-                            'modality'     => $modalityClean,
-                            'modalityId'   => $modalityId,
-                            'carton'       => $cartonId,
-                            'cartonId'     => $cartonId,
-                            'player'       => $userName,
-                            'userName'     => $userName,
-                            'winnerUserId' => $winnerUserId,
-                            'created_at'   => $now,
+                            'id'             => 'sing_' . $singId . '_' . $modalityId,
+                            'title'          => $item['title'] ?? $unifiedSingTitle,
+                            'message'        => $item['message'] ?? $unifiedSingMessage,
+                            'type'           => $item['type'] ?? 'sing',
+                            'game'           => $gameId,
+                            'gameId'         => $gameId,
+                            'modality'       => $modalityClean,
+                            'modalityId'     => $modalityId,
+                            'carton'         => $cartonId,
+                            'cartonId'       => $cartonId,
+                            'player'         => $userName,
+                            'userName'       => $userName,
+                            'winnerUserId'   => $winnerUserId,
+                            'created_at'     => $now,
+                            // Lista canónica de ganadores para sincronización entre dispositivos
+                            'officialWinners' => $officialWinners ?? [],
                         ]);
                     }
                 }
@@ -1250,22 +1359,26 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
             try {
                 $client = bingo_get_broadcast_client();
                 $gameChannel = 'private-game-' . $gameId;
+
                 $gamePayload = [
-                    'id'           => 'sing_' . $singId . '_' . $modalityId,
-                    'type'         => 'sing',
-                    'title'        => $unifiedSingTitle,
-                    'message'      => $unifiedSingMessage,
-                    'game'         => $gameId,
-                    'gameId'       => $gameId,
-                    'modality'     => $modalityClean,
-                    'modalityName' => $modalityClean,
-                    'modalityId'   => $modalityId,
-                    'carton'       => $cartonId,
-                    'cartonId'     => $cartonId,
-                    'userName'     => $userName,
-                    'player'       => $userName,
-                    'winnerUserId' => $winnerUserId,
-                    'created_at'   => $now,
+                    'id'            => 'sing_' . $singId . '_' . $modalityId,
+                    'type'          => 'sing',
+                    'title'         => $unifiedSingTitle,
+                    'message'       => $unifiedSingMessage,
+                    'game'          => $gameId,
+                    'gameId'        => $gameId,
+                    'modality'      => $modalityClean,
+                    'modalityName'  => $modalityClean,
+                    'modalityId'    => $modalityId,
+                    'carton'        => $cartonId,
+                    'cartonId'      => $cartonId,
+                    'userName'      => $userName,
+                    'player'        => $userName,
+                    'winnerUserId'  => $winnerUserId,
+                    'created_at'    => $now,
+                    // Lista canónica de todos los ganadores del juego hasta este instante.
+                    // Permite que el cliente reconstruya la UI completa con un solo evento.
+                    'officialWinners' => $officialWinners,
                 ];
                 $client->trigger($gameChannel, 'game:notification', $gamePayload);
                 $client->trigger($gameChannel, 'notification:new', $gamePayload);

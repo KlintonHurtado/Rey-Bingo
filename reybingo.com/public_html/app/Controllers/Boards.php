@@ -136,17 +136,8 @@ class Boards extends Controller {
         $fiveNumbers = $model->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
         $fiveNumbers = array_reverse(array_column($fiveNumbers, 'number'));
 
-        $singsModalities = $modelSings->where('game', $game['id'])->findAll();
-        $singsModalities = array_column($singsModalities, 'modality');
-
-        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
-        foreach ($winners as &$winner) {
-            $user = $modelUsers->find($winner['user']);
-            $wmodality = $modelModalities->find($winner['modality']);
-
-            $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
-            $winner['modality'] = translate($wmodality['name']);
-        }
+        $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
+        $singsModalities = array_column($winners, 'modalityId');
 
         $getClass = function($number) {
             if ($number <= 15) {
@@ -242,17 +233,8 @@ class Boards extends Controller {
         $fiveNumbers = $model->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'DESC')->limit(5)->findAll();
         $fiveNumbers = array_reverse(array_column($fiveNumbers, 'number'));
 
-        $singsModalities = $modelSings->where('game', $game['id'])->findAll();
-        $singsModalities = array_column($singsModalities, 'modality');
-
-        $winners = bingo_get_official_sings_for_game((int) $game['id'], true);
-        foreach ($winners as &$winner) {
-            $user = $modelUsers->find($winner['user']);
-            $wmodality = $modelModalities->find($winner['modality']);
-
-            $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
-            $winner['modality'] = translate($wmodality['name']);
-        }
+        $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
+        $singsModalities = array_column($winners, 'modalityId');
 
         $getClass = function($number) {
             if ($number <= 15) {
@@ -643,13 +625,7 @@ class Boards extends Controller {
         $totalNumbersGenerated = count($drawnNumbers);
 
         // Obtener lista de ganadores para incluir en todas las respuestas
-        $winners = $modelSings->where('game', $game['id'])->where('status', 1)->findAll();
-        foreach ($winners as &$winner) {
-            $user = $modelUsers->find($winner['user']);
-            $wmodality = $modelModalities->find($winner['modality']);
-            $winner['player'] = $user['firstname'] . ' ' . $user['lastname'];
-            $winner['modality'] = translate($wmodality['name']);
-        }
+        $winners = $this->buildWinnersList((int) $game['id'], $modelSings, $modelUsers, $modelModalities);
 
         $isLiveGame = in_array((int) ($game['type'] ?? 0), [3, 4], true);
 
