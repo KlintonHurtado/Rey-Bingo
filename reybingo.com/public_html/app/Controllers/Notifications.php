@@ -57,29 +57,52 @@ class Notifications extends Controller {
                 if ($userId > 0) {
                     $data['user_id'] = $userId;
                 }
-                $subscriptionModel->update($existing['id'], $data);
+                $saved = $subscriptionModel->update($existing['id'], $data);
             } else {
-                $subscriptionModel->insert($data);
+                $saved = $subscriptionModel->insert($data);
             }
 
-            // Enviar notificación de confirmación inmediata
-            $testPayload = [
-                'title' => '🎉 ¡Notificaciones Activadas!',
-                'message' => 'Recibirás avisos en tu teléfono cuando empiece una partida en vivo de Rey Bingo',
-                'url' => base_url('/')
-            ];
-            
-            $result = $this->pushService->sendToSubscription($data, $testPayload);
+            if ($saved === false) {
+                log_message('error', 'No se pudo guardar la suscripción Web Push.');
+                return $this->response->setStatusCode(500)->setJSON([
+                    'success' => false,
+                    'subscribed' => false,
+                    'message' => 'No se pudo registrar este dispositivo. Vuelve a intentarlo.'
+                ]);
+            }
+
+            // Enviar notificación de confirmación si es nuevo dispositivo o se solicitó explícitamente
+            $confirmationRequested = !$existing || ($request->confirm ?? false) === true;
+            $confirmationAccepted = null;
+            if ($confirmationRequested) {
+                $confirmationPayload = [
+                    'title' => '🎉 ¡Notificaciones Activadas!',
+                    'message' => 'Recibirás avisos en tu teléfono cuando empiece una partida en vivo de Rey Bingo',
+                    'url' => base_url('/')
+                ];
+
+                try {
+                    $result = $this->pushService->sendToSubscription($data, $confirmationPayload);
+                    $confirmationAccepted = !empty($result['success']) && (int) ($result['sent'] ?? 0) > 0;
+                } catch (\Throwable $e) {
+                    log_message('error', 'No se pudo enviar la confirmación Web Push: ' . $e->getMessage());
+                    $confirmationAccepted = false;
+                }
+            }
 
             return $this->response->setJSON([
-                'success' => true, 
+                'success' => true,
+                'subscribed' => true,
+                'confirmation_requested' => $confirmationRequested,
+                'confirmation_accepted' => $confirmationAccepted,
                 'message' => 'Suscripción guardada correctamente',
-                'result' => $result
             ]);
-        } catch (\Exception $e) {
-            return $this->response->setJSON([
-                'success' => false, 
-                'message' => 'Error al guardar suscripción: ' . $e->getMessage()
+        } catch (\Throwable $e) {
+            log_message('error', 'Error al guardar la suscripción Web Push: ' . get_class($e));
+            return $this->response->setStatusCode(500)->setJSON([
+                'success' => false,
+                'subscribed' => false,
+                'message' => 'No se pudo registrar este dispositivo. Vuelve a intentarlo.'
             ]);
         }
     }
@@ -180,7 +203,7 @@ class Notifications extends Controller {
      */
     public function getPublicKey()
     {
-        return $this->response->setJSON([
+        return $this->response->setHeader('Cache-Control', 'no-store')->setJSON([
             'publicKey' => $this->pushService->getVapidPublicKey()
         ]);
     }
@@ -191,15 +214,15 @@ class Notifications extends Controller {
     public function getLatestPush()
     {
         $gamesModel = new \App\Models\GamesModel();
-        // Buscar la partida en vivo más reciente activa
+        // Buscar la partida en vivo más reciente activa por ID descendente
         $game = $gamesModel->whereIn('type', [3, 4])
                            ->whereIn('status', [1, 2])
-                           ->orderBy('created_at', 'DESC')
+                           ->orderBy('id', 'DESC')
                            ->first();
 
         if (!$game) {
             $game = $gamesModel->whereIn('status', [1, 2])
-                               ->orderBy('created_at', 'DESC')
+                               ->orderBy('id', 'DESC')
                                ->first();
         }
 

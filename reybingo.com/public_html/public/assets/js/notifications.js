@@ -67,20 +67,39 @@ class NotificationManager {
         if (!this.registration) return;
 
         try {
-            const permission = Notification.permission;
-            console.log('🔔 Estado de permisos de notificación:', permission);
+            // 1. Si el navegador ya tiene una suscripción Push activa, ocultar banner de inmediato
+            let existingSub = null;
+            try {
+                existingSub = await this.registration.pushManager.getSubscription();
+            } catch (err) {
+                console.warn('No se pudo leer suscripción existente:', err);
+            }
+
+            const permission = (window.Notification && Notification.permission) || 'default';
+            console.log('🔔 Estado de permisos de notificación:', permission, '| Suscripción activa:', !!existingSub);
 
             if (permission === 'granted') {
+                this.hideBanner();
                 await this.subscribe();
+                return;
+            }
+
+            if (existingSub) {
                 this.hideBanner();
-            } else if (permission === 'default') {
-                const dismissedTime = localStorage.getItem('push-banner-dismissed');
-                const now = Date.now();
-                if (!dismissedTime || (now - parseInt(dismissedTime, 10)) > (12 * 60 * 60 * 1000)) {
-                    this.showBanner();
-                }
-            } else if (permission === 'denied') {
+                await this.saveSubscriptionToServer(existingSub);
+                return;
+            }
+
+            if (permission === 'denied') {
                 this.hideBanner();
+                return;
+            }
+
+            // permission === 'default'
+            const dismissedTime = localStorage.getItem('push-banner-dismissed');
+            const now = Date.now();
+            if (!dismissedTime || (now - parseInt(dismissedTime, 10)) > (24 * 60 * 60 * 1000)) {
+                this.showBanner();
             }
         } catch (e) {
             console.error('Error sincronizando estado de notificaciones:', e);
@@ -122,16 +141,13 @@ class NotificationManager {
 
             if (permission === 'granted') {
                 this.hideBanner();
-                const success = await this.subscribe();
-                if (success) {
-                    this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
-                } else {
-                    this.showToast('Permiso concedido, pero ocurrió un problema al registrar el teléfono.', 'warning');
-                }
-                return success;
+                localStorage.setItem('push-banner-dismissed', Date.now().toString());
+                await this.subscribe();
+                this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
+                return true;
             } else if (permission === 'denied') {
                 this.hideBanner();
-                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador. Toca el icono de controles/ajustes junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
+                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador. Toca el icono de ajustes/candado junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
                 return false;
             } else {
                 return false;
@@ -217,7 +233,8 @@ class NotificationManager {
             keys: {
                 p256dh: p256dh,
                 auth: auth
-            }
+            },
+            contentEncoding: 'aes128gcm'
         };
     }
 
@@ -242,7 +259,7 @@ class NotificationManager {
             });
 
             if (!response.ok) {
-                console.error(`❌ El servidor rechazó la suscripción push (HTTP ${response.status})`);
+                console.warn(`El servidor devolvió HTTP ${response.status} al guardar suscripción push`);
                 return false;
             }
 
@@ -321,27 +338,57 @@ class NotificationManager {
     }
 }
 
-// Inicialización global
-document.addEventListener('DOMContentLoaded', function() {
-    window.notificationManager = new NotificationManager();
+// Inicialización global segura (soporta carga diferida o DOM ya listo)
+function initReyBingoPush() {
+    if (!window.notificationManager) {
+        window.notificationManager = new NotificationManager();
+    }
 
-    // Listener para el botón activar en banner
     const activateBtn = document.getElementById('btn-activate-push');
-    if (activateBtn) {
-        activateBtn.addEventListener('click', function() {
-            window.notificationManager.requestPermission();
+    if (activateBtn && !activateBtn._pushBound) {
+        activateBtn._pushBound = true;
+        activateBtn.addEventListener('click', async function() {
+            const originalHtml = activateBtn.innerHTML;
+            activateBtn.disabled = true;
+            activateBtn.innerHTML = '⌛ Activando...';
+            try {
+                await window.notificationManager.requestPermission();
+            } finally {
+                activateBtn.disabled = false;
+                activateBtn.innerHTML = originalHtml;
+            }
         });
     }
 
-    // Listener para el botón descartar
     const dismissBtn = document.getElementById('btn-dismiss-push');
-    if (dismissBtn) {
+    if (dismissBtn && !dismissBtn._pushBound) {
+        dismissBtn._pushBound = true;
         dismissBtn.addEventListener('click', function() {
             window.notificationManager.hideBanner();
             localStorage.setItem('push-banner-dismissed', Date.now().toString());
         });
     }
-});
+
+    // Escuchar cambios de permiso automáticos en el navegador
+    if (navigator.permissions && navigator.permissions.query) {
+        try {
+            navigator.permissions.query({ name: 'notifications' }).then(function(permissionStatus) {
+                permissionStatus.onchange = function() {
+                    console.log('🔔 Cambio en permiso de notificaciones detectado:', permissionStatus.state);
+                    if (window.notificationManager) {
+                        window.notificationManager.syncStatus();
+                    }
+                };
+            }).catch(function() {});
+        } catch (e) {}
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initReyBingoPush);
+} else {
+    initReyBingoPush();
+}
 
 window.requestPushNotifications = function() {
     if (window.notificationManager) {

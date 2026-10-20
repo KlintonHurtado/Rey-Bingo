@@ -7,7 +7,8 @@ use App\Config\Push as PushConfig;
 
 class PushNotificationService
 {
-    private $webPush;
+    private $webPush = null;
+    private $initializationError;
     private $subscriptionModel;
     private $vapidPublicKey;
     private $vapidPrivateKey;
@@ -34,14 +35,21 @@ class PushNotificationService
                     ]
                 ];
 
-                $this->webPush = new \Minishlink\WebPush\WebPush($auth);
-                $this->webPush->setAutomaticPadding(true);
-                $this->webPush->setDefaultOptions([
-                    'TTL' => 86400,
-                    'urgency' => 'high',
-                    'batchMode' => true,
-                    'timeout' => 20
+                // En v11 el tiempo de espera pertenece al cliente HTTP, no a las opciones del push.
+                $client = new \GuzzleHttp\Client([
+                    'connect_timeout' => 8,
+                    'timeout' => 20,
+                    'allow_redirects' => false,
                 ]);
+                $this->webPush = new \Minishlink\WebPush\WebPush(
+                    auth: $auth,
+                    defaultOptions: ['TTL' => 86400, 'urgency' => 'high'],
+                    client: $client,
+                    // Evitar que CI convierta avisos de extensiones opcionales en excepciones.
+                    logger: service('logger')
+                );
+                $this->webPush->setAutomaticPadding(true);
+                $this->webPush->setReuseVAPIDHeaders(true);
             } catch (\Throwable $e) {
                 log_message('error', 'PushNotificationService: Falló inicialización de Minishlink, usando fallback nativo: ' . $e->getMessage());
                 $this->webPush = null;
@@ -108,19 +116,37 @@ class PushNotificationService
      */
     public function sendToSubscription(array $sub, $payload)
     {
+        $sent = false;
+
+        // 1. Intentar con Minishlink WebPush (aes128gcm)
         if ($this->webPush && class_exists('\Minishlink\WebPush\Subscription')) {
-            $formatted = $this->formatPayload($payload);
-            $payloadJson = json_encode($formatted);
-            $this->queueSubscription($sub, $payloadJson);
-            return $this->sendQueued();
+            try {
+                $formatted = $this->formatPayload($payload);
+                $payloadJson = json_encode($formatted);
+                $this->queueSubscription($sub, $payloadJson);
+                $res = $this->sendQueued();
+                if (!empty($res['success']) && (int) ($res['sent'] ?? 0) > 0) {
+                    $sent = true;
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'PushNotificationService: Error Minishlink en sendToSubscription: ' . $e->getMessage());
+            }
         }
 
-        $success = $this->sendViaNativeVapid($sub, $payload);
+        // 2. Si Minishlink no envió con éxito, intentar fallback nativo VAPID (tickle push)
+        if (!$sent) {
+            try {
+                $sent = $this->sendViaNativeVapid($sub, $payload);
+            } catch (\Throwable $e) {
+                log_message('error', 'PushNotificationService: Error fallback nativo en sendToSubscription: ' . $e->getMessage());
+            }
+        }
+
         return [
-            'success' => $success,
+            'success' => $sent,
             'total' => 1,
-            'sent' => $success ? 1 : 0,
-            'failed' => $success ? 0 : 1
+            'sent' => $sent ? 1 : 0,
+            'failed' => $sent ? 0 : 1
         ];
     }
 
@@ -138,19 +164,11 @@ class PushNotificationService
             ];
         }
 
-        if ($this->webPush && class_exists('\Minishlink\WebPush\Subscription')) {
-            $formatted = $this->formatPayload($payload);
-            $payloadJson = json_encode($formatted);
-            foreach ($subscriptions as $sub) {
-                $this->queueSubscription($sub, $payloadJson);
-            }
-            return $this->sendQueued();
-        }
-
         $sent = 0;
         $failed = 0;
         foreach ($subscriptions as $sub) {
-            if ($this->sendViaNativeVapid($sub, $payload)) {
+            $result = $this->sendToSubscription($sub, $payload);
+            if (!empty($result['sent'])) {
                 $sent++;
             } else {
                 $failed++;
@@ -187,30 +205,60 @@ class PushNotificationService
             ];
         }
 
+        $formatted = $this->formatPayload($payload);
+        $payloadJson = json_encode($formatted);
+
+        $sentEndpoints = [];
+        $failedSubscriptions = [];
+
+        // 1. Intentar envío masivo con Minishlink WebPush
         if ($this->webPush && class_exists('\Minishlink\WebPush\Subscription')) {
-            $formatted = $this->formatPayload($payload);
-            $payloadJson = json_encode($formatted);
-            foreach ($subscriptions as $sub) {
-                $this->queueSubscription($sub, $payloadJson);
+            try {
+                foreach ($subscriptions as $sub) {
+                    $this->queueSubscription($sub, $payloadJson);
+                }
+
+                $queuedResult = $this->sendQueued();
+                if (!empty($queuedResult['results'])) {
+                    foreach ($queuedResult['results'] as $r) {
+                        if (!empty($r['success']) && !empty($r['endpoint'])) {
+                            $sentEndpoints[$r['endpoint']] = true;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'PushNotificationService sendToAll WebPush error: ' . $e->getMessage());
             }
-            return $this->sendQueued();
+
+            foreach ($subscriptions as $sub) {
+                if (empty($sentEndpoints[$sub['endpoint']])) {
+                    $failedSubscriptions[] = $sub;
+                }
+            }
+        } else {
+            $failedSubscriptions = $subscriptions;
         }
 
-        $sent = 0;
-        $failed = 0;
-        foreach ($subscriptions as $sub) {
-            if ($this->sendViaNativeVapid($sub, $payload)) {
-                $sent++;
-            } else {
-                $failed++;
+        // 2. Para los endpoints que no recibieron vía Minishlink, enviar vía fallback nativo VAPID (tickle)
+        foreach ($failedSubscriptions as $sub) {
+            try {
+                if ($this->sendViaNativeVapid($sub, $payload)) {
+                    $sentEndpoints[$sub['endpoint']] = true;
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'PushNotificationService sendToAll fallback error: ' . $e->getMessage());
             }
         }
+
+        $totalSent = count($sentEndpoints);
+        $totalSubscriptions = count($subscriptions);
+        $totalFailed = max(0, $totalSubscriptions - $totalSent);
 
         return [
-            'success' => $sent > 0,
-            'total' => $sent + $failed,
-            'sent' => $sent,
-            'failed' => $failed
+            'success' => $totalSent > 0,
+            'total' => $totalSubscriptions,
+            'sent' => $totalSent,
+            'failed' => $totalFailed
         ];
     }
 
@@ -264,16 +312,16 @@ class PushNotificationService
         }
         $audience = $parts['scheme'] . '://' . $parts['host'];
 
-        $jwt = $this->generateVapidJwt($audience);
-        if (!$jwt) {
-            log_message('error', 'PushNotificationService: Falló la generación del JWT VAPID');
+        $authHeader = $this->getVapidAuthorizationHeader($audience);
+        if (!$authHeader) {
+            log_message('error', 'PushNotificationService: Falló la generación del encabezado VAPID Authorization');
             return false;
         }
 
         $headers = [
             'TTL: 86400',
             'Urgency: high',
-            'Authorization: vapid t=' . $jwt . ', k=' . $this->vapidPublicKey,
+            'Authorization: ' . $authHeader,
             'Content-Length: 0'
         ];
 
@@ -311,6 +359,43 @@ class PushNotificationService
         return false;
     }
 
+    /**
+     * Obtiene el encabezado VAPID Authorization ya sea con Minishlink o con OpenSSL nativo
+     */
+    private function getVapidAuthorizationHeader(string $audience): ?string
+    {
+        if (class_exists('\Minishlink\WebPush\VAPID')) {
+            try {
+                $res = \Minishlink\WebPush\VAPID::validate([
+                    'subject' => $this->vapidSubject,
+                    'publicKey' => $this->vapidPublicKey,
+                    'privateKey' => $this->vapidPrivateKey,
+                ]);
+
+                $headers = \Minishlink\WebPush\VAPID::getVapidHeaders(
+                    $audience,
+                    $res['subject'],
+                    $res['publicKey'],
+                    $res['privateKey'],
+                    \Minishlink\WebPush\ContentEncoding::aes128gcm
+                );
+
+                if (!empty($headers['Authorization'])) {
+                    return $headers['Authorization'];
+                }
+            } catch (\Throwable $e) {
+                log_message('warning', 'VAPID::getVapidHeaders falló, usando generador nativo: ' . $e->getMessage());
+            }
+        }
+
+        $jwt = $this->generateVapidJwt($audience);
+        if ($jwt) {
+            return 'vapid t=' . $jwt . ', k=' . $this->vapidPublicKey;
+        }
+
+        return null;
+    }
+
     private function generateVapidJwt(string $audience): ?string
     {
         try {
@@ -333,9 +418,9 @@ class PushNotificationService
                 return null;
             }
 
-            // PKCS#8 DER standard header for P-256 (1.2.840.10045.3.1.7)
+            // SEC1 DER standard para prime256v1 (P-256)
             $der = hex2bin('30770201010420') . $privBin . hex2bin('a00a06082a8648ce3d030107a144034200') . $pubBin;
-            $pem = "-----BEGIN PRIVATE KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PRIVATE KEY-----\n";
+            $pem = "-----BEGIN EC PRIVATE KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END EC PRIVATE KEY-----\n";
 
             $pkey = openssl_pkey_get_private($pem);
             if (!$pkey) {
@@ -414,7 +499,8 @@ class PushNotificationService
                 'keys' => [
                     'p256dh' => $sub['p256dh_key'],
                     'auth' => $sub['auth_key']
-                ]
+                ],
+                'contentEncoding' => 'aes128gcm'
             ]);
 
             $this->webPush->queueNotification($subscription, $payloadJson);
