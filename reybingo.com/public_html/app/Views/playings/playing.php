@@ -604,29 +604,6 @@
         transform: scale(0.94) !important;
     }
 
-    .btn-print-cartons .btn-print-tooltip {
-        position: absolute;
-        right: 76px;
-        background: rgba(15, 23, 42, 0.92);
-        color: #ffffff;
-        font-size: 0.8rem;
-        font-weight: 700;
-        padding: 5px 12px;
-        border-radius: 20px;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 0;
-        transform: translateX(8px);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .btn-print-cartons:hover .btn-print-tooltip {
-        opacity: 1;
-        transform: translateX(0);
-    }
-
     body.modalities-panel-open .btn-print-cartons,
     body.chat-panel-open .btn-print-cartons {
         opacity: 0 !important;
@@ -642,10 +619,6 @@
             height: 64px !important;
             min-width: 64px !important;
             font-size: 1.55rem !important;
-        }
-
-        .btn-print-cartons .btn-print-tooltip {
-            display: none !important;
         }
     }
 
@@ -1207,7 +1180,9 @@
         }
 
         /* Ocultar interfaz interactiva y multimedia de la partida */
+        .container-section.container-section--playing,
         .container-section--playing,
+        .container-section,
         .top-section,
         .center-section,
         .cartons-section,
@@ -1234,9 +1209,15 @@
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
+            max-height: 0 !important;
+            min-height: 0 !important;
             width: 0 !important;
             overflow: hidden !important;
             opacity: 0 !important;
+            position: absolute !important;
+            top: -99999px !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         #content-page {
@@ -1244,10 +1225,12 @@
             margin: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
             overflow: visible !important;
         }
 
-        /* Mostrar única y exclusivamente el área de cartones para imprimir */
+        /* Mostrar única y exclusivamente el área de cartones con el estilo auténtico del juego */
         #printable-cartons-area {
             display: block !important;
             visibility: visible !important;
@@ -1257,7 +1240,6 @@
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
-            color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
@@ -1268,183 +1250,111 @@
             print-color-adjust: exact !important;
         }
 
-        .print-header {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: flex-start !important;
-            border-bottom: 2px solid #111827 !important;
-            padding-bottom: 8px !important;
-            margin-bottom: 12px !important;
-        }
-
-        .print-brand-title {
-            font-size: 16pt !important;
-            font-weight: 900 !important;
-            color: #111827 !important;
-            letter-spacing: 0.5px !important;
-            line-height: 1.2 !important;
-        }
-
-        .print-game-name {
-            font-size: 11pt !important;
-            font-weight: 700 !important;
-            color: #4b5563 !important;
-            margin-top: 2px !important;
-        }
-
-        .print-header-meta {
-            text-align: right !important;
-            font-size: 8.5pt !important;
-            color: #374151 !important;
-            line-height: 1.35 !important;
-        }
-
-        .print-header-meta strong {
-            color: #111827 !important;
-        }
-
         .print-cartons-grid {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 8mm 6mm !important;
+            gap: 12mm 10mm !important;
             width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
         }
 
         .print-cartons-grid.one-card {
             grid-template-columns: 1fr !important;
-            max-width: 105mm !important;
+            max-width: 110mm !important;
             margin: 0 auto !important;
         }
 
         .print-carton-item {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            border: 2px solid #111827 !important;
-            border-radius: 8px !important;
-            padding: 6px 8px !important;
             background: #ffffff !important;
+            border: 1.5px solid #d0c3ff !important;
+            border-radius: 14px !important;
+            padding: 10px 12px 12px !important;
             box-sizing: border-box !important;
         }
 
-        .print-carton-topbar {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            margin-bottom: 4px !important;
-            font-size: 8pt !important;
-            color: #374151 !important;
-        }
-
-        .print-serial-label strong {
-            color: #111827 !important;
-            font-size: 8.5pt !important;
-        }
-
-        .print-card-idx {
-            background: #111827 !important;
-            color: #ffffff !important;
-            padding: 1px 6px !important;
-            border-radius: 4px !important;
-            font-weight: 800 !important;
-            font-size: 7.5pt !important;
-            letter-spacing: 0.5px !important;
-        }
-
-        .print-bingo-table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            table-layout: fixed !important;
-            border: 1.5px solid #111827 !important;
-        }
-
-        .print-bingo-table th {
-            height: 24px !important;
-            font-size: 14pt !important;
-            font-weight: 900 !important;
+        .print-carton-serial {
             text-align: center !important;
-            vertical-align: middle !important;
-            color: #ffffff !important;
-            border: 1.5px solid #111827 !important;
+            font-size: 11pt !important;
+            font-weight: 800 !important;
+            color: #4a4a5a !important;
+            margin: 0 0 8px 0 !important;
+            letter-spacing: 0.5px !important;
+            line-height: 1.2 !important;
+        }
+
+        .print-bingo-carton {
+            display: grid !important;
+            grid-template-columns: repeat(5, 1fr) !important;
+            gap: 5px !important;
+            width: 100% !important;
+            background: #ffffff !important;
+            border-radius: 8px !important;
             padding: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        .print-carton-header {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            aspect-ratio: 1 / 1 !important;
+            min-height: 38px !important;
+            font-size: 16pt !important;
+            font-weight: 900 !important;
+            color: #ffffff !important;
+            border-radius: 6px !important;
+            line-height: 1 !important;
+            text-align: center !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
 
-        .print-bingo-table th.col-b {
-            background-color: #dc2626 !important;
-        }
+        .print-carton-header.B { background-color: #FF4D4D !important; }
+        .print-carton-header.I { background-color: #F39C12 !important; }
+        .print-carton-header.N { background-color: #32CD32 !important; }
+        .print-carton-header.G { background-color: #1E90FF !important; }
+        .print-carton-header.O { background-color: #A020F0 !important; }
 
-        .print-bingo-table th.col-i {
-            background-color: #ea580c !important;
-        }
-
-        .print-bingo-table th.col-n {
-            background-color: #16a34a !important;
-        }
-
-        .print-bingo-table th.col-g {
-            background-color: #0284c7 !important;
-        }
-
-        .print-bingo-table th.col-o {
-            background-color: #7c3aed !important;
-        }
-
-        .print-bingo-table td {
-            height: 36px !important;
-            text-align: center !important;
-            vertical-align: middle !important;
-            border: 1.5px solid #374151 !important;
-            padding: 0 !important;
+        .print-carton-number {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            aspect-ratio: 1 / 1 !important;
+            min-height: 38px !important;
+            background-color: #d0c3ff !important;
+            color: #2b1b54 !important;
             font-weight: 800 !important;
             font-size: 15pt !important;
-            color: #111827 !important;
-            background: #ffffff !important;
-        }
-
-        .print-cartons-grid.one-card .print-bingo-table th {
-            height: 32px !important;
-            font-size: 17pt !important;
-        }
-
-        .print-cartons-grid.one-card .print-bingo-table td {
-            height: 48px !important;
-            font-size: 19pt !important;
-        }
-
-        .print-bingo-table td.cell-star {
-            background-color: #fef3c7 !important;
+            border-radius: 6px !important;
             line-height: 1 !important;
+            text-align: center !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
 
-        .print-bingo-table td.cell-star .star-icon {
-            font-size: 14pt !important;
+        .print-carton-number.data-position-13 {
+            font-size: 18pt !important;
             line-height: 1 !important;
         }
 
-        .print-cartons-grid.one-card .print-bingo-table td.cell-star .star-icon {
-            font-size: 18pt !important;
+        .print-cartons-grid.one-card .print-carton-header,
+        .print-cartons-grid.one-card .print-carton-number {
+            min-height: 54px !important;
+            font-size: 22pt !important;
+            border-radius: 8px !important;
         }
 
-        .print-bingo-table td.cell-star .star-text {
-            font-size: 6.5pt !important;
-            font-weight: 900 !important;
-            color: #78350f !important;
-            letter-spacing: 0.5px !important;
-            display: block !important;
-            margin-top: 1px !important;
+        .print-cartons-grid.one-card .print-carton-number.data-position-13 {
+            font-size: 26pt !important;
         }
 
-        .print-carton-bottom {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            margin-top: 4px !important;
-            font-size: 7pt !important;
-            color: #6b7280 !important;
-            font-weight: 600 !important;
+        .print-cartons-grid.one-card .print-carton-serial {
+            font-size: 13pt !important;
+            margin-bottom: 10px !important;
         }
     }
 </style>
@@ -1689,32 +1599,10 @@
     title="<?= translate('Imprimir cartones'); ?>"
     aria-label="<?= translate('Imprimir cartones'); ?>">
     <i class="fa-duotone fa-solid fa-print"></i>
-    <span class="btn-print-tooltip"><?= translate('Imprimir cartones'); ?></span>
 </button>
 
 <!-- Área exclusiva de impresión de cartones (visible únicamente al imprimir) -->
 <div id="printable-cartons-area" class="printable-cartons-area" aria-hidden="true">
-    <div class="print-header">
-        <div class="print-header-brand">
-            <div class="print-brand-title">👑 REY BINGO</div>
-            <div class="print-game-name"><?= esc($game['description'] ?? translate('Partida de Bingo')); ?></div>
-        </div>
-        <div class="print-header-meta">
-            <div><strong>Modalidad:</strong> <?php
-                if ((int)($game['type'] ?? 0) === 3 || (int)($game['type'] ?? 0) === 4) {
-                    echo 'EN VIVO (LIVE)';
-                } elseif ((int)($game['type'] ?? 0) === 1) {
-                    echo 'AUTOMÁTICA';
-                } else {
-                    echo 'MANUAL';
-                }
-            ?></div>
-            <div><strong>Fecha:</strong> <?= esc($game['date'] ?? date('Y-m-d')); ?> <?= esc($game['time'] ?? ''); ?></div>
-            <div><strong>Jugador:</strong> <?= esc(!empty($user['name']) ? $user['name'] : (!empty($user['username']) ? $user['username'] : 'Jugador')); ?></div>
-            <div><strong>Total Cartones:</strong> <?= isset($cartons) ? count($cartons) : 0; ?></div>
-        </div>
-    </div>
-
     <?php
     $totalPrintCartons = isset($cartons) ? count($cartons) : 0;
     $gridPrintClass = 'print-cartons-grid';
@@ -1724,49 +1612,28 @@
     ?>
     <div class="<?= $gridPrintClass; ?>">
         <?php if ($totalPrintCartons > 0): ?>
-            <?php foreach ($cartons as $cIndex => $cartonData): ?>
+            <?php foreach ($cartons as $cartonData): ?>
                 <?php
                 $numbersList = array_values($cartonData['numbers'] ?? []);
                 ?>
                 <div class="print-carton-item">
-                    <div class="print-carton-topbar">
-                        <span class="print-serial-label">SERIAL: <strong>C<?= esc($cartonData['serial']); ?></strong></span>
-                        <span class="print-card-idx">CARTÓN #<?= $cIndex + 1; ?></span>
-                    </div>
-                    <table class="print-bingo-table">
-                        <thead>
-                            <tr>
-                                <th class="col-b">B</th>
-                                <th class="col-i">I</th>
-                                <th class="col-n">N</th>
-                                <th class="col-g">G</th>
-                                <th class="col-o">O</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php for ($r = 0; $r < 5; $r++): ?>
-                                <tr>
-                                    <?php for ($c = 0; $c < 5; $c++):
-                                        $cellIdx = ($r * 5) + $c;
-                                        $cellNumber = $numbersList[$cellIdx] ?? null;
-                                        $val = $cellNumber ? ($cellNumber['number'] ?? '') : '';
-                                    ?>
-                                        <?php if ($cellIdx === 12): ?>
-                                            <td class="cell-star">
-                                                <div class="star-icon">⭐</div>
-                                                <span class="star-text">LIBRE</span>
-                                            </td>
-                                        <?php else: ?>
-                                            <td class="cell-num"><?= esc($val); ?></td>
-                                        <?php endif; ?>
-                                    <?php endfor; ?>
-                                </tr>
-                            <?php endfor; ?>
-                        </tbody>
-                    </table>
-                    <div class="print-carton-bottom">
-                        <span class="brand-sub">reybingo.com</span>
-                        <span class="serial-sub">SERIAL C<?= esc($cartonData['serial']); ?></span>
+                    <h6 class="carton-serial print-carton-serial">SERIAL: C<?= esc($cartonData['serial']); ?></h6>
+                    <div class="bingo-carton print-bingo-carton">
+                        <div class="bingo-carton-header print-carton-header B"><span>B</span></div>
+                        <div class="bingo-carton-header print-carton-header I"><span>I</span></div>
+                        <div class="bingo-carton-header print-carton-header N"><span>N</span></div>
+                        <div class="bingo-carton-header print-carton-header G"><span>G</span></div>
+                        <div class="bingo-carton-header print-carton-header O"><span>O</span></div>
+
+                        <?php foreach ($numbersList as $index => $number): ?>
+                            <?php if ($index === 12): ?>
+                                <div class="bingo-carton-number print-carton-number data-position-13">⭐️</div>
+                            <?php else: ?>
+                                <div class="bingo-carton-number print-carton-number">
+                                    <?= esc($number['number'] ?? ''); ?>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -2151,7 +2018,146 @@
             });
         }
 
-        window.print();
+        // Impresión mediante iframe aislado para evitar la primera hoja en blanco del DOM 100dvh
+        // y garantizar que los cartones se impriman idénticos a la partida
+        var iframeId = 'bingo-isolated-print-iframe';
+        var iframe = document.getElementById(iframeId);
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = iframeId;
+            iframe.setAttribute('style', 'position:fixed;top:-99999px;left:-99999px;width:0;height:0;border:0;visibility:hidden;');
+            document.body.appendChild(iframe);
+        }
+
+        var iframeDoc = iframe.contentWindow || iframe.contentDocument;
+        if (iframeDoc.document) iframeDoc = iframeDoc.document;
+
+        var printContent = printArea.innerHTML;
+        var printStyles = `
+            @page {
+                size: portrait;
+                margin: 8mm 10mm;
+            }
+            * {
+                box-sizing: border-box;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                color: #000000;
+            }
+            .print-cartons-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12mm 10mm;
+                width: 100%;
+                max-width: 100%;
+                margin: 0 auto;
+                padding: 0;
+            }
+            .print-cartons-grid.one-card {
+                grid-template-columns: 1fr;
+                max-width: 110mm;
+                margin: 0 auto;
+            }
+            .print-carton-item {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                background: #ffffff;
+                border: 1.5px solid #d0c3ff;
+                border-radius: 14px;
+                padding: 10px 12px 12px;
+            }
+            .print-carton-serial {
+                text-align: center;
+                font-size: 11pt;
+                font-weight: 800;
+                color: #4a4a5a;
+                margin: 0 0 8px 0;
+                letter-spacing: 0.5px;
+                line-height: 1.2;
+            }
+            .print-bingo-carton {
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 5px;
+                width: 100%;
+                background: #ffffff;
+                border-radius: 8px;
+                padding: 0;
+            }
+            .print-carton-header {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                aspect-ratio: 1 / 1;
+                min-height: 38px;
+                font-size: 16pt;
+                font-weight: 900;
+                color: #ffffff !important;
+                border-radius: 6px;
+                line-height: 1;
+                text-align: center;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .print-carton-header.B { background-color: #FF4D4D !important; }
+            .print-carton-header.I { background-color: #F39C12 !important; }
+            .print-carton-header.N { background-color: #32CD32 !important; }
+            .print-carton-header.G { background-color: #1E90FF !important; }
+            .print-carton-header.O { background-color: #A020F0 !important; }
+
+            .print-carton-number {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                aspect-ratio: 1 / 1;
+                min-height: 38px;
+                background-color: #d0c3ff !important;
+                color: #2b1b54 !important;
+                font-weight: 800;
+                font-size: 15pt;
+                border-radius: 6px;
+                line-height: 1;
+                text-align: center;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .print-carton-number.data-position-13 {
+                font-size: 18pt !important;
+                line-height: 1 !important;
+            }
+            .print-cartons-grid.one-card .print-carton-header,
+            .print-cartons-grid.one-card .print-carton-number {
+                min-height: 54px;
+                font-size: 22pt;
+                border-radius: 8px;
+            }
+            .print-cartons-grid.one-card .print-carton-number.data-position-13 {
+                font-size: 26pt;
+            }
+            .print-cartons-grid.one-card .print-carton-serial {
+                font-size: 13pt;
+                margin-bottom: 10px;
+            }
+        `;
+
+        iframeDoc.open();
+        iframeDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cartones de Bingo</title><style>' + printStyles + '</style></head><body>' + printContent + '</body></html>');
+        iframeDoc.close();
+
+        setTimeout(function() {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                window.print();
+            }
+        }, 250);
     };
 
     window.audioPath = "<?= site_url('assets/sounds/'); ?>";

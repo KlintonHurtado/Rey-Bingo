@@ -93,6 +93,9 @@
             transition: color 0.2s ease, transform 0.15s ease;
             user-select: none;
         }
+        .btn-toggle-password i {
+            pointer-events: none;
+        }
         .btn-toggle-password:hover {
             color: #1a62e7;
         }
@@ -2996,20 +2999,46 @@ $isNoMusicRole = session()->get('logged_in') && (
         <?php endif; ?>
 
         // Delegación global para alternar visibilidad de contraseñas (ojito)
-        $(document).on('click', '.btn-toggle-password', function(e) {
+        $(document).off('click', '.btn-toggle-password').on('click', '.btn-toggle-password', function(e) {
             e.preventDefault();
-            var target = $(this).data('target');
-            var $pwd = target ? $(target) : $(this).siblings('input[type="password"], input[type="text"]');
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) {
+                e.stopImmediatePropagation();
+            }
+
+            var $btn = $(this);
+            var target = $btn.data('target') || $btn.attr('data-target');
+            var $pwd = target ? $(target) : [];
+
             if (!$pwd.length) {
-                $pwd = $(this).closest('.password-toggle-wrapper').find('input');
+                $pwd = $btn.siblings('input[type="password"], input[type="text"]');
+            }
+            if (!$pwd.length) {
+                $pwd = $btn.closest('.password-toggle-wrapper').find('input');
+            }
+            if (!$pwd.length) {
+                $pwd = $btn.prev('input');
             }
             if (!$pwd.length) return;
-            var isPassword = $pwd.attr('type') === 'password';
-            $pwd.attr('type', isPassword ? 'text' : 'password');
-            $(this).html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '"></i>');
-            $(this).attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            $(this).attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            $pwd.trigger('focus');
+
+            var inputEl = $pwd[0];
+            if (!inputEl) return;
+
+            var isPassword = (inputEl.type === 'password' || $pwd.attr('type') === 'password');
+            var newType = isPassword ? 'text' : 'password';
+
+            inputEl.type = newType;
+            $pwd.attr('type', newType);
+
+            var $icon = $btn.find('i');
+            if ($icon.length) {
+                $icon.removeClass('fa-eye fa-eye-slash').addClass(isPassword ? 'fa-eye-slash' : 'fa-eye');
+            } else {
+                $btn.html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '"></i>');
+            }
+
+            $btn.attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $btn.attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
         });
     </script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>

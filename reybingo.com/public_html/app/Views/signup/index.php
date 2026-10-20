@@ -28,9 +28,12 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
-    z-index: 5;
+    z-index: 10;
     transition: color 0.2s ease, transform 0.15s ease;
     user-select: none;
+}
+.btn-toggle-password i {
+    pointer-events: none;
 }
 .btn-toggle-password:hover {
     color: #1a62e7;
@@ -179,19 +182,6 @@
 
 <script type="text/javascript">
     $(document).ready(function() {
-        $(document).on('click', '.btn-toggle-password', function(e) {
-            e.preventDefault();
-            var target = $(this).data('target');
-            var $pwd = $(target);
-            var isPassword = $pwd.attr('type') === 'password';
-            
-            $pwd.attr('type', isPassword ? 'text' : 'password');
-            $(this).html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '"></i>');
-            $(this).attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            $(this).attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            $pwd.trigger('focus');
-        });
-
         $('#signup-step-button').on('click', function() {
 
             var button = $('#signup-step-button');

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Test Print</title>
+<script src="assets/js/html2pdf.bundle.min.js"></script>
+<style>
+    .print-cartons-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12mm 10mm;
+        width: 100%;
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 10px;
+        background: #ffffff;
+    }
+    .print-carton-item {
+        background: #ffffff;
+        border: 1.5px solid #d0c3ff;
+        border-radius: 14px;
+        padding: 10px 12px 12px;
+        box-sizing: border-box;
+    }
+    .print-carton-serial {
+        text-align: center;
+        font-size: 11pt;
+        font-weight: 800;
+        color: #4a4a5a;
+        margin: 0 0 8px 0;
+        font-family: Arial, sans-serif;
+    }
+    .print-bingo-carton {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 5px;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 0;
+    }
+    .print-carton-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        font-size: 16pt;
+        font-weight: 900;
+        color: #ffffff !important;
+        border-radius: 6px;
+        font-family: Arial, sans-serif;
+    }
+    .print-carton-header.B { background-color: #FF4D4D !important; }
+    .print-carton-header.I { background-color: #F39C12 !important; }
+    .print-carton-header.N { background-color: #32CD32 !important; }
+    .print-carton-header.G { background-color: #1E90FF !important; }
+    .print-carton-header.O { background-color: #A020F0 !important; }
+
+    .print-carton-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        background-color: #d0c3ff !important;
+        color: #2b1b54 !important;
+        font-weight: 800;
+        font-size: 15pt;
+        border-radius: 6px;
+        font-family: Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<div id="print-area">
+    <div class="print-cartons-grid">
+        <div class="print-carton-item">
+            <h6 class="print-carton-serial">SERIAL: C12345678</h6>
+            <div class="print-bingo-carton">
+                <div class="print-carton-header B"><span>B</span></div>
+                <div class="print-carton-header I"><span>I</span></div>
+                <div class="print-carton-header N"><span>N</span></div>
+                <div class="print-carton-header G"><span>G</span></div>
+                <div class="print-carton-header O"><span>O</span></div>
+                <!-- Row 1 -->
+                <div class="print-carton-number">12</div>
+                <div class="print-carton-number">27</div>
+                <div class="print-carton-number">42</div>
+                <div class="print-carton-number">58</div>
+                <div class="print-carton-number">67</div>
+                <!-- Row 2 -->
+                <div class="print-carton-number">10</div>
+                <div class="print-carton-number">25</div>
+                <div class="print-carton-number">36</div>
+                <div class="print-carton-number">55</div>
+                <div class="print-carton-number">63</div>
+                <!-- Row 3 -->
+                <div class="print-carton-number">9</div>
+                <div class="print-carton-number">28</div>
+                <div class="print-carton-number">⭐️</div>
+                <div class="print-carton-number">52</div>
+                <div class="print-carton-number">72</div>
+                <!-- Row 4 -->
+                <div class="print-carton-number">8</div>
+                <div class="print-carton-number">21</div>
+                <div class="print-carton-number">39</div>
+                <div class="print-carton-number">60</div>
+                <div class="print-carton-number">73</div>
+                <!-- Row 5 -->
+                <div class="print-carton-number">5</div>
+                <div class="print-carton-number">26</div>
+                <div class="print-carton-number">43</div>
+                <div class="print-carton-number">47</div>
+                <div class="print-carton-number">61</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function downloadPDF() {
+        var element = document.getElementById('print-area');
+        var opt = {
+            margin:       [8, 8, 8, 8],
+            filename:     'Rey Bingo PRUEBA.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        return html2pdf().set(opt).from(element).outputPdf('blob');
+    }
+</script>
+</body>
+</html>
