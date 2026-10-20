@@ -688,9 +688,6 @@ $isNoMusicRole = session()->get('logged_in') && (
             function playNotificationSound(type, isWinner = false) {
                 if (hasPlayedSound) return;
                 hasPlayedSound = true;
-                window.__lastSoundPlayedAt = Date.now();
-                window.__lastSoundType = isWinner ? 'winner' : type;
-                window.__lastSoundBlocked = false; // Asumir éxito hasta que el promise falle
                 setTimeout(() => {
                     hasPlayedSound = false;
                 }, 1500);
@@ -705,14 +702,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch((err) => {
-                            // Autoplay bloqueado: marcar para reintento en siguiente ciclo de polling
-                            window.__lastSoundBlocked = true;
-                            hasPlayedSound = false; // Liberar la guardia para permitir reintento inmediato
+                            // Autoplay bloqueado por el navegador sin interacción previa: ignorar silenciosamente
                         });
                     }
                 } catch (error) {
-                    window.__lastSoundBlocked = true;
-                    hasPlayedSound = false;
                     console.warn("Audio play failed:", error);
                 }
             }
@@ -786,32 +779,15 @@ $isNoMusicRole = session()->get('logged_in') && (
 
                         // Reproducir sonido UNA SOLA VEZ y ÚNICAMENTE si hay notificaciones genuinamente nuevas
                         if (freshNotifications.length > 0) {
-                            // Detectar el tipo de sonido correcto según el tipo de notificación:
-                            // sing/own_sing → winner.mp3 | game/new_game → partida | resto → notification.mp3
-                            const hasSingNotification = freshNotifications.some(n =>
-                                n.type === 'sing' || n.type === 'own_sing'
-                                || (n.title && /BINGO/i.test(n.title))
-                            );
-                            const hasGameNotification = !hasSingNotification && freshNotifications.some(n => {
+                            hasPlayedSound = false;
+                            const hasGameNotification = freshNotifications.some(n => {
                                 return n.type === 'game'
                                     || n.type === 'new_game'
                                     || (n.title && /partida/i.test(n.title))
                                     || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
                             });
-
-                            const msSinceLastSound = window.__lastSoundPlayedAt ? (Date.now() - window.__lastSoundPlayedAt) : 9999;
-                            const wasBlocked = window.__lastSoundBlocked === true;
-
-                            // Tocar sonido si:
-                            // a) No se ha tocado nada recientemente (guard libre)
-                            // b) El intento anterior fue bloqueado por autoplay → reintentar inmediatamente
-                            // c) El tipo es winner y el último sonido fue hace >600ms (evitar doble)
-                            if (!hasPlayedSound || wasBlocked || (hasSingNotification && msSinceLastSound > 600)) {
-                                window.__lastSoundBlocked = false; // Limpiar bandera de bloqueo antes del reintento
-                                hasPlayedSound = false;
-                                const soundType = hasSingNotification ? 'winner' : (hasGameNotification ? 'game' : 'default');
-                                playNotificationSound(soundType, hasSingNotification);
-                            }
+                            const soundType = hasGameNotification ? 'game' : 'default';
+                            playNotificationSound(soundType, false);
                         }
 
                         // Procesar cada notificación
