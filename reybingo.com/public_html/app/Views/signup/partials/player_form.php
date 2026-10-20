@@ -62,12 +62,22 @@ $backUrl = $backUrl ?? site_url('store/affiliate');
             </div>
             <div class="col-12 col-md-6 player-signup-form-field">
                 <label for="<?= esc($fieldPrefix); ?>-password" class="form-label"><?= translate('password'); ?></label>
-                <input type="password" class="form-control form-control-lg form-bingo" name="password" id="<?= esc($fieldPrefix); ?>-password" autocomplete="new-password" required>
+                <div class="password-toggle-wrapper position-relative">
+                    <input type="password" class="form-control form-control-lg form-bingo" name="password" id="<?= esc($fieldPrefix); ?>-password" autocomplete="new-password" required style="padding-right: 48px;">
+                    <button type="button" class="btn-toggle-password" data-target="#<?= esc($fieldPrefix); ?>-password" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
                 <small id="<?= esc($fieldPrefix); ?>-password-error" class="text-danger d-none"></small>
             </div>
             <div class="col-12 col-md-6 player-signup-form-field">
                 <label for="<?= esc($fieldPrefix); ?>-password_confirm" class="form-label"><?= translate('password confirm'); ?></label>
-                <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="<?= esc($fieldPrefix); ?>-password_confirm" autocomplete="new-password" required>
+                <div class="password-toggle-wrapper position-relative">
+                    <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="<?= esc($fieldPrefix); ?>-password_confirm" autocomplete="new-password" required style="padding-right: 48px;">
+                    <button type="button" class="btn-toggle-password" data-target="#<?= esc($fieldPrefix); ?>-password_confirm" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
                 <small id="<?= esc($fieldPrefix); ?>-password_confirm-error" class="text-danger d-none"></small>
             </div>
             <?php if (bingo_terms_require_accept()) : ?>

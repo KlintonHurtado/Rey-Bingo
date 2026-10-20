@@ -568,6 +568,87 @@
         display: none !important;
     }
 
+    /* Botón flotante para imprimir cartones: parte inferior derecha, alineado sobre el chat */
+    .btn-print-cartons {
+        position: fixed !important;
+        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+        bottom: calc(98px + env(safe-area-inset-bottom, 0px)) !important;
+        width: 64px !important;
+        height: 64px !important;
+        min-width: 64px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%) !important;
+        border: 2.5px solid rgba(255, 255, 255, 0.9) !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), 0 0 14px rgba(14, 165, 233, 0.5) !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.65rem !important;
+        z-index: 1056 !important;
+        cursor: pointer !important;
+        padding: 0 !important;
+        outline: none !important;
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, background 0.25s ease !important;
+        text-decoration: none !important;
+    }
+
+    .btn-print-cartons:hover {
+        transform: scale(1.1) !important;
+        background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 50%, #0284c7 100%) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.7) !important;
+        color: #ffffff !important;
+    }
+
+    .btn-print-cartons:active {
+        transform: scale(0.94) !important;
+    }
+
+    .btn-print-cartons .btn-print-tooltip {
+        position: absolute;
+        right: 76px;
+        background: rgba(15, 23, 42, 0.92);
+        color: #ffffff;
+        font-size: 0.8rem;
+        font-weight: 700;
+        padding: 5px 12px;
+        border-radius: 20px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateX(8px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-print-cartons:hover .btn-print-tooltip {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    body.modalities-panel-open .btn-print-cartons,
+    body.chat-panel-open .btn-print-cartons {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: scale(0.8) !important;
+    }
+
+    @media (max-width: 700px) {
+        .btn-print-cartons {
+            right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+            bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+            width: 64px !important;
+            height: 64px !important;
+            min-width: 64px !important;
+            font-size: 1.55rem !important;
+        }
+
+        .btn-print-cartons .btn-print-tooltip {
+            display: none !important;
+        }
+    }
+
     /* Botón flotante Ver Ganadores para jugador: centrado abajo entre Modalidades (izq) y Chat (der) */
     #btn-ver-ganadores-player {
         position: fixed !important;
@@ -1093,6 +1174,279 @@
             font-size: clamp(0.65rem, 3.2vw, 0.95rem) !important;
         }
     }
+
+    /* ========================================================
+       ESTILOS DE IMPRESIÓN PROFESIONAL DE CARTONES DE BINGO
+       ======================================================== */
+    #printable-cartons-area {
+        display: none !important;
+    }
+
+    @page {
+        size: portrait;
+        margin: 8mm 10mm;
+    }
+
+    @media print {
+        /* Reset para página impresa limpia y sin fondo degradado */
+        html, body {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            position: static !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Ocultar interfaz interactiva y multimedia de la partida */
+        .container-section--playing,
+        .top-section,
+        .center-section,
+        .cartons-section,
+        .btn-modalities,
+        .modalities-display-container,
+        .btn-chat,
+        .message-display-container,
+        .btn-print-cartons,
+        #btn-ver-ganadores-player,
+        .modal,
+        .modal-backdrop,
+        #countdown-container,
+        #game-finalized,
+        #whatsapp-plugin,
+        .czm-chat-support,
+        .preloader,
+        .notifications,
+        #notificationsContainer,
+        #notificationIndicator,
+        header, footer, nav, .navbar,
+        video, iframe,
+        .ratio,
+        #toast-container {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+            opacity: 0 !important;
+        }
+
+        #content-page {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+        }
+
+        /* Mostrar única y exclusivamente el área de cartones para imprimir */
+        #printable-cartons-area {
+            display: block !important;
+            visibility: visible !important;
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        #printable-cartons-area * {
+            visibility: visible !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .print-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+            border-bottom: 2px solid #111827 !important;
+            padding-bottom: 8px !important;
+            margin-bottom: 12px !important;
+        }
+
+        .print-brand-title {
+            font-size: 16pt !important;
+            font-weight: 900 !important;
+            color: #111827 !important;
+            letter-spacing: 0.5px !important;
+            line-height: 1.2 !important;
+        }
+
+        .print-game-name {
+            font-size: 11pt !important;
+            font-weight: 700 !important;
+            color: #4b5563 !important;
+            margin-top: 2px !important;
+        }
+
+        .print-header-meta {
+            text-align: right !important;
+            font-size: 8.5pt !important;
+            color: #374151 !important;
+            line-height: 1.35 !important;
+        }
+
+        .print-header-meta strong {
+            color: #111827 !important;
+        }
+
+        .print-cartons-grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8mm 6mm !important;
+            width: 100% !important;
+        }
+
+        .print-cartons-grid.one-card {
+            grid-template-columns: 1fr !important;
+            max-width: 105mm !important;
+            margin: 0 auto !important;
+        }
+
+        .print-carton-item {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            border: 2px solid #111827 !important;
+            border-radius: 8px !important;
+            padding: 6px 8px !important;
+            background: #ffffff !important;
+            box-sizing: border-box !important;
+        }
+
+        .print-carton-topbar {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin-bottom: 4px !important;
+            font-size: 8pt !important;
+            color: #374151 !important;
+        }
+
+        .print-serial-label strong {
+            color: #111827 !important;
+            font-size: 8.5pt !important;
+        }
+
+        .print-card-idx {
+            background: #111827 !important;
+            color: #ffffff !important;
+            padding: 1px 6px !important;
+            border-radius: 4px !important;
+            font-weight: 800 !important;
+            font-size: 7.5pt !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        .print-bingo-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: fixed !important;
+            border: 1.5px solid #111827 !important;
+        }
+
+        .print-bingo-table th {
+            height: 24px !important;
+            font-size: 14pt !important;
+            font-weight: 900 !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            color: #ffffff !important;
+            border: 1.5px solid #111827 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .print-bingo-table th.col-b {
+            background-color: #dc2626 !important;
+        }
+
+        .print-bingo-table th.col-i {
+            background-color: #ea580c !important;
+        }
+
+        .print-bingo-table th.col-n {
+            background-color: #16a34a !important;
+        }
+
+        .print-bingo-table th.col-g {
+            background-color: #0284c7 !important;
+        }
+
+        .print-bingo-table th.col-o {
+            background-color: #7c3aed !important;
+        }
+
+        .print-bingo-table td {
+            height: 36px !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            border: 1.5px solid #374151 !important;
+            padding: 0 !important;
+            font-weight: 800 !important;
+            font-size: 15pt !important;
+            color: #111827 !important;
+            background: #ffffff !important;
+        }
+
+        .print-cartons-grid.one-card .print-bingo-table th {
+            height: 32px !important;
+            font-size: 17pt !important;
+        }
+
+        .print-cartons-grid.one-card .print-bingo-table td {
+            height: 48px !important;
+            font-size: 19pt !important;
+        }
+
+        .print-bingo-table td.cell-star {
+            background-color: #fef3c7 !important;
+            line-height: 1 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .print-bingo-table td.cell-star .star-icon {
+            font-size: 14pt !important;
+            line-height: 1 !important;
+        }
+
+        .print-cartons-grid.one-card .print-bingo-table td.cell-star .star-icon {
+            font-size: 18pt !important;
+        }
+
+        .print-bingo-table td.cell-star .star-text {
+            font-size: 6.5pt !important;
+            font-weight: 900 !important;
+            color: #78350f !important;
+            letter-spacing: 0.5px !important;
+            display: block !important;
+            margin-top: 1px !important;
+        }
+
+        .print-carton-bottom {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin-top: 4px !important;
+            font-size: 7pt !important;
+            color: #6b7280 !important;
+            font-weight: 600 !important;
+        }
+    }
 </style>
 <div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?>">
     <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
@@ -1328,6 +1682,97 @@
 
 <button class="btn btn-small btn-chat" id="toggle-messages-btn"><i
         class="fa-duotone fa-solid fa-comments-question"></i></button>
+
+<!-- Botón flotante para imprimir cartones (inferior derecha) -->
+<button type="button" class="btn btn-small btn-print-cartons" id="btn-print-cartons"
+    onclick="printBingoCartons();"
+    title="<?= translate('Imprimir cartones'); ?>"
+    aria-label="<?= translate('Imprimir cartones'); ?>">
+    <i class="fa-duotone fa-solid fa-print"></i>
+    <span class="btn-print-tooltip"><?= translate('Imprimir cartones'); ?></span>
+</button>
+
+<!-- Área exclusiva de impresión de cartones (visible únicamente al imprimir) -->
+<div id="printable-cartons-area" class="printable-cartons-area" aria-hidden="true">
+    <div class="print-header">
+        <div class="print-header-brand">
+            <div class="print-brand-title">👑 REY BINGO</div>
+            <div class="print-game-name"><?= esc($game['description'] ?? translate('Partida de Bingo')); ?></div>
+        </div>
+        <div class="print-header-meta">
+            <div><strong>Modalidad:</strong> <?php
+                if ((int)($game['type'] ?? 0) === 3 || (int)($game['type'] ?? 0) === 4) {
+                    echo 'EN VIVO (LIVE)';
+                } elseif ((int)($game['type'] ?? 0) === 1) {
+                    echo 'AUTOMÁTICA';
+                } else {
+                    echo 'MANUAL';
+                }
+            ?></div>
+            <div><strong>Fecha:</strong> <?= esc($game['date'] ?? date('Y-m-d')); ?> <?= esc($game['time'] ?? ''); ?></div>
+            <div><strong>Jugador:</strong> <?= esc(!empty($user['name']) ? $user['name'] : (!empty($user['username']) ? $user['username'] : 'Jugador')); ?></div>
+            <div><strong>Total Cartones:</strong> <?= isset($cartons) ? count($cartons) : 0; ?></div>
+        </div>
+    </div>
+
+    <?php
+    $totalPrintCartons = isset($cartons) ? count($cartons) : 0;
+    $gridPrintClass = 'print-cartons-grid';
+    if ($totalPrintCartons === 1) {
+        $gridPrintClass .= ' one-card';
+    }
+    ?>
+    <div class="<?= $gridPrintClass; ?>">
+        <?php if ($totalPrintCartons > 0): ?>
+            <?php foreach ($cartons as $cIndex => $cartonData): ?>
+                <?php
+                $numbersList = array_values($cartonData['numbers'] ?? []);
+                ?>
+                <div class="print-carton-item">
+                    <div class="print-carton-topbar">
+                        <span class="print-serial-label">SERIAL: <strong>C<?= esc($cartonData['serial']); ?></strong></span>
+                        <span class="print-card-idx">CARTÓN #<?= $cIndex + 1; ?></span>
+                    </div>
+                    <table class="print-bingo-table">
+                        <thead>
+                            <tr>
+                                <th class="col-b">B</th>
+                                <th class="col-i">I</th>
+                                <th class="col-n">N</th>
+                                <th class="col-g">G</th>
+                                <th class="col-o">O</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php for ($r = 0; $r < 5; $r++): ?>
+                                <tr>
+                                    <?php for ($c = 0; $c < 5; $c++):
+                                        $cellIdx = ($r * 5) + $c;
+                                        $cellNumber = $numbersList[$cellIdx] ?? null;
+                                        $val = $cellNumber ? ($cellNumber['number'] ?? '') : '';
+                                    ?>
+                                        <?php if ($cellIdx === 12): ?>
+                                            <td class="cell-star">
+                                                <div class="star-icon">⭐</div>
+                                                <span class="star-text">LIBRE</span>
+                                            </td>
+                                        <?php else: ?>
+                                            <td class="cell-num"><?= esc($val); ?></td>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                </tr>
+                            <?php endfor; ?>
+                        </tbody>
+                    </table>
+                    <div class="print-carton-bottom">
+                        <span class="brand-sub">reybingo.com</span>
+                        <span class="serial-sub">SERIAL C<?= esc($cartonData['serial']); ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</div>
 
 <div class="message-display-container<?= ($game['type'] == 3 || $game['type'] == 4) ? ' message-display-container--live' : '' ?>"
     id="message-display-container" aria-hidden="true">
@@ -1681,6 +2126,34 @@
             }
         }
     });
+    window.printBingoCartons = function() {
+        var printArea = document.getElementById('printable-cartons-area');
+        if (!printArea) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Atención',
+                    text: 'No hay cartones disponibles para imprimir en esta partida.'
+                });
+            } else {
+                alert('No hay cartones disponibles para imprimir en esta partida.');
+            }
+            return;
+        }
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            ['modalExit', 'modalBoard', 'modalAwards', 'modalGameFinalized'].forEach(function(mId) {
+                var mEl = document.getElementById(mId);
+                if (mEl) {
+                    var bsM = bootstrap.Modal.getInstance(mEl);
+                    if (bsM) bsM.hide();
+                }
+            });
+        }
+
+        window.print();
+    };
+
     window.audioPath = "<?= site_url('assets/sounds/'); ?>";
     window.narrationPlaying = <?= (!isset($user['narration']) || (int)$user['narration'] !== 0) ? 'true' : 'false' ?>;
     window.soundPlaying = <?= (!isset($user['sounds']) || (int)$user['sounds'] !== 0) ? 'true' : 'false' ?>;

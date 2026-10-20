@@ -1,3 +1,46 @@
+<style>
+.password-toggle-wrapper {
+    position: relative;
+    width: 100%;
+}
+.password-toggle-wrapper input {
+    padding-right: 48px !important;
+}
+.password-toggle-wrapper input.is-invalid {
+    background-position: right 46px center !important;
+}
+.btn-toggle-password {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 6px 8px;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 1.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 5;
+    transition: color 0.2s ease, transform 0.15s ease;
+    user-select: none;
+}
+.btn-toggle-password:hover {
+    color: #1a62e7;
+}
+.btn-toggle-password:active {
+    transform: translateY(-50%) scale(0.92);
+}
+.btn-toggle-password:focus {
+    outline: none;
+    box-shadow: none;
+}
+</style>
+
 <div class="container">
     <div class="row d-flex justify-content-center">
         <div class="col-md-5 col-xl-5">
@@ -24,13 +67,23 @@
 
                                 <div class="col-md-12 mb-1">
                                     <label for="password" class="form-label"><?= translate('new password'); ?></label>
-                                    <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('new password')); ?>" autocomplete="off">
+                                    <div class="password-toggle-wrapper">
+                                        <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('new password')); ?>" autocomplete="off">
+                                        <button type="button" class="btn-toggle-password" data-target="#password" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
                                     <small id="password-error" class="text-danger d-none"></small>
                                 </div>
                                 
                                 <div class="col-md-12 mb-1">
                                     <label for="password_confirm" class="form-label"><?= translate('password confirm'); ?></label>
-                                    <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="password_confirm" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('password')); ?>" autocomplete="off">
+                                    <div class="password-toggle-wrapper">
+                                        <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="password_confirm" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('password')); ?>" autocomplete="off">
+                                        <button type="button" class="btn-toggle-password" data-target="#password_confirm" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
                                     <small id="password_confirm-error" class="text-danger d-none"></small>
                                 </div>
 
@@ -73,6 +126,19 @@
 
 <script type="text/javascript">
     $(document).ready(function() {
+        $(document).on('click', '.btn-toggle-password', function(e) {
+            e.preventDefault();
+            var target = $(this).data('target');
+            var $pwd = $(target);
+            var isPassword = $pwd.attr('type') === 'password';
+            
+            $pwd.attr('type', isPassword ? 'text' : 'password');
+            $(this).html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '"></i>');
+            $(this).attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $(this).attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $pwd.trigger('focus');
+        });
+
         $('#restore-form').on('submit', function(e) {
             e.preventDefault();
     

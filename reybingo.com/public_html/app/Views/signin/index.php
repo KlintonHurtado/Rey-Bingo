@@ -25,16 +25,60 @@
 .logo {
     margin-bottom: -25px !important;
 }
-#username, #password {
+#username {
     border: 2px solid #1a62e7 !important;
     height: 46px !important;
     font-size: 0.95rem !important;
     border-radius: 30px !important;
     padding: 8px 20px !important;
 }
+#password {
+    border: 2px solid #1a62e7 !important;
+    height: 46px !important;
+    font-size: 0.95rem !important;
+    border-radius: 30px !important;
+    padding: 8px 48px 8px 20px !important;
+}
 #username:focus, #password:focus {
     border-color: #1a62e7 !important;
     box-shadow: 0 0 0 0.2rem rgba(26, 98, 231, 0.25) !important;
+}
+#password.is-invalid {
+    background-position: right 46px center !important;
+}
+.password-toggle-wrapper {
+    position: relative;
+    width: 100%;
+}
+.btn-toggle-password {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 6px 8px;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 1.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 5;
+    transition: color 0.2s ease, transform 0.15s ease;
+    user-select: none;
+}
+.btn-toggle-password:hover {
+    color: #1a62e7;
+}
+.btn-toggle-password:active {
+    transform: translateY(-50%) scale(0.92);
+}
+.btn-toggle-password:focus {
+    outline: none;
+    box-shadow: none;
 }
 </style>
 
@@ -69,7 +113,12 @@
                             
                             <div class="col-md-12 mb-1">
                                 <label for="password" class="form-label"><?= translate('password'); ?></label>
-                                <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('password')); ?>" autocomplete="off">
+                                <div class="password-toggle-wrapper">
+                                    <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('password')); ?>" autocomplete="off">
+                                    <button type="button" class="btn-toggle-password" id="togglePasswordBtn" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                        <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
+                                    </button>
+                                </div>
                                 <small id="password-error" class="text-danger d-none"></small>
                             </div>
 
@@ -110,6 +159,18 @@
 
 <script type="text/javascript">
     $(document).ready(function() {
+        $('#togglePasswordBtn').on('click', function(e) {
+            e.preventDefault();
+            var $pwd = $('#password');
+            var isPassword = $pwd.attr('type') === 'password';
+            
+            $pwd.attr('type', isPassword ? 'text' : 'password');
+            $(this).html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '" id="togglePasswordIcon"></i>');
+            $(this).attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $(this).attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $pwd.trigger('focus');
+        });
+
         $('#signin-form').on('submit', function(e) {
             e.preventDefault();
     

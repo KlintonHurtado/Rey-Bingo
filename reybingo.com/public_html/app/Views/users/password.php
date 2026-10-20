@@ -42,19 +42,34 @@
                         <div class="row">
                             <div class="col-md-12 mb-1">
                                 <label for="username" class="form-label"><?= translate('current password'); ?></label>
-                                <input type="password" class="form-control form-control-lg form-bingo" name="password_current" id="password_current" placeholder="<?= translate('current password'); ?>" autocomplete="off">
+                                <div class="password-toggle-wrapper">
+                                    <input type="password" class="form-control form-control-lg form-bingo" name="password_current" id="password_current" placeholder="<?= translate('current password'); ?>" autocomplete="off">
+                                    <button type="button" class="btn-toggle-password" data-target="#password_current" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
                                 <small id="password_current-error" class="text-danger d-none"></small>
                             </div>
 
                             <div class="col-md-12 mb-1">
                                 <label for="username" class="form-label"><?= translate('password'); ?></label>
-                                <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('password'); ?>" autocomplete="off">
+                                <div class="password-toggle-wrapper">
+                                    <input type="password" class="form-control form-control-lg form-bingo" name="password" id="password" placeholder="<?= translate('password'); ?>" autocomplete="off">
+                                    <button type="button" class="btn-toggle-password" data-target="#password" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
                                 <small id="password-error" class="text-danger d-none"></small>
                             </div>
                             
                             <div class="col-md-12 mb-3">
                                 <label for="username" class="form-label"><?= translate('confirm password'); ?></label>
-                                <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="password_confirm" placeholder="<?= translate('confirm password'); ?>" autocomplete="off">
+                                <div class="password-toggle-wrapper">
+                                    <input type="password" class="form-control form-control-lg form-bingo" name="password_confirm" id="password_confirm" placeholder="<?= translate('confirm password'); ?>" autocomplete="off">
+                                    <button type="button" class="btn-toggle-password" data-target="#password_confirm" tabindex="-1" title="Mostrar contraseña" aria-label="Mostrar contraseña">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
                                 <small id="password_confirm-error" class="text-danger d-none"></small>
                             </div>
 

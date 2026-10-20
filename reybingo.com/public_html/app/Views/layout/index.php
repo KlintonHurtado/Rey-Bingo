@@ -56,6 +56,54 @@
     <link href="<?= asset_url('css/sweetalert.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/components/font-awesome/css/fontawesome.min.css') ?>" rel="stylesheet">
     <link href="<?= asset_url('plugin/czm-chat-support.css') ?>" rel="stylesheet">
+    <style>
+        .password-toggle-wrapper {
+            position: relative;
+            width: 90% !important;
+            margin: 0 auto !important;
+        }
+        .password-toggle-wrapper .form-bingo {
+            width: 100% !important;
+            margin: 0 !important;
+            padding-right: 48px !important;
+        }
+        .password-toggle-wrapper input.form-control {
+            padding-right: 48px !important;
+        }
+        .password-toggle-wrapper input.is-invalid {
+            background-position: right 46px center !important;
+        }
+        .btn-toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            outline: none;
+            padding: 6px 8px;
+            cursor: pointer;
+            color: #6236ff;
+            font-size: 1.15rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            z-index: 10;
+            transition: color 0.2s ease, transform 0.15s ease;
+            user-select: none;
+        }
+        .btn-toggle-password:hover {
+            color: #1a62e7;
+        }
+        .btn-toggle-password:active {
+            transform: translateY(-50%) scale(0.92);
+        }
+        .btn-toggle-password:focus {
+            outline: none;
+            box-shadow: none;
+        }
+    </style>
 <?php
 $isNoMusicRole = session()->get('logged_in') && (
     (int) (session()->get('group') ?? 0) === 1
@@ -2946,6 +2994,23 @@ $isNoMusicRole = session()->get('logged_in') && (
         setTimeout(runAutoAddGamesCron, 2000);
         setInterval(runAutoAddGamesCron, 60000);
         <?php endif; ?>
+
+        // Delegación global para alternar visibilidad de contraseñas (ojito)
+        $(document).on('click', '.btn-toggle-password', function(e) {
+            e.preventDefault();
+            var target = $(this).data('target');
+            var $pwd = target ? $(target) : $(this).siblings('input[type="password"], input[type="text"]');
+            if (!$pwd.length) {
+                $pwd = $(this).closest('.password-toggle-wrapper').find('input');
+            }
+            if (!$pwd.length) return;
+            var isPassword = $pwd.attr('type') === 'password';
+            $pwd.attr('type', isPassword ? 'text' : 'password');
+            $(this).html('<i class="fa-solid ' + (isPassword ? 'fa-eye-slash' : 'fa-eye') + '"></i>');
+            $(this).attr('title', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $(this).attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            $pwd.trigger('focus');
+        });
     </script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
     <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
