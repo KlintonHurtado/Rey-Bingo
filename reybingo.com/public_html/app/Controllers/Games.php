@@ -19,8 +19,7 @@ use App\Models\AwardsModel;
 use App\Models\SingsModel;
 use App\Models\ContactsModel;
 use App\Models\NotificationsModel;
-//use App\Libraries\PushNotificationService;
-use App\Libraries\SimplePushService;
+use App\Libraries\PushNotificationService;
 use App\Libraries\ExcelExport;
 use CodeIgniter\Controller;
 
@@ -3216,9 +3215,6 @@ class Games extends Controller {
             $modelAwards = new AwardsModel();
             $modelNotifications = new NotificationsModel();
 
-            //$pushService = new PushNotificationService();
-            $pushService = new SimplePushService();
-
             $currentUserId = session()->get('id');
             $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
             $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
@@ -3227,6 +3223,10 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
+            $isLive = ((int)$type === 3 || (int)$type === 4);
+            $currency = function_exists('systemGet') ? systemGet('currency') : '$';
+            $formattedPrice = number_format((float)($gameData['price'] ?? 0), 2);
+
             $batchNotifications = [];
             foreach ($users as $user) {
                 $userGroup = (int) ($user['group'] ?? 0);
@@ -3234,9 +3234,9 @@ class Games extends Controller {
                     continue;
                 }
 
-                $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
+                $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
                 helper('system');
-                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText;
+                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
                 $notificationData = [
                     'user' => $user['id'],
@@ -3245,29 +3245,36 @@ class Games extends Controller {
                     'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
+                    'title' => $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida',
+                    'message' => $isLive ? ('🔴 ¡Partida en vivo: ' . $gameData['description'] . '! ' . $gameMessage) : $gameMessage,
                 ];
 
                 $batchNotifications[] = $notificationData;
+            }
+
+            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
+            try {
+                $pushService = new PushNotificationService();
+                $pushTitle = $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida de Bingo';
+                $pushMessage = $isLive
+                    ? "¡Se ha creado la partida en vivo \"{$gameData['description']}\"! Cartón: {$currency} {$formattedPrice}. ¡Entra ya a jugar!"
+                    : "Nueva partida \"{$gameData['description']}\". ¡Entra a comprar tus cartones!";
+                $pushUrl = base_url('playings/availableCartonsGet/' . $gameId);
 
                 $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
+                    'title' => $pushTitle,
+                    'message' => $pushMessage,
+                    'body' => $pushMessage,
                     'game' => $gameId,
-                    'url' => base_url('/game/' . $gameId)
+                    'url' => $pushUrl,
+                    'tag' => ($isLive ? 'live-game-' : 'game-') . $gameId,
+                    'is_live' => $isLive,
+                    'requireInteraction' => true
                 ];
 
-                $results = $pushService->sendToUser($user['id'], $pushPayload);
-                
-                // Log de resultados para debugging
-                if (is_array($results)) {
-                    foreach ($results as $result) {
-                        if (is_array($result) && empty($result['success'])) {
-                            log_message('error', 'Push notification failed: ' . json_encode($result));
-                        }
-                    }
-                }
+                $pushService->sendToAll($pushPayload, [$currentUserId]);
+            } catch (\Throwable $e) {
+                log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
             }
 
             if (!empty($batchNotifications)) {
@@ -3687,9 +3694,6 @@ class Games extends Controller {
             $modelAwards = new AwardsModel();
             $modelNotifications = new NotificationsModel();
 
-            //$pushService = new PushNotificationService();
-            $pushService = new SimplePushService();
-
             $currentUserId = session()->get('id');
             $operatorGroup = function_exists('bingo_group_operator') ? bingo_group_operator() : 3;
             $storeGroup = function_exists('bingo_group_store') ? bingo_group_store() : 2;
@@ -3698,6 +3702,10 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
+            $isLive = ((int)$type === 3 || (int)$type === 4);
+            $currency = function_exists('systemGet') ? systemGet('currency') : '$';
+            $formattedPrice = number_format((float)($gameData['price'] ?? 0), 2);
+
             $batchNotifications = [];
             foreach ($users as $user) {
                 $userGroup = (int) ($user['group'] ?? 0);
@@ -3705,9 +3713,9 @@ class Games extends Controller {
                     continue;
                 }
 
-                $awardText = $gameData['award'] == 2 ? systemGet('currency') . ' ' . number_format($total, 2) : translate('accumulated');
+                $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
                 helper('system');
-                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . systemGet('currency') . ' ' . number_format($gameData['price'], 2) . ' | 🏆 Premio total: ' . $awardText;
+                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
                 $notificationData = [
                     'user' => $user['id'],
@@ -3716,29 +3724,36 @@ class Games extends Controller {
                     'type_id' => $gameId,
                     'game' => $gameId,
                     'modality' => $gameData['modalities'],
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
+                    'title' => $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida',
+                    'message' => $isLive ? ('🔴 ¡Partida en vivo: ' . $gameData['description'] . '! ' . $gameMessage) : $gameMessage,
                 ];
 
                 $batchNotifications[] = $notificationData;
+            }
+
+            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
+            try {
+                $pushService = new PushNotificationService();
+                $pushTitle = $isLive ? '🔴 ¡NUEVA PARTIDA EN VIVO!' : 'Nueva partida de Bingo';
+                $pushMessage = $isLive
+                    ? "¡Se ha creado la partida en vivo \"{$gameData['description']}\"! Cartón: {$currency} {$formattedPrice}. ¡Entra ya a jugar!"
+                    : "Nueva partida \"{$gameData['description']}\". ¡Entra a comprar tus cartones!";
+                $pushUrl = base_url('playings/availableCartonsGet/' . $gameId);
 
                 $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
+                    'title' => $pushTitle,
+                    'message' => $pushMessage,
+                    'body' => $pushMessage,
                     'game' => $gameId,
-                    'url' => base_url('/game/' . $gameId)
+                    'url' => $pushUrl,
+                    'tag' => ($isLive ? 'live-game-' : 'game-') . $gameId,
+                    'is_live' => $isLive,
+                    'requireInteraction' => true
                 ];
 
-                $results = $pushService->sendToUser($user['id'], $pushPayload);
-                
-                // Log de resultados para debugging
-                if (is_array($results)) {
-                    foreach ($results as $result) {
-                        if (is_array($result) && empty($result['success'])) {
-                            log_message('error', 'Push notification failed: ' . json_encode($result));
-                        }
-                    }
-                }
+                $pushService->sendToAll($pushPayload, [$currentUserId]);
+            } catch (\Throwable $e) {
+                log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
             }
 
             if (!empty($batchNotifications)) {

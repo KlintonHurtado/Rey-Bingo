@@ -603,12 +603,20 @@ $isNoMusicRole = session()->get('logged_in') && (
         </div>
     </div>
 
-    <div id="confetti-container"></div>
-    
-    <!-- Firebase para Notificaciones Push -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js"></script>
-    <script src="<?= asset_url('js/firebase-push.js') ?>"></script>
+    <!-- Banner flotante para activar Notificaciones Push al teléfono -->
+    <div id="rey-push-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 460px; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); padding: 16px 20px; z-index: 99999; color: #fff; font-family: inherit;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="font-size: 28px; line-height: 1; flex-shrink: 0;">🔔</div>
+            <div style="flex: 1;">
+                <h5 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #ffffff;">¿Avisarte al teléfono?</h5>
+                <p style="margin: 0; font-size: 12.5px; color: #cbd5e1; line-height: 1.4;">Recibe una alerta en tu celular cuando empiece una partida en vivo, aunque no tengas el juego abierto.</p>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end;">
+            <button id="btn-dismiss-push" type="button" class="btn btn-sm" style="background: rgba(255,255,255,0.1); color: #cbd5e1; border: none; border-radius: 8px; padding: 6px 14px; font-size: 13px;">Ahora no</button>
+            <button id="btn-activate-push" type="button" class="btn btn-sm btn-primary" style="background: #3b82f6; border: none; border-radius: 8px; padding: 6px 16px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(59,130,246,0.4);">🔴 Activar Notificaciones</button>
+        </div>
+    </div>
 
     <script src="<?= asset_url('js/in-app-notifications.js') ?>"></script>
     <script type="text/javascript">
@@ -3041,6 +3049,7 @@ $isNoMusicRole = session()->get('logged_in') && (
             $btn.attr('aria-label', isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
         });
     </script>
+    <script src="<?= asset_url('js/notifications.js') ?>"></script>
     <?php if (ENVIRONMENT === 'development' && session()->get('logged_in')) : ?>
     <script src="<?= asset_url('js/notification-dev.js') ?>"></script>
     <?php endif; ?>

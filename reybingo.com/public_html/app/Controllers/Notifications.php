@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Models\PushSubscriptionModel;
 use App\Models\FirebaseTokenModel;
 use App\Models\NotificationsModel;
-use App\Libraries\SimplePushService;
+use App\Libraries\PushNotificationService;
 use CodeIgniter\Controller;
 
 class Notifications extends Controller {
@@ -20,7 +20,7 @@ class Notifications extends Controller {
         $this->pushSubscriptionModel = new PushSubscriptionModel();
         $this->firebaseTokenModel = new FirebaseTokenModel();
         $this->notificationsModel = new NotificationsModel();
-        $this->pushService = new SimplePushService();
+        $this->pushService = new PushNotificationService();
 
         helper(['form', 'url', 'cookie', 'text']);
         session();
@@ -29,12 +29,12 @@ class Notifications extends Controller {
     public function subscribe()
     {
         $request = $this->request->getJSON();
-        $userId = session()->get('id');
+        $userId = (int) (session()->get('id') ?? 0);
 
-        if (!$userId) {
+        if (!$request || empty($request->endpoint) || empty($request->keys) || empty($request->keys->p256dh) || empty($request->keys->auth)) {
             return $this->response->setJSON([
                 'success' => false, 
-                'message' => 'Usuario no autenticado'
+                'message' => 'Datos de suscripción incompletos'
             ]);
         }
 
@@ -45,30 +45,31 @@ class Notifications extends Controller {
             'endpoint' => $request->endpoint,
             'p256dh_key' => $request->keys->p256dh,
             'auth_key' => $request->keys->auth,
-            'user_agent' => $this->request->getUserAgent()
+            'user_agent' => $this->request->getUserAgent() ? (string)$this->request->getUserAgent() : null
         ];
 
         try {
-            // Verificar si ya existe
-            $existing = $subscriptionModel->where('user_id', $userId)
-                                        ->where('endpoint', $request->endpoint)
-                                        ->first();
+            // Verificar si ya existe el endpoint
+            $existing = $subscriptionModel->where('endpoint', $request->endpoint)->first();
 
             if ($existing) {
+                // Actualizar user_id si ahora está autenticado
+                if ($userId > 0) {
+                    $data['user_id'] = $userId;
+                }
                 $subscriptionModel->update($existing['id'], $data);
             } else {
                 $subscriptionModel->insert($data);
             }
 
-            // Enviar notificación de prueba
-            $pushService = new SimplePushService();
+            // Enviar notificación de confirmación inmediata
             $testPayload = [
                 'title' => '🎉 ¡Notificaciones Activadas!',
-                'message' => 'Ahora recibirás alertas de nuevas partidas de bingo',
-                'url' => base_url()
+                'message' => 'Recibirás avisos en tu teléfono cuando empiece una partida en vivo de Rey Bingo',
+                'url' => base_url('/')
             ];
             
-            $result = $pushService->sendToUser($userId, $testPayload);
+            $result = $this->pushService->sendToUser($userId > 0 ? $userId : 0, $testPayload);
 
             return $this->response->setJSON([
                 'success' => true, 
@@ -179,10 +180,49 @@ class Notifications extends Controller {
      */
     public function getPublicKey()
     {
-        $pushService = new SimplePushService();
-        
         return $this->response->setJSON([
-            'publicKey' => $pushService->getVapidPublicKey()
+            'publicKey' => $this->pushService->getVapidPublicKey()
+        ]);
+    }
+
+    /**
+     * Devuelve los datos de la última partida en vivo creada para el Service Worker
+     */
+    public function getLatestPush()
+    {
+        $gamesModel = new \App\Models\GamesModel();
+        // Buscar la partida en vivo más reciente activa
+        $game = $gamesModel->whereIn('type', [3, 4])
+                           ->whereIn('status', [1, 2])
+                           ->orderBy('created_at', 'DESC')
+                           ->first();
+
+        if (!$game) {
+            $game = $gamesModel->whereIn('status', [1, 2])
+                               ->orderBy('created_at', 'DESC')
+                               ->first();
+        }
+
+        if ($game) {
+            $currency = function_exists('systemGet') ? systemGet('currency') : '$';
+            $price = isset($game['price']) ? number_format((float)$game['price'], 2) : '';
+            return $this->response->setJSON([
+                'title' => '🔴 ¡NUEVA PARTIDA EN VIVO!',
+                'message' => "¡Partida en vivo: {$game['description']}! Precio: {$currency} {$price}. ¡Toca para jugar!",
+                'url' => base_url('playings/availableCartonsGet/' . $game['id']),
+                'tag' => 'live-game-' . $game['id'],
+                'icon' => base_url('assets/img/logo.png'),
+                'badge' => base_url('assets/img/badge.png'),
+                'requireInteraction' => true
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'title' => 'Rey Bingo',
+            'message' => '¡Hay nuevas partidas disponibles en Rey Bingo!',
+            'url' => base_url('/'),
+            'icon' => base_url('assets/img/logo.png'),
+            'badge' => base_url('assets/img/badge.png')
         ]);
     }
     
