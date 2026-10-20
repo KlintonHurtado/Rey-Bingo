@@ -2,7 +2,7 @@
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2 text-uppercase"><i class="fa-duotone fa-solid fa-gamepad"></i> <?= $room['name']; ?></h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <button class="btn-close me-1 btn-close-cartons" type="button" aria-label="close"><i class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body p-1 pt-0 text-center">
             <div class="text-center p-2"><?= $game['description']; ?> <span id="selection-time"></span></div>
@@ -331,6 +331,8 @@
     var gameId = <?= $game['id'] ?>;
     var realTimeInterval;
     var lastUpdateTimestamp = 0;
+    var allowCartonsModalClose = false;
+    var isCartonPurchaseSuccess = false;
     var FAVORITE_CARTONS_KEY = 'favoriteCartonSerials';
     var FAVORITE_CARTONS_META_KEY = 'favoriteCartonsMetaBySerial';
     var LEGACY_FAVORITE_CARTONS_KEY = 'favoriteCartons';
@@ -864,6 +866,36 @@
             });
         });
 
+        // Interceptar botón de cerrar modal
+        $(document).off('click.cartonClose', '#modalAvailableCartons .btn-close, #modalAvailableCartons .btn-close-cartons')
+                   .on('click.cartonClose', '#modalAvailableCartons .btn-close, #modalAvailableCartons .btn-close-cartons', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleCartonsModalCloseAttempt();
+        });
+
+        // Interceptar intento de cerrar por backdrop o tecla ESC
+        $('#modalAvailableCartons').off('hide.bs.modal.cartonExit')
+                                   .on('hide.bs.modal.cartonExit', function(e) {
+            if (allowCartonsModalClose || isCartonPurchaseSuccess) {
+                return true;
+            }
+
+            if (selectedCartons && selectedCartons.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                promptExitCartonsModal(function() {
+                    allowCartonsModalClose = true;
+                    if (typeof hideBsModal === 'function') {
+                        hideBsModal('#modalAvailableCartons');
+                    } else {
+                        $('#modalAvailableCartons').modal('hide');
+                    }
+                });
+                return false;
+            }
+        });
+
         // Inicializar actualizaciones en tiempo real y cargar cartones seleccionados
         startRealTimeUpdates();
         loadSelectedCartons();
@@ -895,6 +927,8 @@
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
+                    isCartonPurchaseSuccess = true;
+                    allowCartonsModalClose = true;
                     // Éxito - mostrar mensaje y redirigir
                     showNotification(
                         `¡Cartones asignados correctamente!`, 
@@ -916,6 +950,8 @@
                     }, 2000);
 
                 } else if (response.play) {
+                    isCartonPurchaseSuccess = true;
+                    allowCartonsModalClose = true;
                     // Juego ya iniciado y usuario tiene cartones
                     showNotification('El juego ya ha iniciado', 'warning');
                     setTimeout(function() {
@@ -923,6 +959,8 @@
                     }, 1500);
 
                 } else if (response.finished) {
+                    isCartonPurchaseSuccess = true;
+                    allowCartonsModalClose = true;
                     // Juego terminado
                     showNotification('El juego ha terminado', 'error');
                     if (response.redirect) {
@@ -1370,15 +1408,112 @@
         }).showToast();
     }
 
+    function deselectAllUserCartons(callback) {
+        var cartonsToClear = selectedCartons.slice();
+        $.ajax({
+            url: '<?= site_url('playings/deselectAllCartons') ?>',
+            method: 'POST',
+            data: {
+                game_id: gameId
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            complete: function() {
+                if (typeof callback === 'function') {
+                    callback();
+                }
+            }
+        });
+
+        cartonsToClear.forEach(function(cartonId) {
+            updateCartonToDeselected(cartonId);
+            delete selectionTimers[cartonId];
+        });
+        selectedCartons = [];
+        $('#select-cartons').text('0');
+        $('#selection-time').text('');
+        updatePlayButton();
+    }
+
+    function promptExitCartonsModal(onConfirmExit) {
+        if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+            return;
+        }
+
+        Swal.fire({
+            title: '¿Estás seguro de salir?',
+            text: 'Tienes cartones seleccionados sin comprar. Si sales ahora, perderás tu selección.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-duotone fa-solid fa-arrow-right-from-bracket me-1"></i> Salir',
+            cancelButtonText: '<i class="fa-duotone fa-solid fa-cart-shopping me-1"></i> Seguir comprando',
+            customClass: {
+                confirmButton: 'btn btn-danger px-3 py-2 me-2',
+                cancelButton: 'btn btn-primary px-3 py-2 ms-2'
+            },
+            buttonsStyling: false,
+            focusCancel: true
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                allowCartonsModalClose = true;
+                deselectAllUserCartons(function() {
+                    if (typeof onConfirmExit === 'function') {
+                        onConfirmExit();
+                    } else if (typeof hideBsModal === 'function') {
+                        hideBsModal('#modalAvailableCartons');
+                    } else {
+                        $('#modalAvailableCartons').modal('hide');
+                    }
+                });
+            }
+        });
+    }
+
+    function handleCartonsModalCloseAttempt() {
+        if (isCartonPurchaseSuccess || selectedCartons.length === 0) {
+            allowCartonsModalClose = true;
+            if (typeof hideBsModal === 'function') {
+                hideBsModal('#modalAvailableCartons');
+            } else {
+                $('#modalAvailableCartons').modal('hide');
+            }
+            return true;
+        }
+
+        promptExitCartonsModal(function() {
+            allowCartonsModalClose = true;
+            if (typeof hideBsModal === 'function') {
+                hideBsModal('#modalAvailableCartons');
+            } else {
+                $('#modalAvailableCartons').modal('hide');
+            }
+        });
+        return false;
+    }
+
     // Event handlers para limpieza
-    $(document).on('hidden.bs.modal', function() {
+    $(document).on('hidden.bs.modal', function(e) {
+        if (!e.target || e.target.id === 'modalAvailableCartons') {
+            allowCartonsModalClose = false;
+            isCartonPurchaseSuccess = false;
+            $('#modalAvailableCartons').off('hide.bs.modal.cartonExit');
+            $(document).off('click.cartonClose', '#modalAvailableCartons .btn-close, #modalAvailableCartons .btn-close-cartons');
+            $(window).off('beforeunload.cartonExit');
+        }
         if (realTimeInterval) {
             clearInterval(realTimeInterval);
             console.log('Actualizaciones en tiempo real detenidas');
         }
     });
 
-    $(window).on('beforeunload', function() {
+    $(window).on('beforeunload.cartonExit', function(e) {
+        if (!isCartonPurchaseSuccess && selectedCartons && selectedCartons.length > 0) {
+            var msg = 'Tienes cartones seleccionados sin comprar.';
+            e.preventDefault();
+            e.returnValue = msg;
+            return msg;
+        }
         if (realTimeInterval) {
             clearInterval(realTimeInterval);
         }

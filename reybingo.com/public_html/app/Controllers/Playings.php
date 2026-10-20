@@ -921,6 +921,31 @@ class Playings extends Controller
         ]);
     }
 
+    public function deselectAllCartons()
+    {
+        $modelTempCartons = new TempCartonsModel();
+        $userId = session()->get('id');
+        $gameId = $this->request->getPost('game_id');
+
+        if (!$userId) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No autorizado'
+            ]);
+        }
+
+        $builder = $modelTempCartons->where('user', $userId);
+        if (!empty($gameId)) {
+            $builder->where('game', $gameId);
+        }
+        $builder->delete();
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Cartones deseleccionados correctamente'
+        ]);
+    }
+
     public function getSelectedCartons($gameId)
     {
         $modelTempCartons = new TempCartonsModel();

@@ -166,6 +166,7 @@ $routes->post('playings/selectCarton', 'Playings::selectCarton');
 $routes->post('playings/getCartonsStatus', 'Playings::getRealTimeCartonsStatus');
 $routes->post('playings/getRealTimeCartonsStatus', 'Playings::getRealTimeCartonsStatus');
 $routes->post('playings/deselectCarton', 'Playings::deselectCarton');
+$routes->post('playings/deselectAllCartons', 'Playings::deselectAllCartons');
 $routes->post('playings/checkExpiredCartons', 'Playings::checkExpiredCartons');
 $routes->get('playings/getSelectedCartons/(:num)', 'Playings::getSelectedCartons/$1');
 $routes->post('playings/playGame', 'Playings::playGame');

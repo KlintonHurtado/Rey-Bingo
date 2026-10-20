@@ -2,7 +2,7 @@
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2 text-uppercase"><i class="fa-duotone fa-solid fa-gamepad"></i> <?= $room['name']; ?></h6>
-            <button class="btn-close me-1" type="button" aria-label="close" data-bs-dismiss="modal"><i class="fa-duotone fa-solid fa-xmark"></i></button>
+            <button class="btn-close me-1 btn-close-cartons" type="button" aria-label="close"><i class="fa-duotone fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body p-1 pt-0 text-center">
             <div class="text-center p-2"><?= $game['description']; ?></div>
@@ -942,6 +942,8 @@
             this.processingQueue = false;
             this.lastActionTime = 0;
             this.minActionInterval = 50;
+            this.allowModalClose = false;
+            this.isPurchased = false;
             
             // Referencias a elementos DOM
             this.elements = {};
@@ -1081,6 +1083,106 @@
                 searchInput.addEventListener('input', this.searchInputHandler);
                 searchInput.addEventListener('search', this.searchInputHandler);
             }
+
+            this.closeButtonHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleExitAttempt();
+            };
+
+            const closeButtons = document.querySelectorAll('#modalAvailableCartons .btn-close, #modalAvailableCartons .btn-close-cartons');
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', this.closeButtonHandler);
+            });
+
+            this.modalHideHandler = (e) => {
+                if (this.allowModalClose || this.isPurchased) {
+                    return true;
+                }
+                if (this.selectedCartons && this.selectedCartons.size > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.promptExitConfirmation(() => {
+                        this.allowModalClose = true;
+                        if (typeof hideBsModal === 'function') {
+                            hideBsModal('#modalAvailableCartons');
+                        } else {
+                            $('#modalAvailableCartons').modal('hide');
+                        }
+                    });
+                    return false;
+                }
+            };
+
+            const modalEl = document.getElementById('modalAvailableCartons');
+            if (modalEl) {
+                modalEl.addEventListener('hide.bs.modal', this.modalHideHandler);
+            }
+
+            this.beforeUnloadHandler = (e) => {
+                if (!this.isPurchased && this.selectedCartons && this.selectedCartons.size > 0) {
+                    const msg = 'Tienes cartones seleccionados sin comprar.';
+                    e.preventDefault();
+                    e.returnValue = msg;
+                    return msg;
+                }
+            };
+            window.addEventListener('beforeunload', this.beforeUnloadHandler);
+        }
+
+        promptExitConfirmation(onConfirmExit) {
+            if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+                return;
+            }
+
+            Swal.fire({
+                title: '¿Estás seguro de salir?',
+                text: 'Tienes cartones seleccionados sin comprar. Si sales ahora, perderás tu selección.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '<i class="fa-duotone fa-solid fa-arrow-right-from-bracket me-1"></i> Salir',
+                cancelButtonText: '<i class="fa-duotone fa-solid fa-cart-shopping me-1"></i> Seguir comprando',
+                customClass: {
+                    confirmButton: 'btn btn-danger px-3 py-2 me-2',
+                    cancelButton: 'btn btn-primary px-3 py-2 ms-2'
+                },
+                buttonsStyling: false,
+                focusCancel: true
+            }).then((result) => {
+                if (result.isConfirmed && !this.destroyed) {
+                    this.clearAllSelections();
+                    this.allowModalClose = true;
+                    if (typeof onConfirmExit === 'function') {
+                        onConfirmExit();
+                    } else if (typeof hideBsModal === 'function') {
+                        hideBsModal('#modalAvailableCartons');
+                    } else {
+                        $('#modalAvailableCartons').modal('hide');
+                    }
+                }
+            });
+        }
+
+        handleExitAttempt() {
+            if (this.destroyed || this.isPurchased || this.selectedCartons.size === 0) {
+                this.allowModalClose = true;
+                if (typeof hideBsModal === 'function') {
+                    hideBsModal('#modalAvailableCartons');
+                } else {
+                    $('#modalAvailableCartons').modal('hide');
+                }
+                return true;
+            }
+
+            this.promptExitConfirmation(() => {
+                this.allowModalClose = true;
+                if (typeof hideBsModal === 'function') {
+                    hideBsModal('#modalAvailableCartons');
+                } else {
+                    $('#modalAvailableCartons').modal('hide');
+                }
+            });
+            return false;
         }
         
         // Sistema de cola para acciones mejorado
@@ -1568,6 +1670,8 @@
                 const data = await response.json();
                 
                 if (data.success) {
+                    this.isPurchased = true;
+                    this.allowModalClose = true;
                     this.showNotification('¡Cartones asignados correctamente!', 'success');
 
                     if (this.elements.walletElement) {
@@ -1685,6 +1789,22 @@
             
             if (this.elements.cartonsContainer && this.scrollHandler) {
                 this.elements.cartonsContainer.removeEventListener('scroll', this.scrollHandler);
+            }
+
+            if (this.closeButtonHandler) {
+                const closeButtons = document.querySelectorAll('#modalAvailableCartons .btn-close, #modalAvailableCartons .btn-close-cartons');
+                closeButtons.forEach(btn => {
+                    btn.removeEventListener('click', this.closeButtonHandler);
+                });
+            }
+
+            const modalEl = document.getElementById('modalAvailableCartons');
+            if (modalEl && this.modalHideHandler) {
+                modalEl.removeEventListener('hide.bs.modal', this.modalHideHandler);
+            }
+
+            if (this.beforeUnloadHandler) {
+                window.removeEventListener('beforeunload', this.beforeUnloadHandler);
             }
             
             // Desuscribirse del wallet manager

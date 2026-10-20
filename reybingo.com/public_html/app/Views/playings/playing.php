@@ -1250,6 +1250,36 @@
             print-color-adjust: exact !important;
         }
 
+        .print-doc-header {
+            text-align: center !important;
+            margin: 0 auto 10px auto !important;
+            padding-bottom: 6px !important;
+            border-bottom: 2px solid #e0d7ff !important;
+            width: 100% !important;
+            max-width: 680px !important;
+        }
+
+        .print-doc-title {
+            font-size: 18pt !important;
+            font-weight: 900 !important;
+            color: #1e1b4b !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            letter-spacing: 0.5px !important;
+            line-height: 1.2 !important;
+        }
+
+        .print-doc-gamename {
+            font-size: 11pt !important;
+            font-weight: 700 !important;
+            color: #6236ff !important;
+            margin: 2px 0 0 0 !important;
+            padding: 0 !important;
+            line-height: 1.2 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+
         .print-cartons-grid {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
@@ -1603,6 +1633,11 @@
 
 <!-- Área exclusiva de impresión de cartones (visible únicamente al imprimir) -->
 <div id="printable-cartons-area" class="printable-cartons-area" aria-hidden="true">
+    <div class="print-doc-header">
+        <div class="print-doc-title">👑 REY BINGO</div>
+        <div class="print-doc-gamename"><?= esc(!empty($game['description']) ? $game['description'] : translate('Partida de Bingo')); ?></div>
+    </div>
+
     <?php
     $totalPrintCartons = isset($cartons) ? count($cartons) : 0;
     $gridPrintClass = 'print-cartons-grid';
@@ -1843,6 +1878,7 @@
 </button>
 
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/html2pdf.bundle.min.js') : site_url('assets/js/html2pdf.bundle.min.js') ?>"></script>
 
 <script type="text/javascript">
     // Silenciar y detener de inmediato cualquier canción de fondo en la partida
@@ -2018,146 +2054,398 @@
             });
         }
 
-        // Impresión mediante iframe aislado para evitar la primera hoja en blanco del DOM 100dvh
-        // y garantizar que los cartones se impriman idénticos a la partida
-        var iframeId = 'bingo-isolated-print-iframe';
-        var iframe = document.getElementById(iframeId);
-        if (!iframe) {
-            iframe = document.createElement('iframe');
-            iframe.id = iframeId;
-            iframe.setAttribute('style', 'position:fixed;top:-99999px;left:-99999px;width:0;height:0;border:0;visibility:hidden;');
-            document.body.appendChild(iframe);
+        // 1. Nombre solicitado del documento: Rey Bingo + "nombre de la partida"
+        var rawDesc = <?= json_encode(!empty($game['description']) ? trim($game['description']) : 'Partida'); ?>;
+        var cleanDesc = (rawDesc || 'Partida').replace(/[\\/:*?"<>|]/g, '').trim();
+        var docTitle = (/^rey\s*bingo/i.test(cleanDesc)) ? cleanDesc : ('Rey Bingo ' + cleanDesc);
+        var pdfFileName = docTitle + '.pdf';
+
+        // 2. Función para descargar el documento PDF directamente
+        function downloadCartonsPDF() {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Descargando cartones',
+                    text: 'Preparando ' + pdfFileName + '...',
+                    allowOutsideClick: false,
+                    didOpen: function() {
+                        Swal.showLoading();
+                    }
+                });
+            }
+
+            function generateAndSave() {
+                if (typeof html2pdf === 'undefined') {
+                    if (typeof Swal !== 'undefined') Swal.close();
+                    var prevTitle = document.title;
+                    document.title = docTitle;
+                    window.print();
+                    setTimeout(function() { document.title = prevTitle; }, 1500);
+                    return;
+                }
+
+                // Contenedor temporal de exportación con estilos inline robustos
+                var exportWrapper = document.createElement('div');
+                exportWrapper.id = 'bingo-pdf-temp-export';
+                exportWrapper.style.position = 'fixed';
+                exportWrapper.style.left = '-99999px';
+                exportWrapper.style.top = '0';
+                exportWrapper.style.width = '750px';
+                exportWrapper.style.background = '#ffffff';
+                exportWrapper.style.color = '#000000';
+                exportWrapper.style.padding = '14px';
+                exportWrapper.style.boxSizing = 'border-box';
+                exportWrapper.style.zIndex = '-9999';
+
+                exportWrapper.innerHTML = `
+                    <style>
+                        #bingo-pdf-temp-export * {
+                            box-sizing: border-box;
+                            font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        }
+                        #bingo-pdf-temp-export .print-doc-header {
+                            text-align: center;
+                            margin: 0 auto 12px auto;
+                            padding-bottom: 6px;
+                            border-bottom: 2px solid #e0d7ff;
+                            width: 100%;
+                        }
+                        #bingo-pdf-temp-export .print-doc-title {
+                            font-size: 22px;
+                            font-weight: 900;
+                            color: #1e1b4b;
+                            margin: 0;
+                            padding: 0;
+                            letter-spacing: 0.5px;
+                            line-height: 1.2;
+                        }
+                        #bingo-pdf-temp-export .print-doc-gamename {
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: #6236ff;
+                            margin: 3px 0 0 0;
+                            padding: 0;
+                            line-height: 1.2;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        }
+                        #bingo-pdf-temp-export .print-cartons-grid {
+                            display: flex;
+                            flex-wrap: wrap;
+                            justify-content: center;
+                            gap: 16px;
+                            width: 100%;
+                        }
+                        #bingo-pdf-temp-export .print-cartons-grid.one-card .print-carton-item {
+                            width: 380px;
+                            max-width: 100%;
+                        }
+                        #bingo-pdf-temp-export .print-carton-item {
+                            width: 345px;
+                            background: #ffffff;
+                            border: 2px solid #d0c3ff;
+                            border-radius: 12px;
+                            padding: 8px 10px 10px;
+                            margin-bottom: 12px;
+                            page-break-inside: avoid;
+                            break-inside: avoid;
+                        }
+                        #bingo-pdf-temp-export .print-carton-serial {
+                            text-align: center;
+                            font-size: 13px;
+                            font-weight: 800;
+                            color: #4a4a5a;
+                            margin: 0 0 6px 0;
+                        }
+                        #bingo-pdf-temp-export .print-bingo-carton {
+                            display: flex;
+                            flex-wrap: wrap;
+                            width: 100%;
+                            gap: 4px;
+                            justify-content: space-between;
+                        }
+                        #bingo-pdf-temp-export .print-carton-header {
+                            width: calc(20% - 4px);
+                            height: 38px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 18px;
+                            font-weight: 900;
+                            color: #ffffff !important;
+                            border-radius: 6px;
+                            text-align: center;
+                        }
+                        #bingo-pdf-temp-export .print-carton-header.B { background-color: #FF4D4D !important; }
+                        #bingo-pdf-temp-export .print-carton-header.I { background-color: #F39C12 !important; }
+                        #bingo-pdf-temp-export .print-carton-header.N { background-color: #32CD32 !important; }
+                        #bingo-pdf-temp-export .print-carton-header.G { background-color: #1E90FF !important; }
+                        #bingo-pdf-temp-export .print-carton-header.O { background-color: #A020F0 !important; }
+
+                        #bingo-pdf-temp-export .print-carton-number {
+                            width: calc(20% - 4px);
+                            height: 38px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background-color: #d0c3ff !important;
+                            color: #2b1b54 !important;
+                            font-weight: 800;
+                            font-size: 16px;
+                            border-radius: 6px;
+                            text-align: center;
+                        }
+                        #bingo-pdf-temp-export .print-carton-number.data-position-13 {
+                            font-size: 20px;
+                        }
+                    </style>
+                ` + printArea.innerHTML;
+
+                document.body.appendChild(exportWrapper);
+
+                var opt = {
+                    margin: [8, 8, 8, 8],
+                    filename: pdfFileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                html2pdf().set(opt).from(exportWrapper).save().then(function() {
+                    if (exportWrapper.parentNode) exportWrapper.parentNode.removeChild(exportWrapper);
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Descargado!',
+                            text: 'Se ha descargado ' + pdfFileName,
+                            timer: 2500,
+                            showConfirmButton: false
+                        });
+                    }
+                }).catch(function(err) {
+                    console.error('Error al generar PDF:', err);
+                    if (exportWrapper.parentNode) exportWrapper.parentNode.removeChild(exportWrapper);
+                    if (typeof Swal !== 'undefined') Swal.close();
+                    var prevTitle = document.title;
+                    document.title = docTitle;
+                    window.print();
+                    setTimeout(function() { document.title = prevTitle; }, 1500);
+                });
+            }
+
+            if (typeof html2pdf === 'undefined') {
+                var script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                script.onload = generateAndSave;
+                script.onerror = generateAndSave;
+                document.head.appendChild(script);
+            } else {
+                generateAndSave();
+            }
         }
 
-        var iframeDoc = iframe.contentWindow || iframe.contentDocument;
-        if (iframeDoc.document) iframeDoc = iframeDoc.document;
+        // 3. Función para imprimir en computadoras de escritorio
+        function printCartonsDesktop() {
+            var prevTitle = document.title;
+            document.title = docTitle;
 
-        var printContent = printArea.innerHTML;
-        var printStyles = `
-            @page {
-                size: portrait;
-                margin: 8mm 10mm;
+            var iframeId = 'bingo-isolated-print-iframe';
+            var iframe = document.getElementById(iframeId);
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = iframeId;
+                iframe.setAttribute('style', 'position:fixed;top:-99999px;left:-99999px;width:0;height:0;border:0;visibility:hidden;');
+                document.body.appendChild(iframe);
             }
-            * {
-                box-sizing: border-box;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                background: #ffffff !important;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-                color: #000000;
-            }
-            .print-cartons-grid {
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 12mm 10mm;
-                width: 100%;
-                max-width: 100%;
-                margin: 0 auto;
-                padding: 0;
-            }
-            .print-cartons-grid.one-card {
-                grid-template-columns: 1fr;
-                max-width: 110mm;
-                margin: 0 auto;
-            }
-            .print-carton-item {
-                page-break-inside: avoid;
-                break-inside: avoid;
-                background: #ffffff;
-                border: 1.5px solid #d0c3ff;
-                border-radius: 14px;
-                padding: 10px 12px 12px;
-            }
-            .print-carton-serial {
-                text-align: center;
-                font-size: 11pt;
-                font-weight: 800;
-                color: #4a4a5a;
-                margin: 0 0 8px 0;
-                letter-spacing: 0.5px;
-                line-height: 1.2;
-            }
-            .print-bingo-carton {
-                display: grid;
-                grid-template-columns: repeat(5, 1fr);
-                gap: 5px;
-                width: 100%;
-                background: #ffffff;
-                border-radius: 8px;
-                padding: 0;
-            }
-            .print-carton-header {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                aspect-ratio: 1 / 1;
-                min-height: 38px;
-                font-size: 16pt;
-                font-weight: 900;
-                color: #ffffff !important;
-                border-radius: 6px;
-                line-height: 1;
-                text-align: center;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .print-carton-header.B { background-color: #FF4D4D !important; }
-            .print-carton-header.I { background-color: #F39C12 !important; }
-            .print-carton-header.N { background-color: #32CD32 !important; }
-            .print-carton-header.G { background-color: #1E90FF !important; }
-            .print-carton-header.O { background-color: #A020F0 !important; }
 
-            .print-carton-number {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                aspect-ratio: 1 / 1;
-                min-height: 38px;
-                background-color: #d0c3ff !important;
-                color: #2b1b54 !important;
-                font-weight: 800;
-                font-size: 15pt;
-                border-radius: 6px;
-                line-height: 1;
-                text-align: center;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .print-carton-number.data-position-13 {
-                font-size: 18pt !important;
-                line-height: 1 !important;
-            }
-            .print-cartons-grid.one-card .print-carton-header,
-            .print-cartons-grid.one-card .print-carton-number {
-                min-height: 54px;
-                font-size: 22pt;
-                border-radius: 8px;
-            }
-            .print-cartons-grid.one-card .print-carton-number.data-position-13 {
-                font-size: 26pt;
-            }
-            .print-cartons-grid.one-card .print-carton-serial {
-                font-size: 13pt;
-                margin-bottom: 10px;
-            }
-        `;
+            var iframeDoc = iframe.contentWindow || iframe.contentDocument;
+            if (iframeDoc.document) iframeDoc = iframeDoc.document;
 
-        iframeDoc.open();
-        iframeDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cartones de Bingo</title><style>' + printStyles + '</style></head><body>' + printContent + '</body></html>');
-        iframeDoc.close();
+            var printContent = printArea.innerHTML;
+            var printStyles = `
+                @page {
+                    size: portrait;
+                    margin: 8mm 10mm;
+                }
+                * {
+                    box-sizing: border-box;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: #ffffff !important;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                    color: #000000;
+                }
+                .print-doc-header {
+                    text-align: center;
+                    margin: 0 auto 10px auto;
+                    padding-bottom: 6px;
+                    border-bottom: 2px solid #e0d7ff;
+                    width: 100%;
+                    max-width: 680px;
+                }
+                .print-doc-title {
+                    font-size: 18pt;
+                    font-weight: 900;
+                    color: #1e1b4b;
+                    margin: 0;
+                    padding: 0;
+                    letter-spacing: 0.5px;
+                    line-height: 1.2;
+                }
+                .print-doc-gamename {
+                    font-size: 11pt;
+                    font-weight: 700;
+                    color: #6236ff;
+                    margin: 2px 0 0 0;
+                    padding: 0;
+                    line-height: 1.2;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .print-cartons-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 12mm 10mm;
+                    width: 100%;
+                    max-width: 100%;
+                    margin: 0 auto;
+                    padding: 0;
+                }
+                .print-cartons-grid.one-card {
+                    grid-template-columns: 1fr;
+                    max-width: 110mm;
+                    margin: 0 auto;
+                }
+                .print-carton-item {
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                    background: #ffffff;
+                    border: 1.5px solid #d0c3ff;
+                    border-radius: 14px;
+                    padding: 10px 12px 12px;
+                }
+                .print-carton-serial {
+                    text-align: center;
+                    font-size: 11pt;
+                    font-weight: 800;
+                    color: #4a4a5a;
+                    margin: 0 0 8px 0;
+                    letter-spacing: 0.5px;
+                    line-height: 1.2;
+                }
+                .print-bingo-carton {
+                    display: grid;
+                    grid-template-columns: repeat(5, 1fr);
+                    gap: 5px;
+                    width: 100%;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    padding: 0;
+                }
+                .print-carton-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    aspect-ratio: 1 / 1;
+                    min-height: 38px;
+                    font-size: 16pt;
+                    font-weight: 900;
+                    color: #ffffff !important;
+                    border-radius: 6px;
+                    line-height: 1;
+                    text-align: center;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .print-carton-header.B { background-color: #FF4D4D !important; }
+                .print-carton-header.I { background-color: #F39C12 !important; }
+                .print-carton-header.N { background-color: #32CD32 !important; }
+                .print-carton-header.G { background-color: #1E90FF !important; }
+                .print-carton-header.O { background-color: #A020F0 !important; }
 
-        setTimeout(function() {
-            try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-            } catch (e) {
-                window.print();
+                .print-carton-number {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    aspect-ratio: 1 / 1;
+                    min-height: 38px;
+                    background-color: #d0c3ff !important;
+                    color: #2b1b54 !important;
+                    font-weight: 800;
+                    font-size: 15pt;
+                    border-radius: 6px;
+                    line-height: 1;
+                    text-align: center;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .print-carton-number.data-position-13 {
+                    font-size: 18pt !important;
+                    line-height: 1 !important;
+                }
+                .print-cartons-grid.one-card .print-carton-header,
+                .print-cartons-grid.one-card .print-carton-number {
+                    min-height: 54px;
+                    font-size: 22pt;
+                    border-radius: 8px;
+                }
+                .print-cartons-grid.one-card .print-carton-number.data-position-13 {
+                    font-size: 26pt;
+                }
+                .print-cartons-grid.one-card .print-carton-serial {
+                    font-size: 13pt;
+                    margin-bottom: 10px;
+                }
+            `;
+
+            iframeDoc.open();
+            iframeDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + docTitle + '</title><style>' + printStyles + '</style></head><body>' + printContent + '</body></html>');
+            iframeDoc.close();
+
+            setTimeout(function() {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    window.print();
+                }
+                setTimeout(function() { document.title = prevTitle; }, 2000);
+            }, 250);
+        }
+
+        // 4. Detección de dispositivo móvil / teléfono
+        var isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+            || (window.matchMedia && window.matchMedia('(max-width: 820px)').matches && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+
+        if (isMobileDevice) {
+            // En teléfonos: descarga directa del documento PDF solicitado
+            downloadCartonsPDF();
+        } else {
+            // En computadoras de escritorio: permitir descargar PDF o imprimir directamente
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: docTitle,
+                    text: '¿Cómo deseas obtener tus cartones?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fa-solid fa-download me-1"></i> Descargar PDF',
+                    cancelButtonText: '<i class="fa-solid fa-print me-1"></i> Imprimir',
+                    confirmButtonColor: '#6236ff',
+                    cancelButtonColor: '#0ea5e9'
+                }).then(function(result) {
+                    if (result.isConfirmed) {
+                        downloadCartonsPDF();
+                    } else if (result.dismiss === Swal.DismissReason.cancel) {
+                        printCartonsDesktop();
+                    }
+                });
+            } else {
+                downloadCartonsPDF();
             }
-        }, 250);
+        }
     };
 
     window.audioPath = "<?= site_url('assets/sounds/'); ?>";
