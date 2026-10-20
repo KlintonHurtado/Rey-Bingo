@@ -104,7 +104,7 @@ class NotificationManager {
                 return success;
             } else if (permission === 'denied') {
                 this.hideBanner();
-                this.showToast('Las notificaciones están bloqueadas en tu navegador. Toca el candado junto a la URL para permitirlas.', 'warning');
+                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador. Toca el icono de controles/ajustes junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
                 return false;
             } else {
                 return false;

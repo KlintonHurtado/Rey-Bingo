@@ -46,6 +46,34 @@ $routes->get('sw.js', function() {
     return response()->setStatusCode(404);
 });
 
+$routes->get('test-push-status', function() {
+    $results = [];
+    $results['php_version'] = PHP_VERSION;
+    $results['minishlink_exists'] = class_exists('\Minishlink\WebPush\WebPush');
+    
+    try {
+        $db = \Config\Database::connect();
+        $results['db_connected'] = true;
+        $tables = $db->listTables();
+        $results['has_push_subscriptions'] = in_array('push_subscriptions', $tables);
+        if ($results['has_push_subscriptions']) {
+            $results['subscription_count'] = $db->table('push_subscriptions')->countAllResults();
+        }
+    } catch (\Throwable $e) {
+        $results['db_error'] = $e->getMessage();
+    }
+
+    try {
+        $svc = new \App\Libraries\PushNotificationService();
+        $results['push_service_init'] = true;
+    } catch (\Throwable $e) {
+        $results['push_service_init'] = false;
+        $results['push_service_error'] = $e->getMessage();
+    }
+
+    return response()->setJSON($results);
+});
+
 $routes->get('/', 'Signin::index');
 $routes->head('/', 'Signin::index');
 $routes->get('signin', 'Signin::index');
@@ -82,13 +110,20 @@ $routes->post('restore/changeSubmit', 'Restore::changeSubmit');
 $routes->get('cartons', 'Cartons::index');
 $routes->post('cartons/cartonsSubmit', 'Cartons::cartonsSubmit');
 
-// Agregar estas rutas
-/*$routes->post('notifications/subscribe', 'Notifications::subscribe');
-$routes->post('notifications/unsubscribe', 'Notifications::unsubscribe');
-$routes->get('notifications/vapid-key', 'Notifications::getVapidPublicKey');
-
-$routes->post('notification/save-token', 'Notifications::saveToken');
-$routes->post('notification/send', 'Notifications::sendNotification');*/
+// Rutas de Notificaciones Push y Web
+$routes->group('notifications', ['namespace' => 'App\Controllers'], function($routes) {
+    $routes->post('subscribe', 'Notifications::subscribe');
+    $routes->post('unsubscribe', 'Notifications::unsubscribe');
+    $routes->get('getPublicKey', 'Notifications::getPublicKey');
+    $routes->get('getLatestPush', 'Notifications::getLatestPush');
+    $routes->get('getUserNotifications', 'Notifications::getUserNotifications');
+    $routes->post('markAsRead/(:num)', 'Notifications::markAsRead/$1');
+    $routes->post('markAllAsRead', 'Notifications::markAllAsRead');
+    $routes->get('getUnreadCount', 'Notifications::getUnreadCount');
+    $routes->post('sendTest', 'Notifications::sendTest');
+    $routes->post('saveToken', 'Notifications::saveToken');
+    $routes->post('sendNotification', 'Notifications::sendNotification');
+});
 
 $routes->get('store', 'Store::index');
 $routes->get('store/funding', 'Store::funding');
