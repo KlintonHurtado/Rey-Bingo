@@ -1,967 +1,1288 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title><?= esc($game['description'] ?? 'Partida de Bingo') ?> — Modo Espectador (REY BINGO)</title>
-    <link rel="icon" type="image/png" href="<?= site_url('assets/img/logo.png') ?>">
-    <link rel="apple-touch-icon" href="<?= site_url('assets/img/apple-touch-icon.png') ?>">
-    <meta name="theme-color" content="#0d0622">
+<link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?v=<?= APP_VERSION ?>">
+<style>
+    /* ==========================================================================
+       REY BINGO — ESTILOS OFICIALES DE LA SALA DE JUEGO (REPRODUCCIÓN EXACTA)
+       ========================================================================== */
+    .ball-slide-in {
+        animation: ballSlideIn 0.45s ease-out;
+    }
 
-    <!-- Fuentes y CSS base -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <link rel="stylesheet" href="<?= site_url('assets/plyr/plyr.css'); ?>?v=<?= APP_VERSION ?>">
+    @keyframes ballSlideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-12px) scale(0.85);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
 
-    <!-- Hojas de estilos del Bingo -->
-    <link rel="stylesheet" href="<?= site_url('assets/css/styles.css'); ?>?v=<?= APP_VERSION ?>">
-    <link rel="stylesheet" href="<?= site_url('assets/css/bingo.css'); ?>?v=<?= APP_VERSION ?>">
+    /* Controles partida en la barra superior */
+    .container-section--playing .btn-sliders,
+    .container-section--playing .btn-volume,
+    .container-section--playing .btn-microphone,
+    .container-section--playing .btn-binary {
+        position: fixed !important;
+        z-index: 1080 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
 
-    <style>
-        /* ==============================================================
-           ESTILOS GENERALES Y ADAPTACIÓN AL MODO ESPECTADOR
-           ============================================================== */
-        :root {
-            --spectator-accent: #10b981;
-            --spectator-purple: #8b5cf6;
-            --spectator-gold: #f59e0b;
+    .container-section--playing .btn-volume {
+        right: 12px !important;
+        top: 12px !important;
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.18) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border: 2px solid rgba(255, 255, 255, 0.4) !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.35rem !important;
+        cursor: pointer !important;
+        transition: transform 0.2s ease, background 0.2s ease !important;
+    }
+
+    .container-section--playing .btn-volume:hover {
+        transform: scale(1.08) !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .container-section--playing .btn-share-game {
+        position: fixed !important;
+        left: 130px !important;
+        top: 10px !important;
+        width: 55px !important;
+        height: 55px !important;
+        z-index: 1080 !important;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        border: 2px solid rgba(255, 255, 255, 0.75) !important;
+        border-radius: 50% !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.45rem !important;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.45) !important;
+        cursor: pointer !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    }
+
+    .container-section--playing .btn-share-game:hover {
+        transform: scale(1.1) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.65) !important;
+        color: #ffffff !important;
+    }
+
+    /* Badge del espectador: integrado armónicamente junto a los botones superiores */
+    .spectator-hud-badge {
+        position: fixed !important;
+        left: 195px !important;
+        top: 14px !important;
+        z-index: 1080 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background: rgba(16, 185, 129, 0.25) !important;
+        border: 1.5px solid #10b981 !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        color: #ffffff !important;
+        padding: 6px 14px !important;
+        border-radius: 50px !important;
+        font-size: 0.85rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35) !important;
+        pointer-events: none !important;
+    }
+
+    .spectator-hud-badge .spectator-avatar {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        border: 1.5px solid #ffffff !important;
+    }
+
+    .spectator-hud-badge .live-dot {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 50% !important;
+        background: #10b981 !important;
+        box-shadow: 0 0 8px #10b981 !important;
+        animation: pulseSpectatorDot 1.4s infinite !important;
+    }
+
+    @keyframes pulseSpectatorDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(1.3); }
+    }
+
+    /* Pastillas de bolas totales y acumulado a la izquierda */
+    .container-section--playing .total-accumulated {
+        right: auto !important;
+        left: 10px !important;
+        top: 120px !important;
+        z-index: 1 !important;
+    }
+
+    .container-section--playing .total-balls {
+        right: auto !important;
+        left: 10px !important;
+        top: 75px !important;
+        z-index: 1 !important;
+    }
+
+    .container-section--playing .top-section.live .last-numbers,
+    .container-section--playing.container-section--live-game .last-numbers {
+        top: 130px !important;
+        right: 10px !important;
+        z-index: 2 !important;
+    }
+
+    @media (max-width: 700px) {
+        .container-section--playing .btn-volume {
+            right: 8px !important;
+            top: 8px !important;
+            width: 42px !important;
+            height: 42px !important;
+            font-size: 1.15rem !important;
         }
 
-        body {
-            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-            background: #0d0622 !important;
-            color: #ffffff;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
+        .container-section--playing .btn-share-game {
+            left: 95px !important;
+            top: 5px !important;
+            width: 42px !important;
+            height: 42px !important;
+            font-size: 1.15rem !important;
         }
 
-        .container-section--spectator {
-            display: flex !important;
-            flex-direction: column !important;
-            height: 100dvh !important;
-            max-height: 100dvh !important;
-            padding-bottom: 0 !important;
+        .spectator-hud-badge {
+            left: 144px !important;
+            top: 8px !important;
+            padding: 4px 10px !important;
+            font-size: 0.72rem !important;
+            max-width: calc(100vw - 200px) !important;
             overflow: hidden !important;
-            position: relative;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
         }
 
-        /* Banner de Espectador Superior */
-        .spectator-header-bar {
-            background: linear-gradient(90deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
-            color: #ffffff;
-            padding: 6px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-            z-index: 1070;
-            flex-shrink: 0;
+        .container-section--playing .total-balls {
+            left: 5px !important;
+            top: 55px !important;
         }
 
-        .spectator-player-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
+        .container-section--playing .total-accumulated {
+            left: 5px !important;
+            top: 95px !important;
         }
 
-        .spectator-player-avatar {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 1.5px solid #ffffff;
-            flex-shrink: 0;
+        .container-section--playing .top-section.live .last-numbers,
+        .container-section--playing.container-section--live-game .last-numbers {
+            top: 115px !important;
+        }
+    }
+
+    /* Layout playing: header + cartones a pantalla completa */
+    .container-section.container-section--playing {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding-bottom: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .container-section--playing > .top-section {
+        flex: 0 0 auto !important;
+    }
+
+    .container-section--playing .top-section.live {
+        flex: 0 0 auto !important;
+        padding-top: 3rem !important;
+        padding-bottom: 0.5rem !important;
+        justify-content: flex-start !important;
+        align-items: center !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: transparent !important;
+    }
+
+    /* Video centrado de tamaño proporcional */
+    .container-section--playing .top-section.live .video-responsive {
+        position: relative !important;
+        width: min(100%, 560px) !important;
+        max-width: min(92vw, 560px) !important;
+        height: auto !important;
+        max-height: none !important;
+        aspect-ratio: 16 / 9 !important;
+        padding-bottom: 0 !important;
+        margin: 0 auto !important;
+        border-radius: 12px !important;
+        background: #0b0620;
+        overflow: hidden !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .container-section--playing .top-section.live .video-responsive iframe {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border: 0 !important;
+    }
+
+    .container-section--playing .top-section.live #plyr-video-player {
+        display: block !important;
+        width: min(100%, 560px) !important;
+        max-width: min(92vw, 560px) !important;
+        height: auto !important;
+        max-height: none !important;
+        aspect-ratio: 16 / 9 !important;
+        margin: 0 auto !important;
+        object-fit: cover !important;
+        border-radius: 12px !important;
+        background: #0b0620;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    /* LIVE: columna (video arriba, cartones abajo) */
+    .container-section--playing.container-section--live-game {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .container-section--playing.container-section--live-game .center-section.center-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+    }
+
+    .container-section--playing.container-section--live-game .cartons-section.cartons-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 180px !important;
+        padding-top: 8px !important;
+    }
+
+    .container-section--playing .center-section.center-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        overflow: visible !important;
+        width: 100% !important;
+        font-size: inherit;
+        font-weight: inherit;
+    }
+
+    .container-section--playing .cartons-section.cartons-section--playing {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        height: 0 !important;
+        overflow-y: scroll !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        padding: 10px 10px calc(115px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar {
+        width: 8px !important;
+        display: block !important;
+    }
+
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.3) !important;
+        border-radius: 10px !important;
+    }
+
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(255, 255, 255, 0.45) !important;
+    }
+
+    .container-section--playing .cartons-section.cartons-section--playing::-webkit-scrollbar-track {
+        background-color: rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .container-section--playing .content-cartons {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        gap: 14px !important;
+    }
+
+    @media (min-width: 701px) {
+        .container-section--playing .content-cartons {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+            justify-items: center !important;
+            max-width: 1200px !important;
+        }
+    }
+
+    .container-section--playing .bingo-border-carton {
+        width: fit-content !important;
+        max-width: min(320px, 88vw) !important;
+        margin: 0 auto !important;
+    }
+
+    .container-section--playing .bingo-border-carton .carton-serial {
+        font-size: 0.72rem !important;
+        margin-bottom: 4px !important;
+    }
+
+    .container-section--playing .bingo-carton {
+        width: min(290px, 84vw) !important;
+        max-width: 100% !important;
+        display: grid !important;
+        grid-template-columns: repeat(5, 1fr) !important;
+        gap: 4px !important;
+        padding: 5px 6px !important;
+        box-sizing: border-box !important;
+    }
+
+    .container-section--playing .bingo-carton-number,
+    .container-section--playing .bingo-carton-header {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1;
+        min-width: 0 !important;
+        font-size: clamp(0.75rem, 2.4vw, 1rem) !important;
+        border-radius: 6px !important;
+    }
+
+    .container-section--playing .bingo-carton-number.data-position-13,
+    .container-section--playing .bingo-carton-number.modality {
+        font-size: clamp(0.9rem, 3vw, 1.15rem) !important;
+    }
+
+    /* Regla del modo espectador: SOLO LECTURA en los cartones */
+    .container-section--playing .bingo-carton-number {
+        cursor: default !important;
+        pointer-events: none !important;
+        user-select: none !important;
+    }
+
+    /* Modalidades: patrón flotante en la esquina inferior izquierda */
+    .btn-modalities {
+        position: fixed !important;
+        left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+        bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        width: 80px !important;
+        height: 80px !important;
+        border-radius: 50% !important;
+        background: transparent !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 1055 !important;
+        border: none !important;
+        transition: transform 0.3s ease !important;
+        padding: 0 !important;
+        cursor: pointer !important;
+    }
+
+    .btn-modalities:hover {
+        transform: scale(1.08) !important;
+    }
+
+    /* Panel de modalidades */
+    .modalities-display-container {
+        display: none;
+        flex-direction: column;
+        position: fixed;
+        bottom: 15px;
+        left: 0;
+        width: 330px;
+        max-width: 100%;
+        background: linear-gradient(180deg, rgba(24, 10, 84, 0.22) 0%, rgba(33, 16, 95, 0.72) 28%, rgba(55, 29, 146, 0.96) 100%);
+        border: none;
+        box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.35);
+        border-radius: 16px 16px 0 0;
+        z-index: 1060;
+        height: min(48vh, 420px);
+        max-height: min(48vh, 420px);
+        justify-content: space-between;
+        overflow: hidden;
+    }
+
+    .modalities-display-container.is-open {
+        display: flex !important;
+    }
+
+    .modalities-display-container__toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        padding: 8px 10px 4px;
+    }
+
+    .modalities-display-meta {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modalities-display-meta h6 {
+        margin: 0;
+        font-size: 0.92rem;
+        color: #ffffff;
+        font-weight: 700;
+    }
+
+    .modalities-display-meta .modalities-display__hint {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .modalities-display-close {
+        background: transparent;
+        border: none;
+        color: #ffffff;
+        font-size: 1.25rem;
+        cursor: pointer;
+        padding: 4px 8px;
+    }
+
+    .modalities-display {
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 6px 10px 10px;
+        scroll-snap-type: x mandatory;
+        flex: 1;
+    }
+
+    .modalities-display .container-cartons-modalities {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 0.85rem !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
+        width: max-content !important;
+        min-width: 100% !important;
+        margin: 0 !important;
+        padding: 4px 2px 8px !important;
+    }
+
+    .modalities-display .border-carton {
+        flex: 0 0 auto !important;
+        min-width: 200px !important;
+        width: 80vw !important;
+        max-width: 280px !important;
+        scroll-snap-align: center;
+        scroll-snap-stop: always;
+        background: #ffffff !important;
+        border: 2px solid #6236ff !important;
+        border-radius: 14px !important;
+        padding: 12px 10px 10px !important;
+        box-shadow: 0 4px 14px rgba(98, 54, 255, 0.2) !important;
+    }
+
+    .modalities-display .border-carton.modality-won {
+        background: #f5f5f5 !important;
+        border-color: #cccccc !important;
+        box-shadow: none !important;
+        filter: grayscale(100%) opacity(0.7) !important;
+        pointer-events: none;
+    }
+
+    .modalities-display .border-carton .modality-name {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 6px;
+        text-align: center;
+    }
+
+    .modalities-display .border-carton .modality-prize {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #6236ff;
+        text-align: center;
+        margin-top: 6px;
+    }
+
+    .modalities-display .carton {
+        width: 100%;
+        max-width: 180px;
+        margin: 0 auto;
+    }
+
+    @media (min-width: 701px) {
+        .modalities-display-container {
+            width: 450px !important;
+            height: 520px !important;
+            max-height: calc(100vh - 120px) !important;
+            top: auto !important;
+            bottom: 20px !important;
+            left: 20px !important;
+            border-radius: 16px !important;
         }
 
-        .spectator-live-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50px;
-            padding: 2px 10px;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            white-space: nowrap;
+        .modalities-display-container .modalities-display {
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
         }
 
-        .spectator-live-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #ef4444;
-            animation: pulseDot 1.4s infinite;
+        .modalities-display-container .container-cartons-modalities {
+            flex-direction: column !important;
+            width: 100% !important;
         }
 
-        @keyframes pulseDot {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(1.3); }
+        .modalities-display-container .border-carton {
+            width: 100% !important;
+            max-width: 320px !important;
         }
+    }
 
-        /* Desactivar cualquier interacción sobre las celdas del cartón (Modo Solo Lectura) */
-        .container-section--spectator .bingo-carton-number {
-            cursor: default !important;
-            pointer-events: none !important;
+    /* Botón flotante Ver Ganadores */
+    #btn-ver-ganadores-player {
+        position: fixed !important;
+        left: 50% !important;
+        right: auto !important;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+        transform: translateX(-50%) !important;
+        z-index: 1056 !important;
+        border-radius: 50px !important;
+        font-weight: 800 !important;
+        background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%) !important;
+        color: #1a0b36 !important;
+        border: 2px solid rgba(255, 255, 255, 0.75) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 12px rgba(255, 193, 7, 0.4) !important;
+        padding: 9px 18px !important;
+        font-size: 14px !important;
+        white-space: nowrap !important;
+        max-width: calc(100vw - 180px) !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: inline-flex;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        cursor: pointer !important;
+    }
+
+    #btn-ver-ganadores-player:hover {
+        transform: translateX(-50%) scale(1.06) !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 15px rgba(255, 193, 7, 0.5) !important;
+    }
+
+    /* BOTÓN FLOTANTE: "👑 ¡Juega tú también! Regístrate aquí" */
+    .btn-spectator-cta {
+        position: fixed !important;
+        right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
+        z-index: 1060 !important;
+        background: linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #d97706 100%) !important;
+        color: #ffffff !important;
+        border: 2px solid rgba(255, 255, 255, 0.9) !important;
+        border-radius: 50px !important;
+        padding: 11px 22px !important;
+        font-size: 0.95rem !important;
+        font-weight: 800 !important;
+        box-shadow: 0 8px 24px rgba(245, 158, 11, 0.55), 0 0 16px rgba(234, 88, 12, 0.4) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease !important;
+        animation: ctaGlow 2.5s infinite !important;
+    }
+
+    @keyframes ctaGlow {
+        0%, 100% {
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45), 0 0 14px rgba(234, 88, 12, 0.35);
         }
-
-        /* Cartón marcado con estilo vibrante */
-        .container-section--spectator .bingo-carton-number.selected {
-            background-color: #facc15 !important;
-            color: #1a0b36 !important;
-            font-weight: 900 !important;
-            box-shadow: 0 0 10px rgba(250, 204, 21, 0.6) !important;
+        50% {
+            box-shadow: 0 10px 28px rgba(245, 158, 11, 0.7), 0 0 22px rgba(234, 88, 12, 0.6);
         }
+    }
 
-        /* Animación suave de aparición de balota */
-        .ball-slide-in {
-            animation: ballSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+    .btn-spectator-cta:hover {
+        transform: scale(1.06) translateY(-2px) !important;
+        color: #ffffff !important;
+    }
 
-        @keyframes ballSlideIn {
-            from {
-                opacity: 0;
-                transform: scale(0.6) translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
+    .btn-spectator-cta:active {
+        transform: scale(0.96) !important;
+    }
 
-        /* BOTÓN FLOTANTE REGÍSTRATE AQUÍ */
+    @media (max-width: 700px) {
         .btn-spectator-cta {
-            position: fixed;
-            bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-            right: calc(16px + env(safe-area-inset-right, 0px));
-            z-index: 1060;
-            background: linear-gradient(135deg, #f59e0b 0%, #ea580c 50%, #d97706 100%);
-            color: #ffffff !important;
-            border: 2px solid rgba(255, 255, 255, 0.85);
-            border-radius: 50px;
-            padding: 10px 20px;
-            font-size: 0.95rem;
-            font-weight: 800;
-            box-shadow: 0 8px 24px rgba(245, 158, 11, 0.5), 0 0 16px rgba(234, 88, 12, 0.4);
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            text-decoration: none !important;
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-            animation: ctaGlow 2.5s infinite;
+            bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+            right: 12px !important;
+            font-size: 0.82rem !important;
+            padding: 8px 14px !important;
         }
 
-        @keyframes ctaGlow {
-            0%, 100% {
-                box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45), 0 0 14px rgba(234, 88, 12, 0.35);
-            }
-            50% {
-                box-shadow: 0 10px 28px rgba(245, 158, 11, 0.7), 0 0 22px rgba(234, 88, 12, 0.6);
-            }
+        #btn-ver-ganadores-player {
+            bottom: calc(65px + env(safe-area-inset-bottom, 0px)) !important;
+            font-size: 12px !important;
+            padding: 7px 14px !important;
         }
+    }
+</style>
 
-        .btn-spectator-cta:hover {
-            transform: scale(1.06) translateY(-2px);
-            color: #ffffff !important;
-        }
+<div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?>">
+    <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
+        <!-- Botón de Inicio -->
+        <a class="btn btn-small btn-home" href="<?= site_url(); ?>" title="<?= translate('home'); ?>">
+            <i class="fa-duotone fa-solid fa-house"></i>
+        </a>
 
-        .btn-spectator-cta:active {
-            transform: scale(0.96);
-        }
-
-        @media (max-width: 576px) {
-            .btn-spectator-cta {
-                bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-                right: 50%;
-                transform: translateX(50%);
-                font-size: 0.85rem;
-                padding: 9px 18px;
-                white-space: nowrap;
-            }
-            .btn-spectator-cta:hover {
-                transform: translateX(50%) scale(1.05);
-            }
-            .btn-spectator-cta:active {
-                transform: translateX(50%) scale(0.95);
-            }
-        }
-
-        /* Botón de Sonido para el Espectador (arriba a la derecha) */
-        .btn-spectator-sound {
-            position: absolute;
-            top: 10px;
-            right: 14px;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #ffffff;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            cursor: pointer;
-            z-index: 1065;
-            transition: all 0.2s ease;
-        }
-
-        .btn-spectator-sound:hover {
-            background: rgba(255, 255, 255, 0.28);
-            transform: scale(1.08);
-            color: #ffffff;
-        }
-
-        /* Banner de partida finalizada */
-        #game-finished-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(13, 6, 34, 0.88);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            z-index: 2000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .game-finished-card {
-            background: linear-gradient(145deg, rgba(30, 16, 69, 0.95) 0%, rgba(13, 6, 34, 0.98) 100%);
-            border: 2px solid rgba(245, 158, 11, 0.5);
-            border-radius: 24px;
-            max-width: 460px;
-            width: 100%;
-            padding: 32px 24px;
-            text-align: center;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(245, 158, 11, 0.25);
-            animation: zoomIn 0.35s ease;
-        }
-
-        @keyframes zoomIn {
-            from { transform: scale(0.85); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-    </style>
-</head>
-<body>
-
-    <!-- 1. BARRA SUPERIOR DE MODO ESPECTADOR -->
-    <header class="spectator-header-bar">
-        <div class="spectator-player-badge">
-            <img src="<?= esc($playerImage) ?>" alt="Avatar" class="spectator-player-avatar">
-            <span class="text-truncate">
-                Viendo a: <strong><?= esc($playerName) ?></strong>
-            </span>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="spectator-live-pill">
-                <span class="spectator-live-dot"></span>
-                <span>En Vivo</span>
-            </span>
-        </div>
-    </header>
-
-    <!-- 2. CONTENEDOR PRINCIPAL DEL JUEGO (IDÉNTICO A PLAYING) -->
-    <div class="container-section container-section--playing container-section--spectator<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?>">
-
-        <!-- Botón de sonido espectador -->
-        <button type="button" class="btn-spectator-sound" id="btn-sound-toggle" title="Activar/Silenciar sonido" aria-label="Sonido">
-            <i class="fa-solid fa-volume-high" id="sound-icon"></i>
+        <!-- Botón de Registro / Billetera interactiva -->
+        <button type="button" class="btn btn-small btn-wallet" onclick="openSpectatorRegisterModal();" title="Regístrate para jugar">
+            <i class="fa-duotone fa-solid fa-wallet"></i>
         </button>
 
-        <!-- TOP SECTION: BALOTAS Y CONTADORES -->
-        <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
+        <!-- Botón Compartir Partida -->
+        <button type="button" class="btn btn-small btn-share-game" onclick="openShareGameModal();" title="Compartir Partida" aria-label="Compartir Partida">
+            <i class="fa-solid fa-share-nodes"></i>
+        </button>
 
-            <?php if ($game['type'] == 3): ?>
-                <div class="ratio ratio-16x9 video-responsive">
-                    <iframe src="<?= esc($game['url']); ?>" title="Transmisión en vivo" frameborder="0"
-                        allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen>
-                    </iframe>
-                </div>
+        <!-- Badge Espectador: visualización en vivo -->
+        <div class="spectator-hud-badge">
+            <span class="live-dot"></span>
+            <?php if (!empty($playerImage)): ?>
+                <img src="<?= $playerImage; ?>" alt="Avatar" class="spectator-avatar">
             <?php endif; ?>
-
-            <?php if ($game['type'] == 4): ?>
-                <video class="w-100"
-                    poster="<?= !empty($game['cover']) ? site_url('uploads/covers/' . $game['cover']) : site_url('uploads/covers/image.jpg'); ?>"
-                    id="plyr-video-player" playsinline="" controls="">
-                    <source
-                        src="<?= !empty($game['video']) ? site_url('uploads/videos/' . $game['video']) : site_url('uploads/videos/image.jpg'); ?>"
-                        type="video/mp4">
-                </video>
-            <?php endif; ?>
-
-            <!-- Contador de Balotas -->
-            <h6 class="total-balls m-0">
-                <small><?= translate('total balls'); ?></small><br />
-                <span id="balls-counter"><?= (int)$totalNumbersGenerated ?> - <?= 75 - (int)$totalNumbersGenerated ?></span>
-            </h6>
-
-            <!-- Premio Acumulado -->
-            <h6 class="total-accumulated m-0">
-                <?php
-                $hudPrize = bingo_live_prize_hud($game, bingo_count_game_cartons((int) ($game['id'] ?? 0)));
-                ?>
-                <small id="accumulated-label"><?= esc($hudPrize['label']); ?></small><br />
-                <span id="accumulated-counter"><?= systemGet('currency'); ?> <?= esc($hudPrize['amount']); ?></span>
-            </h6>
-
-            <!-- Balota Principal Actual -->
-            <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
-                <?php $class = $lastNumber ? $getClass($lastNumber) : 'STOP'; ?>
-                <?php $letter = $lastNumber ? $getClass($lastNumber) : ''; ?>
-                <div class="bingo-ball <?= $class ?> size-100" id="last-number">
-                    <small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;"><?= $letter ?></small>
-                    <span><?= $lastNumber ? $lastNumber : 'STOP'; ?></span>
-                </div>
-            <?php endif; ?>
-
-            <!-- Historial de Últimas Balotas -->
-            <div class="last-numbers">
-                <span id="last-five-numbers">
-                    <?php foreach ($fourNumbers as $number): ?>
-                        <?php $class = in_array($number, $fourNumbers) ? $getClass($number) : ''; ?>
-                        <div class="bingo-ball <?= $class ?> size-50">
-                            <span><?= $number ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                </span>
-            </div>
-
-            <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
-                <h6 class="text-white text-center mb-0 mt-1" style="font-size: 0.9rem; font-weight: 700;"><?= esc($game['description']); ?></h6>
-            <?php endif; ?>
+            <span>Viendo a: <strong><?= esc($playerName); ?></strong></span>
         </div>
 
-        <!-- CENTER SECTION: CARTONES DEL JUGADOR OBSERVADO -->
-        <div class="center-section center-section--playing">
+        <!-- Botón de Sonido del Espectador -->
+        <button type="button" class="btn btn-small btn-volume" id="btn-spectator-sound" onclick="toggleSpectatorAudio();" title="Activar/Silenciar sonido" aria-label="Sonido">
+            <i class="fa-duotone fa-solid fa-volume" id="sound-icon"></i>
+        </button>
+
+        <!-- Contenedor del video o transmisión en vivo -->
+        <?php if ($game['type'] == 3): ?>
+            <div class="ratio ratio-16x9 video-responsive">
+                <iframe src="<?= $game['url']; ?>" title="YouTube video player" frameborder="0"
+                    allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen>
+                </iframe>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($game['type'] == 4): ?>
+            <video class="w-100"
+                poster="<?= !empty($game['cover']) ? site_url('uploads/covers/' . $game['cover']) : site_url('uploads/covers/image.jpg'); ?>"
+                id="plyr-video-player" playsinline="" controls="">
+                <source
+                    src="<?= !empty($game['video']) ? site_url('uploads/videos/' . $game['video']) : site_url('uploads/videos/image.jpg'); ?>"
+                    type="video/mp4">
+            </video>
+        <?php endif; ?>
+
+        <!-- Bolas Totales -->
+        <h6 class="total-balls m-0">
+            <small><?= translate('total balls'); ?></small><br />
+            <span id="balls-counter"><?= $totalNumbersGenerated ?> - <?= max(0, 75 - $totalNumbersGenerated) ?></span>
+        </h6>
+
+        <!-- Acumulado Oficial -->
+        <h6 class="total-accumulated m-0"><?php
+            $hudPrize = bingo_live_prize_hud($game, bingo_count_game_cartons((int) ($game['id'] ?? 0)));
+        ?><small id="accumulated-label"><?= esc($hudPrize['label']); ?></small><br />
+            <span id="accumulated-counter"><?= systemGet('currency'); ?> <?= esc($hudPrize['amount']); ?></span>
+        </h6>
+
+        <!-- Modo Bingo Tradicional: Gran balota central y carrusel de últimas balotas -->
+        <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
+            <?php $class = $lastNumber ? $getClass($lastNumber) : 'STOP'; ?>
+            <?php $letter = $lastNumber ? $getClass($lastNumber) : ''; ?>
+            <div class="bingo-ball <?= $class ?> size-100" id="last-number">
+                <small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;"><?= $letter ?></small>
+                <span><?= $lastNumber ? $lastNumber : 'STOP'; ?></span>
+            </div>
+        <?php endif; ?>
+
+        <div class="last-numbers">
+            <span id="last-five-numbers">
+                <?php foreach ($fourNumbers as $number): ?>
+                    <?php $class = in_array($number, $fourNumbers) ? $getClass($number) : ''; ?>
+                    <div class="bingo-ball <?= $class ?> size-50">
+                        <span><?= $number ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </span>
+        </div>
+
+        <?php if ($game['type'] != 3 && $game['type'] != 4): ?>
+            <h6 class="text-white text-center mb-0"><?= esc($game['description'] ?? ''); ?></h6>
+            <h6 class="text-white text-center next-game mb-1 text-uppercase" style="font-size: 0.8rem;"></h6>
+        <?php endif; ?>
+    </div>
+
+    <!-- SECCIÓN CENTRAL: CARTONES OFICIALES DEL JUGADOR COMPARTIDO -->
+    <div class="center-section center-section--playing">
+        <?php
+        $playingCartonCount = isset($cartons) ? count($cartons) : 0;
+        $cartonsSectionClass = 'cartons-section cartons-section--playing';
+        if ($playingCartonCount > 1) {
+            $cartonsSectionClass .= ' cartons-section--multi';
+        }
+        ?>
+        <div class="<?= $cartonsSectionClass; ?>">
             <?php
-            $playingCartonCount = isset($cartons) ? count($cartons) : 0;
-            $cartonsSectionClass = 'cartons-section cartons-section--playing';
-            if ($playingCartonCount > 1) {
-                $cartonsSectionClass .= ' cartons-section--multi';
+            $playingCartonsGridClass = 'content-cartons';
+            if ($playingCartonCount === 1) {
+                $playingCartonsGridClass .= ' one-carton';
+            } elseif ($playingCartonCount === 2) {
+                $playingCartonsGridClass .= ' two-cartons';
+            } elseif ($playingCartonCount === 3) {
+                $playingCartonsGridClass .= ' three-cartons';
+            } elseif ($playingCartonCount === 4) {
+                $playingCartonsGridClass .= ' four-cartons';
+            } elseif ($playingCartonCount > 4) {
+                $playingCartonsGridClass .= ' many-cartons';
             }
             ?>
-            <div class="<?= $cartonsSectionClass; ?>">
-                <?php
-                $playingCartonsGridClass = 'content-cartons';
-                if ($playingCartonCount === 1) {
-                    $playingCartonsGridClass .= ' one-carton';
-                } elseif ($playingCartonCount === 2) {
-                    $playingCartonsGridClass .= ' two-cartons';
-                } elseif ($playingCartonCount === 3) {
-                    $playingCartonsGridClass .= ' three-cartons';
-                } elseif ($playingCartonCount === 4) {
-                    $playingCartonsGridClass .= ' four-cartons';
-                } elseif ($playingCartonCount > 4) {
-                    $playingCartonsGridClass .= ' many-cartons';
-                }
-                ?>
-                <div class="<?= $playingCartonsGridClass; ?>" id="cartons-container">
-                    <?php if (!empty($cartons)): ?>
-                        <?php foreach ($cartons as $cartonData): ?>
-                            <div class="bingo-border-carton" id="carton-wrapper-<?= $cartonData['cartonId']; ?>">
-                                <h6 class="ms-2 mb-1 text-center text-muted carton-serial">
-                                    SERIAL: C<?= esc($cartonData['serial']); ?>
-                                </h6>
-                                <div class="bingo-carton" id="carton-<?= $cartonData['cartonId']; ?>">
-                                    <div class="bingo-carton-header B"><span>B</span></div>
-                                    <div class="bingo-carton-header I"><span>I</span></div>
-                                    <div class="bingo-carton-header N"><span>N</span></div>
-                                    <div class="bingo-carton-header G"><span>G</span></div>
-                                    <div class="bingo-carton-header O"><span>O</span></div>
+            <div class="<?= $playingCartonsGridClass; ?>">
+                <?php if (isset($cartons) && count($cartons) > 0): ?>
+                    <?php foreach ($cartons as $cartonData): ?>
+                        <div class="bingo-border-carton" id="card-box-<?= $cartonData['cartonId']; ?>">
+                            <h6 class="ms-2 mb-1 text-center text-muted carton-serial">SERIAL: C<?= esc($cartonData['serial']); ?></h6>
+                            <div class="bingo-carton" id="carton-<?= $cartonData['cartonId']; ?>">
+                                <div class="bingo-carton-header B"><span>B</span></div>
+                                <div class="bingo-carton-header I"><span>I</span></div>
+                                <div class="bingo-carton-header N"><span>N</span></div>
+                                <div class="bingo-carton-header G"><span>G</span></div>
+                                <div class="bingo-carton-header O"><span>O</span></div>
 
-                                    <?php foreach ($cartonData['numbers'] as $index => $number): ?>
-                                        <?php if ($number['position'] == 13): ?>
-                                            <div class="bingo-carton-number data-position-13" data-carton="<?= $cartonData['cartonId']; ?>" data-position="13">⭐️</div>
-                                        <?php else: ?>
-                                            <?php
-                                            $isNumberSelected = in_array((int)$number['number'], $selectedNumbers, true);
-                                            ?>
-                                            <div class="bingo-carton-number <?= $isNumberSelected ? 'selected' : ''; ?>"
-                                                data-carton="<?= $cartonData['cartonId']; ?>"
-                                                data-number="<?= $number['number']; ?>"
-                                                data-position="<?= $number['position']; ?>">
-                                                <?= esc($number['number']); ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
+                                <?php foreach ($cartonData['numbers'] as $index => $number): ?>
+                                    <?php
+                                    $numVal = (int) $number['number'];
+                                    $isMarked = ($number['status'] == 1) || in_array($numVal, $selectedNumbers);
+                                    $classes = [];
+                                    if ($isMarked) {
+                                        $classes[] = 'marked';
+                                    }
+                                    ?>
+                                    <?php if ($index === 12): ?>
+                                        <div class="bingo-carton-number modality data-position-13" data-position="<?= $number['position']; ?>">⭐️</div>
+                                    <?php else: ?>
+                                        <div class="bingo-carton-number number-<?= $number['number']; ?> <?= implode(' ', $classes); ?>"
+                                             data-position="<?= $number['position']; ?>"
+                                             data-number="<?= $number['number']; ?>"
+                                             id="number-<?= $number['number']; ?>">
+                                            <?= $number['number']; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="text-white text-center mt-4"><?= translate('there are no cards available for this game'); ?></p>
+                <?php endif; ?>
+                <div style="width: 100%; height: 60px; flex-shrink: 0; pointer-events: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALIDADES DE JUEGO (IDÉNTICO A PLAYING) -->
+<?php if (!empty($modalities)): ?>
+    <button type="button" class="btn btn-small btn-modalities" id="toggle-modalities-btn"
+        aria-label="<?= translate('modalities'); ?>" aria-expanded="false" onclick="toggleModalitiesPanel();">
+        <img src="<?= site_url('assets/img/modalidades.png'); ?>" alt="<?= translate('modalities'); ?>"
+            style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.35));">
+    </button>
+    <div class="modalities-display-container" id="playing-modalities-panel" role="region"
+        aria-label="<?= translate('modalities'); ?>" aria-hidden="true">
+        <div class="modalities-display-container__toolbar">
+            <div class="modalities-display-meta">
+                <h6><img src="<?= site_url('assets/img/modalidades.png'); ?>" alt="<?= translate('modalities'); ?>"
+                        style="width: 20px; height: 20px; object-fit: contain; margin-right: 6px; vertical-align: middle; filter: drop-shadow(0px 1px 3px rgba(0,0,0,0.25));">
+                    <?= translate('modalities'); ?></h6>
+                <span class="modalities-display__hint"><?= count($modalities); ?> <?= count($modalities) === 1 ? 'modalidad' : 'modalidades'; ?> · desliza →</span>
+            </div>
+            <button type="button" class="modalities-display-close" id="modalities-panel-close"
+                aria-label="<?= translate('close'); ?>" onclick="toggleModalitiesPanel(false);">
+                <i class="fa-duotone fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modalities-display">
+            <div class="container-cartons-modalities<?= count($modalities) === 1 ? ' container-cartons-modalities--solo' : '' ?>">
+                <?php foreach ($modalities as $modality): ?>
+                    <?php $isSing = in_array($modality['id'], $singsModalities ?? []);
+                    $positions = explode(',', $modality['positions']); ?>
+                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
+                        <span class="modality-name"><?= translate($modality['name']); ?></span>
+                        <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                            <div class="card-letter B"><span>B</span></div>
+                            <div class="card-letter I"><span>I</span></div>
+                            <div class="card-letter N"><span>N</span></div>
+                            <div class="card-letter G"><span>G</span></div>
+                            <div class="card-letter O"><span>O</span></div>
+                            <?php for ($i = 1; $i <= 25; $i++): ?>
+                                <?php $isMarked = in_array($i, $positions);
+                                $showStar = ($isSing && $isMarked) || $i == 13; ?>
+                                <?php if ($i == 13): ?>
+                                    <div class="card-number" data-position="13">⭐️</div>
+                                <?php else: ?>
+                                    <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>"
+                                        data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+                        </div>
+                        <?php if ($game['award'] == 2): ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                        <?php else: ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- BOTÓN FLOTANTE "VER GANADORES" -->
+<button id="btn-ver-ganadores-player" type="button" style="display: <?= !empty($winners) ? 'inline-flex' : 'none' ?>;" onclick="openSpectatorWinnersModal();">
+    <i class="fa-solid fa-trophy-star me-1"></i>
+    <span id="winners-btn-text">Ver Ganadores (<?= count($winners); ?>)</span>
+</button>
+
+<!-- BOTÓN FLOTANTE CTA "REGÍSTRATE AQUÍ" -->
+<button type="button" class="btn-spectator-cta" onclick="openSpectatorRegisterModal();">
+    <i class="fa-solid fa-crown me-1 text-warning"></i>
+    <span>¡Juega tú también! Regístrate aquí</span>
+</button>
+
+<!-- MODAL COMPARTIR PARTIDA -->
+<div class="modal fade" id="modal-share-game" tabindex="-1" aria-labelledby="modalShareGameLabel" aria-hidden="true" style="z-index: 1095;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg text-dark" style="border-radius: 20px; overflow: hidden; background: #ffffff;">
+            <div class="modal-header text-white p-3 p-md-4" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-share-nodes fs-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0 text-white" id="modalShareGameLabel" style="font-size: 1.15rem;">Compartir Partida</h5>
+                        <small class="text-white-50">Invita a más personas a ver la partida en vivo</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-3 p-md-4">
+                <div class="text-center mb-3">
+                    <div class="badge bg-success-subtle text-success px-3 py-2 rounded-pill fw-bold mb-2" style="font-size: 0.82rem;">
+                        <i class="fa-solid fa-eye me-1"></i> Modo Espectador (Solo Lectura)
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Quien abra este enlace observará en vivo los cartones de <strong><?= esc($playerName); ?></strong> y las balotas cantadas sin poder intervenir.
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">Enlace de espectador:</label>
+                    <div class="input-group shadow-sm rounded-3 overflow-hidden border">
+                        <input type="text" id="spectator-share-input" class="form-control border-0 bg-light py-2" style="font-size: 0.88rem; font-family: monospace;" readonly value="<?= current_url(); ?>">
+                        <button class="btn btn-primary px-3 fw-bold" type="button" onclick="copySpectatorLink();">
+                            <i class="fa-solid fa-copy me-1"></i>
+                            <span>Copiar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <a href="https://api.whatsapp.com/send?text=<?= rawurlencode("¡Hola! Te invito a ver la partida de " . $playerName . " en vivo en Rey Bingo aquí: " . current_url()) ?>" target="_blank" class="btn btn-success py-2 fw-bold d-flex align-items-center justify-content-center gap-2 rounded-3 shadow-sm" style="background: #25D366; border-color: #25D366;">
+                        <i class="fa-brands fa-whatsapp fs-5"></i>
+                        <span>Compartir por WhatsApp</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REGISTRO Y LOGIN DEL ESPECTADOR -->
+<div class="modal fade" id="modal-spectator-register" tabindex="-1" aria-labelledby="modalSpectatorRegisterLabel" aria-hidden="true" style="z-index: 1099;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg text-dark" style="border-radius: 24px; overflow: hidden; background: #ffffff;">
+            <div class="modal-header p-4 text-white" style="background: linear-gradient(135deg, #6236ff 0%, #4318ff 100%);">
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width: 44px; height: 44px; border-radius: 14px; background: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-crown text-warning fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0 text-white" id="modalSpectatorRegisterLabel" style="font-size: 1.25rem;">¡Únete a Rey Bingo!</h5>
+                        <small class="text-white-50">Crea tu cuenta para jugar, marcar y ganar premios reales</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Botón Continuar con Google -->
+                <a href="<?= site_url('signup/google') ?>" class="btn w-100 py-2 mb-3 border shadow-sm d-flex align-items-center justify-content-center gap-2 fw-bold" style="background: #ffffff; color: #374151; border-radius: 12px; font-size: 0.95rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.33 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.92 0 12s.45 3.85 1.24 5.42l4.04-3.15z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.93 6.72-4.93z"/>
+                    </svg>
+                    <span>Continuar con Google</span>
+                </a>
+
+                <div class="d-flex align-items-center my-3">
+                    <hr class="flex-grow-1 my-0 text-muted">
+                    <span class="px-3 text-muted small fw-semibold">o con tu correo</span>
+                    <hr class="flex-grow-1 my-0 text-muted">
+                </div>
+
+                <!-- Formulario Tradicional de Registro -->
+                <form action="<?= site_url('signup/signupSubmit') ?>" method="POST" id="spectator-signup-form">
+                    <?= csrf_field() ?>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Nombre</label>
+                            <input type="text" name="firstname" class="form-control" required placeholder="Tu nombre" style="border-radius: 10px;">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold mb-1">Apellido</label>
+                            <input type="text" name="lastname" class="form-control" required placeholder="Tu apellido" style="border-radius: 10px;">
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold mb-1">Correo Electrónico</label>
+                        <input type="email" name="email" class="form-control" required placeholder="ejemplo@correo.com" style="border-radius: 10px;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold mb-1">Contraseña</label>
+                        <input type="password" name="password" class="form-control" required placeholder="Crea una contraseña segura" style="border-radius: 10px;">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold text-white shadow-sm" style="background: linear-gradient(135deg, #6236ff 0%, #4318ff 100%); border-radius: 12px; border: none;">
+                        Crear Cuenta y Jugar
+                    </button>
+                </form>
+
+                <div class="text-center mt-3 pt-2 border-top">
+                    <span class="text-muted small">¿Ya tienes cuenta?</span>
+                    <a href="<?= site_url('signin') ?>" class="small fw-bold ms-1" style="color: #6236ff;">Iniciar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL GANADORES DE LA PARTIDA -->
+<div class="modal fade" id="modal-spectator-winners" tabindex="-1" aria-labelledby="modalWinnersLabel" aria-hidden="true" style="z-index: 1098;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden; background: #ffffff;">
+            <div class="modal-header text-white p-3" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-trophy fs-5"></i>
+                    <h5 class="modal-title fw-bold mb-0 text-white" id="modalWinnersLabel">Tabla de Ganadores</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div id="spectator-winners-list" class="d-flex flex-column gap-2">
+                    <?php if (!empty($winners)): ?>
+                        <?php foreach ($winners as $w): ?>
+                            <div class="d-flex align-items-center justify-content-between p-2 rounded-3 border bg-light">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="<?= esc($w['image'] ?? site_url('assets/img/avatar.jpg')) ?>" class="rounded-circle border" style="width: 36px; height: 36px; object-fit: cover;">
+                                    <div>
+                                        <div class="fw-bold small text-dark"><?= esc($w['player'] ?? 'Jugador') ?></div>
+                                        <small class="text-muted">Modalidad: <span class="badge bg-primary"><?= esc($w['modality_name'] ?? 'Bingo') ?></span></small>
+                                    </div>
                                 </div>
+                                <div class="badge bg-warning text-dark fw-bold px-2 py-1">👑 Ganador</div>
                             </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div class="text-center py-5 text-white-50">
-                            <i class="fa-solid fa-ticket-simple fs-1 d-block mb-3 opacity-50"></i>
-                            El jugador no tiene cartones asignados en esta partida.
+                        <div class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-trophy-star fs-1 text-muted opacity-50 mb-2"></i>
+                            <p class="mb-0 small">Aún no se han registrado ganadores en esta partida.</p>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
-
     </div>
+</div>
 
-    <!-- 3. BOTÓN FLOTANTE "MODALIDADES" (INFERIOR IZQUIERDA) -->
-    <?php if (!empty($modalities)): ?>
-        <button type="button" class="btn btn-small btn-modalities" id="btn-toggle-modalities" title="Ver Modalidades">
-            <img src="<?= site_url('assets/img/modalities.png'); ?>" alt="Modalidades" style="width: 100%; height: 100%; object-fit: contain;">
-        </button>
+<!-- SCRIPT Y SINCRONIZACIÓN EN TIEMPO REAL CON SOKETI / PUSHER -->
+<script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
+<script src="<?= function_exists('asset_url') ? asset_url('js/pusher.min.js') : (site_url('assets/js/pusher.min.js') . '?v=' . time()) ?>"></script>
 
-        <!-- PANEL DE MODALIDADES FLOTANTE -->
-        <div class="modalities-display-container" id="modalities-display-container" aria-hidden="true">
-            <div class="modalities-display-container__toolbar">
-                <div class="modalities-display-meta">
-                    <h6>Modalidades en Juego</h6>
-                    <span class="modalities-display__hint">Premios de la partida</span>
-                </div>
-                <button type="button" class="modalities-display-close" id="modalities-display-close" aria-label="Cerrar">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-            <div class="modalities-display" id="modalities-display">
-                <div class="container-cartons-modalities">
-                    <?php foreach ($modalities as $index => $modality): ?>
-                        <?php
-                        $positions = array_map('intval', explode(',', $modality['positions'] ?? ''));
-                        $isSing = in_array((int)$modality['id'], $singsModalities, true);
-                        ?>
-                        <div class="border-carton me-3">
-                            <h6 class="title-carton"><?= esc($modality['name']); ?></h6>
-                            <div class="carton mb-2">
-                                <?php for ($i = 1; $i <= 25; $i++): ?>
-                                    <?php
-                                    $isMarked = in_array($i, $positions, true);
-                                    $showStar = ($isSing && $isMarked) || $i == 13;
-                                    ?>
-                                    <?php if ($i == 13): ?>
-                                        <div class="card-number" data-position="13">⭐️</div>
-                                    <?php else: ?>
-                                        <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>"
-                                            data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                    <?php endif; ?>
-                                <?php endfor; ?>
-                            </div>
-                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">
-                                <?= systemGet('currency'); ?> <?= number_format((float)($modality['amount'] ?? 0), 2) ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <!-- 4. BOTÓN "VER GANADORES" (CENTRO INFERIOR) -->
-    <button type="button" class="btn" id="btn-ver-ganadores-player" onclick="openWinnersModal();">
-        <i class="fa-solid fa-trophy text-warning"></i>
-        <span>Tabla de Ganadores</span>
-    </button>
-
-    <!-- 5. BOTÓN DESTACADO "REGÍSTRATE AQUÍ" -->
-    <button type="button" class="btn-spectator-cta" id="btn-open-register" data-bs-toggle="modal" data-bs-target="#modal-spectator-register">
-        <i class="fa-solid fa-crown text-warning"></i>
-        <span>¡Juega tú también! Regístrate aquí</span>
-    </button>
-
-    <!-- ==============================================================
-         MODALES: REGISTRO/LOGIN Y TABLA DE GANADORES
-         ============================================================== -->
-
-    <!-- MODAL DE AUTENTICACIÓN / REGISTRO PARA ESPECTADORES -->
-    <div class="modal fade" id="modal-spectator-register" tabindex="-1" aria-labelledby="modalSpectatorRegisterLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-md">
-            <div class="modal-content text-dark border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
-                <!-- Header con gradiente -->
-                <div class="modal-header text-white p-3 p-md-4" style="background: linear-gradient(135deg, #1e1045 0%, #3b1d82 100%);">
-                    <div class="d-flex align-items-center gap-2">
-                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(245, 158, 11, 0.25); display: flex; align-items: center; justify-content: center;">
-                            <i class="fa-solid fa-crown text-warning fs-5"></i>
-                        </div>
-                        <div>
-                            <h5 class="modal-title fw-bold mb-0" id="modalSpectatorRegisterLabel" style="font-size: 1.15rem;">Únete a REY BINGO</h5>
-                            <small class="text-white-50">Crea tu cuenta gratis y juega en las próximas partidas</small>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-
-                <div class="modal-body p-3 p-md-4">
-                    <!-- Botón Continuar con Google -->
-                    <div class="mb-3 text-center">
-                        <a href="<?= site_url('signup/google') ?>" class="btn w-100 py-2 d-flex align-items-center justify-content-center gap-2 border shadow-sm rounded-3" style="background: #ffffff; color: #374151; font-weight: 600; font-size: 0.95rem;">
-                            <svg width="20" height="20" viewBox="0 0 48 48">
-                                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-                                <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                                <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.57l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-                            </svg>
-                            <span>Continuar con Google</span>
-                        </a>
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2 my-3">
-                        <hr class="flex-grow-1 my-0">
-                        <span class="text-muted small">o completa tu registro</span>
-                        <hr class="flex-grow-1 my-0">
-                    </div>
-
-                    <!-- Mensajes de Alerta del Formulario -->
-                    <div id="register-alert-box"></div>
-
-                    <!-- Formulario Tradicional de Registro -->
-                    <form id="spectator-register-form">
-                        <?= csrf_field() ?>
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Nombre *</label>
-                                <input type="text" name="firstname" class="form-control form-control-sm" required placeholder="Tu nombre">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Apellido *</label>
-                                <input type="text" name="lastname" class="form-control form-control-sm" required placeholder="Tu apellido">
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Cédula / Documento *</label>
-                                <input type="text" name="document" class="form-control form-control-sm" required placeholder="1234567890">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Teléfono / WhatsApp *</label>
-                                <input type="text" name="phone" class="form-control form-control-sm" required placeholder="0991234567">
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Usuario *</label>
-                                <input type="text" name="username" class="form-control form-control-sm" required placeholder="tu_apodo">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Correo Electrónico *</label>
-                                <input type="email" name="email" class="form-control form-control-sm" required placeholder="tu@correo.com">
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Contraseña *</label>
-                                <input type="password" name="password" class="form-control form-control-sm" required placeholder="Mínimo 6 carácteres">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-bold mb-1">Confirmar *</label>
-                                <input type="password" name="password_confirm" class="form-control form-control-sm" required placeholder="Repite contraseña">
-                            </div>
-                        </div>
-
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" name="accept_terms" value="1" id="spectator-accept-terms" required checked>
-                            <label class="form-check-label small text-muted" for="spectator-accept-terms">
-                                Acepto los <a href="<?= site_url('terminos') ?>" target="_blank" class="text-primary text-decoration-none fw-semibold">Términos y Condiciones</a>
-                            </label>
-                        </div>
-
-                        <button type="submit" class="btn w-100 py-2 text-white fw-bold shadow-sm rounded-3" id="btn-submit-register" style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);">
-                            <i class="fa-solid fa-user-plus me-1" id="register-spinner-icon"></i>
-                            <span>Crear Mi Cuenta Gratis</span>
-                        </button>
-                    </form>
-
-                    <div class="text-center mt-3 pt-2 border-top">
-                        <small class="text-muted">¿Ya tienes una cuenta?</small>
-                        <a href="<?= site_url('signin') ?>" class="small text-primary fw-bold text-decoration-none ms-1">Inicia sesión aquí</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL TABLA DE GANADORES -->
-    <div class="modal fade" id="modal-spectator-winners" tabindex="-1" aria-labelledby="modalSpectatorWinnersLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content text-dark border-0 shadow-lg" style="border-radius: 20px;">
-                <div class="modal-header text-white p-3" style="background: linear-gradient(135deg, #1e1045 0%, #3b1d82 100%);">
-                    <h5 class="modal-title fw-bold mb-0 d-flex align-items-center gap-2" id="modalSpectatorWinnersLabel">
-                        <i class="fa-solid fa-trophy text-warning"></i>
-                        <span>Ganadores de la Partida</span>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <div class="modal-body p-3">
-                    <div id="spectator-winners-list">
-                        <?php if (!empty($winners)): ?>
-                            <div class="list-group list-group-flush">
-                                <?php foreach ($winners as $w): ?>
-                                    <div class="list-group-item d-flex align-items-center gap-3 px-2 py-2">
-                                        <img src="<?= esc($w['image'] ?? site_url('assets/img/avatar.jpg')) ?>" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;" alt="Ganador">
-                                        <div class="flex-grow-1">
-                                            <strong class="d-block text-dark"><?= esc($w['player']) ?></strong>
-                                            <span class="badge bg-primary-subtle text-primary fw-semibold"><?= esc($w['modality_name'] ?? $w['modalityName'] ?? 'Bingo') ?></span>
-                                            <small class="text-muted ms-1">Cartón: C<?= esc($w['carton']) ?></small>
-                                        </div>
-                                        <i class="fa-solid fa-medal text-warning fs-4"></i>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center py-4 text-muted">
-                                <i class="fa-solid fa-hourglass-half fs-2 d-block mb-2 opacity-50"></i>
-                                Aún no se han registrado ganadores en esta partida.
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- OVERLAY DE PARTIDA FINALIZADA -->
-    <div id="game-finished-overlay">
-        <div class="game-finished-card">
-            <div style="font-size: 3.5rem;" class="mb-2">🏆</div>
-            <h3 class="fw-bold text-white mb-2">¡Partida Finalizada!</h3>
-            <p class="text-white-50 mb-4" style="font-size: 0.92rem;">
-                La partida ha concluido. Todos los premios y números han sido completados.
-            </p>
-            <div class="d-flex flex-column gap-2">
-                <button type="button" class="btn btn-warning fw-bold py-2 rounded-pill shadow" data-bs-toggle="modal" data-bs-target="#modal-spectator-register">
-                    <i class="fa-solid fa-crown me-1"></i> ¡Juega en la próxima partida!
-                </button>
-                <button type="button" class="btn btn-outline-light rounded-pill py-2" onclick="document.getElementById('game-finished-overlay').style.display = 'none';">
-                    Ver cartones finales
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SCRIPTS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="<?= site_url('assets/js/pusher.min.js') ?>?v=<?= APP_VERSION ?>"></script>
-    <script src="<?= site_url('assets/js/pusher-client.js') ?>?v=<?= APP_VERSION ?>"></script>
-
-    <script>
-    (function() {
-        const GAME_ID = <?= (int) $game['id'] ?>;
-        const SPECTATOR_TOKEN = '<?= esc($token) ?>';
-        const PUSHER_KEY = '<?= env("SOKETI_KEY") ?: env("PUSHER_KEY") ?>';
+<script>
+    (function () {
+        const GAME_ID = '<?= (int) $game["id"] ?>';
+        const TOKEN = '<?= esc($token, "js") ?>';
+        const SOKETI_KEY = '<?= env("SOKETI_KEY") ?>';
         const SOKETI_HOST = '<?= env("SOKETI_HOST") ?>';
-        const SOKETI_PORT = '<?= env("SOKETI_PORT", 443) ?>';
+        const SOKETI_PORT = parseInt('<?= env("SOKETI_PORT", 443) ?>', 10);
+        const PUSHER_KEY = SOKETI_KEY || '<?= env("PUSHER_KEY") ?>';
+        const PUSHER_CLUSTER = '<?= env("PUSHER_CLUSTER", "us2") ?>';
         const AUTH_URL = '<?= site_url("pusher/auth") ?>';
-        const STATUS_URL = '<?= site_url("espectador/status/" . $token) ?>';
 
         let audioEnabled = true;
+        const chimeAudio = new Audio('<?= site_url("assets/sounds/bingo.mp3") ?>');
+        chimeAudio.volume = 0.5;
 
-        // 1. Control de Sonido Espectador
-        const btnSound = document.getElementById('btn-sound-toggle');
-        const iconSound = document.getElementById('sound-icon');
-        if (btnSound && iconSound) {
-            btnSound.addEventListener('click', function() {
-                audioEnabled = !audioEnabled;
-                if (audioEnabled) {
-                    iconSound.className = 'fa-solid fa-volume-high';
-                    btnSound.style.background = 'rgba(255, 255, 255, 0.15)';
-                } else {
-                    iconSound.className = 'fa-solid fa-volume-xmark text-danger';
-                    btnSound.style.background = 'rgba(239, 68, 68, 0.2)';
-                }
-            });
-        }
-
-        // Sintetizador de audio para balotas
-        function playBallSound(num) {
-            if (!audioEnabled) return;
-            try {
-                if ('speechSynthesis' in window) {
-                    const letter = getLetterByNumber(num);
-                    const utter = new SpeechSynthesisUtterance(letter + ' ' + num);
-                    utter.lang = 'es-ES';
-                    utter.rate = 1.05;
-                    window.speechSynthesis.speak(utter);
-                }
-            } catch (e) { /* ignore */ }
-        }
-
-        function getLetterByNumber(num) {
-            const n = parseInt(num, 10);
-            if (n <= 15) return 'B';
-            if (n <= 30) return 'I';
-            if (n <= 45) return 'N';
-            if (n <= 60) return 'G';
-            return 'O';
-        }
-
-        // 2. MODALIDADES PANEL TOGGLE
-        const btnModalities = document.getElementById('btn-toggle-modalities');
-        const modalitiesContainer = document.getElementById('modalities-display-container');
-        const modalitiesClose = document.getElementById('modalities-display-close');
-
-        if (btnModalities && modalitiesContainer) {
-            btnModalities.addEventListener('click', function() {
-                modalitiesContainer.classList.toggle('is-open');
-            });
-        }
-        if (modalitiesClose && modalitiesContainer) {
-            modalitiesClose.addEventListener('click', function() {
-                modalitiesContainer.classList.remove('is-open');
-            });
-        }
-
-        // 3. TABLA DE GANADORES MODAL
-        window.openWinnersModal = function() {
-            const el = document.getElementById('modal-spectator-winners');
-            if (el && typeof bootstrap !== 'undefined') {
-                const modal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
-                modal.show();
+        // Toggle del panel de modalidades
+        window.toggleModalitiesPanel = function (forceState) {
+            const panel = document.getElementById('playing-modalities-panel');
+            if (!panel) return;
+            const isOpen = panel.classList.contains('is-open');
+            const shouldOpen = forceState !== undefined ? forceState : !isOpen;
+            if (shouldOpen) {
+                panel.classList.add('is-open');
+            } else {
+                panel.classList.remove('is-open');
             }
         };
 
-        // 4. REGISTRO TRADICIONAL VÍA AJAX
-        const registerForm = document.getElementById('spectator-register-form');
-        const registerAlertBox = document.getElementById('register-alert-box');
-        const registerBtn = document.getElementById('btn-submit-register');
-        const registerSpinner = document.getElementById('register-spinner-icon');
-
-        if (registerForm) {
-            registerForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                registerAlertBox.innerHTML = '';
-                registerBtn.disabled = true;
-                if (registerSpinner) registerSpinner.className = 'fa-solid fa-spinner fa-spin me-1';
-
-                const formData = new FormData(registerForm);
-
-                fetch('<?= site_url("signup/signupSubmit") ?>', {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                })
-                .then(r => r.json())
-                .then(data => {
-                    registerBtn.disabled = false;
-                    if (registerSpinner) registerSpinner.className = 'fa-solid fa-user-plus me-1';
-
-                    if (data.success) {
-                        registerAlertBox.innerHTML = '<div class="alert alert-success py-2 small mb-3">¡Registro exitoso! Redirigiendo...</div>';
-                        setTimeout(() => {
-                            if (data.redirect) {
-                                window.location.href = data.redirect;
-                            } else {
-                                window.location.href = '<?= site_url("play") ?>';
-                            }
-                        }, 1200);
-                    } else {
-                        let errorMsg = 'Error al registrarte.';
-                        if (data.errors && typeof data.errors === 'object') {
-                            errorMsg = Object.values(data.errors).join('<br>');
-                        } else if (data.error) {
-                            errorMsg = data.error;
-                        }
-                        registerAlertBox.innerHTML = `<div class="alert alert-danger py-2 small mb-3">${errorMsg}</div>`;
-                    }
-                })
-                .catch(err => {
-                    registerBtn.disabled = false;
-                    if (registerSpinner) registerSpinner.className = 'fa-solid fa-user-plus me-1';
-                    registerAlertBox.innerHTML = '<div class="alert alert-danger py-2 small mb-3">Error de conexión al procesar el registro.</div>';
-                });
-            });
-        }
-
-        // 5. MARCAR NÚMERO EN CARTONES OBSERVADOS
-        function markNumberOnCartons(number) {
-            const num = parseInt(number, 10);
-            if (!num || isNaN(num)) return;
-
-            const cells = document.querySelectorAll(`.container-section--spectator .bingo-carton-number[data-number="${num}"]`);
-            cells.forEach(cell => {
-                if (!cell.classList.contains('selected')) {
-                    cell.classList.add('selected', 'ball-slide-in');
-                    setTimeout(() => cell.classList.remove('ball-slide-in'), 500);
+        // Modales de espectador
+        window.openSpectatorRegisterModal = function () {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const el = document.getElementById('modal-spectator-register');
+                if (el) {
+                    const m = bootstrap.Modal.getOrCreateInstance(el);
+                    m.show();
                 }
-            });
-        }
+            }
+        };
 
-        // 6. ACTUALIZAR BALOTA PRINCIPAL E HISTORIAL
-        function onNewBall(num, drawnList) {
+        window.openShareGameModal = function () {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const el = document.getElementById('modal-share-game');
+                if (el) {
+                    const m = bootstrap.Modal.getOrCreateInstance(el);
+                    m.show();
+                }
+            }
+        };
+
+        window.openSpectatorWinnersModal = function () {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const el = document.getElementById('modal-spectator-winners');
+                if (el) {
+                    const m = bootstrap.Modal.getOrCreateInstance(el);
+                    m.show();
+                }
+            }
+        };
+
+        window.copySpectatorLink = function () {
+            const input = document.getElementById('spectator-share-input');
+            if (!input) return;
+            input.select();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(input.value).then(onCopied).catch(() => {
+                    try { document.execCommand('copy'); onCopied(); } catch (e) { alert('Enlace: ' + input.value); }
+                });
+            } else {
+                try { document.execCommand('copy'); onCopied(); } catch (e) { alert('Enlace: ' + input.value); }
+            }
+            function onCopied() {
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: "¡Enlace copiado al portapapeles!",
+                        duration: 2500,
+                        gravity: "top",
+                        position: "center",
+                        style: { background: "linear-gradient(135deg, #10b981, #059669)", borderRadius: "10px" }
+                    }).showToast();
+                } else {
+                    alert('¡Enlace copiado!');
+                }
+            }
+        };
+
+        window.toggleSpectatorAudio = function () {
+            audioEnabled = !audioEnabled;
+            const icon = document.getElementById('sound-icon');
+            if (icon) {
+                if (audioEnabled) {
+                    icon.className = 'fa-duotone fa-solid fa-volume';
+                } else {
+                    icon.className = 'fa-duotone fa-solid fa-volume-slash';
+                }
+            }
+        };
+
+        // Función para marcar automáticamente un número en todos los cartones mostrados
+        function markNumberInCartons(num) {
             const n = parseInt(num, 10);
             if (!n || isNaN(n)) return;
 
-            playBallSound(n);
-
-            // Actualizar número actual
-            const lastNumberEl = document.getElementById('last-number');
-            if (lastNumberEl) {
-                const letter = getLetterByNumber(n);
-                lastNumberEl.className = 'bingo-ball ' + letter + ' size-100 ball-slide-in';
-                lastNumberEl.innerHTML = `<small style="position: absolute; top: -13px; font-size: 1.2rem; z-index: 1;">${letter}</small><span>${n}</span>`;
-            }
-
-            // Marcar en los cartones del jugador observado
-            markNumberOnCartons(n);
-
-            // Actualizar contador
-            if (Array.isArray(drawnList)) {
-                const total = drawnList.length;
-                const ballsCounter = document.getElementById('balls-counter');
-                if (ballsCounter) {
-                    ballsCounter.textContent = total + ' - ' + (75 - total);
+            // Buscar celdas con el número en todos los cartones
+            const cells = document.querySelectorAll('.bingo-carton-number.number-' + n + ', [data-number="' + n + '"]');
+            cells.forEach(function (cell) {
+                if (!cell.classList.contains('marked')) {
+                    cell.classList.add('marked', 'ball-slide-in');
                 }
+            });
 
-                // Actualizar carrusel de últimas balotas
-                const lastFiveContainer = document.getElementById('last-five-numbers');
-                if (lastFiveContainer) {
-                    const recent = drawnList.slice(-5).reverse();
-                    let html = '';
-                    recent.forEach(b => {
-                        const letClass = getLetterByNumber(b);
-                        html += `<div class="bingo-ball ${letClass} size-50"><span>${b}</span></div>`;
-                    });
-                    lastFiveContainer.innerHTML = html;
-                }
+            // Reproducir sonido de balota si está activado
+            if (audioEnabled) {
+                try {
+                    chimeAudio.currentTime = 0;
+                    chimeAudio.play().catch(function () {});
+                } catch (e) {}
             }
         }
 
-        // 7. WEBSOCKET: CONEXIÓN EN TIEMPO REAL VÍA PUSHERCLIENT / SOKETI
-        if (typeof PusherClient !== 'undefined') {
-            const wsClient = new PusherClient(GAME_ID, 0);
+        // Actualizar interfaz al salir una balota
+        function handleBallDrawn(data) {
+            const num = data.n ?? data.number;
+            const total = data.totalNumbersGenerated ?? (data.drawnNumbers ? data.drawnNumbers.length : null);
 
-            wsClient.on('connection:success', function() {
-                console.log('Modo Espectador: Conectado a WebSocket en tiempo real.');
-            });
-
-            wsClient.on('game:number_drawn', function(data) {
-                console.log('Modo Espectador: Balota cantada', data);
-                const ball = data.n || data.number;
-                const drawn = data.drawn || data.drawnNumbers;
-                if (ball) {
-                    onNewBall(ball, drawn);
+            if (total !== null) {
+                const counter = document.getElementById('balls-counter');
+                if (counter) {
+                    counter.textContent = total + ' - ' + Math.max(0, 75 - total);
                 }
-            });
+            }
 
-            wsClient.on('game:bingo_claimed', function(data) {
-                console.log('Modo Espectador: Bingo reclamado', data);
-                const modName = data.modalityName || data.modality_name || 'Bingo';
-                const player = data.player || 'Un jugador';
-                Toastify({
-                    text: `🎉 ¡${player} cantó ${modName}!`,
-                    duration: 4000,
-                    gravity: "top",
-                    position: "center",
-                    style: {
-                        background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                        borderRadius: "12px",
-                        boxShadow: "0 6px 18px rgba(245, 158, 11, 0.4)",
-                        fontWeight: "700",
-                        fontSize: "1rem"
-                    }
-                }).showToast();
-            });
+            if (num) {
+                markNumberInCartons(num);
 
-            wsClient.on('game:bingo_accepted', function(data) {
-                console.log('Modo Espectador: Bingo aceptado', data);
-                const modName = data.modalityName || data.modality_name || 'Bingo';
-                const player = data.player || 'Un jugador';
+                // Si es bingo tradicional con balota central
+                const lastBall = document.getElementById('last-number');
+                if (lastBall) {
+                    const span = lastBall.querySelector('span');
+                    if (span) span.textContent = num;
+                    const letterEl = lastBall.querySelector('small');
+                    let letter = 'O';
+                    const n = parseInt(num, 10);
+                    if (n <= 15) letter = 'B';
+                    else if (n <= 30) letter = 'I';
+                    else if (n <= 45) letter = 'N';
+                    else if (n <= 60) letter = 'G';
+                    if (letterEl) letterEl.textContent = letter;
+                    lastBall.className = 'bingo-ball ' + letter + ' size-100 ball-slide-in';
+                }
+            }
+
+            if (Array.isArray(data.drawnNumbers)) {
+                data.drawnNumbers.forEach(function (n) {
+                    markNumberInCartons(n);
+                });
+            }
+        }
+
+        // Manejar notificación de ganador
+        function handleWinnerAnnounced(data) {
+            const btn = document.getElementById('btn-ver-ganadores-player');
+            if (btn) btn.style.display = 'inline-flex';
+
+            const modalityId = data.modality ?? data.modalityId;
+            if (modalityId) {
+                const modCard = document.getElementById('modality-card-' + modalityId);
+                if (modCard) {
+                    modCard.classList.add('modality-won');
+                }
+            }
+
+            if (typeof Toastify === 'function') {
+                const playerName = data.player || ('Jugador #' + (data.user || ''));
+                const modName = data.modality_name || data.modalityName || 'Bingo';
                 Toastify({
-                    text: `🏆 ¡BINGO CONFIRMADO! ${player} ganó ${modName}`,
+                    text: '👑 ¡BINGO! ' + playerName + ' ganó ' + modName + '!',
                     duration: 5000,
-                    gravity: "top",
-                    position: "center",
+                    gravity: 'top',
+                    position: 'center',
                     style: {
-                        background: "linear-gradient(135deg, #10b981, #059669)",
-                        borderRadius: "12px",
-                        boxShadow: "0 6px 18px rgba(16, 185, 129, 0.4)",
-                        fontWeight: "700",
-                        fontSize: "1.05rem"
+                        background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+                        borderRadius: '12px',
+                        fontWeight: 'bold',
+                        fontSize: '1rem',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
                     }
                 }).showToast();
+            }
+        }
 
-                if (data.stopped || data.gameCompleted) {
-                    showGameFinishedOverlay();
+        // Conectar WebSocket vía Pusher / Soketi
+        if (typeof Pusher !== 'undefined' && PUSHER_KEY) {
+            const pConfig = {
+                channelAuthorization: {
+                    endpoint: AUTH_URL,
+                    transport: 'ajax'
                 }
-            });
+            };
+            if (SOKETI_HOST) {
+                pConfig.wsHost = SOKETI_HOST;
+                pConfig.wsPort = SOKETI_PORT;
+                pConfig.wssPort = SOKETI_PORT;
+                pConfig.forceTLS = (SOKETI_PORT === 443);
+                pConfig.disableStats = true;
+                pConfig.enabledTransports = ['ws', 'wss'];
+            } else {
+                pConfig.cluster = PUSHER_CLUSTER;
+            }
 
-            wsClient.on('game:game_finished', function() {
-                showGameFinishedOverlay();
-            });
+            try {
+                const pusher = new Pusher(PUSHER_KEY, pConfig);
+                const publicChannel = pusher.subscribe('game-' + GAME_ID);
+                const privateChannel = pusher.subscribe('private-game-' + GAME_ID);
 
-            wsClient.on('game:completed', function() {
-                showGameFinishedOverlay();
-            });
+                const onBall = function (data) {
+                    if (data) handleBallDrawn(data);
+                };
 
-            wsClient.on('game:live_finalized', function() {
-                showGameFinishedOverlay();
-            });
+                const onWin = function (data) {
+                    if (data) handleWinnerAnnounced(data);
+                };
 
-            // Inicializar cliente WebSocket
-            wsClient.init(
-                PUSHER_KEY,
-                '<?= env("PUSHER_CLUSTER", "us2") ?>',
-                AUTH_URL,
-                SOKETI_HOST,
-                SOKETI_PORT
-            );
-        }
+                publicChannel.bind('game:number_drawn', onBall);
+                privateChannel.bind('game:number_drawn', onBall);
 
-        function showGameFinishedOverlay() {
-            const overlay = document.getElementById('game-finished-overlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
+                publicChannel.bind('game:sing_accepted', onWin);
+                privateChannel.bind('game:sing_accepted', onWin);
+                publicChannel.bind('game:modality_won', onWin);
+                privateChannel.bind('game:modality_won', onWin);
+            } catch (e) {
+                console.warn('Pusher spectator error:', e);
             }
         }
 
-        // Si la partida ya estaba finalizada al entrar
-        <?php if ($gameIsFinished): ?>
-            showGameFinishedOverlay();
-        <?php endif; ?>
-
-        // 8. SINCRONIZACIÓN AUTOMÁTICA EN CASO DE RECONEXIÓN
-        window.addEventListener('online', syncState);
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                syncState();
-            }
-        });
-
-        function syncState() {
-            fetch(STATUS_URL)
-                .then(r => r.json())
-                .then(res => {
+        // Polling ligero de sincronización de seguridad cada 12 segundos
+        setInterval(function () {
+            if (document.hidden) return;
+            fetch('<?= site_url("espectador/status/" . $token) ?>', { cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
                     if (res && res.success) {
                         if (Array.isArray(res.drawnNumbers)) {
-                            res.drawnNumbers.forEach(n => markNumberOnCartons(n));
-                            const ballsCounter = document.getElementById('balls-counter');
-                            if (ballsCounter) {
-                                ballsCounter.textContent = res.totalNumbersGenerated + ' - ' + (75 - res.totalNumbersGenerated);
-                            }
+                            res.drawnNumbers.forEach(function (n) {
+                                markNumberInCartons(n);
+                            });
                         }
-                        if (res.gameIsFinished) {
-                            showGameFinishedOverlay();
+                        if (res.totalNumbersGenerated !== undefined) {
+                            const counter = document.getElementById('balls-counter');
+                            if (counter) {
+                                counter.textContent = res.totalNumbersGenerated + ' - ' + Math.max(0, 75 - res.totalNumbersGenerated);
+                            }
                         }
                     }
                 })
-                .catch(() => {});
-        }
+                .catch(function () {});
+        }, 12000);
     })();
-    </script>
-</body>
-</html>
+</script>

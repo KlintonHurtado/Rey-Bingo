@@ -204,7 +204,28 @@ class Spectator extends Controller
             'gameIsFinished'         => $gameIsFinished,
         ];
 
-        return view('spectator/index', $data);
+        $modelContacts = new \App\Models\ContactsModel();
+        $contacts = $modelContacts->findAll();
+
+        $currentUser = null;
+        if (session()->get('logged_in')) {
+            $currentUser = $modelUsers->find(session()->get('id'));
+        }
+        $userForLayout = $currentUser ?: $player;
+        $imagePath = !empty($userForLayout['image']) ? site_url('uploads/users/' . $userForLayout['image']) : site_url('assets/img/avatar.jpg');
+
+        $layoutData = [
+            'page' => [
+                'title' => ($game['description'] ?? 'Partida de Bingo') . ' · Modo Espectador'
+            ],
+            'validation' => \Config\Services::validation(),
+            'user' => $userForLayout,
+            'imagePath' => $imagePath,
+            'contacts' => $contacts,
+            'contentPage' => view('spectator/index', $data)
+        ];
+
+        return view('layout/index', $layoutData);
     }
 
     /**
