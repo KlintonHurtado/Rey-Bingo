@@ -878,14 +878,6 @@ $formatCardPreview = function($text) {
                         showConfirmButton: false
                     });
                 }
-
-                if (typeof window.showNotification === 'function') {
-                    window.showNotification({
-                        title: title,
-                        message: message,
-                        type: 'admin'
-                    });
-                }
             } else {
                 showAlert('danger', data.message || 'Error al enviar la notificación.');
             }
