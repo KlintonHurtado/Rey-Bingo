@@ -181,7 +181,7 @@ $formatCardPreview = function($text) {
                                                     Campos automáticos
                                                 </span>
                                             </div>
-                                            <div class="row g-2" id="dynamic-vars-grid">
+                                            <div class="row g-3" id="dynamic-vars-grid">
                                                 <!-- Inputs generados dinámicamente -->
                                             </div>
                                         </div>
@@ -468,19 +468,28 @@ $formatCardPreview = function($text) {
             const label = formatVarLabel(v);
             const defaultVal = smartDefaultValues[v] || '';
             const col = document.createElement('div');
-            col.className = vars.length === 1 ? 'col-12' : 'col-sm-6';
+            
+            // Si son 1 o 2 variables, o texto descriptivo, cada uno tiene su propia fila con ancho completo
+            const isLongVar = (v.includes('desc') || v.includes('benefit') || v.includes('name') || v.includes('message'));
+            if (vars.length <= 2 || isLongVar) {
+                col.className = 'col-12';
+            } else {
+                col.className = 'col-md-6 col-12';
+            }
+
             col.innerHTML = `
                 <div>
-                    <label class="form-label text-dark fw-bold mb-1" style="font-size: 0.76rem;">
-                        <i class="fa-solid fa-pen text-primary me-1" style="font-size: 0.72rem;"></i> ${escapeHtml(label)}:
+                    <label class="form-label text-dark fw-bold mb-1 d-flex align-items-center gap-1" style="font-size: 0.80rem;">
+                        <i class="fa-solid fa-pen text-primary me-1" style="font-size: 0.72rem;"></i>
+                        <span>${escapeHtml(label)}:</span>
                     </label>
                     <input 
                         type="text" 
-                        class="form-control form-control-sm var-input" 
+                        class="form-control var-input" 
                         data-var="${escapeHtml(v)}" 
                         value="${escapeHtml(defaultVal)}" 
                         placeholder="Ingresa ${escapeHtml(label)}..."
-                        style="font-size: 0.84rem; padding: 6px 10px; border-color: #cbd5e1;"
+                        style="font-size: 0.88rem; padding: 8px 12px; border-color: #cbd5e1; border-radius: 8px;"
                     >
                 </div>
             `;
@@ -601,9 +610,19 @@ $formatCardPreview = function($text) {
         }
     });
 
+    // Normalizador de texto para búsqueda (ignora mayúsculas y tildes)
+    function normalizeSearch(str) {
+        return (str || '')
+            .toString()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .trim();
+    }
+
     // 7. Buscador en tiempo real de notificaciones guardadas
     function filterTemplates() {
-        const q = (templateSearch.value || '').trim().toLowerCase();
+        const q = normalizeSearch(templateSearch ? templateSearch.value : '');
         if (btnClearSearch) {
             btnClearSearch.style.display = q ? 'inline-block' : 'none';
         }
@@ -612,15 +631,20 @@ $formatCardPreview = function($text) {
         let visibleCount = 0;
 
         cards.forEach(card => {
-            const name = (card.dataset.name || '').toLowerCase();
-            const title = (card.dataset.title || '').toLowerCase();
-            const msg = (card.dataset.message || '').toLowerCase();
+            const name = normalizeSearch(card.dataset.name);
+            const title = normalizeSearch(card.dataset.title);
+            const msg = normalizeSearch(card.dataset.message);
+            const fullCardText = normalizeSearch(card.textContent || card.innerText);
 
-            if (!q || name.includes(q) || title.includes(q) || msg.includes(q)) {
-                card.style.display = 'flex';
+            const matches = !q || name.includes(q) || title.includes(q) || msg.includes(q) || fullCardText.includes(q);
+
+            if (matches) {
+                card.classList.remove('d-none');
+                card.style.removeProperty('display');
                 visibleCount++;
             } else {
-                card.style.display = 'none';
+                card.classList.add('d-none');
+                card.style.setProperty('display', 'none', 'important');
             }
         });
 
@@ -631,6 +655,8 @@ $formatCardPreview = function($text) {
 
     if (templateSearch) {
         templateSearch.addEventListener('input', filterTemplates);
+        templateSearch.addEventListener('keyup', filterTemplates);
+        templateSearch.addEventListener('search', filterTemplates);
     }
     if (btnClearSearch) {
         btnClearSearch.addEventListener('click', function() {
