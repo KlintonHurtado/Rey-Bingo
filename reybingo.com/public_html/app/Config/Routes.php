@@ -80,6 +80,17 @@ $routes->get('test-push-status', function() {
     return response()->setJSON($results);
 });
 
+$routes->get('test-push-send', function() {
+    $svc = new \App\Libraries\PushNotificationService();
+    $result = $svc->sendToAll([
+        'title' => 'Prueba de Entrega Rey Bingo',
+        'message' => 'Comprobación de entrega en teléfonos y computadoras',
+        'url' => base_url('/'),
+        'tag' => 'diag-' . time()
+    ]);
+    return response()->setJSON($result);
+});
+
 $routes->get('/', 'Signin::index');
 $routes->head('/', 'Signin::index');
 $routes->get('signin', 'Signin::index');

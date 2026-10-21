@@ -264,6 +264,7 @@ class PushNotificationService
 
         $sentEndpoints = [];
         $failedSubscriptions = [];
+        $queuedResult = [];
 
         // 1. Envío masivo con Minishlink WebPush (despacho concurrente paralelo)
         if ($this->webPush && class_exists('\Minishlink\WebPush\Subscription')) {
@@ -304,7 +305,8 @@ class PushNotificationService
             'success' => $totalSent > 0,
             'total' => $totalSubscriptions,
             'sent' => $totalSent,
-            'failed' => $totalFailed
+            'failed' => $totalFailed,
+            'results' => $queuedResult['results'] ?? []
         ];
     }
 
@@ -582,6 +584,7 @@ class PushNotificationService
                 $reason = $report->getReason();
                 $response = $report->getResponse();
                 $statusCode = $response ? $response->getStatusCode() : 0;
+                $isExpired = method_exists($report, 'isSubscriptionExpired') ? $report->isSubscriptionExpired() : false;
                 $isDead = $isExpired || in_array($statusCode, [400, 401, 403, 404, 410], true);
 
                 if ($isSuccess) {
