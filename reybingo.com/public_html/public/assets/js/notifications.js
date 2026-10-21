@@ -177,7 +177,8 @@ class NotificationManager {
 
             if (permission === 'granted') {
                 this.hideBanner();
-                localStorage.setItem('push-banner-dismissed', Date.now().toString());
+                this.hideFloatingBell();
+                sessionStorage.setItem('push-banner-dismissed', '1');
                 const subOk = await this.subscribe(true);
                 if (subOk) {
                     this.showToast('¡Notificaciones activadas! Te avisaremos al teléfono cuando empiece una partida en vivo.', 'success');
@@ -187,7 +188,8 @@ class NotificationManager {
                 return true;
             } else if (permission === 'denied') {
                 this.hideBanner();
-                this.showToast('Las notificaciones para este sitio están bloqueadas en tu navegador móvil. Toca el icono de ajustes/candado junto a reybingo.com en la barra superior -> Permisos -> Notificaciones y selecciona "Permitir".', 'warning');
+                this.hideFloatingBell();
+                this.showBlockedGuideModal();
                 return false;
             } else {
                 return false;
@@ -377,26 +379,89 @@ class NotificationManager {
         toast.style.cssText = `
             position: fixed;
             bottom: 25px;
-            right: 25px;
+            right: 20px;
+            left: 20px;
+            max-width: 420px;
+            margin: 0 auto;
             background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
             color: #ffffff;
-            padding: 14px 22px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            padding: 14px 42px 14px 18px;
+            border-radius: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
             z-index: 999999;
-            font-size: 14px;
-            font-family: sans-serif;
+            font-size: 13.5px;
+            font-family: inherit;
             font-weight: 600;
-            max-width: 350px;
+            line-height: 1.4;
             transition: opacity 0.3s ease;
         `;
-        toast.innerHTML = message;
+        toast.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <span>${message}</span>
+                <button type="button" style="background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px; opacity: 0.85;">&times;</button>
+            </div>
+        `;
+        const closeBtn = toast.querySelector('button');
+        if (closeBtn) {
+            closeBtn.onclick = () => toast.remove();
+        }
         document.body.appendChild(toast);
 
         setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }
         }, 6000);
+    }
+
+    showBlockedGuideModal() {
+        const existing = document.getElementById('rey-push-blocked-modal');
+        if (existing) {
+            existing.remove();
+        }
+
+        const modal = document.createElement('div');
+        modal.id = 'rey-push-blocked-modal';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px;';
+        modal.innerHTML = `
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; max-width: 420px; width: 100%; color: #fff; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); font-family: inherit; position: relative;">
+                <button type="button" id="btn-close-blocked-modal-x" style="position: absolute; top: 14px; right: 16px; background: none; border: none; color: #94a3b8; font-size: 26px; cursor: pointer; line-height: 1;">&times;</button>
+                <div style="text-align: center; margin-bottom: 16px;">
+                    <div style="font-size: 38px; margin-bottom: 6px;">🔔⚠️</div>
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #fbbf24;">Permiso bloqueado en este sitio</h4>
+                </div>
+                <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.5; margin-bottom: 14px;">
+                    Las notificaciones generales de Chrome en tu celular están activadas, pero <strong>dentro del navegador el sitio reybingo.com quedó bloqueado</strong>.
+                </p>
+                <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 14px; margin-bottom: 18px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <span style="background: #3b82f6; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; font-weight: bold;">1</span>
+                        <span>En la barra de direcciones superior, toca el <strong>icono de ajustes/candado</strong> junto a <code>reybingo.com</code>.</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <span style="background: #3b82f6; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; font-weight: bold;">2</span>
+                        <span>Toca en <strong>Permisos</strong>.</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <span style="background: #3b82f6; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; font-weight: bold;">3</span>
+                        <span>Cambia <strong>Notificaciones</strong> a <span style="color: #34d399; font-weight: bold;">Permitir</span>.</span>
+                    </div>
+                </div>
+                <button type="button" id="btn-close-blocked-modal" style="width: 100%; background: #3b82f6; color: white; border: none; border-radius: 10px; padding: 11px; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(59,130,246,0.4);">
+                    Entendido, voy a cambiarlo
+                </button>
+            </div>
+        `;
+
+        const closeModal = () => modal.remove();
+        modal.querySelector('#btn-close-blocked-modal-x').onclick = closeModal;
+        modal.querySelector('#btn-close-blocked-modal').onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        document.body.appendChild(modal);
     }
 }
 
