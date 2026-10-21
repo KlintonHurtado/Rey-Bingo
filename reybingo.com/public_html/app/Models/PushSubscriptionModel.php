@@ -15,6 +15,8 @@ class PushSubscriptionModel extends Model
     protected $createdField = 'created_at';
     protected $updatedField = 'updated_at';
 
+    private static bool $tableEnsured = false;
+
     public function __construct()
     {
         parent::__construct();
@@ -23,6 +25,10 @@ class PushSubscriptionModel extends Model
 
     public function ensureTable(): void
     {
+        if (self::$tableEnsured) {
+            return;
+        }
+        self::$tableEnsured = true;
         try {
             $db = \Config\Database::connect();
             $db->query("CREATE TABLE IF NOT EXISTS `push_subscriptions` (

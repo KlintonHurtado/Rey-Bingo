@@ -92,8 +92,8 @@ class PushNotificationService
                 ];
 
                 $client = new \GuzzleHttp\Client([
-                    'connect_timeout' => 5,
-                    'timeout' => 10,
+                    'connect_timeout' => 2.0,
+                    'timeout' => 3.5,
                     'allow_redirects' => false,
                 ]);
                 $this->webPush = new ParallelWebPush(
@@ -135,7 +135,7 @@ class PushNotificationService
         $url = $payload['url'] ?? base_url('/');
         $tag = $payload['tag'] ?? 'rey-bingo-' . time();
         $icon = $payload['icon'] ?? base_url('assets/img/logo.png');
-        $badge = $payload['badge'] ?? base_url('assets/img/badge.png');
+        $badge = $payload['badge'] ?? base_url('assets/img/logo.png');
 
         return [
             'title' => $title,
@@ -155,11 +155,11 @@ class PushNotificationService
             'actions' => [
                 [
                     'action' => 'view',
-                    'title' => '🎮 Entrar a Jugar'
+                    'title' => 'Entrar a Jugar'
                 ],
                 [
                     'action' => 'close',
-                    'title' => '❌ Cerrar'
+                    'title' => 'Cerrar'
                 ]
             ]
         ];
@@ -265,7 +265,7 @@ class PushNotificationService
         $sentEndpoints = [];
         $failedSubscriptions = [];
 
-        // 1. Intentar envío masivo con Minishlink WebPush
+        // 1. Envío masivo con Minishlink WebPush (despacho concurrente paralelo)
         if ($this->webPush && class_exists('\Minishlink\WebPush\Subscription')) {
             try {
                 foreach ($subscriptions as $sub) {
@@ -273,39 +273,26 @@ class PushNotificationService
                 }
 
                 $queuedResult = $this->sendQueued();
-                $expiredEndpoints = [];
                 if (!empty($queuedResult['results'])) {
                     foreach ($queuedResult['results'] as $r) {
                         if (!empty($r['success']) && !empty($r['endpoint'])) {
                             $sentEndpoints[$r['endpoint']] = true;
-                        } elseif (!empty($r['expired']) && !empty($r['endpoint'])) {
-                            $expiredEndpoints[$r['endpoint']] = true;
                         }
                     }
                 }
             } catch (\Throwable $e) {
                 log_message('error', 'PushNotificationService sendToAll WebPush error: ' . $e->getMessage());
             }
-
-            foreach ($subscriptions as $sub) {
-                $ep = $sub['endpoint'] ?? '';
-                // No intentar tickle fallback en endpoints que FCM ya confirmó como expirados/eliminados
-                if (!empty($ep) && empty($sentEndpoints[$ep]) && empty($expiredEndpoints[$ep])) {
-                    $failedSubscriptions[] = $sub;
-                }
-            }
         } else {
-            $failedSubscriptions = $subscriptions;
-        }
-
-        // 2. Para los endpoints que no recibieron vía Minishlink, enviar vía fallback nativo VAPID (tickle)
-        foreach ($failedSubscriptions as $sub) {
-            try {
-                if ($this->sendViaNativeVapid($sub, $payload)) {
-                    $sentEndpoints[$sub['endpoint']] = true;
+            // Minishlink no disponible: Fallback nativo VAPID sin dependencias
+            foreach ($subscriptions as $sub) {
+                try {
+                    if ($this->sendViaNativeVapid($sub, $payload)) {
+                        $sentEndpoints[$sub['endpoint']] = true;
+                    }
+                } catch (\Throwable $e) {
+                    log_message('error', 'PushNotificationService sendToAll fallback error: ' . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                log_message('error', 'PushNotificationService sendToAll fallback error: ' . $e->getMessage());
             }
         }
 
@@ -390,8 +377,8 @@ class PushNotificationService
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
         $response = curl_exec($ch);
@@ -404,9 +391,9 @@ class PushNotificationService
             return true;
         }
 
-        // Si la suscripción expiró (404 Not Found o 410 Gone), eliminar de la base de datos
-        if ($httpCode === 404 || $httpCode === 410) {
-            log_message('info', "Suscripción expirada (HTTP {$httpCode}), eliminando endpoint: {$endpoint}");
+        // Si la suscripción expiró o es inválida (400, 401, 403, 404, 410), eliminar de la base de datos
+        if (in_array($httpCode, [400, 401, 403, 404, 410], true)) {
+            log_message('info', "Suscripción expirada/inválida (HTTP {$httpCode}), eliminando endpoint: {$endpoint}");
             try {
                 $this->subscriptionModel->where('endpoint', $endpoint)->delete();
             } catch (\Throwable $e) {
@@ -595,7 +582,7 @@ class PushNotificationService
                 $reason = $report->getReason();
                 $response = $report->getResponse();
                 $statusCode = $response ? $response->getStatusCode() : 0;
-                $isExpired = $report->isSubscriptionExpired();
+                $isDead = $isExpired || in_array($statusCode, [400, 401, 403, 404, 410], true);
 
                 if ($isSuccess) {
                     $totalSent++;
@@ -604,12 +591,12 @@ class PushNotificationService
                     $totalFailed++;
                     log_message('error', "Push notification falló a {$endpoint} (HTTP {$statusCode}): {$reason}");
 
-                    if ($isExpired) {
+                    if ($isDead && !empty($endpoint)) {
                         try {
                             $this->subscriptionModel->where('endpoint', $endpoint)->delete();
-                            log_message('info', "Suscripción expirada eliminada (HTTP {$statusCode}): {$endpoint}");
+                            log_message('info', "Suscripción expirada/inválida eliminada (HTTP {$statusCode}): {$endpoint}");
                         } catch (\Throwable $ex) {
-                            log_message('error', "Error eliminando suscripción expirada: " . $ex->getMessage());
+                            log_message('error', "Error eliminando suscripción: " . $ex->getMessage());
                         }
                     }
                 }
@@ -619,7 +606,7 @@ class PushNotificationService
                     'endpoint' => $endpoint,
                     'reason' => $reason,
                     'status_code' => $statusCode,
-                    'expired' => $isExpired
+                    'expired' => $isDead
                 ];
             }
         } catch (\Throwable $e) {

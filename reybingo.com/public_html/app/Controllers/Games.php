@@ -3252,29 +3252,6 @@ class Games extends Controller {
                 $batchNotifications[] = $notificationData;
             }
 
-            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
-            try {
-                $pushService = new PushNotificationService();
-                $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
-                    'body' => $gameMessage,
-                    'game' => $gameId,
-                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
-                    'tag' => 'game-' . $gameId,
-                    'requireInteraction' => true
-                ];
-
-                $pushResult = $pushService->sendToAll($pushPayload);
-                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
-                    log_message('warning', 'Push Web parcial o fallido al crear partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
-                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
-                        . ', total=' . (int) ($pushResult['total'] ?? 0));
-                }
-            } catch (\Throwable $e) {
-                log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
-            }
-
             if (!empty($batchNotifications)) {
                 $modelNotifications->insertBatch($batchNotifications);
 
@@ -3302,6 +3279,29 @@ class Games extends Controller {
                         log_message('error', 'WebSocket broadcast for new game failed: ' . $bwe->getMessage());
                     }
                 }
+            }
+
+            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos de forma rápida
+            try {
+                $pushService = new PushNotificationService();
+                $pushPayload = [
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
+                    'body' => $gameMessage,
+                    'game' => $gameId,
+                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                    'tag' => 'game-' . $gameId,
+                    'requireInteraction' => true
+                ];
+
+                $pushResult = $pushService->sendToAll($pushPayload);
+                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                    log_message('warning', 'Push Web parcial o fallido al crear partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
             }
         }
 
@@ -3729,29 +3729,6 @@ class Games extends Controller {
                 $batchNotifications[] = $notificationData;
             }
 
-            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos
-            try {
-                $pushService = new PushNotificationService();
-                $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
-                    'body' => $gameMessage,
-                    'game' => $gameId,
-                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
-                    'tag' => 'game-' . $gameId,
-                    'requireInteraction' => true
-                ];
-
-                $pushResult = $pushService->sendToAll($pushPayload);
-                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
-                    log_message('warning', 'Push Web parcial o fallido al iniciar partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
-                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
-                        . ', total=' . (int) ($pushResult['total'] ?? 0));
-                }
-            } catch (\Throwable $e) {
-                log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
-            }
-
             if (!empty($batchNotifications)) {
                 $modelNotifications->insertBatch($batchNotifications);
 
@@ -3774,9 +3751,32 @@ class Games extends Controller {
                             ]);
                         }
                     } catch (\Throwable $bwe) {
-                        log_message('error', 'WebSocket broadcast for updated game failed: ' . $bwe->getMessage());
+                        log_message('error', 'WebSocket broadcast on start game failed: ' . $bwe->getMessage());
                     }
                 }
+            }
+
+            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos de forma rápida
+            try {
+                $pushService = new PushNotificationService();
+                $pushPayload = [
+                    'title' => 'Nueva partida',
+                    'message' => $gameMessage,
+                    'body' => $gameMessage,
+                    'game' => $gameId,
+                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                    'tag' => 'game-' . $gameId,
+                    'requireInteraction' => true
+                ];
+
+                $pushResult = $pushService->sendToAll($pushPayload);
+                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                    log_message('warning', 'Push Web parcial o fallido al iniciar partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
             }
         }
 
