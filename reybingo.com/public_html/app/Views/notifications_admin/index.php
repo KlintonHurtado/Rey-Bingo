@@ -1,353 +1,289 @@
-<?php
-$user = $user ?? [];
-$imagePath = $imagePath ?? site_url('assets/img/avatar.jpg');
-$pushSubscriptionsCount = $pushSubscriptionsCount ?? 0;
-$activeGamesCount = $activeGamesCount ?? 0;
-$templates = $templates ?? [];
-$notifications = $notifications ?? [];
-$users = $users ?? [];
-?>
-
-<div class="admin-stores-scroll">
-<?= view('games/partials/admin_nav_cluster', [
-    'activeNav' => 'notifications',
-    'showHome' => true,
-    'showStatistics' => false,
-    'showUsers' => false,
-]) ?>
-
-<a class="btn btn-small btn-logout" href="<?= site_url('logout'); ?>" title="Cerrar sesión">
+<a href="<?= site_url('games'); ?>" class="btn-top-right btn-profile-logout" title="Regresar al Panel">
     <i class="fa-duotone fa-solid fa-arrow-right-from-arc"></i>
 </a>
 
-<div class="container admin-stores-page admin-notifications-page pb-5">
+<div class="container-fluid px-lg-5 admin-stores-page admin-notifications-page pb-5">
     <div class="row justify-content-center">
-        <div class="col-12 col-xl-11">
+        <div class="col-12 col-xxl-11">
 
-            <!-- Encabezado Principal y KPIs -->
+            <!-- Card Principal -->
             <div class="card mb-3 admin-stores-card border-0 shadow-sm">
                 <div class="card-body p-3 p-md-4">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 border-bottom pb-3">
-                        <div>
-                            <h4 class="mb-1 text-dark fw-bold d-flex align-items-center gap-2">
-                                <i class="fa-duotone fa-solid fa-bell text-primary"></i>
-                                Centro de Notificaciones
-                            </h4>
-                            <p class="text-muted small mb-0">
-                                Personaliza, crea y guarda plantillas. Envía notificaciones Push a móviles y avisos en pantalla en vivo a los jugadores en tiempo real.
-                            </p>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 d-inline-flex align-items-center gap-1 rounded-pill">
-                                <i class="fa-solid fa-bolt"></i> Live Realtime (Soketi)
-                            </span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 d-inline-flex align-items-center gap-1 rounded-pill">
-                                <i class="fa-solid fa-mobile-screen-button"></i> <?= (int)$pushSubscriptionsCount ?> Dispositivos Push
-                            </span>
-                            <?php if ($activeGamesCount > 0) : ?>
-                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-2 d-inline-flex align-items-center gap-1 rounded-pill">
-                                    <i class="fa-solid fa-gamepad text-warning"></i> <?= (int)$activeGamesCount ?> Partidas en Vivo
-                                </span>
-                            <?php endif; ?>
-                        </div>
+                    <div class="mb-3">
+                        <h4 class="mb-0 text-dark fw-bold d-flex align-items-center gap-2">
+                            <i class="fa-duotone fa-solid fa-bell text-primary"></i>
+                            Centro de Notificaciones
+                        </h4>
                     </div>
 
                     <!-- Contenedor para mensajes de respuesta -->
                     <div id="notif-alert-container"></div>
 
-                    <!-- Fila dividida: Formulario (Izquierda) y Vista Previa + Plantillas (Derecha) -->
+                    <!-- Fila dividida: Buscador + Notificaciones Guardadas (Izquierda) y Pantalla de Notificación + Envío (Derecha) -->
                     <div class="row g-4 mt-1">
 
-                        <!-- COLUMNA IZQUIERDA: Formulario de Redacción y Envío -->
-                        <div class="col-lg-7">
-                            <div class="p-3 p-md-4 rounded-4" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                                    <h5 class="text-dark fw-bold mb-0 d-flex align-items-center gap-2">
-                                        <i class="fa-duotone fa-solid fa-paper-plane text-primary"></i>
-                                        Redactar Notificación
-                                    </h5>
-                                    <span class="badge bg-primary-subtle text-primary fw-semibold small">Cualquier Texto</span>
+                        <!-- COLUMNA IZQUIERDA: Buscador y Notificaciones Guardadas -->
+                        <div class="col-lg-4 col-md-5">
+                            <div class="p-3 rounded-4 h-100" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                <!-- Encabezado lista -->
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h6 class="text-dark fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 0.92rem;">
+                                        <i class="fa-duotone fa-solid fa-bookmark text-primary"></i>
+                                        Notificaciones Guardadas
+                                    </h6>
+                                    <span class="badge bg-primary-subtle text-primary fw-bold rounded-pill" id="templates-count-badge"><?= count($templates) ?></span>
                                 </div>
 
-                                <form id="form-send-notification" autocomplete="off">
-                                    <?= csrf_field() ?>
+                                <!-- Buscador -->
+                                <div class="input-group mb-3 shadow-sm rounded-3 overflow-hidden border">
+                                    <span class="input-group-text bg-white border-0 text-muted ps-3">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                    </span>
+                                    <input 
+                                        type="text" 
+                                        id="template-search" 
+                                        class="form-control border-0 py-2" 
+                                        placeholder="Buscar notificación..." 
+                                        style="box-shadow: none; font-size: 0.88rem;"
+                                    >
+                                    <button class="btn btn-white border-0 text-muted pe-3" type="button" id="btn-clear-search" style="display: none;">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
 
-                                    <!-- Selector Rápido de Plantillas -->
-                                    <div class="mb-3">
-                                        <label class="form-label text-dark small fw-semibold d-flex justify-content-between">
-                                            <span><i class="fa-duotone fa-solid fa-bookmark text-warning me-1"></i> Cargar Plantilla Guardada:</span>
-                                            <a href="#saved-templates-section" class="text-primary text-decoration-none small">Ver guardadas</a>
-                                        </label>
-                                        <select class="form-select" id="quick-template-select">
-                                            <option value="">-- Selecciona una plantilla para rellenar rápido --</option>
-                                            <?php foreach ($templates as $tmpl) : ?>
-                                                <option 
-                                                    value="<?= $tmpl['id'] ?>" 
-                                                    data-title="<?= esc($tmpl['title_template'] ?? '') ?>" 
-                                                    data-message="<?= esc($tmpl['message_template'] ?? '') ?>"
-                                                    data-url="<?= esc($tmpl['action_url_template'] ?? '') ?>"
+                                <!-- Lista de Notificaciones Guardadas -->
+                                <div id="templates-list-container" class="d-flex flex-column gap-2" style="max-height: 540px; overflow-y: auto; padding-right: 4px;">
+                                    <?php if (empty($templates)) : ?>
+                                        <div class="text-center py-4 text-muted small" id="templates-none-initial">
+                                            <i class="fa-solid fa-inbox fs-3 d-block mb-2 text-secondary opacity-50"></i>
+                                            No tienes notificaciones guardadas aún.
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modal-create-template">
+                                                    <i class="fa-solid fa-plus me-1"></i> Crear Primera
+                                                </button>
+                                            </div>
+                                        </div>
+                                    <?php else : ?>
+                                        <?php foreach ($templates as $idx => $tmpl) : ?>
+                                            <div 
+                                                class="saved-template-card p-3 rounded-3 border d-flex justify-content-between align-items-start gap-2 shadow-sm position-relative <?= $idx === 0 ? 'active-template' : '' ?>"
+                                                id="tmpl-card-<?= $tmpl['id'] ?>"
+                                                data-id="<?= $tmpl['id'] ?>"
+                                                data-name="<?= esc($tmpl['name']) ?>"
+                                                data-title="<?= esc($tmpl['title_template'] ?? '') ?>"
+                                                data-message="<?= esc($tmpl['message_template'] ?? '') ?>"
+                                                role="button"
+                                                tabindex="0"
+                                            >
+                                                <div class="flex-grow-1" style="min-width: 0;">
+                                                    <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                                                        <strong class="text-dark text-truncate tmpl-card-name" style="font-size: 0.88rem;">
+                                                            <?= esc($tmpl['name']) ?>
+                                                        </strong>
+                                                    </div>
+                                                    <div class="text-primary small fw-semibold text-truncate tmpl-card-title mb-1" style="font-size: 0.8rem;">
+                                                        <?= esc($tmpl['title_template'] ?? '') ?>
+                                                    </div>
+                                                    <p class="text-muted small mb-0 tmpl-card-message" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.77rem; line-height: 1.35;">
+                                                        <?= esc($tmpl['message_template'] ?? '') ?>
+                                                    </p>
+                                                </div>
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-sm text-danger p-0 ms-1 opacity-50 hover-opacity-100 btn-del-tmpl" 
+                                                    data-id="<?= $tmpl['id'] ?>" 
+                                                    title="Eliminar notificación"
+                                                    onclick="event.stopPropagation();"
                                                 >
-                                                    <?= esc($tmpl['name']) ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <!-- Título -->
-                                    <div class="mb-3">
-                                        <label for="notif-title" class="form-label text-dark small fw-semibold d-flex justify-content-between">
-                                            <span>Título de la Notificación: <span class="text-danger">*</span></span>
-                                            <span id="title-char-count" class="text-muted small">0/80</span>
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            class="form-control fw-semibold" 
-                                            id="notif-title" 
-                                            name="title" 
-                                            maxlength="80" 
-                                            placeholder="Ej: 🎉 ¡Gran Pozo Acumulado Esta Noche!" 
-                                            required
-                                        >
-                                    </div>
-
-                                    <!-- Mensaje (Cualquier texto) -->
-                                    <div class="mb-3">
-                                        <label for="notif-message" class="form-label text-dark small fw-semibold d-flex justify-content-between">
-                                            <span>Mensaje Personalizado: <span class="text-danger">*</span></span>
-                                            <span id="msg-char-count" class="text-muted small">0/280</span>
-                                        </label>
-                                        <textarea 
-                                            class="form-control" 
-                                            id="notif-message" 
-                                            name="message" 
-                                            rows="4" 
-                                            maxlength="280" 
-                                            placeholder="Escribe aquí cualquier texto que desees enviar a los jugadores (anuncios, promociones, avisos en live, premios, etc.)..." 
-                                            required
-                                        ></textarea>
-                                    </div>
-
-                                    <!-- Destinatarios y Enlace -->
-                                    <div class="row g-3 mb-3">
-                                        <div class="col-sm-6">
-                                            <label for="notif-segment" class="form-label text-dark small fw-semibold">
-                                                <i class="fa-duotone fa-solid fa-users text-primary me-1"></i> Destinatarios:
-                                            </label>
-                                            <select class="form-select" id="notif-segment" name="segment">
-                                                <option value="all" selected>📢 Todos los Jugadores</option>
-                                                <option value="live_games">🎮 Jugadores en Salas Activas (Live)</option>
-                                                <option value="pro">⭐ Usuarios Pro / VIP</option>
-                                                <option value="specific">👤 Usuario Específico</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label for="notif-action-url" class="form-label text-dark small fw-semibold">
-                                                <i class="fa-duotone fa-solid fa-link text-primary me-1"></i> Enlace de Acción (Opcional):
-                                            </label>
-                                            <input 
-                                                type="url" 
-                                                class="form-control" 
-                                                id="notif-action-url" 
-                                                name="action_url" 
-                                                placeholder="<?= site_url('games') ?>"
-                                            >
-                                        </div>
-                                    </div>
-
-                                    <!-- Selector de usuario específico (oculto por defecto) -->
-                                    <div class="mb-3" id="specific-user-wrapper" style="display: none;">
-                                        <label for="notif-user-id" class="form-label text-dark small fw-semibold">
-                                            Seleccionar Usuario Específico:
-                                        </label>
-                                        <select class="form-select" id="notif-user-id" name="user_id">
-                                            <option value="">-- Buscar jugador --</option>
-                                            <?php foreach ($users as $u) : ?>
-                                                <option value="<?= $u['id'] ?>">
-                                                    <?= esc($u['username']) ?> (<?= esc(trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? ''))) ?>) #<?= $u['id'] ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <!-- Canales de Entrega (Live + Push) -->
-                                    <div class="p-3 mb-3 rounded-3" style="background: #ffffff; border: 1px solid #e2e8f0;">
-                                        <label class="form-label text-dark small fw-bold mb-2 d-block">
-                                            <i class="fa-duotone fa-solid fa-tower-broadcast text-warning me-1"></i> Canales de Envío Simultáneos:
-                                        </label>
-                                        <div class="row g-3">
-                                            <div class="col-sm-6">
-                                                <div class="form-check form-switch custom-notif-switch">
-                                                    <input class="form-check-input" type="checkbox" role="switch" id="channel-live" name="send_live" value="1" checked>
-                                                    <label class="form-check-label text-dark small ms-1" for="channel-live">
-                                                        <strong class="d-block text-dark">Notificación en Live</strong>
-                                                        <span class="text-muted" style="font-size: 0.74rem;">Aparece en pantalla en salas, partidas y sitio (WebSocket).</span>
-                                                    </label>
-                                                </div>
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
                                             </div>
-                                            <div class="col-sm-6">
-                                                <div class="form-check form-switch custom-notif-switch">
-                                                    <input class="form-check-input" type="checkbox" role="switch" id="channel-push" name="send_push" value="1" checked>
-                                                    <label class="form-check-label text-dark small ms-1" for="channel-push">
-                                                        <strong class="d-block text-dark">Notificación Push</strong>
-                                                        <span class="text-muted" style="font-size: 0.74rem;">Llega a teléfonos y navegadores (Service Worker).</span>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
 
-                                    <!-- Opción Guardar como Plantilla -->
-                                    <div class="mb-4">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="check-save-template" name="save_as_template" value="1">
-                                            <label class="form-check-label text-dark small fw-semibold" for="check-save-template">
-                                                <i class="fa-duotone fa-solid fa-floppy-disk text-primary me-1"></i> Guardar también como plantilla reutilizable
-                                            </label>
-                                        </div>
-                                        <div id="template-name-wrapper" style="display: none;">
-                                            <input 
-                                                type="text" 
-                                                class="form-control form-control-sm" 
-                                                id="template-name" 
-                                                name="template_name" 
-                                                placeholder="Nombre de la plantilla (ej: Pozo Acumulado Fin de Semana)"
-                                            >
-                                        </div>
+                                    <div id="templates-empty-state" class="text-center py-4 text-muted small" style="display: none;">
+                                        <i class="fa-solid fa-folder-open fs-3 d-block mb-2 text-secondary opacity-50"></i>
+                                        No se encontraron notificaciones guardadas.
                                     </div>
+                                </div>
+                            </div>
+                        </div>
 
-                                    <!-- BOTÓN DE TIPO ENVIAR -->
+                        <!-- COLUMNA DERECHA: Botón de Crear, Notificación y Botón de Enviar -->
+                        <div class="col-lg-8 col-md-7">
+                            <div class="p-3 p-md-4 rounded-4" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                <!-- Barra Superior: Indicador a la izquierda y Botón de Crear Notificación a la derecha -->
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill fw-semibold small d-inline-flex align-items-center gap-1">
+                                            <i class="fa-solid fa-bell"></i> Notificación en Pantalla
+                                        </span>
+                                        <span id="selected-template-name" class="text-muted small text-truncate d-none d-sm-inline" style="max-width: 260px;"></span>
+                                    </div>
                                     <button 
                                         type="button" 
-                                        id="btn-send-now" 
-                                        class="btn btn-primary btn-lg w-100 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm"
-                                        style="background: linear-gradient(145deg, #8767fa, #6236ff); border: 0; padding: 12px 24px; font-size: 1rem;"
+                                        class="btn btn-primary fw-semibold d-inline-flex align-items-center gap-2 px-3 py-2 rounded-3 shadow-sm"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modal-create-template"
+                                        id="btn-open-create-modal"
+                                        style="background: linear-gradient(145deg, #8767fa, #6236ff); border: 0;"
                                     >
-                                        <i class="fa-solid fa-paper-plane" id="btn-send-icon"></i>
-                                        <span id="btn-send-text">Enviar Notificación Ahora</span>
+                                        <i class="fa-solid fa-plus-circle"></i>
+                                        <span>Crear Notificación</span>
                                     </button>
+                                </div>
+
+                                <!-- Formulario de Notificación (Área Central) -->
+                                <form id="form-send-notification" autocomplete="off">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="segment" value="all">
+                                    <input type="hidden" name="send_live" value="1">
+                                    <input type="hidden" name="send_push" value="1">
+
+                                    <div class="bg-white p-3 p-md-4 rounded-3 border mb-3 shadow-sm">
+                                        <!-- Título -->
+                                        <div class="mb-3">
+                                            <label for="notif-title" class="form-label text-dark small fw-bold d-flex justify-content-between">
+                                                <span>Título de la Notificación: <span class="text-danger">*</span></span>
+                                                <span id="title-char-count" class="text-muted small">0/80</span>
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                class="form-control fw-bold" 
+                                                id="notif-title" 
+                                                name="title" 
+                                                maxlength="80" 
+                                                placeholder="Ej: 🎉 ¡Gran Pozo Acumulado Esta Noche!" 
+                                                required
+                                                style="font-size: 0.95rem; padding: 10px 14px;"
+                                            >
+                                        </div>
+
+                                        <!-- Mensaje -->
+                                        <div class="mb-3">
+                                            <label for="notif-message" class="form-label text-dark small fw-bold d-flex justify-content-between">
+                                                <span>Mensaje de la Notificación: <span class="text-danger">*</span></span>
+                                                <span id="msg-char-count" class="text-muted small">0/280</span>
+                                            </label>
+                                            <textarea 
+                                                class="form-control" 
+                                                id="notif-message" 
+                                                name="message" 
+                                                rows="5" 
+                                                maxlength="280" 
+                                                placeholder="Escribe aquí el texto que se enviará en vivo y push a todos los jugadores..." 
+                                                required
+                                                style="font-size: 0.92rem; line-height: 1.5; padding: 12px 14px;"
+                                            ></textarea>
+                                        </div>
+
+                                        <!-- Previsualización en Vivo de la Notificación -->
+                                        <div class="p-3 rounded-3 position-relative" style="background: linear-gradient(135deg, #231942, #1b0e36); border-left: 4px solid #8767fa; border: 1px solid rgba(255, 255, 255, 0.12);">
+                                            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                                <h6 class="fw-bold mb-0 text-white" id="preview-live-title" style="font-size: 0.88rem;">
+                                                    🎉 ¡Gran Pozo Acumulado Esta Noche!
+                                                </h6>
+                                                <span class="badge bg-success" style="font-size: 0.65rem;">LIVE & PUSH</span>
+                                            </div>
+                                            <div class="text-white-50 small" id="preview-live-message" style="line-height: 1.35; font-size: 0.8rem;">
+                                                Coloca aquí cualquier texto que desees enviar a los jugadores...
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Botón de enviar Notificación (Centrado y destacado como en el boceto) -->
+                                    <div class="text-center pt-2">
+                                        <button 
+                                            type="button" 
+                                            id="btn-send-now" 
+                                            class="btn btn-primary btn-lg px-5 py-3 fw-bold rounded-pill shadow d-inline-flex align-items-center justify-content-center gap-2"
+                                            style="background: linear-gradient(145deg, #8767fa, #6236ff); border: 0; min-width: 290px; font-size: 1.05rem;"
+                                        >
+                                            <i class="fa-solid fa-paper-plane" id="btn-send-icon"></i>
+                                            <span id="btn-send-text">Enviar Notificación</span>
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
 
-                        <!-- COLUMNA DERECHA: Vista Previa y Plantillas Guardadas -->
-                        <div class="col-lg-5">
-                            <div class="d-flex flex-column gap-3">
-
-                                <!-- CARD: Previsualización Notificación en Pantalla Live -->
-                                <div class="p-3 rounded-4 shadow-sm" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                                            <i class="fa-solid fa-display text-primary me-1"></i> Vista Previa: Pantalla Live
-                                        </span>
-                                        <span class="badge bg-success" style="font-size: 0.65rem;">EN TIEMPO REAL</span>
-                                    </div>
-                                    
-                                    <!-- Toast Mockup representando la pantalla del bingo -->
-                                    <div class="p-3 rounded-3 shadow position-relative" style="background: linear-gradient(135deg, #231942, #1b0e36); border-left: 4px solid #8767fa; border: 1px solid rgba(255, 255, 255, 0.12);">
-                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                                            <h6 class="fw-bold mb-0 text-white" id="preview-live-title" style="font-size: 0.9rem;">
-                                                🎉 ¡Gran Pozo Acumulado Esta Noche!
-                                            </h6>
-                                            <span class="text-white-50" style="font-size: 0.7rem;">Ahora</span>
-                                        </div>
-                                        <div class="text-white-50 small mb-2" id="preview-live-message" style="line-height: 1.35; font-size: 0.82rem;">
-                                            Coloca aquí cualquier texto que desees enviar a los jugadores...
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center pt-1 border-top border-white-subtle" style="font-size: 0.7rem;">
-                                            <span class="text-white-50"><i class="fa-regular fa-hand-point-right text-warning me-1"></i> Desliza para cerrar</span>
-                                            <span class="text-info fw-semibold">Rey Bingo Live</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- CARD: Previsualización Notificación Push Móvil -->
-                                <div class="p-3 rounded-4 shadow-sm" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                                            <i class="fa-solid fa-mobile-screen text-primary me-1"></i> Vista Previa: Notificación Push
-                                        </span>
-                                        <span class="badge bg-info text-dark" style="font-size: 0.65rem;">CELULAR / NAVEGADOR</span>
-                                    </div>
-                                    
-                                    <!-- Mobile Push Mockup (estilo smartphone limpio) -->
-                                    <div class="p-2 px-3 rounded-3 shadow-sm position-relative" style="background: #ffffff; border: 1px solid #e2e8f0;">
-                                        <div class="d-flex align-items-center gap-2 mb-1">
-                                            <img src="<?= site_url('assets/img/logo.png'); ?>" alt="logo" style="width: 18px; height: 18px; border-radius: 4px;" onerror="this.src='<?= site_url('assets/img/avatar.jpg') ?>';">
-                                            <strong class="text-dark small" style="font-size: 0.75rem;">Rey Bingo</strong>
-                                            <span class="text-muted ms-auto" style="font-size: 0.65rem;">ahora</span>
-                                        </div>
-                                        <div class="text-dark fw-semibold small mb-1" id="preview-push-title" style="font-size: 0.82rem;">
-                                            🎉 ¡Gran Pozo Acumulado Esta Noche!
-                                        </div>
-                                        <div class="text-muted small" id="preview-push-message" style="font-size: 0.77rem; line-height: 1.3;">
-                                            Coloca aquí cualquier texto que desees enviar a los jugadores...
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- CARD: Plantillas Guardadas ("Tenerlas ahí") -->
-                                <div class="p-3 rounded-4 shadow-sm" id="saved-templates-section" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-dark fw-bold small text-uppercase" style="letter-spacing: 0.5px;">
-                                            <i class="fa-duotone fa-solid fa-bookmark text-warning me-1"></i> Plantillas Guardadas
-                                        </span>
-                                        <span class="badge bg-primary rounded-pill" id="templates-count-badge"><?= count($templates) ?></span>
-                                    </div>
-                                    <p class="text-muted small mb-2" style="font-size: 0.75rem;">
-                                        Pulsa <strong>Usar</strong> para cargar la plantilla en el formulario al instante.
-                                    </p>
-
-                                    <div class="d-flex flex-column gap-2" id="templates-list-container" style="max-height: 250px; overflow-y: auto; padding-right: 4px;">
-                                        <?php if (empty($templates)) : ?>
-                                            <div class="text-muted text-center py-3 small">
-                                                No hay plantillas guardadas aún. Crea una activando "Guardar como plantilla".
-                                            </div>
-                                        <?php else : ?>
-                                            <?php foreach ($templates as $tmpl) : ?>
-                                                <div class="template-item p-2 rounded-3 d-flex justify-content-between align-items-center gap-2 shadow-sm" style="background: #ffffff; border: 1px solid #e2e8f0;" id="tmpl-card-<?= $tmpl['id'] ?>">
-                                                    <div style="min-width: 0;">
-                                                        <strong class="d-block text-dark text-truncate" style="font-size: 0.8rem;"><?= esc($tmpl['name']) ?></strong>
-                                                        <span class="text-muted text-truncate d-block" style="font-size: 0.72rem;"><?= esc($tmpl['title_template'] ?? '') ?></span>
-                                                    </div>
-                                                    <div class="d-flex gap-1 flex-shrink-0">
-                                                        <button 
-                                                            type="button" 
-                                                            class="btn btn-sm btn-outline-primary py-0 px-2 btn-apply-tmpl" 
-                                                            style="font-size: 0.72rem;"
-                                                            data-title="<?= esc($tmpl['title_template'] ?? '') ?>"
-                                                            data-message="<?= esc($tmpl['message_template'] ?? '') ?>"
-                                                            data-url="<?= esc($tmpl['action_url_template'] ?? '') ?>"
-                                                            title="Cargar al formulario"
-                                                        >
-                                                            Usar
-                                                        </button>
-                                                        <button 
-                                                            type="button" 
-                                                            class="btn btn-sm btn-outline-danger py-0 px-2 btn-del-tmpl" 
-                                                            style="font-size: 0.72rem;"
-                                                            data-id="<?= $tmpl['id'] ?>"
-                                                            title="Eliminar plantilla"
-                                                        >
-                                                            <i class="fa-solid fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
 
-
-
         </div>
     </div>
 </div>
+
+<!-- MODAL: Crear Notificación Guardada -->
+<div class="modal fade" id="modal-create-template" tabindex="-1" aria-labelledby="modalCreateTmplLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom py-3 px-4">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="modalCreateTmplLabel">
+                    <i class="fa-duotone fa-solid fa-plus-circle text-primary"></i>
+                    Crear Notificación Guardada
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="modal-alert-container"></div>
+                <form id="form-create-modal-template" autocomplete="off">
+                    <div class="mb-3">
+                        <label for="modal-tmpl-name" class="form-label text-dark small fw-bold">
+                            Nombre de Referencia: <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="modal-tmpl-name" 
+                            placeholder="Ej: Pozo Acumulado Fin de Semana" 
+                            required
+                        >
+                        <div class="form-text small">Nombre para identificarla en tu lista izquierda.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal-tmpl-title" class="form-label text-dark small fw-bold">
+                            Título de la Notificación: <span class="text-danger">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            class="form-control fw-semibold" 
+                            id="modal-tmpl-title" 
+                            maxlength="80" 
+                            placeholder="Ej: 🎉 ¡Gran Pozo Acumulado Esta Noche!" 
+                            required
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal-tmpl-message" class="form-label text-dark small fw-bold">
+                            Mensaje: <span class="text-danger">*</span>
+                        </label>
+                        <textarea 
+                            class="form-control" 
+                            id="modal-tmpl-message" 
+                            rows="4" 
+                            maxlength="280" 
+                            placeholder="Escribe el mensaje de la notificación..." 
+                            required
+                        ></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-top py-3 px-4 d-flex justify-content-between">
+                <button type="button" class="btn btn-light px-3" data-bs-dismiss="modal">Cancelar</button>
+                <button 
+                    type="button" 
+                    id="btn-save-modal-template" 
+                    class="btn btn-primary fw-bold px-4 d-inline-flex align-items-center gap-2"
+                    style="background: linear-gradient(145deg, #8767fa, #6236ff); border: 0;"
+                >
+                    <i class="fa-solid fa-floppy-disk" id="btn-save-modal-icon"></i>
+                    <span id="btn-save-modal-text">Guardar Notificación</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Estilos específicos limpios y alineados al diseño de Rey Bingo -->
@@ -368,29 +304,32 @@ $users = $users ?? [];
     box-shadow: 0 0 0 3px rgba(98, 54, 255, 0.18) !important;
     background-color: #ffffff !important;
 }
-.admin-notifications-page .custom-notif-switch .form-check-input {
-    width: 2.75rem;
-    height: 1.4rem;
+.saved-template-card {
+    transition: all 0.2s ease;
     cursor: pointer;
+    background: #ffffff;
+    border-color: #e2e8f0 !important;
 }
-.admin-notifications-page .custom-notif-switch .form-check-input:checked {
-    background-color: #6236ff;
-    border-color: #6236ff;
+.saved-template-card:hover {
+    transform: translateY(-2px);
+    border-color: #c4b5fd !important;
+    box-shadow: 0 4px 12px rgba(98, 54, 255, 0.08) !important;
+}
+.saved-template-card.active-template {
+    border: 2px solid #6236ff !important;
+    background-color: #f5f3ff !important;
+    box-shadow: 0 4px 14px rgba(98, 54, 255, 0.16) !important;
+}
+.hover-opacity-100:hover {
+    opacity: 1 !important;
 }
 </style>
 
-<!-- Script interactivo de Notificaciones (Envío Live + Push, Vista Previa y Plantillas) -->
+<!-- Script interactivo de Notificaciones (Envío Live + Push, Vista Previa, Modal y Buscador) -->
 <script>
 (function() {
     const inputTitle = document.getElementById('notif-title');
     const inputMsg = document.getElementById('notif-message');
-    const inputUrl = document.getElementById('notif-action-url');
-    const inputSegment = document.getElementById('notif-segment');
-    const specificUserWrapper = document.getElementById('specific-user-wrapper');
-    const checkSaveTmpl = document.getElementById('check-save-template');
-    const tmplNameWrapper = document.getElementById('template-name-wrapper');
-    const tmplNameInput = document.getElementById('template-name');
-    const quickTmplSelect = document.getElementById('quick-template-select');
     const btnSend = document.getElementById('btn-send-now');
     const btnSendIcon = document.getElementById('btn-send-icon');
     const btnSendText = document.getElementById('btn-send-text');
@@ -398,20 +337,30 @@ $users = $users ?? [];
 
     const previewLiveTitle = document.getElementById('preview-live-title');
     const previewLiveMsg = document.getElementById('preview-live-message');
-    const previewPushTitle = document.getElementById('preview-push-title');
-    const previewPushMsg = document.getElementById('preview-push-message');
     const titleCount = document.getElementById('title-char-count');
     const msgCount = document.getElementById('msg-char-count');
 
-    // 1. Actualización en tiempo real de previsualizaciones
+    const templateSearch = document.getElementById('template-search');
+    const btnClearSearch = document.getElementById('btn-clear-search');
+    const templatesContainer = document.getElementById('templates-list-container');
+    const templatesCountBadge = document.getElementById('templates-count-badge');
+    const templatesEmptyState = document.getElementById('templates-empty-state');
+    const selectedTemplateName = document.getElementById('selected-template-name');
+
+    // Elementos del Modal
+    const btnSaveModal = document.getElementById('btn-save-modal-template');
+    const modalName = document.getElementById('modal-tmpl-name');
+    const modalTitle = document.getElementById('modal-tmpl-title');
+    const modalMsg = document.getElementById('modal-tmpl-message');
+    const modalAlert = document.getElementById('modal-alert-container');
+
+    // 1. Actualización en tiempo real de previsualizaciones y contadores
     function updatePreviews() {
         const title = inputTitle.value.trim() || '🎉 ¡Gran Pozo Acumulado Esta Noche!';
         const msg = inputMsg.value.trim() || 'Coloca aquí cualquier texto que desees enviar a los jugadores...';
 
         previewLiveTitle.textContent = title;
         previewLiveMsg.textContent = msg;
-        previewPushTitle.textContent = title;
-        previewPushMsg.textContent = msg;
 
         titleCount.textContent = (inputTitle.value.length) + '/80';
         msgCount.textContent = (inputMsg.value.length) + '/280';
@@ -420,30 +369,21 @@ $users = $users ?? [];
     inputTitle.addEventListener('input', updatePreviews);
     inputMsg.addEventListener('input', updatePreviews);
 
-    // 2. Control de destinatarios específicos
-    inputSegment.addEventListener('change', function() {
-        if (this.value === 'specific') {
-            specificUserWrapper.style.display = 'block';
-        } else {
-            specificUserWrapper.style.display = 'none';
-        }
-    });
+    // 2. Selección de plantilla guardada (Carga en pantalla para enviar)
+    function selectTemplate(cardEl) {
+        if (!cardEl) return;
+        templatesContainer.querySelectorAll('.saved-template-card').forEach(c => c.classList.remove('active-template'));
+        cardEl.classList.add('active-template');
 
-    // 3. Control de guardar como plantilla
-    checkSaveTmpl.addEventListener('change', function() {
-        if (this.checked) {
-            tmplNameWrapper.style.display = 'block';
-            tmplNameInput.focus();
-        } else {
-            tmplNameWrapper.style.display = 'none';
-        }
-    });
+        const title = cardEl.dataset.title || '';
+        const msg = cardEl.dataset.message || '';
+        const name = cardEl.dataset.name || '';
 
-    // 4. Cargar plantilla rápida
-    function applyTemplate(title, message, url) {
-        if (title) inputTitle.value = title;
-        if (message) inputMsg.value = message;
-        if (url) inputUrl.value = url;
+        inputTitle.value = title;
+        inputMsg.value = msg;
+        if (selectedTemplateName) {
+            selectedTemplateName.textContent = name ? '• ' + name : '';
+        }
         updatePreviews();
 
         inputTitle.style.backgroundColor = '#ede9fe';
@@ -451,39 +391,18 @@ $users = $users ?? [];
         setTimeout(() => {
             inputTitle.style.backgroundColor = '#ffffff';
             inputMsg.style.backgroundColor = '#ffffff';
-        }, 400);
+        }, 300);
     }
 
-    quickTmplSelect.addEventListener('change', function() {
-        const selected = this.options[this.selectedIndex];
-        if (selected && selected.value) {
-            applyTemplate(
-                selected.dataset.title,
-                selected.dataset.message,
-                selected.dataset.url
-            );
-        }
-    });
+    // 3. Eventos sobre las tarjetas de la lista (Click para cargar o eliminar)
+    templatesContainer.addEventListener('click', function(e) {
+        const delBtn = e.target.closest('.btn-del-tmpl');
+        if (delBtn) {
+            e.stopPropagation();
+            const tmplId = delBtn.dataset.id;
+            if (!confirm('¿Deseas eliminar esta notificación guardada?')) return;
 
-    // Delegación de eventos para botones de plantillas
-    document.addEventListener('click', function(e) {
-        const btnApply = e.target.closest('.btn-apply-tmpl');
-        if (btnApply) {
-            applyTemplate(
-                btnApply.dataset.title,
-                btnApply.dataset.message,
-                btnApply.dataset.url
-            );
-            window.scrollTo({ top: 120, behavior: 'smooth' });
-            return;
-        }
-
-        const btnDel = e.target.closest('.btn-del-tmpl');
-        if (btnDel) {
-            const tmplId = btnDel.dataset.id;
-            if (!confirm('¿Deseas eliminar esta plantilla guardada?')) return;
-
-            btnDel.disabled = true;
+            delBtn.disabled = true;
             fetch('<?= site_url('notificationsAdmin/deleteTemplateAjax') ?>/' + tmplId, {
                 method: 'POST',
                 headers: {
@@ -496,27 +415,198 @@ $users = $users ?? [];
             .then(data => {
                 if (data.success) {
                     const card = document.getElementById('tmpl-card-' + tmplId);
-                    if (card) card.remove();
+                    if (card) {
+                        const wasActive = card.classList.contains('active-template');
+                        card.remove();
+                        updateCountBadge();
+                        if (wasActive) {
+                            const firstRemaining = templatesContainer.querySelector('.saved-template-card');
+                            if (firstRemaining) selectTemplate(firstRemaining);
+                        }
+                    }
                     showAlert('success', data.message);
                 } else {
-                    showAlert('danger', data.message || 'No se pudo eliminar la plantilla.');
-                    btnDel.disabled = false;
+                    showAlert('danger', data.message || 'No se pudo eliminar la notificación.');
+                    delBtn.disabled = false;
                 }
             })
             .catch(() => {
                 showAlert('danger', 'Error de conexión al eliminar.');
-                btnDel.disabled = false;
+                delBtn.disabled = false;
             });
+            return;
+        }
+
+        const card = e.target.closest('.saved-template-card');
+        if (card) {
+            selectTemplate(card);
         }
     });
 
-    // 5. Alertas
+    // 4. Buscador en tiempo real de notificaciones guardadas
+    function filterTemplates() {
+        const q = (templateSearch.value || '').trim().toLowerCase();
+        if (btnClearSearch) {
+            btnClearSearch.style.display = q ? 'inline-block' : 'none';
+        }
+
+        const cards = templatesContainer.querySelectorAll('.saved-template-card');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+            const name = (card.dataset.name || '').toLowerCase();
+            const title = (card.dataset.title || '').toLowerCase();
+            const msg = (card.dataset.message || '').toLowerCase();
+
+            if (!q || name.includes(q) || title.includes(q) || msg.includes(q)) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (templatesEmptyState) {
+            templatesEmptyState.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
+        }
+    }
+
+    if (templateSearch) {
+        templateSearch.addEventListener('input', filterTemplates);
+    }
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', function() {
+            templateSearch.value = '';
+            filterTemplates();
+            templateSearch.focus();
+        });
+    }
+
+    function updateCountBadge() {
+        const total = templatesContainer.querySelectorAll('.saved-template-card').length;
+        if (templatesCountBadge) {
+            templatesCountBadge.textContent = total;
+        }
+    }
+
+    // 5. Guardar Nueva Notificación desde el Modal
+    if (btnSaveModal) {
+        btnSaveModal.addEventListener('click', function() {
+            const name = modalName.value.trim();
+            const title = modalTitle.value.trim();
+            const message = modalMsg.value.trim();
+
+            if (!name) {
+                modalAlert.innerHTML = '<div class="alert alert-warning py-2 small mb-3">Por favor ingresa un nombre de referencia.</div>';
+                modalName.focus();
+                return;
+            }
+            if (!title) {
+                modalAlert.innerHTML = '<div class="alert alert-warning py-2 small mb-3">Por favor ingresa el título de la notificación.</div>';
+                modalTitle.focus();
+                return;
+            }
+            if (!message) {
+                modalAlert.innerHTML = '<div class="alert alert-warning py-2 small mb-3">Por favor ingresa el mensaje de la notificación.</div>';
+                modalMsg.focus();
+                return;
+            }
+
+            btnSaveModal.disabled = true;
+            document.getElementById('btn-save-modal-icon').className = 'fa-solid fa-spinner fa-spin';
+
+            const postData = new URLSearchParams();
+            postData.append('<?= csrf_token() ?>', '<?= csrf_hash() ?>');
+            postData.append('name', name);
+            postData.append('title', title);
+            postData.append('message', message);
+
+            fetch('<?= site_url('notificationsAdmin/saveTemplateAjax') ?>', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: postData.toString()
+            })
+            .then(res => res.json())
+            .then(data => {
+                btnSaveModal.disabled = false;
+                document.getElementById('btn-save-modal-icon').className = 'fa-solid fa-floppy-disk';
+
+                if (data.success) {
+                    const tmpl = data.template;
+                    const initialNone = document.getElementById('templates-none-initial');
+                    if (initialNone) initialNone.remove();
+
+                    // Insertar tarjeta arriba de la lista
+                    const newCard = document.createElement('div');
+                    newCard.className = 'saved-template-card p-3 rounded-3 border d-flex justify-content-between align-items-start gap-2 shadow-sm position-relative';
+                    newCard.id = 'tmpl-card-' + tmpl.id;
+                    newCard.dataset.id = tmpl.id;
+                    newCard.dataset.name = tmpl.name;
+                    newCard.dataset.title = tmpl.title_template;
+                    newCard.dataset.message = tmpl.message_template;
+                    newCard.setAttribute('role', 'button');
+                    newCard.setAttribute('tabindex', '0');
+
+                    newCard.innerHTML = `
+                        <div class="flex-grow-1" style="min-width: 0;">
+                            <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                                <strong class="text-dark text-truncate tmpl-card-name" style="font-size: 0.88rem;">${escapeHtml(tmpl.name)}</strong>
+                            </div>
+                            <div class="text-primary small fw-semibold text-truncate tmpl-card-title mb-1" style="font-size: 0.8rem;">
+                                ${escapeHtml(tmpl.title_template)}
+                            </div>
+                            <p class="text-muted small mb-0 tmpl-card-message" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.77rem; line-height: 1.35;">
+                                ${escapeHtml(tmpl.message_template)}
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-sm text-danger p-0 ms-1 opacity-50 hover-opacity-100 btn-del-tmpl" data-id="${tmpl.id}" title="Eliminar notificación" onclick="event.stopPropagation();">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    `;
+
+                    templatesContainer.prepend(newCard);
+                    updateCountBadge();
+                    selectTemplate(newCard);
+
+                    // Cerrar modal
+                    const modalEl = document.getElementById('modal-create-template');
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                        bsModal.hide();
+                    } else if (typeof $ !== 'undefined') {
+                        $('#modal-create-template').modal('hide');
+                    }
+
+                    // Limpiar formulario de modal
+                    modalName.value = '';
+                    modalTitle.value = '';
+                    modalMsg.value = '';
+                    modalAlert.innerHTML = '';
+
+                    showAlert('success', '¡Notificación guardada y lista en pantalla para enviar!');
+                } else {
+                    modalAlert.innerHTML = `<div class="alert alert-danger py-2 small mb-3">${data.message || 'Error al guardar la notificación.'}</div>`;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                btnSaveModal.disabled = false;
+                document.getElementById('btn-save-modal-icon').className = 'fa-solid fa-floppy-disk';
+                modalAlert.innerHTML = '<div class="alert alert-danger py-2 small mb-3">Error de conexión al guardar.</div>';
+            });
+        });
+    }
+
+    // 6. Alertas en pantalla
     function showAlert(type, message, details) {
         let detailsHtml = '';
         if (details) {
             detailsHtml = `
                 <div class="mt-2 pt-2 border-top border-secondary-subtle small d-flex flex-wrap gap-3">
-                    <span><i class="fa-solid fa-users text-primary me-1"></i> Destinatarios: <strong>${details.users_targeted || 0}</strong></span>
+                    <span><i class="fa-solid fa-users text-primary me-1"></i> Destinatarios: <strong>Todos los Jugadores (${details.users_targeted || 0})</strong></span>
                     <span><i class="fa-solid fa-bolt text-success me-1"></i> En vivo (Live): <strong>${details.live_sent || 'Activo'}</strong></span>
                     <span><i class="fa-solid fa-mobile-screen text-info me-1"></i> Dispositivos Push: <strong>${details.push_sent || 0}</strong></span>
                 </div>
@@ -538,14 +628,12 @@ $users = $users ?? [];
         alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // 6. ENVÍO DE NOTIFICACIÓN
+    // 7. ENVÍO DE NOTIFICACIÓN (Botón Central "Enviar Notificación")
     btnSend.addEventListener('click', function(e) {
         e.preventDefault();
 
         const title = inputTitle.value.trim();
         const message = inputMsg.value.trim();
-        const sendLive = document.getElementById('channel-live').checked ? 1 : 0;
-        const sendPush = document.getElementById('channel-push').checked ? 1 : 0;
 
         if (!title) {
             showAlert('warning', 'Por favor ingresa un título para la notificación.');
@@ -556,11 +644,6 @@ $users = $users ?? [];
         if (!message) {
             showAlert('warning', 'Por favor ingresa el mensaje a enviar.');
             inputMsg.focus();
-            return;
-        }
-
-        if (sendLive === 0 && sendPush === 0) {
-            showAlert('warning', 'Debes activar al menos un canal de entrega (Live o Push).');
             return;
         }
 
@@ -581,7 +664,7 @@ $users = $users ?? [];
         .then(data => {
             btnSend.disabled = false;
             btnSendIcon.className = 'fa-solid fa-paper-plane';
-            btnSendText.textContent = 'Enviar Notificación Ahora';
+            btnSendText.textContent = 'Enviar Notificación';
 
             if (data.success) {
                 showAlert('success', data.message, data.details);
@@ -593,16 +676,6 @@ $users = $users ?? [];
                         type: 'admin'
                     });
                 }
-
-                if (!checkSaveTmpl.checked) {
-                    inputTitle.value = '';
-                    inputMsg.value = '';
-                    inputUrl.value = '';
-                    updatePreviews();
-                } else {
-                    checkSaveTmpl.checked = false;
-                    tmplNameWrapper.style.display = 'none';
-                }
             } else {
                 showAlert('danger', data.message || 'Error al enviar la notificación.');
             }
@@ -611,7 +684,7 @@ $users = $users ?? [];
             console.error('Error al enviar notificación:', err);
             btnSend.disabled = false;
             btnSendIcon.className = 'fa-solid fa-paper-plane';
-            btnSendText.textContent = 'Enviar Notificación Ahora';
+            btnSendText.textContent = 'Enviar Notificación';
             showAlert('danger', 'Ocurrió un error inesperado al conectar con el servidor.');
         });
     });
@@ -626,6 +699,12 @@ $users = $users ?? [];
             .replace(/'/g, '&#039;');
     }
 
-    updatePreviews();
+    // Cargar automáticamente la primera plantilla al inicio si existe
+    const firstCard = templatesContainer.querySelector('.saved-template-card');
+    if (firstCard) {
+        selectTemplate(firstCard);
+    } else {
+        updatePreviews();
+    }
 })();
 </script>

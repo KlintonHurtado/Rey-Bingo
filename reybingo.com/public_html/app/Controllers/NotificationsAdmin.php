@@ -242,37 +242,12 @@ class NotificationsAdmin extends Controller
             }
         }
 
-        // Destinatarios
-        $targetUsers = [];
-        if ($segment === 'specific' && $specificUserId > 0) {
-            $u = $this->usersModel->find($specificUserId);
-            if ($u) {
-                $targetUsers = [$u];
-            }
-        } elseif ($segment === 'pro') {
-            $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->where('is_pro', 1)->findAll();
-        } elseif ($segment === 'live_games') {
-            $db = \Config\Database::connect();
-            $activeGameUids = $db->table('cartons')
-                ->select('cartons.user')
-                ->join('games', 'games.id = cartons.game')
-                ->whereIn('games.status', [1, 2])
-                ->groupBy('cartons.user')
-                ->get()->getResultArray();
-            $uids = array_column($activeGameUids, 'user');
-            if (!empty($uids)) {
-                $targetUsers = $this->usersModel->whereIn('id', $uids)->where('status', 1)->where('deleted', 0)->findAll();
-            }
-            if (empty($targetUsers)) {
-                $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->findAll(50);
-            }
-        } else {
-            $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->findAll();
-        }
+        // Destinatarios: siempre todos los usuarios activos
+        $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->findAll();
 
         $adminId = (int) session()->get('id');
         $now = date('Y-m-d H:i:s');
-        $formattedUrl = $actionUrl ?: site_url('games');
+        $formattedUrl = $actionUrl !== '' ? $actionUrl : null;
         $formattedImage = $imageUrl ?: site_url('assets/img/logo.png');
 
         // 1. Guardar en tabla notifications para persistencia
@@ -358,18 +333,14 @@ class NotificationsAdmin extends Controller
                     'title' => $title,
                     'message' => $message,
                     'body' => $message,
-                    'url' => $formattedUrl,
+                    'url' => $formattedUrl ?: site_url(),
                     'icon' => $formattedImage,
                     'badge' => site_url('assets/img/badge.png'),
                     'tag' => 'admin-msg-' . time(),
                     'requireInteraction' => true,
                 ];
 
-                if ($segment === 'specific' && $specificUserId > 0) {
-                    $pushResult = $this->pushService->sendToUser($specificUserId, $pushPayload);
-                } else {
-                    $pushResult = $this->pushService->sendToAll($pushPayload);
-                }
+                $pushResult = $this->pushService->sendToAll($pushPayload);
             } catch (\Throwable $pe) {
                 log_message('error', 'Push sending error: ' . $pe->getMessage());
                 $pushResult['error'] = $pe->getMessage();
