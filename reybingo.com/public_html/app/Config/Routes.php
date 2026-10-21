@@ -245,6 +245,14 @@ $routes->get('playings/cleanExpiredCartons', 'Playings::cleanExpiredCartons');
 $routes->post('playings/selectCartons', 'Playings::selectCartons');
 $routes->get('playings/generateCartons/(:num)', 'Playings::generateCartons/$1');
 $routes->get('playings/getGameStatus', 'Playings::getGameStatus');
+$routes->post('playings/getShareLink', 'Playings::getShareLink');
+$routes->get('playings/getShareLink', 'Playings::getShareLink');
+
+// Modo Espectador routes (públicas)
+$routes->get('espectador/(:segment)', 'Spectator::view/$1');
+$routes->get('espectador/status/(:segment)', 'Spectator::status/$1');
+$routes->get('spectator/(:segment)', 'Spectator::view/$1');
+$routes->get('spectator/status/(:segment)', 'Spectator::status/$1');
 
 $routes->get('boards', 'Boards::index');
 $routes->get('board', 'Boards::board');
@@ -453,6 +461,7 @@ $routes->get('notificationsAdmin/subscriptions', 'NotificationsAdmin::subscripti
 $routes->get('notificationsAdmin/cleanupOld', 'NotificationsAdmin::cleanupOld');
 $routes->post('notificationsAdmin/sendAjax', 'NotificationsAdmin::sendAjax');
 $routes->post('notificationsAdmin/saveTemplateAjax', 'NotificationsAdmin::saveTemplateAjax');
+$routes->post('notificationsAdmin/deleteTemplateAjax', 'NotificationsAdmin::deleteTemplateAjax');
 $routes->post('notificationsAdmin/deleteTemplateAjax/(:num)', 'NotificationsAdmin::deleteTemplateAjax/$1');
 $routes->get('notificationsAdmin/templatesAjax', 'NotificationsAdmin::templatesAjax');
 $routes->get('notificationsAdmin/historyAjax', 'NotificationsAdmin::historyAjax');

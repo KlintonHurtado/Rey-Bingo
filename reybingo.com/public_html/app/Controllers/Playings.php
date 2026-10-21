@@ -1259,18 +1259,101 @@ class Playings extends Controller
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
 
+        $spectatorToken = '';
+        $spectatorShareUrl = '';
+        try {
+            $spectatorTokensModel = new \App\Models\GameSpectatorTokensModel();
+            $spectatorToken = $spectatorTokensModel->getOrCreateToken((int) $game['id'], (int) session()->get('id'));
+            $spectatorShareUrl = site_url('espectador/' . $spectatorToken);
+        } catch (\Throwable $e) {
+            log_message('error', 'Error generating spectator token: ' . $e->getMessage());
+        }
+
         $data = [
             'page' => [
                 'title' => $game['description']
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('playings/playing', ['contacts' => $contacts, 'game' => $game, 'user' => $user, 'selectedNumbers' => $selectedNumbers, 'singsModalities' => $singsModalities, 'lastNumber' => $lastNumber['number'] ?? '', 'fourNumbers' => $fourNumbers, 'lastNumbersJson' => json_encode($fiveNumbers), 'getClass' => $getClass, 'cartons' => $cartonData, 'modalities' => $modalities, 'winners' => $winners, 'totalNumbersGenerated' => $totalNumbersGenerated, 'gameIsFinished' => $gameIsFinished, 'isLiveGame' => $isLiveGame, 'isGameCompleted' => $isGameCompleted, 'isLiveFinalized' => $isLiveFinalized, 'singsUser' => $singsUser, 'imagePath' => $imagePath])
+            'contentPage' => view('playings/playing', [
+                'contacts' => $contacts,
+                'game' => $game,
+                'user' => $user,
+                'selectedNumbers' => $selectedNumbers,
+                'singsModalities' => $singsModalities,
+                'lastNumber' => $lastNumber['number'] ?? '',
+                'fourNumbers' => $fourNumbers,
+                'lastNumbersJson' => json_encode($fiveNumbers),
+                'getClass' => $getClass,
+                'cartons' => $cartonData,
+                'modalities' => $modalities,
+                'winners' => $winners,
+                'totalNumbersGenerated' => $totalNumbersGenerated,
+                'gameIsFinished' => $gameIsFinished,
+                'isLiveGame' => $isLiveGame,
+                'isGameCompleted' => $isGameCompleted,
+                'isLiveFinalized' => $isLiveFinalized,
+                'singsUser' => $singsUser,
+                'imagePath' => $imagePath,
+                'spectatorToken' => $spectatorToken,
+                'spectatorShareUrl' => $spectatorShareUrl
+            ])
         ];
 
         if ($this->request->isAJAX()) {
             return $this->response->setBody($data['contentPage']);
         } else {
             return view('layout/index', $data);
+        }
+    }
+
+    /**
+     * Endpoint AJAX para generar u obtener el enlace de compartir partida para espectadores
+     */
+    public function getShareLink()
+    {
+        if (!session()->get('logged_in') || (int) session()->get('group') !== 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'success' => false,
+                'message' => 'No autorizado'
+            ]);
+        }
+
+        $userId = (int) session()->get('id');
+        $gameId = (int) ($this->request->getVar('game_id') ?: session()->get('game_id'));
+
+        if ($gameId <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Partida inválida'
+            ]);
+        }
+
+        $modelGames = new \App\Models\GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'La partida especificada no existe'
+            ]);
+        }
+
+        try {
+            $spectatorTokensModel = new \App\Models\GameSpectatorTokensModel();
+            $token = $spectatorTokensModel->getOrCreateToken($gameId, $userId);
+            $shareUrl = site_url('espectador/' . $token);
+
+            return $this->response->setJSON([
+                'success'   => true,
+                'token'     => $token,
+                'share_url' => $shareUrl,
+                'game_name' => $game['description'] ?? 'Partida de Bingo'
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Error in getShareLink: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error al generar el enlace de compartir'
+            ]);
         }
     }
 

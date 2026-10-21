@@ -119,12 +119,11 @@ $formatCardPreview = function($text) {
                                                 </div>
                                                 <button 
                                                     type="button" 
-                                                    class="btn btn-sm text-danger p-0 ms-1 opacity-50 hover-opacity-100 btn-del-tmpl" 
+                                                    class="btn btn-sm text-danger p-1 ms-1 opacity-75 hover-opacity-100 btn-del-tmpl" 
                                                     data-id="<?= $tmpl['id'] ?>" 
                                                     title="Eliminar notificación"
-                                                    onclick="event.stopPropagation();"
                                                 >
-                                                    <i class="fa-solid fa-trash-can" style="font-size: 0.82rem;"></i>
+                                                    <i class="fa-solid fa-trash-can" style="font-size: 0.85rem; pointer-events: none;"></i>
                                                 </button>
                                             </div>
                                         <?php endforeach; ?>
@@ -561,46 +560,122 @@ $formatCardPreview = function($text) {
         }, 300);
     }
 
-    // 6. Eventos sobre las tarjetas de la lista (Click para cargar o eliminar)
+    // 6. Actualizar contador de notificaciones guardadas
+    function updateCountBadge() {
+        if (templatesCountBadge && templatesContainer) {
+            const count = templatesContainer.querySelectorAll('.saved-template-card').length;
+            templatesCountBadge.textContent = count;
+        }
+    }
+
+    // 7. Eventos sobre las tarjetas de la lista (Click para cargar o eliminar)
     templatesContainer.addEventListener('click', function(e) {
         const delBtn = e.target.closest('.btn-del-tmpl');
         if (delBtn) {
+            e.preventDefault();
             e.stopPropagation();
             const tmplId = delBtn.dataset.id;
-            if (!confirm('¿Deseas eliminar esta notificación guardada?')) return;
+            if (!tmplId) return;
 
-            delBtn.disabled = true;
-            fetch('<?= site_url('notificationsAdmin/deleteTemplateAjax') ?>/' + tmplId, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: '<?= csrf_token() ?>=<?= csrf_hash() ?>'
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    const card = document.getElementById('tmpl-card-' + tmplId);
-                    if (card) {
-                        const wasActive = card.classList.contains('active-template');
-                        card.remove();
-                        updateCountBadge();
-                        if (wasActive) {
-                            const firstRemaining = templatesContainer.querySelector('.saved-template-card');
-                            if (firstRemaining) selectTemplate(firstRemaining);
+            const executeDelete = () => {
+                delBtn.disabled = true;
+                const originalHtml = delBtn.innerHTML;
+                delBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size: 0.85rem;"></i>';
+
+                const postData = new URLSearchParams();
+                postData.append('<?= csrf_token() ?>', '<?= csrf_hash() ?>');
+                postData.append('id', tmplId);
+
+                fetch('<?= site_url('notificationsAdmin/deleteTemplateAjax') ?>/' + tmplId, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: postData.toString()
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const card = document.getElementById('tmpl-card-' + tmplId);
+                        if (card) {
+                            const wasActive = card.classList.contains('active-template');
+                            card.style.transition = 'all 0.25s ease';
+                            card.style.opacity = '0';
+                            card.style.transform = 'translateX(-20px)';
+                            setTimeout(() => {
+                                card.remove();
+                                updateCountBadge();
+                                const remaining = templatesContainer.querySelectorAll('.saved-template-card');
+                                if (remaining.length === 0) {
+                                    if (templatesEmptyState) templatesEmptyState.style.display = 'block';
+                                    if (selectedTemplateName) selectedTemplateName.textContent = '';
+                                    inputTitle.value = '';
+                                    inputMsg.value = '';
+                                    if (dynamicVarsWrapper) dynamicVarsWrapper.style.display = 'none';
+                                } else if (wasActive) {
+                                    selectTemplate(remaining[0]);
+                                }
+                            }, 250);
                         }
+
+                        if (typeof Toastify !== 'undefined') {
+                            Toastify({
+                                text: data.message || 'Notificación eliminada exitosamente.',
+                                duration: 3000,
+                                gravity: 'top',
+                                position: 'right',
+                                style: {
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    borderRadius: '10px',
+                                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                                    fontWeight: '600'
+                                }
+                            }).showToast();
+                        } else if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: data.message || 'Eliminada con éxito',
+                                timer: 1800,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            showAlert('success', data.message || 'Notificación eliminada exitosamente.');
+                        }
+                    } else {
+                        showAlert('danger', data.message || 'No se pudo eliminar la notificación.');
+                        delBtn.disabled = false;
+                        delBtn.innerHTML = originalHtml;
                     }
-                    showAlert('success', data.message);
-                } else {
-                    showAlert('danger', data.message || 'No se pudo eliminar la notificación.');
+                })
+                .catch(() => {
+                    showAlert('danger', 'Error de conexión al eliminar la notificación.');
                     delBtn.disabled = false;
+                    delBtn.innerHTML = originalHtml;
+                });
+            };
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: '¿Eliminar notificación?',
+                    text: 'Esta notificación guardada se eliminará de forma permanente.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: '<i class="fa-solid fa-trash-can me-1"></i> Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        executeDelete();
+                    }
+                });
+            } else {
+                if (confirm('¿Deseas eliminar esta notificación guardada?')) {
+                    executeDelete();
                 }
-            })
-            .catch(() => {
-                showAlert('danger', 'Error de conexión al eliminar.');
-                delBtn.disabled = false;
-            });
+            }
             return;
         }
 
@@ -749,8 +824,8 @@ $formatCardPreview = function($text) {
                                 ${previewMsg}
                             </p>
                         </div>
-                        <button type="button" class="btn btn-sm text-danger p-0 ms-1 opacity-50 hover-opacity-100 btn-del-tmpl" data-id="${tmpl.id}" title="Eliminar notificación" onclick="event.stopPropagation();">
-                            <i class="fa-solid fa-trash-can" style="font-size: 0.82rem;"></i>
+                        <button type="button" class="btn btn-sm text-danger p-1 ms-1 opacity-75 hover-opacity-100 btn-del-tmpl" data-id="${tmpl.id}" title="Eliminar notificación">
+                            <i class="fa-solid fa-trash-can" style="font-size: 0.85rem; pointer-events: none;"></i>
                         </button>
                     `;
 

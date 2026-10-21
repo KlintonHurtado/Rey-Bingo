@@ -414,17 +414,25 @@ class NotificationsAdmin extends Controller
             return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'No autorizado']);
         }
 
-        $id = (int) ($id ?? $this->request->getPost('id'));
+        $id = (int) ($id ?: ($this->request->getPost('id') ?: $this->request->getVar('id')));
         if ($id <= 0) {
             return $this->response->setJSON(['success' => false, 'message' => 'ID de plantilla inválido.']);
         }
 
-        $this->notificationTemplatesModel->delete($id);
+        try {
+            $this->notificationTemplatesModel->delete($id);
 
-        return $this->response->setJSON([
-            'success' => true,
-            'message' => 'Plantilla eliminada exitosamente.'
-        ]);
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Notificación eliminada exitosamente.'
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Error al eliminar plantilla: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Error al eliminar la notificación.'
+            ]);
+        }
     }
 
     /**

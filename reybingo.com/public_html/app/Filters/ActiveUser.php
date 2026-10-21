@@ -25,6 +25,8 @@ class ActiveUser implements FilterInterface
             'cron',
             'terminos',
             'promociones',
+            'espectador',
+            'spectator',
         ];
         foreach ($public as $prefix) {
             if ($path === $prefix || str_starts_with($path, $prefix . '/')) {

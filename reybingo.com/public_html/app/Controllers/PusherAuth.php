@@ -19,13 +19,6 @@ class PusherAuth extends ResourceController
 
     public function auth()
     {
-        if (! session()->get('logged_in')) {
-            return $this->respond(
-                ['message' => 'No autenticado'],
-                ResponseInterface::HTTP_UNAUTHORIZED
-            );
-        }
-
         // Leer parámetros (POST o JSON body)
         $request = $this->request->getPost();
         if (empty($request)) {
@@ -46,9 +39,39 @@ class PusherAuth extends ResourceController
             );
         }
 
-        $userId = (int) session()->get('id');
+        $userId = (int) (session()->get('id') ?? 0);
+        $isLoggedIn = session()->get('logged_in');
         $isGameChannel = strpos($channelName, 'private-game-') === 0;
         $isUserChannel = $userId > 0 && ($channelName === 'private-user-' . $userId);
+
+        // Si no está logueado, verificar si es un espectador con token válido para esta partida
+        $isSpectatorAuthorized = false;
+        if (!$isLoggedIn && $isGameChannel) {
+            $gameIdFromChannel = (int) substr($channelName, strlen('private-game-'));
+            $spectatorGameId = (int) session()->get('spectator_game_id');
+            $spectatorToken = (string) (session()->get('spectator_token') ?? ($request['spectator_token'] ?? ''));
+
+            if ($spectatorGameId > 0 && $spectatorGameId === $gameIdFromChannel) {
+                $isSpectatorAuthorized = true;
+            } elseif ($spectatorToken !== '') {
+                try {
+                    $tokenModel = new \App\Models\GameSpectatorTokensModel();
+                    $shareInfo = $tokenModel->getShareInfoByToken($spectatorToken);
+                    if ($shareInfo && (int)$shareInfo['game_id'] === $gameIdFromChannel) {
+                        $isSpectatorAuthorized = true;
+                    }
+                } catch (\Throwable $e) {
+                    log_message('error', 'PusherAuth spectator check error: ' . $e->getMessage());
+                }
+            }
+        }
+
+        if (!$isLoggedIn && !$isSpectatorAuthorized) {
+            return $this->respond(
+                ['message' => 'No autenticado'],
+                ResponseInterface::HTTP_UNAUTHORIZED
+            );
+        }
 
         if (!$isGameChannel && !$isUserChannel) {
             log_message('error', 'PusherAuth: canal no permitido ' . $channelName);

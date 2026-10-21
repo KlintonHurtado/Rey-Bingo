@@ -55,6 +55,36 @@
         top: 12px !important;
     }
 
+    .container-section--playing .btn-share-game {
+        position: fixed !important;
+        left: 130px !important;
+        top: 10px !important;
+        width: 55px !important;
+        height: 55px !important;
+        z-index: 1080 !important;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        border: 2px solid rgba(255, 255, 255, 0.75) !important;
+        border-radius: 50% !important;
+        color: #ffffff !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 1.45rem !important;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.45) !important;
+        cursor: pointer !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    }
+
+    .container-section--playing .btn-share-game:hover {
+        transform: scale(1.1) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.65) !important;
+        color: #ffffff !important;
+    }
+
+    .container-section--playing .btn-share-game:active {
+        transform: scale(0.95) !important;
+    }
+
     /* Acumulado a la izquierda para no tapar el botón manual (derecha) */
     .container-section--playing .total-accumulated {
         right: auto !important;
@@ -95,6 +125,14 @@
         .container-section--playing .btn-sliders {
             right: 8px !important;
             top: 8px !important;
+        }
+
+        .container-section--playing .btn-share-game {
+            left: 95px !important;
+            top: 5px !important;
+            width: 42px !important;
+            height: 42px !important;
+            font-size: 1.15rem !important;
         }
 
         .container-section--playing .total-accumulated {
@@ -1397,6 +1435,10 @@
             <i class="fa-duotone fa-solid fa-wallet"></i>
         </button>
 
+        <button type="button" class="btn btn-small btn-share-game" onclick="openShareGameModal();" title="Compartir Partida" aria-label="Compartir Partida">
+            <i class="fa-solid fa-share-nodes"></i>
+        </button>
+
         <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();" title="Sonido" aria-label="Sonido">
             <?php if (!isset($user['sounds']) || (int)$user['sounds'] !== 0): ?>
                 <i class="fa-duotone fa-solid fa-volume"></i>
@@ -2589,7 +2631,175 @@
             })
         }();
     <?php endif; ?>
+
+    // ========================================================
+    // MODAL Y LÓGICA DE COMPARTIR PARTIDA (MODO ESPECTADOR)
+    // ========================================================
+    window.openShareGameModal = function() {
+        const modalEl = document.getElementById('modal-share-game');
+        if (!modalEl) return;
+
+        // Si el enlace aún no se ha cargado en el input, obtenerlo vía AJAX
+        const input = document.getElementById('spectator-share-input');
+        if (input && (!input.value || input.value.trim() === '')) {
+            fetch('<?= site_url("playings/getShareLink") ?>', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: '<?= csrf_token() ?>=<?= csrf_hash() ?>&game_id=<?= $game["id"] ?>'
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.success && res.share_url) {
+                    input.value = res.share_url;
+                    const waBtn = document.getElementById('btn-share-whatsapp');
+                    if (waBtn) {
+                        const msg = encodeURIComponent("¡Hola! Te invito a ver mi partida de Rey Bingo en vivo aquí: " + res.share_url);
+                        waBtn.href = "https://api.whatsapp.com/send?text=" + msg;
+                    }
+                }
+            })
+            .catch(() => {});
+        }
+
+        const nativeBtn = document.getElementById('btn-native-share');
+        if (nativeBtn && navigator.share) {
+            nativeBtn.style.display = 'flex';
+        }
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            bsModal.show();
+        } else if (typeof $ !== 'undefined') {
+            $('#modal-share-game').modal('show');
+        }
+    };
+
+    window.copySpectatorLink = function() {
+        const input = document.getElementById('spectator-share-input');
+        if (!input || !input.value) return;
+
+        input.select();
+        input.setSelectionRange(0, 99999);
+
+        const onCopied = function() {
+            const copyText = document.getElementById('copy-text');
+            const copyIcon = document.getElementById('copy-icon');
+            if (copyText) copyText.textContent = '¡Copiado!';
+            if (copyIcon) copyIcon.className = 'fa-solid fa-check me-1';
+
+            setTimeout(() => {
+                if (copyText) copyText.textContent = 'Copiar';
+                if (copyIcon) copyIcon.className = 'fa-solid fa-copy me-1';
+            }, 2500);
+
+            if (typeof Toastify !== 'undefined') {
+                Toastify({
+                    text: "¡Enlace de espectador copiado al portapapeles!",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "center",
+                    style: {
+                        background: "linear-gradient(135deg, #10b981, #059669)",
+                        borderRadius: "10px",
+                        fontWeight: "600"
+                    }
+                }).showToast();
+            } else if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Enlace copiado!',
+                    text: 'Compártelo con tus amigos para que vean tu partida en vivo.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(onCopied).catch(() => {
+                try { document.execCommand('copy'); onCopied(); } catch (e) { alert('Enlace: ' + input.value); }
+            });
+        } else {
+            try { document.execCommand('copy'); onCopied(); } catch (e) { alert('Enlace: ' + input.value); }
+        }
+    };
+
+    window.nativeShareSpectator = function() {
+        const input = document.getElementById('spectator-share-input');
+        const url = input ? input.value : '<?= esc($spectatorShareUrl ?? "") ?>';
+        if (navigator.share) {
+            navigator.share({
+                title: 'Rey Bingo - Mira mi partida en vivo',
+                text: '¡Mira mi partida en vivo en Rey Bingo!',
+                url: url
+            }).catch(() => {});
+        }
+    };
 </script>
+
+<!-- MODAL COMPARTIR PARTIDA (MODO ESPECTADOR) -->
+<div class="modal fade" id="modal-share-game" tabindex="-1" aria-labelledby="modalShareGameLabel" aria-hidden="true" style="z-index: 1090;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg text-dark" style="border-radius: 20px; overflow: hidden; background: #ffffff;">
+            <div class="modal-header text-white p-3 p-md-4" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-share-nodes fs-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0 text-white" id="modalShareGameLabel" style="font-size: 1.15rem;">Compartir mi Partida</h5>
+                        <small class="text-white-50">Invita a tus amigos a ver tu juego en tiempo real</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-3 p-md-4">
+                <div class="text-center mb-3">
+                    <div class="badge bg-success-subtle text-success px-3 py-2 rounded-pill fw-bold mb-2" style="font-size: 0.82rem;">
+                        <i class="fa-solid fa-eye me-1"></i> Modo Espectador (Solo Lectura)
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Quien abra este enlace verá <strong>tus cartones exclusivos</strong>, las balotas que van saliendo y tus aciertos en vivo sin poder modificarlos.
+                    </p>
+                </div>
+
+                <!-- Input con enlace y botón de copiar -->
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">Tu enlace exclusivo de espectador:</label>
+                    <div class="input-group shadow-sm rounded-3 overflow-hidden border">
+                        <input type="text" id="spectator-share-input" class="form-control border-0 bg-light py-2" style="font-size: 0.88rem; font-family: monospace;" readonly value="<?= esc($spectatorShareUrl ?? '') ?>">
+                        <button class="btn btn-primary px-3 fw-bold" type="button" id="btn-copy-share-link" onclick="copySpectatorLink();">
+                            <i class="fa-solid fa-copy me-1" id="copy-icon"></i>
+                            <span id="copy-text">Copiar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botones de Compartir -->
+                <div class="d-grid gap-2">
+                    <a href="https://api.whatsapp.com/send?text=<?= rawurlencode("¡Hola! Te invito a ver mi partida de Rey Bingo en vivo aquí: " . ($spectatorShareUrl ?? '')) ?>" target="_blank" id="btn-share-whatsapp" class="btn btn-success py-2 fw-bold d-flex align-items-center justify-content-center gap-2 rounded-3 shadow-sm" style="background: #25D366; border-color: #25D366;">
+                        <i class="fa-brands fa-whatsapp fs-5"></i>
+                        <span>Compartir por WhatsApp</span>
+                    </a>
+
+                    <button type="button" class="btn btn-outline-secondary py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 rounded-3" id="btn-native-share" onclick="nativeShareSpectator();" style="display: none;">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                        <span>Más opciones de compartir</span>
+                    </button>
+                </div>
+
+                <div class="text-center mt-3 pt-2 border-top">
+                    <small class="text-muted" style="font-size: 0.78rem;">
+                        <i class="fa-solid fa-shield-halved text-success me-1"></i> Seguro: el espectador solo podrá observar; no puede marcar números, comprar cartones ni alterar tu juego.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- WebSocket: Soketi self-hosted (VPS) con fallback a Pusher Cloud -->
 <script src="<?= function_exists('asset_url') ? asset_url('js/pusher.min.js') : (site_url('assets/js/pusher.min.js') . '?v=' . time()) ?>"></script>

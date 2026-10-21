@@ -205,15 +205,18 @@ if (!function_exists('bingo_broadcast_sing_accepted')) {
         }
 
         try {
-            $client  = bingo_get_broadcast_client();
-            $channel = 'private-game-' . $gameId;
+            $client   = bingo_get_broadcast_client();
+            $channels = [
+                'private-game-' . $gameId,
+                'game-' . $gameId,
+            ];
 
-            $client->trigger($channel, 'game:bingo_claimed', array_merge([
+            $client->trigger($channels, 'game:bingo_claimed', array_merge([
                 'gameId' => $gameId,
                 'at'     => date('c'),
             ], $payload));
 
-            $client->trigger($channel, 'game:bingo_accepted', array_merge([
+            $client->trigger($channels, 'game:bingo_accepted', array_merge([
                 'gameId'  => $gameId,
                 'stopped' => !empty($payload['gameCompleted']),
                 'at'      => date('c'),
