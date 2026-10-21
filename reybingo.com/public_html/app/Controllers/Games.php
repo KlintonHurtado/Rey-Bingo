@@ -2739,6 +2739,16 @@ class Games extends Controller {
                 ]);
             }
 
+            // Validar código de acceso si la partida está protegida
+            if (!empty($game['access_code']) && session()->get('unlocked_game_' . $game_id) !== true) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'requires_code' => true,
+                    'game_title' => $game['description'] ?? 'Partida Privada',
+                    'message' => 'Esta partida requiere código de acceso.'
+                ]);
+            }
+
             $cartons = $modelCartons->getCartonsByUser(session()->get('id'), $game['id']);
 
             if (empty($cartons)) {
@@ -3919,13 +3929,18 @@ class Games extends Controller {
                     ? '<button type="button" class="btn btn-modal btn-warning btn-sm" onclick="assignBotsPrompt(\'' . $game['id'] . '\');" title="Inyectar 2,000 Bots (4 cartones)" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-robot"></i></button>'
                     : '';
 
+                $hasCode = !empty($game['access_code']);
+                $codeBtnClass = $hasCode ? 'btn-warning' : 'btn-secondary';
+                $codeTitle = $hasCode ? ('Partida protegida con código: ' . esc($game['access_code'])) : 'Asignar código de acceso a la partida';
+                $codeButton = '<button type="button" class="btn btn-modal ' . $codeBtnClass . ' btn-sm" onclick="manageGameCode(\'' . $game['id'] . '\', \'' . esc($game['access_code'] ?? '', 'js') . '\');" title="' . $codeTitle . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;' . ($hasCode ? ' background: linear-gradient(135deg, #f59e0b, #d97706) !important; color: #ffffff !important;' : '') . '"><i class="fa-duotone fa-solid fa-key"></i></button>';
+
                 if ($game['type'] != 3 && $game['type'] != 4) {
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a>' . $botButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a>' . $botButton . $codeButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 } else {
                     // LIVE: misma regla — validación fresca en servidor
                     $liveButtonAction = "liveGet('" . $game['id'] . "');";
                     $liveButtonClass = $canView ? 'primary' : ($canStart ? 'primary' : 'secondary');
-                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a>' . $botButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
+                    $buttons = '<div class="btn-group" role="group"><a class="btn btn-' . $playButtonClass . ' btn-modal btn-sm" onclick="' . $playButtonAction . '" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-' . $playButtonIcon . '"></i></a><a style="width: 40px; height: 40px; font-size: 1rem; margin: auto;" class="btn btn-' . $liveButtonClass . ' btn-modal text-white" onclick="' . $liveButtonAction . '"><i class="fa-duotone fa-solid fa-desktop"></i></a>' . $botButton . $codeButton . '<button type="button" class="btn btn-modal btn-info btn-sm" onclick="updateGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-pen"></i></button><button type="button" class="btn btn-modal btn-danger btn-sm" onclick="deleteGame(\'' . $game['id'] . '\');" style="width: 40px; height: 40px; font-size: 1rem; margin: auto;"><i class="fa-duotone fa-solid fa-trash"></i></button></div>';
                 }
             } else {
                 if ($canView) {
@@ -4353,5 +4368,133 @@ class Games extends Controller {
         $result = $botManager->clearBotsFromGame($gameId);
 
         return $this->response->setJSON($result);
+    }
+
+    /**
+     * Endpoint AJAX para asignar, editar o quitar el código de acceso de una partida (exclusivo Admin).
+     */
+    public function setAccessCode()
+    {
+        if (! session()->get('logged_in') || (int) session()->get('group') !== 1) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'success' => false,
+                'message' => 'No autorizado'
+            ]);
+        }
+
+        $gameId = (int) $this->request->getPost('game_id');
+        $code = trim((string) $this->request->getPost('access_code'));
+
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success' => false,
+                'message' => 'ID de partida no válido'
+            ]);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'success' => false,
+                'message' => 'Partida no encontrada'
+            ]);
+        }
+
+        $cleanCode = ($code !== '') ? $code : null;
+        $modelGames->update($gameId, [
+            'access_code' => $cleanCode,
+            'updated_at'  => date('Y-m-d H:i:s')
+        ]);
+
+        return $this->response->setJSON([
+            'success'     => true,
+            'message'     => $cleanCode ? 'Código de acceso guardado correctamente.' : 'La partida ahora es pública (sin código de acceso).',
+            'has_code'    => $cleanCode !== null,
+            'access_code' => $cleanCode ?? ''
+        ]);
+    }
+
+    /**
+     * Endpoint AJAX para verificar si una partida requiere código y si el usuario actual ya la desbloqueó.
+     */
+    public function checkAccess($gameId = null)
+    {
+        $gameId = (int) ($gameId ?: ($this->request->getGet('game_id') ?: $this->request->getPost('game_id')));
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success' => false,
+                'message' => 'ID de partida no válido'
+            ]);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'success' => false,
+                'message' => 'Partida no encontrada'
+            ]);
+        }
+
+        $hasCode = !empty($game['access_code']);
+        $isAdmin = session()->get('logged_in') && (int) session()->get('group') === 1;
+        $isUnlocked = $isAdmin || (session()->get('unlocked_game_' . $gameId) === true) || !$hasCode;
+
+        return $this->response->setJSON([
+            'success'       => true,
+            'game_id'       => $gameId,
+            'game_title'    => $game['description'] ?? 'Partida de Bingo',
+            'requires_code' => $hasCode,
+            'is_unlocked'   => $isUnlocked
+        ]);
+    }
+
+    /**
+     * Endpoint AJAX para validar el código de acceso ingresado por el usuario.
+     */
+    public function verifyAccessCode()
+    {
+        $gameId = (int) $this->request->getPost('game_id');
+        $code = trim((string) $this->request->getPost('code'));
+
+        if ($gameId < 1) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success' => false,
+                'message' => 'ID de partida no válido'
+            ]);
+        }
+
+        $modelGames = new GamesModel();
+        $game = $modelGames->find($gameId);
+        if (!$game) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'success' => false,
+                'message' => 'Partida no encontrada'
+            ]);
+        }
+
+        // Si la partida no tiene código, se considera desbloqueada directamente
+        if (empty($game['access_code'])) {
+            session()->set('unlocked_game_' . $gameId, true);
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => 'Acceso concedido.'
+            ]);
+        }
+
+        // Comparación insensible a mayúsculas/minúsculas
+        if (strcasecmp($code, trim((string) $game['access_code'])) === 0) {
+            session()->set('unlocked_game_' . $gameId, true);
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => '¡Código correcto! Acceso concedido.'
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false,
+            'message' => 'El código de acceso es incorrecto. Verifica e inténtalo de nuevo.'
+        ]);
     }
 }

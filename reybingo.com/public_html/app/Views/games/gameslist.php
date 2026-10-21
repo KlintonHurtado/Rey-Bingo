@@ -299,6 +299,114 @@
         $('#modalAwards').modal('show');
     }
 
+    function manageGameCode(gameId, currentCode) {
+        if (!gameId) return;
+        var hasCode = currentCode && String(currentCode).trim() !== '';
+        var safeCode = hasCode ? String(currentCode).replace(/"/g, '&quot;') : '';
+
+        var htmlContent = `
+            <div class="text-start p-2">
+                <p class="text-muted small mb-3">
+                    Al asignar un <strong>código de acceso</strong> a esta partida, será obligatorio que los jugadores lo ingresen antes de comprar cartones (con saldo real o bono) o ingresar a jugar.
+                </p>
+                <label class="form-label fw-bold small text-dark mb-1">Clave / Código de acceso:</label>
+                <div class="input-group mb-2">
+                    <span class="input-group-text bg-light border"><i class="fa-solid fa-key text-warning"></i></span>
+                    <input type="text" id="swal-game-access-code" class="form-control form-control-lg fw-bold" placeholder="EJ: VIP2026, SALA1" value="${safeCode}" maxlength="50" style="text-transform: uppercase; letter-spacing: 1.5px;" autofocus>
+                </div>
+                <small class="text-muted d-block" style="font-size: 0.8rem;">
+                    * Para que la partida vuelva a ser <strong>pública</strong>, borra el código y guarda, o presiona "Hacer Pública".
+                </small>
+            </div>
+        `;
+
+        Swal.fire({
+            title: hasCode ? '🔒 Partida Protegida' : '🔑 Asignar Código de Acceso',
+            html: htmlContent,
+            icon: hasCode ? 'info' : 'question',
+            showCancelButton: true,
+            confirmButtonText: '<i class="fa-solid fa-floppy-disk me-1"></i> Guardar Código',
+            cancelButtonText: 'Cancelar',
+            showDenyButton: hasCode,
+            denyButtonText: '<i class="fa-solid fa-lock-open me-1"></i> Quitar Código (Hacer Pública)',
+            customClass: {
+                confirmButton: 'btn btn-primary me-2',
+                cancelButton: 'btn btn-secondary',
+                denyButton: 'btn btn-danger me-2'
+            },
+            buttonsStyling: false,
+            didOpen: () => {
+                const input = document.getElementById('swal-game-access-code');
+                if (input) {
+                    setTimeout(() => input.focus(), 150);
+                    input.addEventListener('keyup', function(e) {
+                        if (e.key === 'Enter') {
+                            Swal.clickConfirm();
+                        }
+                    });
+                }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                var codeVal = ($('#swal-game-access-code').val() || '').trim();
+                saveGameAccessCode(gameId, codeVal);
+            } else if (result.isDenied) {
+                saveGameAccessCode(gameId, '');
+            }
+        });
+    }
+
+    function saveGameAccessCode(gameId, code) {
+        $.ajax({
+            url: '<?= site_url('games/setAccessCode') ?>',
+            method: 'POST',
+            data: {
+                game_id: gameId,
+                access_code: code,
+                '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+            },
+            dataType: 'json',
+            success: function(res) {
+                if (res.success) {
+                    Toastify({
+                        text: res.message,
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#198754" },
+                        stopOnFocus: true
+                    }).showToast();
+                    if (typeof gameslistGet === 'function') {
+                        gameslistGet();
+                    } else if (typeof gameslistGetPage === 'function') {
+                        gameslistGetPage(1);
+                    }
+                } else {
+                    Toastify({
+                        text: res.message || 'Error al guardar el código',
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            },
+            error: function() {
+                Toastify({
+                    text: 'Error de conexión con el servidor',
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#dc3545" },
+                    stopOnFocus: true
+                }).showToast();
+            }
+        });
+    }
+    window.manageGameCode = manageGameCode;
+    window.saveGameAccessCode = saveGameAccessCode;
+
     function playersGet(id) {
         $("#modalPlayers").load('<?= site_url('games/playersGet') ?>/' + id);
         $('#modalPlayers').modal('show');

@@ -187,39 +187,62 @@
     <?php endif; ?>
 
     function gameGet(gameId) {
-        fetch('<?= site_url('game') ?>/' + gameId, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.href = data.redirect;
-            } else {
-                console.error('error when starting the game:', data.message || 'unknown error');
+        var proceedToGame = function() {
+            fetch('<?= site_url('game') ?>/' + gameId, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else if (data.requires_code) {
+                    if (typeof promptGameAccessCode === 'function') {
+                        promptGameAccessCode(gameId, data.game_title, function() {
+                            gameGet(gameId);
+                        });
+                    } else {
+                        Toastify({
+                            text: data.message || "Esta partida requiere un código de acceso.",
+                            duration: 4000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "#dc3545" },
+                            stopOnFocus: true
+                        }).showToast();
+                    }
+                } else {
+                    console.error('error when starting the game:', data.message || 'unknown error');
+                    Toastify({
+                        text: data.message || "<?= translate('the game could not be started. try again'); ?>",
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "#dc3545" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            })
+            .catch(error => {
+                console.error('request error:', error);
                 Toastify({
-                    text: "<?= translate('the game could not be started. try again'); ?>",
+                    text: "<?= translate('there was an error processing your request. Please try again'); ?>",
                     duration: 3000,
                     gravity: "top",
                     position: "right",
                     style: { background: "#dc3545" },
                     stopOnFocus: true
                 }).showToast();
-            }
-        })
-        .catch(error => {
-            console.error('request error:', error);
-            Toastify({
-                text: "<?= translate('there was an error processing your request. Please try again'); ?>",
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                style: { background: "#dc3545" },
-                stopOnFocus: true
-            }).showToast();
-        });
+            });
+        };
+
+        if (typeof checkGameAccess === 'function') {
+            checkGameAccess(gameId, proceedToGame);
+        } else {
+            proceedToGame();
+        }
     }
 
     $('.format').change(function() {

@@ -515,6 +515,11 @@ class Playings extends Controller
 
         helper('wallet');
         $game = $modelGames->find($gameId);
+
+        if ($game && !empty($game['access_code']) && session()->get('unlocked_game_' . $gameId) !== true && (int) session()->get('group') === 0) {
+            return '<div class="modal-dialog modal-dialog-centered"><div class="modal-content text-center p-4 border-0 shadow" style="border-radius:20px;"><div class="mb-3"><div style="width:60px;height:60px;border-radius:50%;background:rgba(245,158,11,0.15);display:inline-flex;align-items:center;justify-content:center;"><i class="fa-solid fa-lock text-warning fs-2"></i></div></div><h5 class="fw-bold mb-2">Partida Protegida con Código</h5><p class="text-muted small mb-4">Esta sala requiere una clave de acceso para ver y comprar cartones.</p><div class="d-flex justify-content-center gap-2"><button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-primary px-4 fw-bold" onclick="bootstrap.Modal.getInstance(document.getElementById(\'modalAvailableCartons\')).hide(); promptGameAccessCode(' . (int) $gameId . ', \'' . esc($game['description'] ?? '', 'js') . '\', function(){ generateCartonsGet(' . (int) $gameId . ', \'' . esc($this->request->getGet('pay_with') ?: 'real') . '\'); });"><i class=\"fa-solid fa-key me-1\"></i> Ingresar Código</button></div></div></div>';
+        }
+
         $user = wallet_service()->normalizeUser($modelUsers->find(session()->get('id')) ?: []);
         $data['user'] = $user;
         $data['game'] = $game;
@@ -576,6 +581,15 @@ class Playings extends Controller
             return $this->response->setJSON([
                 'success' => false,
                 'message' => translate('game not found')
+            ]);
+        }
+
+        // Verificar código de acceso si la partida está protegida
+        if (!empty($game['access_code']) && session()->get('unlocked_game_' . $gameId) !== true && (int) session()->get('group') === 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'requires_code' => true,
+                'message' => 'Esta partida requiere código de acceso para comprar cartones.'
             ]);
         }
 

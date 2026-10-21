@@ -205,6 +205,9 @@ $routes->post('games/assignBots', 'Games::assignBots');
 $routes->get('games/assignBots/(:num)', 'Games::assignBots/$1');
 $routes->post('games/clearBots', 'Games::clearBots');
 $routes->get('games/clearBots/(:num)', 'Games::clearBots/$1');
+$routes->post('games/setAccessCode', 'Games::setAccessCode');
+$routes->get('games/checkAccess/(:num)', 'Games::checkAccess/$1');
+$routes->post('games/verifyAccessCode', 'Games::verifyAccessCode');
 
 $routes->get('playings', 'Playings::index');
 $routes->get('play', 'Playings::play');

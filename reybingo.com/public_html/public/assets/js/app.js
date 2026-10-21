@@ -449,10 +449,170 @@ function boardGet() {
     showBsModal('#modalBoard');
 }
 
+function checkGameAccess(gameId, onSuccess) {
+    if (!gameId) return;
+    var base = (typeof site_url !== 'undefined' && site_url) ? site_url : '/';
+    if (!base.endsWith('/')) base += '/';
+
+    $.ajax({
+        url: base + 'games/checkAccess/' + gameId,
+        type: 'GET',
+        dataType: 'json',
+        success: function(res) {
+            if (res && res.success) {
+                if (!res.requires_code || res.is_unlocked) {
+                    if (typeof onSuccess === 'function') onSuccess();
+                } else {
+                    promptGameAccessCode(gameId, res.game_title, onSuccess);
+                }
+            } else {
+                if (typeof onSuccess === 'function') onSuccess();
+            }
+        },
+        error: function() {
+            if (typeof onSuccess === 'function') onSuccess();
+        }
+    });
+}
+window.checkGameAccess = checkGameAccess;
+
+function promptGameAccessCode(gameId, gameTitle, onSuccess) {
+    if (!gameId) return;
+    var titleDisplay = gameTitle ? ('"' + gameTitle + '"') : 'esta partida';
+    var base = (typeof site_url !== 'undefined' && site_url) ? site_url : '/';
+    if (!base.endsWith('/')) base += '/';
+
+    function escapeHtml(text) {
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return String(text || '').replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    if (typeof Swal === 'undefined') {
+        var code = prompt('Esta partida privada requiere un código de acceso. Por favor ingrésalo:');
+        if (code !== null && code.trim() !== '') {
+            $.ajax({
+                url: base + 'games/verifyAccessCode',
+                type: 'POST',
+                data: { game_id: gameId, code: code.trim() },
+                dataType: 'json',
+                success: function(d) {
+                    if (d.success) {
+                        if (typeof onSuccess === 'function') onSuccess();
+                    } else {
+                        alert(d.message || 'Código incorrecto');
+                    }
+                }
+            });
+        }
+        return;
+    }
+
+    var htmlModal = `
+        <div class="text-center p-2">
+            <div class="mb-3">
+                <div style="width: 72px; height: 72px; margin: 0 auto; border-radius: 50%; background: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(253, 126, 20, 0.25)); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);">
+                    <i class="fa-solid fa-lock text-warning" style="font-size: 2rem;"></i>
+                </div>
+            </div>
+            <p class="text-muted mb-3" style="font-size: 0.95rem;">
+                La partida <strong class="text-dark">${escapeHtml(titleDisplay)}</strong> requiere clave de acceso.<br>
+                Ingresa el código para desbloquearla y continuar:
+            </p>
+            <div class="mb-2">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border"><i class="fa-solid fa-key text-warning"></i></span>
+                    <input type="text" id="swal-game-input-code" class="form-control form-control-lg text-center fw-bold" 
+                        placeholder="CÓDIGO DE ACCESO" 
+                        maxlength="50" 
+                        style="letter-spacing: 2px; text-transform: uppercase; font-size: 1.25rem;" 
+                        autocomplete="off">
+                </div>
+            </div>
+            <small class="text-muted d-block" style="font-size: 0.82rem;">
+                * Solicita el código al anfitrión o administrador de la sala.
+            </small>
+        </div>
+    `;
+
+    Swal.fire({
+        title: '🔒 Partida Protegida',
+        html: htmlModal,
+        showCancelButton: true,
+        confirmButtonText: '<i class="fa-solid fa-unlock-keyhole me-1"></i> Desbloquear e Ingresar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'btn btn-warning px-4 py-2 fw-bold text-dark shadow-sm me-2',
+            cancelButton: 'btn btn-secondary px-3 py-2'
+        },
+        buttonsStyling: false,
+        didOpen: function() {
+            var input = document.getElementById('swal-game-input-code');
+            if (input) {
+                setTimeout(function() { input.focus(); }, 150);
+                input.addEventListener('keyup', function(e) {
+                    if (e.key === 'Enter') {
+                        Swal.clickConfirm();
+                    }
+                });
+            }
+        },
+        showLoaderOnConfirm: true,
+        preConfirm: function() {
+            var codeInput = document.getElementById('swal-game-input-code');
+            var code = codeInput ? codeInput.value.trim() : '';
+            if (!code) {
+                Swal.showValidationMessage('Por favor ingresa el código de acceso');
+                return false;
+            }
+
+            var postData = { game_id: gameId, code: code };
+            if (window.csrfTokenName && window.csrfHash) {
+                postData[window.csrfTokenName] = window.csrfHash;
+            }
+
+            return $.ajax({
+                url: base + 'games/verifyAccessCode',
+                type: 'POST',
+                data: postData,
+                dataType: 'json'
+            }).then(function(res) {
+                if (!res.success) {
+                    Swal.showValidationMessage(res.message || 'Código de acceso incorrecto');
+                    return false;
+                }
+                return res;
+            }).catch(function(err) {
+                Swal.showValidationMessage('Error de comunicación con el servidor');
+                return false;
+            });
+        },
+        allowOutsideClick: function() { return !Swal.isLoading(); }
+    }).then(function(result) {
+        if (result.isConfirmed && result.value && result.value.success) {
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: result.value.message || '¡Acceso concedido!',
+                    duration: 2500,
+                    gravity: "top",
+                    position: "right",
+                    style: { background: "#198754" },
+                    stopOnFocus: true
+                }).showToast();
+            }
+            if (typeof onSuccess === 'function') {
+                onSuccess();
+            }
+        }
+    });
+}
+window.promptGameAccessCode = promptGameAccessCode;
+
 function generateCartonsGet(game, payWith) {
     if(game != '') {
-        var mode = (payWith === 'bonus' || payWith === 'bono' || payWith === 'abono') ? 'bonus' : 'real';
-        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/generateCartonsGet/' + game + '?pay_with=' + encodeURIComponent(mode));
+        checkGameAccess(game, function() {
+            var mode = (payWith === 'bonus' || payWith === 'bono' || payWith === 'abono') ? 'bonus' : 'real';
+            loadAndShowModal('#modalAvailableCartons', site_url + 'playings/generateCartonsGet/' + game + '?pay_with=' + encodeURIComponent(mode));
+        });
     } else {
         Toastify({
             text: 'Debe seleccionar una sala.',
@@ -467,7 +627,9 @@ function generateCartonsGet(game, payWith) {
 
 function availableCartonsRoomGet(game) {
     if(game != '') {
-        loadAndShowModal('#modalAvailableCartons', site_url + 'playings/availableCartonsGet/' + game);
+        checkGameAccess(game, function() {
+            loadAndShowModal('#modalAvailableCartons', site_url + 'playings/availableCartonsGet/' + game);
+        });
     } else {
         Toastify({
             text: 'Debe seleccionar una sala.',
