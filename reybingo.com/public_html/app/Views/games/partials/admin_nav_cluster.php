@@ -25,6 +25,9 @@ $canAudit = function_exists('bingo_can') ? bingo_can('audit.view') : false;
 $canKyc = function_exists('bingo_can') ? bingo_can('kyc.review') : false;
 $canLegal = function_exists('bingo_is_admin') ? bingo_is_admin() : ((int)(session()->get('group') ?? 0) === 1);
 $canPayments = function_exists('bingo_can') ? bingo_can_any(['payments.view', 'payments.manage']) : false;
+$canNotifications = function_exists('bingo_can')
+    ? bingo_can_any(['notifications.manage', 'settings.manage'])
+    : (function_exists('bingo_is_admin') ? bingo_is_admin() : ((int)(session()->get('group') ?? 0) === 1));
 
 $lowBalancePending = 0;
 if (!empty($canLowBalance) && function_exists('bingo_low_balance_roulette_pending_count')) {
@@ -129,6 +132,15 @@ if ($canLegal) {
         'label' => translate('legal content'),
         'icon' => 'fa-duotone fa-solid fa-scale-balanced',
         'class' => 'admin-menu-tile--legal' . ($activeNav === 'legal' ? ' is-active' : ''),
+    ];
+}
+if ($canNotifications) {
+    $menuItems[] = [
+        'type' => 'link',
+        'href' => site_url('notificationsAdmin'),
+        'label' => 'Notificaciones',
+        'icon' => 'fa-duotone fa-solid fa-bell',
+        'class' => 'admin-menu-tile--notifications' . ($activeNav === 'notifications' ? ' is-active' : ''),
     ];
 }
 

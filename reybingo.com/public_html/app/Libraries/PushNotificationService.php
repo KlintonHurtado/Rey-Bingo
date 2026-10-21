@@ -135,7 +135,8 @@ class PushNotificationService
         $url = $payload['url'] ?? base_url('/');
         $tag = $payload['tag'] ?? 'rey-bingo-' . time();
         $icon = $payload['icon'] ?? base_url('assets/img/logo.png');
-        $badge = $payload['badge'] ?? base_url('assets/img/logo.png');
+        $badge = $payload['badge'] ?? base_url('assets/img/badge.png');
+        $image = $payload['image'] ?? base_url('assets/img/push-banner.png');
 
         return [
             'title' => $title,
@@ -143,6 +144,7 @@ class PushNotificationService
             'message' => $message,
             'icon' => $icon,
             'badge' => $badge,
+            'image' => $image,
             'url' => $url,
             'tag' => $tag,
             'requireInteraction' => true,
@@ -150,7 +152,8 @@ class PushNotificationService
             'data' => [
                 'url' => $url,
                 'timestamp' => round(microtime(true) * 1000),
-                'tag' => $tag
+                'tag' => $tag,
+                'image' => $image
             ],
             'actions' => [
                 [

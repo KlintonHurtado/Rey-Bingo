@@ -451,6 +451,11 @@ $routes->get('notificationsAdmin/processScheduled', 'NotificationsAdmin::process
 $routes->get('notificationsAdmin/statistics', 'NotificationsAdmin::statistics');
 $routes->get('notificationsAdmin/subscriptions', 'NotificationsAdmin::subscriptions');
 $routes->get('notificationsAdmin/cleanupOld', 'NotificationsAdmin::cleanupOld');
+$routes->post('notificationsAdmin/sendAjax', 'NotificationsAdmin::sendAjax');
+$routes->post('notificationsAdmin/saveTemplateAjax', 'NotificationsAdmin::saveTemplateAjax');
+$routes->post('notificationsAdmin/deleteTemplateAjax/(:num)', 'NotificationsAdmin::deleteTemplateAjax/$1');
+$routes->get('notificationsAdmin/templatesAjax', 'NotificationsAdmin::templatesAjax');
+$routes->get('notificationsAdmin/historyAjax', 'NotificationsAdmin::historyAjax');
 
 // Email Marketing routes
 $routes->get('emailMarketing', 'EmailMarketing::index');

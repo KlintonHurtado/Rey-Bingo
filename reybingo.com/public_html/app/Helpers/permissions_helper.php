@@ -32,6 +32,7 @@ if (! function_exists('bingo_permissions_catalog')) {
             ['key' => 'ggr.manage', 'name' => 'Gestionar GGR', 'module' => 'GGR'],
             ['key' => 'legal.manage', 'name' => 'Contenido legal', 'module' => 'Legal'],
             ['key' => 'settings.manage', 'name' => 'Configuración del sistema', 'module' => 'Sistema', 'sensitive' => true],
+            ['key' => 'notifications.manage', 'name' => 'Enviar y gestionar notificaciones push / live', 'module' => 'Notificaciones'],
             ['key' => 'admins.manage', 'name' => 'Crear staff y asignar permisos', 'module' => 'Administración', 'sensitive' => true],
         ];
     }

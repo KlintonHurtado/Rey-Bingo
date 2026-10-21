@@ -29,37 +29,145 @@ class NotificationsAdmin extends Controller
         $this->firebaseTokenModel = new FirebaseTokenModel();
         $this->pushService = new PushNotificationService();
 
-        helper(['form', 'url', 'cookie', 'text']);
+        helper(['form', 'url', 'cookie', 'text', 'bingo', 'permissions']);
         session();
+    }
+
+    protected function checkAccess()
+    {
+        if (!session()->get('logged_in')) {
+            return redirect()->to('/signin');
+        }
+
+        $can = function_exists('bingo_can') ? bingo_can_any(['notifications.manage', 'settings.manage']) : false;
+        $isAdmin = function_exists('bingo_is_admin') ? bingo_is_admin() : ((int) session()->get('group') === 1);
+
+        if (!$can && !$isAdmin) {
+            return redirect()->to('/dashboard')->with('error', translate('unauthorized'));
+        }
+
+        return null;
+    }
+
+    protected function ensureSchema(): void
+    {
+        try {
+            $db = \Config\Database::connect();
+            if (!$db->tableExists('notification_templates')) {
+                $db->query("CREATE TABLE IF NOT EXISTS `notification_templates` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `name` varchar(255) NOT NULL,
+                  `title_template` varchar(255) NOT NULL,
+                  `message_template` text NOT NULL,
+                  `image_url` varchar(255) DEFAULT NULL,
+                  `action_url_template` varchar(255) DEFAULT NULL,
+                  `created_at` datetime DEFAULT NULL,
+                  `updated_at` datetime DEFAULT NULL,
+                  PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+            }
+
+            $count = $db->table('notification_templates')->countAllResults();
+            if ($count === 0) {
+                $now = date('Y-m-d H:i:s');
+                $db->table('notification_templates')->insertBatch([
+                    [
+                        'name' => 'Nueva Partida en Vivo',
+                        'title_template' => '🎉 ¡Nueva Partida Abierta!',
+                        'message_template' => '¡La sala de bingo ya está disponible! Entra ahora, adquiere tus cartones de la suerte y participa por grandes premios.',
+                        'action_url_template' => site_url('games'),
+                        'image_url' => site_url('assets/img/logo.png'),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                    [
+                        'name' => 'Gran Pozo Acumulado',
+                        'title_template' => '💰 ¡Gran Pozo Acumulado!',
+                        'message_template' => '¡Atención jugadores! El pozo acumulado para la próxima partida está que arde. ¡No te quedes sin tus cartones!',
+                        'action_url_template' => site_url('games'),
+                        'image_url' => site_url('assets/img/logo.png'),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                    [
+                        'name' => 'Bono Especial de Recarga',
+                        'title_template' => '🎁 ¡Bono Especial de Recarga!',
+                        'message_template' => '¡Recarga tu saldo hoy y recibe beneficios adicionales para jugar más cartones en nuestras salas!',
+                        'action_url_template' => site_url('profile'),
+                        'image_url' => site_url('assets/img/logo.png'),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                    [
+                        'name' => 'Aviso Oficial de la Sala',
+                        'title_template' => '📢 Comunicado Oficial Rey Bingo',
+                        'message_template' => 'Apreciada comunidad, recuerden revisar sus modalidades ganadoras y jugar con responsabilidad. ¡Éxito a todos!',
+                        'action_url_template' => site_url('games'),
+                        'image_url' => site_url('assets/img/logo.png'),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'ensureSchema notification_templates error: ' . $e->getMessage());
+        }
     }
     
     /**
      * Display notifications dashboard
      */
     public function index() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
+
+        $this->ensureSchema();
 
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
 
         $contacts = $modelContacts->findAll();
-
         $user = $modelUsers->find(session()->get('id'));
 
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
         
-        $notifications = $this->notificationsModel->orderBy('created_at', 'DESC')->findAll(50);
+        $notifications = $this->notificationsModel
+            ->select('notifications.*, users.username, users.firstname, users.lastname')
+            ->join('users', 'users.id = notifications.user', 'left')
+            ->orderBy('notifications.created_at', 'DESC')
+            ->findAll(50);
+
         $stats = $this->notificationsModel->getNotificationStats();
         $templates = $this->notificationTemplatesModel->getAllTemplates();
+        $users = $modelUsers->where('status', 1)->where('deleted', 0)->orderBy('username', 'ASC')->findAll(100);
+
+        $db = \Config\Database::connect();
+        $pushSubscriptionsCount = 0;
+        if ($db->tableExists('push_subscriptions')) {
+            $pushSubscriptionsCount = $db->table('push_subscriptions')->countAllResults();
+        }
+
+        $gamesModel = new \App\Models\GamesModel();
+        $activeGamesCount = $gamesModel->whereIn('status', [1, 2])->countAllResults();
 
         $data = [
             'page' => [
                 'title' => translate('notification management')
             ],
             'validation' => \Config\Services::validation(),
-            'contentPage' => view('notifications_admin/index', ['contacts' => $contacts, 'notifications' => $notifications, 'stats' => $stats, 'templates' => $templates, 'user' => $user, 'imagePath' => $imagePath]) 
+            'contentPage' => view('notifications_admin/index', [
+                'contacts' => $contacts,
+                'notifications' => $notifications,
+                'stats' => $stats,
+                'templates' => $templates,
+                'user' => $user,
+                'imagePath' => $imagePath,
+                'users' => $users,
+                'pushSubscriptionsCount' => $pushSubscriptionsCount,
+                'activeGamesCount' => $activeGamesCount
+            ]) 
         ];
 
         if ($this->request->isAJAX()) {
@@ -68,22 +176,339 @@ class NotificationsAdmin extends Controller
             return view('layout/index', $data);
         }
     }
+
+    /**
+     * Send notification via AJAX with Live WebSocket + Web Push
+     */
+    public function sendAjax()
+    {
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'success' => false,
+                'message' => 'No tienes permisos para enviar notificaciones.'
+            ]);
+        }
+
+        $title = trim((string) $this->request->getPost('title'));
+        $message = trim((string) $this->request->getPost('message'));
+        $segment = trim((string) $this->request->getPost('segment'));
+        if ($segment === '') {
+            $segment = 'all';
+        }
+        $specificUserId = (int) $this->request->getPost('user_id');
+        $sendLive = (int) ($this->request->getPost('send_live') ?? 1);
+        $sendPush = (int) ($this->request->getPost('send_push') ?? 1);
+        $actionUrl = trim((string) $this->request->getPost('action_url'));
+        $imageUrl = trim((string) $this->request->getPost('image_url'));
+        $saveAsTemplate = (int) ($this->request->getPost('save_as_template') ?? 0);
+        $templateName = trim((string) $this->request->getPost('template_name'));
+
+        if ($title === '') {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Por favor ingrese un título para la notificación.'
+            ]);
+        }
+
+        if ($message === '') {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Por favor ingrese el mensaje de la notificación.'
+            ]);
+        }
+
+        if ($sendLive === 0 && $sendPush === 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Debe activar al menos un canal de entrega (Live o Push).'
+            ]);
+        }
+
+        // Guardar como plantilla si se solicitó
+        if ($saveAsTemplate === 1 && $templateName !== '') {
+            try {
+                $this->notificationTemplatesModel->insert([
+                    'name' => $templateName,
+                    'title_template' => $title,
+                    'message_template' => $message,
+                    'action_url_template' => $actionUrl ?: site_url('games'),
+                    'image_url' => $imageUrl ?: site_url('assets/img/logo.png'),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            } catch (\Throwable $te) {
+                log_message('warning', 'Error al guardar plantilla: ' . $te->getMessage());
+            }
+        }
+
+        // Destinatarios
+        $targetUsers = [];
+        if ($segment === 'specific' && $specificUserId > 0) {
+            $u = $this->usersModel->find($specificUserId);
+            if ($u) {
+                $targetUsers = [$u];
+            }
+        } elseif ($segment === 'pro') {
+            $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->where('is_pro', 1)->findAll();
+        } elseif ($segment === 'live_games') {
+            $db = \Config\Database::connect();
+            $activeGameUids = $db->table('cartons')
+                ->select('cartons.user')
+                ->join('games', 'games.id = cartons.game')
+                ->whereIn('games.status', [1, 2])
+                ->groupBy('cartons.user')
+                ->get()->getResultArray();
+            $uids = array_column($activeGameUids, 'user');
+            if (!empty($uids)) {
+                $targetUsers = $this->usersModel->whereIn('id', $uids)->where('status', 1)->where('deleted', 0)->findAll();
+            }
+            if (empty($targetUsers)) {
+                $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->findAll(50);
+            }
+        } else {
+            $targetUsers = $this->usersModel->where('status', 1)->where('deleted', 0)->findAll();
+        }
+
+        $adminId = (int) session()->get('id');
+        $now = date('Y-m-d H:i:s');
+        $formattedUrl = $actionUrl ?: site_url('games');
+        $formattedImage = $imageUrl ?: site_url('assets/img/logo.png');
+
+        // 1. Guardar en tabla notifications para persistencia
+        $notificationRows = [];
+        $recipientUserIds = [];
+        foreach ($targetUsers as $tu) {
+            $uid = (int) $tu['id'];
+            $recipientUserIds[] = $uid;
+            $notificationRows[] = [
+                'user' => $uid,
+                'from' => $adminId,
+                'type' => 'admin',
+                'type_id' => 0,
+                'game' => 0,
+                'carton' => 0,
+                'modality' => 0,
+                'numbers' => '',
+                'title' => $title,
+                'message' => $message,
+                'action_url' => $formattedUrl,
+                'image_url' => $formattedImage,
+                'status' => 0,
+                'sent_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        $insertedCount = 0;
+        if (!empty($notificationRows)) {
+            $chunks = array_chunk($notificationRows, 100);
+            foreach ($chunks as $chunk) {
+                $this->notificationsModel->insertBatch($chunk);
+                $insertedCount += count($chunk);
+            }
+        }
+
+        // 2. Transmisión LIVE en tiempo real vía WebSocket (Soketi / Pusher)
+        $liveBroadcastCount = 0;
+        if ($sendLive === 1) {
+            helper('bingo');
+            $livePayload = [
+                'id' => 'admin_' . time() . '_' . rand(100, 999),
+                'title' => $title,
+                'message' => $message,
+                'type' => 'admin',
+                'action_url' => $formattedUrl,
+                'image_url' => $formattedImage,
+                'created_at' => $now,
+                'time' => date('H:i')
+            ];
+
+            // A) Enviar a canales de usuario privados individuales
+            if (!empty($recipientUserIds)) {
+                $targetLimit = count($recipientUserIds) > 200 ? 200 : count($recipientUserIds);
+                for ($i = 0; $i < $targetLimit; $i++) {
+                    $uId = $recipientUserIds[$i];
+                    bingo_broadcast_user_notification($uId, $livePayload);
+                    $liveBroadcastCount++;
+                }
+            }
+
+            // B) Transmitir a todas las salas de juego activas
+            try {
+                $client = bingo_get_broadcast_client();
+                $gamesModel = new \App\Models\GamesModel();
+                $activeGames = $gamesModel->whereIn('status', [1, 2])->findAll();
+                foreach ($activeGames as $ag) {
+                    $gId = (int) $ag['id'];
+                    $client->trigger(['private-game-' . $gId, 'game-' . $gId], 'game:notification', $livePayload);
+                    $client->trigger(['private-game-' . $gId, 'game-' . $gId], 'notification:new', $livePayload);
+                }
+            } catch (\Throwable $be) {
+                log_message('error', 'Live game broadcast error: ' . $be->getMessage());
+            }
+        }
+
+        // 3. Notificación Push a teléfonos y navegadores (Web Push / Service Worker)
+        $pushResult = ['sent' => 0, 'total' => 0, 'failed' => 0];
+        if ($sendPush === 1) {
+            try {
+                $pushPayload = [
+                    'title' => $title,
+                    'message' => $message,
+                    'body' => $message,
+                    'url' => $formattedUrl,
+                    'icon' => $formattedImage,
+                    'badge' => site_url('assets/img/badge.png'),
+                    'tag' => 'admin-msg-' . time(),
+                    'requireInteraction' => true,
+                ];
+
+                if ($segment === 'specific' && $specificUserId > 0) {
+                    $pushResult = $this->pushService->sendToUser($specificUserId, $pushPayload);
+                } else {
+                    $pushResult = $this->pushService->sendToAll($pushPayload);
+                }
+            } catch (\Throwable $pe) {
+                log_message('error', 'Push sending error: ' . $pe->getMessage());
+                $pushResult['error'] = $pe->getMessage();
+            }
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => '¡Notificación enviada con éxito!',
+            'details' => [
+                'users_targeted' => count($targetUsers),
+                'live_sent' => $sendLive === 1 ? 'Activo (Soketi Realtime)' : 'No seleccionado',
+                'live_count' => $liveBroadcastCount,
+                'push_sent' => (int) ($pushResult['sent'] ?? 0),
+                'push_total' => (int) ($pushResult['total'] ?? 0),
+                'saved_as_template' => ($saveAsTemplate === 1 && $templateName !== '')
+            ]
+        ]);
+    }
+
+    /**
+     * Guardar plantilla rápida vía AJAX
+     */
+    public function saveTemplateAjax()
+    {
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $name = trim((string) $this->request->getPost('name'));
+        $title = trim((string) $this->request->getPost('title'));
+        $message = trim((string) $this->request->getPost('message'));
+        $actionUrl = trim((string) $this->request->getPost('action_url'));
+
+        if ($name === '' || $title === '' || $message === '') {
+            return $this->response->setJSON(['success' => false, 'message' => 'Nombre, título y mensaje son obligatorios.']);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $id = $this->notificationTemplatesModel->insert([
+            'name' => $name,
+            'title_template' => $title,
+            'message_template' => $message,
+            'action_url_template' => $actionUrl ?: site_url('games'),
+            'image_url' => site_url('assets/img/logo.png'),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Plantilla guardada correctamente.',
+            'template' => [
+                'id' => $id,
+                'name' => $name,
+                'title_template' => $title,
+                'message_template' => $message,
+                'action_url_template' => $actionUrl ?: site_url('games')
+            ]
+        ]);
+    }
+
+    /**
+     * Eliminar plantilla vía AJAX
+     */
+    public function deleteTemplateAjax($id = null)
+    {
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $id = (int) ($id ?? $this->request->getPost('id'));
+        if ($id <= 0) {
+            return $this->response->setJSON(['success' => false, 'message' => 'ID de plantilla inválido.']);
+        }
+
+        $this->notificationTemplatesModel->delete($id);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Plantilla eliminada exitosamente.'
+        ]);
+    }
+
+    /**
+     * Listar plantillas vía AJAX
+     */
+    public function templatesAjax()
+    {
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $templates = $this->notificationTemplatesModel->getAllTemplates();
+        return $this->response->setJSON([
+            'success' => true,
+            'templates' => $templates
+        ]);
+    }
+
+    /**
+     * Obtener historial reciente vía AJAX
+     */
+    public function historyAjax()
+    {
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'No autorizado']);
+        }
+
+        $notifications = $this->notificationsModel
+            ->select('notifications.*, users.username, users.firstname, users.lastname')
+            ->join('users', 'users.id = notifications.user', 'left')
+            ->orderBy('notifications.created_at', 'DESC')
+            ->findAll(30);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'notifications' => $notifications
+        ]);
+    }
     
     /**
-     * Create new notification
+     * Create new notification (legacy/standard form support)
      */
     public function create() {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
 
         $modelUsers = new UsersModel();
         $modelContacts = new ContactsModel();
 
         $contacts = $modelContacts->findAll();
-
         $user = $modelUsers->find(session()->get('id'));
-
         $imagePath = !empty($user['image']) ? site_url('uploads/users/' . $user['image']) : site_url('assets/img/avatar.jpg');
         
         if ($this->request->getMethod() === 'post') {
@@ -101,29 +526,19 @@ class NotificationsAdmin extends Controller
                 $imageUrl = $this->request->getPost('image_url');
                 $templateId = $this->request->getPost('template_id');
                 
-                // Get users based on segment
                 $users = [];
-                
                 switch ($segment) {
                     case 'all':
                         $users = $this->usersModel->where('status', 1)->findAll();
                         break;
-                    
                     case 'pro':
                         $users = $this->usersModel->where('status', 1)->where('is_pro', 1)->findAll();
                         break;
-                    
                     case 'non_pro':
                         $users = $this->usersModel->where('status', 1)->where('is_pro', 0)->findAll();
                         break;
-                    
                     default:
-                        // Check if segment is a level
-                        if (strpos($segment, 'level_') === 0) {
-                            $levelId = substr($segment, 6);
-                            $users = $this->usersModel->where('status', 1)->where('level_id', $levelId)->findAll();
-                        } else if (is_numeric($segment)) {
-                            // Single user
+                        if (is_numeric($segment)) {
                             $user = $this->usersModel->find($segment);
                             if ($user) {
                                 $users = [$user];
@@ -136,7 +551,6 @@ class NotificationsAdmin extends Controller
                     return redirect()->back()->withInput()->with('error', 'No se encontraron usuarios para el segmento seleccionado');
                 }
                 
-                // Prepare notification data
                 $notificationData = [
                     'from' => session()->get('id'),
                     'type' => 'admin',
@@ -153,35 +567,28 @@ class NotificationsAdmin extends Controller
                     'status' => 0
                 ];
                 
-                // Handle scheduled sending
-                if ($this->request->getPost('schedule') == 'yes') {
-                    $scheduledDate = $this->request->getPost('scheduled_date');
-                    $scheduledTime = $this->request->getPost('scheduled_time');
-                    
-                    if ($scheduledDate && $scheduledTime) {
-                        $notificationData['scheduled_at'] = $scheduledDate . ' ' . $scheduledTime . ':00';
-                    }
-                }
-                
-                // Create notifications for all users
                 $userIds = array_column($users, 'id');
                 $this->notificationsModel->createBulkNotifications($notificationData, $userIds);
                 
-                // If not scheduled, send immediately
-                if (!isset($notificationData['scheduled_at'])) {
-                    // Get the created notifications
-                    $createdNotifications = $this->notificationsModel->where('from', session()->get('id'))
-                                                                    ->where('title', $title)
-                                                                    ->where('message', $message)
-                                                                    ->where('sent_at IS NULL', null, false)
-                                                                    ->findAll();
-                    
-                    $notificationIds = array_column($createdNotifications, 'id');
-                    
-                    if (!empty($notificationIds)) {
-                        $this->notificationsModel->sendBulkPushNotifications($notificationIds);
-                    }
+                // Live broadcast & push
+                helper('bingo');
+                $livePayload = [
+                    'title' => $title,
+                    'message' => $message,
+                    'type' => 'admin',
+                    'action_url' => $actionUrl ?: site_url('games'),
+                    'created_at' => date('Y-m-d H:i:s'),
+                ];
+                foreach ($userIds as $uid) {
+                    bingo_broadcast_user_notification($uid, $livePayload);
                 }
+
+                $this->pushService->sendToAll([
+                    'title' => $title,
+                    'message' => $message,
+                    'body' => $message,
+                    'url' => $actionUrl ?: site_url('games')
+                ]);
                 
                 return redirect()->to('/notificationsAdmin')->with('success', 'Notificación creada y enviada exitosamente');
             } else {
@@ -212,8 +619,9 @@ class NotificationsAdmin extends Controller
      */
     public function view($id = null)
     {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($id === null) {
@@ -221,19 +629,13 @@ class NotificationsAdmin extends Controller
         }
         
         $notification = $this->notificationsModel->find($id);
-        
         if (!$notification) {
             return redirect()->to('/notificationsAdmin')->with('error', 'Notificación no encontrada');
         }
         
         $user = $this->usersModel->find($notification['user']);
         $sender = $this->usersModel->find($notification['from']);
-        
-        if ($notification['template_id']) {
-            $template = $this->notificationTemplatesModel->find($notification['template_id']);
-        } else {
-            $template = null;
-        }
+        $template = $notification['template_id'] ? $this->notificationTemplatesModel->find($notification['template_id']) : null;
         
         $data = [
             'title' => 'Detalles de Notificación',
@@ -251,8 +653,9 @@ class NotificationsAdmin extends Controller
      */
     public function sendNow($id = null)
     {
-        if (!session()->get('logged_in') || session()->get('group') != 1) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($id === null) {
@@ -260,14 +663,8 @@ class NotificationsAdmin extends Controller
         }
         
         $notification = $this->notificationsModel->find($id);
-        
         if (!$notification) {
             return redirect()->to('/notificationsAdmin')->with('error', 'Notificación no encontrada');
-        }
-        
-        // Only send if not already sent
-        if ($notification['sent_at']) {
-            return redirect()->to('/notificationsAdmin/view/' . $id)->with('error', 'Esta notificación ya ha sido enviada');
         }
         
         $result = $this->notificationsModel->sendPushNotification($id);
@@ -275,7 +672,7 @@ class NotificationsAdmin extends Controller
         if ($result['success']) {
             return redirect()->to('/notificationsAdmin/view/' . $id)->with('success', 'Notificación enviada exitosamente');
         } else {
-            return redirect()->to('/notificationsAdmin/view/' . $id)->with('error', 'Error al enviar la notificación: ' . $result['message']);
+            return redirect()->to('/notificationsAdmin/view/' . $id)->with('error', 'Error al enviar la notificación: ' . ($result['message'] ?? ''));
         }
     }
     
@@ -284,12 +681,9 @@ class NotificationsAdmin extends Controller
      */
     public function delete($id = null)
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
-        }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($id === null) {
@@ -297,13 +691,11 @@ class NotificationsAdmin extends Controller
         }
         
         $notification = $this->notificationsModel->find($id);
-        
         if (!$notification) {
             return redirect()->to('/notificationsAdmin')->with('error', 'Notificación no encontrada');
         }
         
         $this->notificationsModel->delete($id);
-        
         return redirect()->to('/notificationsAdmin')->with('success', 'Notificación eliminada exitosamente');
     }
     
@@ -312,16 +704,12 @@ class NotificationsAdmin extends Controller
      */
     public function templates()
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
-        }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         $templates = $this->notificationTemplatesModel->getAllTemplates();
-        
         $data = [
             'title' => 'Plantillas de Notificación',
             'templates' => $templates
@@ -335,12 +723,9 @@ class NotificationsAdmin extends Controller
      */
     public function createTemplate()
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
-        }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($this->request->getMethod() === 'post') {
@@ -360,7 +745,6 @@ class NotificationsAdmin extends Controller
                 ];
                 
                 $this->notificationTemplatesModel->insert($data);
-                
                 return redirect()->to('/notificationsAdmin/templates')->with('success', 'Plantilla creada exitosamente');
             } else {
                 return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
@@ -368,7 +752,8 @@ class NotificationsAdmin extends Controller
         }
         
         $data = [
-            'title' => 'Crear Plantilla de Notificación'
+            'title' => 'Crear Plantilla de Notificación',
+            'validation' => \Config\Services::validation()
         ];
         
         return view('notifications_admin/create_template', $data);
@@ -379,12 +764,9 @@ class NotificationsAdmin extends Controller
      */
     public function editTemplate($id = null)
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
-        }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($id === null) {
@@ -392,7 +774,6 @@ class NotificationsAdmin extends Controller
         }
         
         $template = $this->notificationTemplatesModel->find($id);
-        
         if (!$template) {
             return redirect()->to('/notificationsAdmin/templates')->with('error', 'Plantilla no encontrada');
         }
@@ -414,7 +795,6 @@ class NotificationsAdmin extends Controller
                 ];
                 
                 $this->notificationTemplatesModel->update($id, $data);
-                
                 return redirect()->to('/notificationsAdmin/templates')->with('success', 'Plantilla actualizada exitosamente');
             } else {
                 return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
@@ -423,7 +803,8 @@ class NotificationsAdmin extends Controller
         
         $data = [
             'title' => 'Editar Plantilla de Notificación',
-            'template' => $template
+            'template' => $template,
+            'validation' => \Config\Services::validation()
         ];
         
         return view('notifications_admin/edit_template', $data);
@@ -434,12 +815,9 @@ class NotificationsAdmin extends Controller
      */
     public function deleteTemplate($id = null)
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
-        }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
         if ($id === null) {
@@ -447,132 +825,59 @@ class NotificationsAdmin extends Controller
         }
         
         $template = $this->notificationTemplatesModel->find($id);
-        
         if (!$template) {
             return redirect()->to('/notificationsAdmin/templates')->with('error', 'Plantilla no encontrada');
         }
         
-        // Check if template is in use
-        $inUse = $this->notificationsModel->where('template_id', $id)->countAllResults();
-        
-        if ($inUse > 0) {
-            return redirect()->to('/notificationsAdmin/templates')->with('error', 'No se puede eliminar la plantilla porque está en uso');
-        }
-        
         $this->notificationTemplatesModel->delete($id);
-        
         return redirect()->to('/notificationsAdmin/templates')->with('success', 'Plantilla eliminada exitosamente');
     }
     
     /**
-     * Process scheduled notifications
-     * This should be called by a cron job
-     */
-    public function processScheduled()
-    {
-        // Check if this is called from CLI or by admin
-        if (!is_cli() && (!session()->get('isLoggedIn') || session()->get('group') != 1)) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Acceso no autorizado'
-            ]);
-        }
-        
-        $readyNotifications = $this->notificationsModel->getReadyToSendNotifications();
-        
-        $processed = 0;
-        foreach ($readyNotifications as $notification) {
-            $result = $this->notificationsModel->sendPushNotification($notification['id']);
-            $processed++;
-        }
-        
-        if (is_cli()) {
-            echo "Processed {$processed} notifications.\n";
-            return;
-        }
-        
-        return $this->response->setJSON([
-            'success' => true,
-            'message' => "Procesadas {$processed} notificaciones programadas."
-        ]);
-    }
-    
-    /**
-     * View notification statistics
+     * Statistics
      */
     public function statistics()
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
-        }
-        
-        $dayStats = $this->notificationsModel->getNotificationStats('day');
-        $weekStats = $this->notificationsModel->getNotificationStats('week');
-        $monthStats = $this->notificationsModel->getNotificationStats('month');
-        $yearStats = $this->notificationsModel->getNotificationStats('year');
         
         $data = [
             'title' => 'Estadísticas de Notificaciones',
-            'dayStats' => $dayStats,
-            'weekStats' => $weekStats,
-            'monthStats' => $monthStats,
-            'yearStats' => $yearStats
+            'stats' => $this->notificationsModel->getNotificationStats()
         ];
         
         return view('notifications_admin/statistics', $data);
     }
     
     /**
-     * View push subscriptions
+     * Subscriptions
      */
     public function subscriptions()
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
         
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
-        }
-        
-        $webPushSubscriptions = $this->pushSubscriptionModel->findAll();
-        $firebaseTokens = $this->firebaseTokenModel->findAll();
-        
+        $subscriptions = $this->pushSubscriptionModel->findAll();
         $data = [
             'title' => 'Suscripciones Push',
-            'webPushSubscriptions' => $webPushSubscriptions,
-            'firebaseTokens' => $firebaseTokens
+            'subscriptions' => $subscriptions
         ];
         
         return view('notifications_admin/subscriptions', $data);
     }
-    
-    /**
-     * Delete old notifications
-     */
+
     public function cleanupOld()
     {
-        if (!session()->get('isLoggedIn')) {
-            return redirect()->to('/signin');
+        $auth = $this->checkAccess();
+        if ($auth !== null) {
+            return $auth;
         }
-        
-        if (session()->get('group') != 1) {
-            return redirect()->to('/dashboard');
-        }
-        
-        $days = $this->request->getGet('days') ?? 30;
-        $days = intval($days);
-        
-        if ($days < 7) {
-            $days = 7; // Minimum 7 days
-        }
-        
-        $this->notificationsModel->deleteOldNotifications($days);
-        
-        return redirect()->to('/notificationsAdmin')->with('success', "Notificaciones antiguas (más de {$days} días) eliminadas exitosamente");
+
+        $this->notificationsModel->deleteOldNotifications(30);
+        return redirect()->to('/notificationsAdmin')->with('success', 'Notificaciones antiguas eliminadas.');
     }
 }

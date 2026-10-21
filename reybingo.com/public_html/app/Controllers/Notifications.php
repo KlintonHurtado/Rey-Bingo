@@ -78,7 +78,10 @@ class Notifications extends Controller {
                 $confirmationPayload = [
                     'title' => '🎉 ¡Notificaciones Activadas!',
                     'message' => 'Recibirás avisos en tu teléfono cuando empiece una partida en vivo de Rey Bingo',
-                    'url' => base_url('/')
+                    'url' => base_url('/'),
+                    'icon' => base_url('assets/img/logo.png'),
+                    'badge' => base_url('assets/img/badge.png'),
+                    'image' => base_url('assets/img/push-banner.png')
                 ];
 
                 try {
@@ -213,6 +216,28 @@ class Notifications extends Controller {
      */
     public function getLatestPush()
     {
+        // 1. Revisar si hay una notificación personalizada reciente enviada por administración
+        try {
+            $notifModel = new \App\Models\NotificationsModel();
+            $recentNotif = $notifModel->where('created_at >=', date('Y-m-d H:i:s', strtotime('-15 minutes')))
+                                      ->orderBy('id', 'DESC')
+                                      ->first();
+            if ($recentNotif && !empty($recentNotif['message'])) {
+                return $this->response->setJSON([
+                    'title' => !empty($recentNotif['title']) ? $recentNotif['title'] : 'Rey Bingo',
+                    'message' => $recentNotif['message'],
+                    'body' => $recentNotif['message'],
+                    'url' => !empty($recentNotif['action_url']) ? $recentNotif['action_url'] : base_url('/'),
+                    'tag' => 'admin-notif-' . $recentNotif['id'],
+                    'icon' => !empty($recentNotif['image_url']) ? $recentNotif['image_url'] : base_url('assets/img/logo.png'),
+                    'badge' => base_url('assets/img/badge.png'),
+                    'requireInteraction' => true
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'Error in getLatestPush admin check: ' . $e->getMessage());
+        }
+
         $gamesModel = new \App\Models\GamesModel();
         // Buscar la partida en vivo más reciente activa por ID descendente
         $game = $gamesModel->whereIn('type', [3, 4])
