@@ -3,7 +3,12 @@
  */
 class NotificationManager {
     constructor() {
-        this.isSupported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+        this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        this.isStandalone = Boolean(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+
+        // En iOS Safari (navegador regular), PushManager solo existe tras "Agregar a pantalla de inicio" (standalone)
+        this.isSupported = ('serviceWorker' in navigator) && ('Notification' in window) && ('PushManager' in window);
         this.registration = null;
         this.baseUrl = new URL((typeof site_url !== 'undefined' && site_url) ? site_url : '/', window.location.origin);
         this.vapidPublicKey = null;
@@ -11,6 +16,12 @@ class NotificationManager {
     }
 
     async init() {
+        if (this.isIOS && !this.isStandalone) {
+            console.log('📱 Dispositivo iOS Safari detectado (requiere agregar a pantalla de inicio para Web Push)');
+            this.setupIOSBanner();
+            return;
+        }
+
         if (!this.isSupported) {
             console.log('ℹ️ Push notifications no están soportadas en este navegador');
             return;
@@ -118,6 +129,11 @@ class NotificationManager {
     }
 
     showBanner() {
+        if (this.isIOS && !this.isStandalone) {
+            this.setupIOSBanner();
+            return;
+        }
+
         if (!this.isSupported || (window.Notification && Notification.permission !== 'default')) {
             this.hideBanner();
             return;
@@ -129,6 +145,28 @@ class NotificationManager {
         this.hideFloatingBell();
     }
 
+    setupIOSBanner() {
+        const dismissed = sessionStorage.getItem('push-banner-dismissed');
+        if (dismissed) {
+            this.showFloatingBell();
+            return;
+        }
+
+        const banner = document.getElementById('rey-push-banner');
+        if (!banner) return;
+
+        const titleEl = banner.querySelector('h5');
+        const descEl = banner.querySelector('p');
+        const activateBtn = document.getElementById('btn-activate-push');
+
+        if (titleEl) titleEl.textContent = '📱 Notificaciones en tu iPhone';
+        if (descEl) descEl.textContent = 'Para recibir avisos de partidas en tu iPhone, pulsa Compartir (⎋) y "Agregar a pantalla de inicio".';
+        if (activateBtn) activateBtn.innerHTML = '📲 ¿Cómo activar?';
+
+        banner.style.display = 'block';
+        this.hideFloatingBell();
+    }
+
     hideBanner() {
         const banner = document.getElementById('rey-push-banner');
         if (banner) {
@@ -137,7 +175,11 @@ class NotificationManager {
     }
 
     showFloatingBell() {
-        if (!this.isSupported || (window.Notification && Notification.permission !== 'default')) {
+        if (!this.isSupported && !(this.isIOS && !this.isStandalone)) {
+            this.hideFloatingBell();
+            return;
+        }
+        if (window.Notification && Notification.permission !== 'default') {
             this.hideFloatingBell();
             return;
         }
@@ -155,14 +197,13 @@ class NotificationManager {
     }
 
     async requestPermission() {
+        if (this.isIOS && !this.isStandalone) {
+            this.showIOSGuideModal();
+            return false;
+        }
+
         if (!this.isSupported) {
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            const isStandalone = window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-            if (isIOS && !isStandalone) {
-                alert('Para activar notificaciones en iPhone:\n\n1. Toca el botón Compartir (icono de cuadrado con flecha hacia arriba) en Safari.\n2. Elige "Agregar a pantalla de inicio".\n3. Abre Rey Bingo desde tu pantalla de inicio y pulsa "Activar Notificaciones".');
-            } else {
-                alert('Tu navegador no admite notificaciones push nativas.');
-            }
+            alert('Tu navegador no admite notificaciones push nativas.');
             return false;
         }
 
@@ -171,7 +212,17 @@ class NotificationManager {
             let permission = Notification.permission;
 
             if (permission !== 'granted') {
-                permission = await Notification.requestPermission();
+                // Compatibilidad dual (Promise + Callback) para Safari iOS y navegadores antiguos
+                try {
+                    const req = Notification.requestPermission();
+                    if (req && typeof req.then === 'function') {
+                        permission = await req;
+                    } else {
+                        permission = await new Promise(resolve => Notification.requestPermission(resolve));
+                    }
+                } catch (pErr) {
+                    permission = await new Promise(resolve => Notification.requestPermission(resolve));
+                }
             }
             console.log('Respuesta de permiso:', permission);
 
@@ -457,6 +508,53 @@ class NotificationManager {
         const closeModal = () => modal.remove();
         modal.querySelector('#btn-close-blocked-modal-x').onclick = closeModal;
         modal.querySelector('#btn-close-blocked-modal').onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        document.body.appendChild(modal);
+    }
+
+    showIOSGuideModal() {
+        const existing = document.getElementById('rey-push-ios-guide-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'rey-push-ios-guide-modal';
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px;';
+        modal.innerHTML = `
+            <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; max-width: 440px; width: 100%; color: #fff; padding: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); font-family: inherit; position: relative;">
+                <button type="button" id="btn-close-ios-modal-x" style="position: absolute; top: 14px; right: 16px; background: none; border: none; color: #94a3b8; font-size: 26px; cursor: pointer; line-height: 1;">&times;</button>
+                <div style="text-align: center; margin-bottom: 16px;">
+                    <div style="font-size: 38px; margin-bottom: 6px;">📱🔔</div>
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #ffffff;">Activar en iPhone / iPad</h4>
+                </div>
+                <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.5; margin-bottom: 16px; text-align: center;">
+                    Apple exige que agregues el juego a tu <strong>pantalla de inicio</strong> para permitir notificaciones push.
+                </p>
+                <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 16px; margin-bottom: 18px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start;">
+                        <span style="background: #3b82f6; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; font-weight: bold;">1</span>
+                        <span>En la barra inferior de Safari, toca el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba <strong>⎋</strong>).</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start;">
+                        <span style="background: #3b82f6; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; font-weight: bold;">2</span>
+                        <span>Desliza las opciones y selecciona <strong>"Agregar a pantalla de inicio"</strong> (icono <strong>＋</strong>).</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <span style="background: #3b82f6; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; font-weight: bold;">3</span>
+                        <span>Abre <strong>Rey Bingo</strong> desde tu pantalla de inicio y presiona <strong>"Activar Notificaciones"</strong>.</span>
+                    </div>
+                </div>
+                <button type="button" id="btn-close-ios-modal" style="width: 100%; background: #3b82f6; color: white; border: none; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 4px 14px rgba(59,130,246,0.4);">
+                    ¡Entendido!
+                </button>
+            </div>
+        `;
+
+        const closeModal = () => modal.remove();
+        modal.querySelector('#btn-close-ios-modal-x').onclick = closeModal;
+        modal.querySelector('#btn-close-ios-modal').onclick = closeModal;
         modal.onclick = (e) => {
             if (e.target === modal) closeModal();
         };

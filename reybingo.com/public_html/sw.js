@@ -2,7 +2,7 @@
  * Service Worker de Rey Bingo para notificaciones push.
  */
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `reybingo-cache-${CACHE_VERSION}`;
 const DEFAULT_NOTIFICATION = {
     title: 'Nueva notificación',
@@ -33,6 +33,11 @@ function asObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+function isIOSClient() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function normalizeNotification(payload) {
     const source = asObject(payload);
     const notification = asObject(source.notification);
@@ -47,13 +52,32 @@ function normalizeNotification(payload) {
         || (source.fcmOptions && source.fcmOptions.link)
         || '/';
 
+    const title = notification.title || source.title || data.title || DEFAULT_NOTIFICATION.title;
+    const body = notification.body || source.body || source.message || data.body || data.message || DEFAULT_NOTIFICATION.body;
+    const tag = notification.tag || source.tag || data.tag || `rey-bingo-${Date.now()}`;
+    const clickData = Object.assign({}, data, nestedData, { url, timestamp: Date.now() });
+
+    // Apple iOS WebKit (Safari PWA) no soporta 'actions', 'requireInteraction', 'vibrate', 'badge', 'icon'
+    // en showNotification y arroja un TypeError si se le envían, bloqueando la notificación en el iPhone.
+    if (isIOSClient()) {
+        return {
+            title: title,
+            options: {
+                body: body,
+                tag: tag,
+                data: clickData
+            }
+        };
+    }
+
+    // Android / Windows / Desktop: Opciones completas
     return {
-        title: notification.title || source.title || data.title || DEFAULT_NOTIFICATION.title,
+        title: title,
         options: {
-            body: notification.body || source.body || source.message || data.body || data.message || DEFAULT_NOTIFICATION.body,
+            body: body,
             icon: notification.icon || source.icon || data.icon || DEFAULT_NOTIFICATION.icon,
             badge: notification.badge || source.badge || data.badge || DEFAULT_NOTIFICATION.badge,
-            tag: notification.tag || source.tag || data.tag || `rey-bingo-${Date.now()}`,
+            tag: tag,
             requireInteraction: typeof notification.requireInteraction === 'boolean'
                 ? notification.requireInteraction
                 : (typeof source.requireInteraction === 'boolean'
@@ -62,7 +86,7 @@ function normalizeNotification(payload) {
             vibrate: source.vibrate || data.vibrate || DEFAULT_NOTIFICATION.vibrate,
             actions: notification.actions || source.actions || data.actions,
             timestamp: Date.now(),
-            data: Object.assign({}, data, nestedData, { url, timestamp: Date.now() })
+            data: clickData
         }
     };
 }
@@ -103,13 +127,18 @@ self.addEventListener('push', event => {
         try {
             await self.registration.showNotification(normalized.title, normalized.options);
         } catch (showError) {
-            console.warn('[sw.js] Falló showNotification completo, ejecutando fallback básico para móvil:', showError);
+            console.warn('[sw.js] Falló showNotification completo, ejecutando fallback básico para móvil/iOS:', showError);
             try {
-                await self.registration.showNotification(normalized.title || 'Rey Bingo', {
+                // Fallback seguro compatible con todas las versiones de iOS y Android
+                const fallbackOpts = {
                     body: (normalized.options && normalized.options.body) || '¡Partida en vivo disponible!',
-                    icon: `${self.location.origin}/assets/img/logo.png`,
+                    tag: (normalized.options && normalized.options.tag) || 'rey-bingo-push',
                     data: (normalized.options && normalized.options.data) || { url: '/' }
-                });
+                };
+                if (!isIOSClient()) {
+                    fallbackOpts.icon = `${self.location.origin}/assets/img/logo.png`;
+                }
+                await self.registration.showNotification(normalized.title || 'Rey Bingo', fallbackOpts);
             } catch (fallbackError) {
                 console.error('[sw.js] Error crítico en showNotification:', fallbackError);
             }

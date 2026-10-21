@@ -1,35 +1,44 @@
 {
+  "id": "/",
   "name": "REY BINGO",
   "short_name": "REY BINGO",
-  "start_url": "/signin",
+  "description": "Juega al bingo en vivo con cartones reales y premios al instante.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#6236ff",
   "theme_color": "#6236ff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "logo.png",
-      "sizes": "512x512",
+      "src": "/assets/img/favicon-180x180.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "favicon-192x192.png",
+      "src": "/assets/img/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "favicon-512x512.png",
+      "src": "/assets/img/favicon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "app.png",
+      "src": "/assets/img/logo.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/img/app.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
