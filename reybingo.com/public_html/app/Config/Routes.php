@@ -58,6 +58,12 @@ $routes->get('test-push-status', function() {
         $results['has_push_subscriptions'] = in_array('push_subscriptions', $tables);
         if ($results['has_push_subscriptions']) {
             $results['subscription_count'] = $db->table('push_subscriptions')->countAllResults();
+            $results['recent_subscriptions'] = $db->table('push_subscriptions')
+                ->select('id, user_id, LEFT(endpoint, 65) as endpoint_prefix, user_agent, created_at, updated_at')
+                ->orderBy('id', 'DESC')
+                ->limit(10)
+                ->get()
+                ->getResultArray();
         }
     } catch (\Throwable $e) {
         $results['db_error'] = $e->getMessage();

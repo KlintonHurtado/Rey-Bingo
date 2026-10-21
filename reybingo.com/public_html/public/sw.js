@@ -2,13 +2,13 @@
  * Service Worker de Rey Bingo para notificaciones push.
  */
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `reybingo-cache-${CACHE_VERSION}`;
 const DEFAULT_NOTIFICATION = {
     title: 'Nueva notificación',
     body: 'Tienes una nueva notificación de Rey Bingo',
     icon: `${self.location.origin}/assets/img/logo.png`,
-    badge: `${self.location.origin}/assets/img/badge.png`,
+    badge: `${self.location.origin}/assets/img/logo.png`,
     requireInteraction: true,
     vibrate: [300, 100, 300]
 };
@@ -100,7 +100,20 @@ self.addEventListener('push', event => {
         }
 
         const normalized = normalizeNotification(payload);
-        await self.registration.showNotification(normalized.title, normalized.options);
+        try {
+            await self.registration.showNotification(normalized.title, normalized.options);
+        } catch (showError) {
+            console.warn('[sw.js] Falló showNotification completo, ejecutando fallback básico para móvil:', showError);
+            try {
+                await self.registration.showNotification(normalized.title || 'Rey Bingo', {
+                    body: (normalized.options && normalized.options.body) || '¡Partida en vivo disponible!',
+                    icon: `${self.location.origin}/assets/img/logo.png`,
+                    data: (normalized.options && normalized.options.data) || { url: '/' }
+                });
+            } catch (fallbackError) {
+                console.error('[sw.js] Error crítico en showNotification:', fallbackError);
+            }
+        }
     })());
 });
 
