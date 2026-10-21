@@ -53,7 +53,7 @@ $formatCardPreview = function($text) {
 
                         <!-- COLUMNA IZQUIERDA: Buscador y Notificaciones Guardadas -->
                         <div class="col-lg-5 col-md-5">
-                            <div class="p-3 rounded-4 h-100" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <div class="p-3 p-md-4 rounded-4 h-100" style="background: #f8fafc; border: 1px solid #e2e8f0;">
                                 <!-- Encabezado lista -->
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <h6 class="text-dark fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 0.9rem;">
@@ -81,7 +81,7 @@ $formatCardPreview = function($text) {
                                 </div>
 
                                 <!-- Lista de Notificaciones Guardadas -->
-                                <div id="templates-list-container" class="d-flex flex-column gap-2" style="max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                                <div id="templates-list-container" class="d-flex flex-column gap-2" style="max-height: 480px; min-height: 440px; overflow-y: auto; padding-right: 4px;">
                                     <?php if (empty($templates)) : ?>
                                         <div class="text-center py-4 text-muted small" id="templates-none-initial">
                                             <i class="fa-solid fa-inbox fs-3 d-block mb-2 text-secondary opacity-50"></i>
@@ -214,11 +214,11 @@ $formatCardPreview = function($text) {
                                                 class="form-control" 
                                                 id="notif-message" 
                                                 name="message" 
-                                                rows="4" 
+                                                rows="5" 
                                                 maxlength="280" 
                                                 placeholder="Escribe aquí el texto que se enviará en vivo y push a todos los jugadores..." 
                                                 required
-                                                style="font-size: 0.88rem; line-height: 1.45; padding: 10px 12px;"
+                                                style="font-size: 0.90rem; line-height: 1.5; padding: 12px 14px; min-height: 125px;"
                                             ></textarea>
                                         </div>
                                     </div>
@@ -252,18 +252,20 @@ $formatCardPreview = function($text) {
 <div class="modal fade" id="modal-create-template" tabindex="-1" aria-labelledby="modalCreateTmplLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header border-bottom py-3 px-4">
-                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="modalCreateTmplLabel">
-                    <i class="fa-duotone fa-solid fa-plus-circle text-primary"></i>
+            <div class="modal-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title fw-bold text-white d-flex align-items-center gap-2 mb-0" id="modalCreateTmplLabel">
+                    <i class="fa-duotone fa-solid fa-plus-circle text-white"></i>
                     Crear Notificación Guardada
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                <button type="button" class="btn-close d-inline-flex align-items-center justify-content-center" data-bs-dismiss="modal" aria-label="Cerrar" style="background: rgba(255, 255, 255, 0.25) !important; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 50%; width: 34px; height: 34px; padding: 0; opacity: 1; color: #ffffff !important; cursor: pointer; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-xmark text-white" style="font-size: 1.1rem; line-height: 1; color: #ffffff !important;"></i>
+                </button>
             </div>
             <div class="modal-body p-4">
                 <div id="modal-alert-container"></div>
                 <form id="form-create-modal-template" autocomplete="off">
                     <div class="mb-3">
-                        <label for="modal-tmpl-name" class="form-label text-dark small fw-bold">
+                        <label for="modal-tmpl-name" class="form-label text-white small fw-bold">
                             Nombre de Referencia: <span class="text-danger">*</span>
                         </label>
                         <input 
@@ -273,10 +275,10 @@ $formatCardPreview = function($text) {
                             placeholder="Ej: Pozo Acumulado Fin de Semana" 
                             required
                         >
-                        <div class="form-text small">Nombre para identificarla en tu lista izquierda.</div>
+                        <div class="form-text text-white-50 small">Nombre para identificarla en tu lista izquierda.</div>
                     </div>
                     <div class="mb-3">
-                        <label for="modal-tmpl-title" class="form-label text-dark small fw-bold">
+                        <label for="modal-tmpl-title" class="form-label text-white small fw-bold">
                             Título de la Notificación: <span class="text-danger">*</span>
                         </label>
                         <input 
@@ -289,7 +291,7 @@ $formatCardPreview = function($text) {
                         >
                     </div>
                     <div class="mb-3">
-                        <label for="modal-tmpl-message" class="form-label text-dark small fw-bold">
+                        <label for="modal-tmpl-message" class="form-label text-white small fw-bold">
                             Mensaje: <span class="text-danger">*</span>
                         </label>
                         <textarea 
@@ -303,13 +305,15 @@ $formatCardPreview = function($text) {
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-top py-3 px-4 d-flex justify-content-between">
-                <button type="button" class="btn btn-light px-3" data-bs-dismiss="modal">Cancelar</button>
+            <div class="modal-footer border-top py-3 px-4 d-flex justify-content-between align-items-center">
+                <button type="button" class="btn fw-bold px-4 py-2 rounded-pill shadow-sm" data-bs-dismiss="modal" style="background: #ffffff !important; color: #4338ca !important; border: 0; font-size: 0.92rem; font-weight: 700;">
+                    <i class="fa-solid fa-xmark me-1" style="color: #4338ca !important;"></i> Cancelar
+                </button>
                 <button 
                     type="button" 
                     id="btn-save-modal-template" 
-                    class="btn btn-primary fw-bold px-4 d-inline-flex align-items-center gap-2"
-                    style="background: linear-gradient(145deg, #8767fa, #6236ff); border: 0;"
+                    class="btn fw-bold px-4 py-2 rounded-pill shadow d-inline-flex align-items-center gap-2"
+                    style="background: #4f46e5; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.35); font-size: 0.92rem; font-weight: 700;"
                 >
                     <i class="fa-solid fa-floppy-disk" id="btn-save-modal-icon"></i>
                     <span id="btn-save-modal-text">Guardar Notificación</span>
@@ -322,7 +326,8 @@ $formatCardPreview = function($text) {
 <!-- Estilos específicos limpios y alineados al diseño de Rey Bingo -->
 <style>
 .admin-notifications-page {
-    max-width: 1100px;
+    max-width: 1280px;
+    width: 96%;
 }
 .admin-notifications-page .form-control,
 .admin-notifications-page .form-select {
@@ -764,18 +769,9 @@ $formatCardPreview = function($text) {
         });
     }
 
-    // 9. Alertas en pantalla
-    function showAlert(type, message, details) {
-        let detailsHtml = '';
-        if (details) {
-            detailsHtml = `
-                <div class="mt-2 pt-2 border-top border-secondary-subtle small d-flex flex-wrap gap-3">
-                    <span><i class="fa-solid fa-users text-primary me-1"></i> Destinatarios: <strong>Todos los Jugadores (${details.users_targeted || 0})</strong></span>
-                    <span><i class="fa-solid fa-bolt text-success me-1"></i> En vivo (Live): <strong>${details.live_sent || 'Activo'}</strong></span>
-                    <span><i class="fa-solid fa-mobile-screen text-info me-1"></i> Dispositivos Push: <strong>${details.push_sent || 0}</strong></span>
-                </div>
-            `;
-        }
+    // 9. Alertas en pantalla (solo para advertencias o errores)
+    function showAlert(type, message) {
+        if (!alertBox) return;
 
         alertBox.innerHTML = `
             <div class="alert alert-${type} alert-dismissible fade show border shadow-sm" role="alert">
@@ -783,7 +779,6 @@ $formatCardPreview = function($text) {
                     <i class="fa-solid ${type === 'success' ? 'fa-circle-check text-success' : 'fa-triangle-exclamation text-danger'} fs-5"></i>
                     <div>
                         <strong>${message}</strong>
-                        ${detailsHtml}
                     </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -831,7 +826,32 @@ $formatCardPreview = function($text) {
             btnSendText.textContent = 'Enviar Notificación';
 
             if (data.success) {
-                showAlert('success', data.message, data.details);
+                // Quitar cualquier alerta previa fija de la pantalla
+                if (alertBox) alertBox.innerHTML = '';
+
+                // Notificación emergente limpia tipo Toast
+                if (typeof Toastify === 'function') {
+                    Toastify({
+                        text: "¡Notificación enviada con éxito!",
+                        duration: 3500,
+                        gravity: "top",
+                        position: "right",
+                        style: {
+                            background: "linear-gradient(135deg, #10b981, #059669)",
+                            borderRadius: "10px",
+                            boxShadow: "0 6px 18px rgba(16, 185, 129, 0.35)",
+                            fontWeight: "600",
+                            fontSize: "0.95rem"
+                        }
+                    }).showToast();
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Notificación enviada con éxito!',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
 
                 if (typeof window.showNotification === 'function') {
                     window.showNotification({
