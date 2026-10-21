@@ -85,26 +85,32 @@ class NotificationManager {
 
             if (permission === 'granted') {
                 this.hideBanner();
+                this.hideFloatingBell();
                 await this.subscribe();
                 return;
             }
 
             if (existingSub) {
                 this.hideBanner();
+                this.hideFloatingBell();
                 await this.saveSubscriptionToServer(existingSub);
                 return;
             }
 
             if (permission === 'denied') {
                 this.hideBanner();
+                this.hideFloatingBell();
                 return;
             }
 
             // permission === 'default'
-            const dismissedTime = localStorage.getItem('push-banner-dismissed');
-            const now = Date.now();
-            if (!dismissedTime || (now - parseInt(dismissedTime, 10)) > (24 * 60 * 60 * 1000)) {
+            const dismissed = sessionStorage.getItem('push-banner-dismissed');
+            if (dismissed) {
+                this.hideBanner();
+                this.showFloatingBell();
+            } else {
                 this.showBanner();
+                this.hideFloatingBell();
             }
         } catch (e) {
             console.error('Error sincronizando estado de notificaciones:', e);
@@ -120,12 +126,31 @@ class NotificationManager {
         if (banner) {
             banner.style.display = 'block';
         }
+        this.hideFloatingBell();
     }
 
     hideBanner() {
         const banner = document.getElementById('rey-push-banner');
         if (banner) {
             banner.style.display = 'none';
+        }
+    }
+
+    showFloatingBell() {
+        if (!this.isSupported || (window.Notification && Notification.permission !== 'default')) {
+            this.hideFloatingBell();
+            return;
+        }
+        const bell = document.getElementById('rey-push-floating-bell');
+        if (bell) {
+            bell.style.display = 'block';
+        }
+    }
+
+    hideFloatingBell() {
+        const bell = document.getElementById('rey-push-floating-bell');
+        if (bell) {
+            bell.style.display = 'none';
         }
     }
 
@@ -402,7 +427,16 @@ function initReyBingoPush() {
         dismissBtn._pushBound = true;
         dismissBtn.addEventListener('click', function() {
             window.notificationManager.hideBanner();
-            localStorage.setItem('push-banner-dismissed', Date.now().toString());
+            sessionStorage.setItem('push-banner-dismissed', '1');
+            window.notificationManager.showFloatingBell();
+        });
+    }
+
+    const floatingBtn = document.getElementById('btn-floating-activate-push');
+    if (floatingBtn && !floatingBtn._pushBound) {
+        floatingBtn._pushBound = true;
+        floatingBtn.addEventListener('click', async function() {
+            await window.notificationManager.requestPermission();
         });
     }
 

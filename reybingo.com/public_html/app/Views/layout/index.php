@@ -618,6 +618,13 @@ $isNoMusicRole = session()->get('logged_in') && (
         </div>
     </div>
 
+    <!-- Botón flotante campana para activar notificaciones si se cerró el banner -->
+    <div id="rey-push-floating-bell" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 99998;">
+        <button id="btn-floating-activate-push" type="button" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border: 2px solid #ffffff; box-shadow: 0 4px 16px rgba(0,0,0,0.35); font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;" title="Activar notificaciones en el teléfono" aria-label="Activar notificaciones en el teléfono">
+            🔔
+        </button>
+    </div>
+
     <script src="<?= asset_url('js/in-app-notifications.js') ?>"></script>
     <script type="text/javascript">
         var site_url = "<?= site_url(); ?>";
