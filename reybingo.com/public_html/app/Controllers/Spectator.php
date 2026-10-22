@@ -103,6 +103,14 @@ class Spectator extends Controller
         }
         $fourNumbers = array_map('intval', array_reverse(array_column($recentBoards, 'number')));
 
+        $fiveBoards = $modelBoards->where('game', $gameId)
+                                  ->where('status', 1)
+                                  ->orderBy('created_at', 'DESC')
+                                  ->orderBy('id', 'DESC')
+                                  ->limit(5)
+                                  ->findAll();
+        $fiveNumbers = array_map('intval', array_reverse(array_column($fiveBoards, 'number')));
+
         // 2. Estado de finalización de la partida
         $singsCountFinished = $modelSings->select('modality')->where('game', $gameId)->groupBy('modality')->countAllResults();
         $awardsCountFinished = $modelAwards->where('game', $gameId)->where('status', 1)->countAllResults();
@@ -228,7 +236,7 @@ class Spectator extends Controller
             'singsModalities'        => $singsModalities,
             'lastNumber'             => $lastNumber,
             'fourNumbers'            => $fourNumbers,
-            'lastNumbersJson'        => json_encode($drawnNumbersOrdered),
+            'lastNumbersJson'        => json_encode($fiveNumbers),
             'getClass'               => $getClass,
             'modalities'             => $modalities,
             'winners'                => $winners,
@@ -253,6 +261,7 @@ class Spectator extends Controller
             'user' => $userForLayout,
             'imagePath' => $imagePath,
             'contacts' => $contacts,
+            'isSpectator' => true,
             'contentPage' => view('playings/playing', $data)
         ];
 

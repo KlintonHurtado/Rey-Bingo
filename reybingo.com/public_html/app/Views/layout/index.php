@@ -144,22 +144,25 @@ $isNoMusicRole = session()->get('logged_in') && (
     <div class="notifications" id="notificationsContainer"></div>
     <span class="notification-indicator hidden" id="notificationIndicator"></span>
 
-    <?php if (session()->get('logged_in')) : ?>
-        <?php
-            // Jugadores: sonido y locución activados por defecto (1) si no están definidos
+    <?php
+        $layoutSounds = 0;
+        $layoutNarration = 0;
+        $layoutAutoMark = 1;
+
+        if (session()->get('logged_in') || !empty($isSpectator) || session()->get('spectator_game_id') || session()->get('spectator_token')) {
+            // Jugadores y espectadores: sonido y locución activados por defecto (1) si no están definidos
             $layoutSounds = isset($user['sounds']) && $user['sounds'] !== null && $user['sounds'] !== '' ? (int)$user['sounds'] : 1;
             // Admin/Staff, Operador y Punto de venta: sin música de fondo
-            if ($isNoMusicRole) {
+            if (!empty($isNoMusicRole)) {
                 $layoutSounds = 0;
             }
             $layoutNarration = isset($user['narration']) && $user['narration'] !== null && $user['narration'] !== '' ? (int)$user['narration'] : 1;
-        ?>
-        <input type="hidden" name="sounds" id="sounds" value="<?= esc($layoutSounds); ?>">
-        <input type="hidden" name="narration" id="narration" value="<?= esc($layoutNarration); ?>">
-        <input type="hidden" name="autodial" id="autodial" value="<?= esc($user['autodial'] ?? 1); ?>">
-    <?php else : ?>
-        <input type="hidden" name="sounds" id="sounds" value="0">
-    <?php endif; ?>
+            $layoutAutoMark = isset($user['autodial']) && $user['autodial'] !== null && $user['autodial'] !== '' ? (int)$user['autodial'] : 1;
+        }
+    ?>
+    <input type="hidden" name="sounds" id="sounds" value="<?= esc($layoutSounds); ?>">
+    <input type="hidden" name="narration" id="narration" value="<?= esc($layoutNarration); ?>">
+    <input type="hidden" name="autodial" id="autodial" value="<?= esc($layoutAutoMark); ?>">
 
 
     <div class="modal fade" id="wallet" tabindex="-1" role="dialog"></div>
@@ -637,9 +640,9 @@ $isNoMusicRole = session()->get('logged_in') && (
         var audioPath = "<?= site_url('assets/sounds/'); ?>";
         
         var imagePath = "<?= $imagePath ?? site_url('assets/img/avatar.jpg'); ?>";
-        var soundPlaying = <?= ($layoutSounds === 1) ? 'true' : 'false' ?>;
-        var narrationPlaying = <?= ($layoutNarration === 1) ? 'true' : 'false' ?>;
-        var autoMarkEnabled = <?= ($user['autodial'] ?? 1) == 1 ? 'true' : 'false' ?>;
+        var soundPlaying = <?= (isset($layoutSounds) && (int)$layoutSounds === 1) ? 'true' : 'false' ?>;
+        var narrationPlaying = <?= (isset($layoutNarration) && (int)$layoutNarration === 1) ? 'true' : 'false' ?>;
+        var autoMarkEnabled = <?= (isset($layoutAutoMark) && (int)$layoutAutoMark === 1) ? 'true' : 'false' ?>;
         window.soundPlaying = soundPlaying;
         window.narrationPlaying = narrationPlaying;
         window.autoMarkEnabled = autoMarkEnabled;

@@ -96,8 +96,8 @@
         display: inline-flex !important;
         align-items: center !important;
         gap: 8px !important;
-        background: rgba(16, 185, 129, 0.25) !important;
-        border: 1.5px solid #10b981 !important;
+        background: rgba(98, 54, 255, 0.35) !important;
+        border: 1.5px solid rgba(167, 139, 250, 0.8) !important;
         backdrop-filter: blur(10px) !important;
         -webkit-backdrop-filter: blur(10px) !important;
         color: #ffffff !important;
@@ -105,7 +105,7 @@
         border-radius: 50px !important;
         font-size: 0.85rem !important;
         font-weight: 700 !important;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35), 0 0 12px rgba(98, 54, 255, 0.35) !important;
         pointer-events: none !important;
     }
 
@@ -121,8 +121,8 @@
         width: 8px !important;
         height: 8px !important;
         border-radius: 50% !important;
-        background: #10b981 !important;
-        box-shadow: 0 0 8px #10b981 !important;
+        background: #a855f7 !important;
+        box-shadow: 0 0 8px #c084fc !important;
         animation: pulseSpectatorDot 1.4s infinite !important;
     }
 
@@ -142,14 +142,14 @@
         left: 50% !important;
         transform: translateX(-50%) !important;
         z-index: 1056 !important;
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        background: linear-gradient(135deg, #7c3aed 0%, #6236ff 50%, #4b1ecc 100%) !important;
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 0.95rem !important;
-        padding: 9px 22px !important;
+        padding: 9px 24px !important;
         border-radius: 50px !important;
         border: 2px solid rgba(255, 255, 255, 0.85) !important;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 14px rgba(16, 185, 129, 0.45) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 16px rgba(98, 54, 255, 0.5) !important;
         cursor: pointer !important;
         display: inline-flex !important;
         align-items: center !important;
@@ -161,7 +161,7 @@
 
     .btn-spectator-play:hover {
         transform: translateX(-50%) scale(1.06) !important;
-        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 18px rgba(16, 185, 129, 0.7) !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 22px rgba(124, 58, 237, 0.75) !important;
         color: #ffffff !important;
     }
 
@@ -181,21 +181,29 @@
 
     @media (max-width: 700px) {
         .spectator-hud-badge {
-            left: 145px !important;
-            top: 8px !important;
-            padding: 4px 10px !important;
+            position: absolute !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            top: auto !important;
+            bottom: 4px !important;
+            padding: 3px 12px !important;
             font-size: 0.72rem !important;
-            max-width: calc(100vw - 215px) !important;
+            max-width: calc(100vw - 30px) !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
+            background: rgba(24, 10, 84, 0.85) !important;
+            border: 1px solid rgba(167, 139, 250, 0.6) !important;
+            z-index: 5 !important;
         }
 
         .btn-spectator-play {
             font-size: 0.82rem !important;
-            padding: 8px 16px !important;
+            padding: 8px 18px !important;
             bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
-            max-width: calc(100vw - 180px) !important;
+            max-width: calc(100vw - 140px) !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
         }
     }
 
@@ -1542,13 +1550,17 @@
 </style>
 <div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?><?= !empty($isSpectator) ? ' spectator-mode' : '' ?>">
     <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
-        <a class="btn btn-small btn-home" href="<?= (!empty($isSpectator) && !session()->get('logged_in')) ? site_url('') : site_url('play'); ?>"><i
+        <a class="btn btn-small btn-home" href="<?= (!empty($isSpectator) && !session()->get('logged_in')) ? site_url('') : site_url('play'); ?>" title="Inicio" aria-label="Inicio"><i
                 class="fa-duotone fa-solid fa-house"></i></a>
 
-        <?php if (empty($isSpectator)): ?>
-        <button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();">
+        <?php if (session()->get('logged_in')): ?>
+        <button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();" title="Billetera" aria-label="Billetera">
             <i class="fa-duotone fa-solid fa-wallet"></i>
         </button>
+        <?php else: ?>
+        <a href="<?= site_url('signup'); ?>" class="btn btn-small btn-wallet" title="Registrarse / Billetera" aria-label="Billetera">
+            <i class="fa-duotone fa-solid fa-wallet"></i>
+        </a>
         <?php endif; ?>
 
         <button type="button" class="btn btn-small btn-share-game" onclick="openShareGameModal();" title="Compartir Partida" aria-label="Compartir Partida">
@@ -1587,10 +1599,10 @@
                 <i class="fa-duotone fa-solid fa-hand"></i>
             <?php endif; ?>
         </button>
-
-        <button class="btn btn-small btn-sliders" onclick="ViewSliders();"><i
-                class="fa-duotone fa-solid fa-sliders-simple"></i></button>
         <?php endif; ?>
+
+        <button class="btn btn-small btn-sliders" onclick="ViewSliders();" title="Ajustes" aria-label="Ajustes"><i
+                class="fa-duotone fa-solid fa-sliders-simple"></i></button>
 
         <?php if ($game['type'] == 3): ?>
             <div class="ratio ratio-16x9 video-responsive">
@@ -2047,7 +2059,7 @@
 
 <?php if (!empty($isSpectator)): ?>
     <a href="<?= site_url('signup') ?>" class="btn-spectator-play" target="_blank" rel="noopener">
-        <i class="fa-solid fa-crown me-2"></i> ¡Juega tú también! Regístrate aquí
+        ¡Juega tú también! Regístrate aquí
     </a>
 <?php endif; ?>
 
