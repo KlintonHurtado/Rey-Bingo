@@ -1225,6 +1225,22 @@ function sendMessage(content, id) {
     if (!content || !content.trim()) return;
     if (chatSendInFlight) return;
 
+    if (window.isSpectator || window.IS_SPECTATOR) {
+        const uid = getCurrentUserId();
+        if (!uid || uid <= 0) {
+            if (typeof Toastify === 'function') {
+                Toastify({
+                    text: 'Inicia sesión para enviar mensajes en el chat',
+                    duration: 3000,
+                    gravity: 'top',
+                    position: 'center',
+                    style: { background: 'linear-gradient(135deg, #6366f1, #4f46e5)', borderRadius: '10px' }
+                }).showToast();
+            }
+            return;
+        }
+    }
+
     const trimmedContent = content.trim();
     chatSendInFlight = true;
 
@@ -1576,6 +1592,10 @@ function scheduleAutoSingCheck(delay) {
 }
 
 function autoSingIfComplete() {
+    if (window.isSpectator || window.IS_SPECTATOR) {
+        return;
+    }
+
     // No bloquear por gameHasWinner: un segundo cartón / otra modalidad debe poder cantar
     if (autoSingInFlight || bingoInProgress || window.gameIsFinished) {
         return;
@@ -3164,6 +3184,10 @@ function stopUpdateGameAccumulated() {
 
 // Función optimizada para marcar números (modo manual)
 function dialNumber(number) {
+    if (window.isSpectator || window.IS_SPECTATOR) {
+        return;
+    }
+
     const elementsNumber = $(".number-" + number);
 
     if (!elementsNumber.length) {
@@ -3236,6 +3260,10 @@ function autoDialNumber(number) {
 
 
 function singBingo() {
+    if (window.isSpectator || window.IS_SPECTATOR) {
+        return;
+    }
+
     // Si ya hay un bingo en progreso, no permitir cantar otro
     if (bingoInProgress) {
         // Mostrar mensaje al usuario
@@ -3404,6 +3432,10 @@ function RemoveMicrophone() {
 }
 
 function RemoveCheck() {
+    if (window.isSpectator || window.IS_SPECTATOR) {
+        return;
+    }
+
     $.ajax({
         url: site_url + 'playings/checkSubmit',
         method: 'POST',

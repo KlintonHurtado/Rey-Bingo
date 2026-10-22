@@ -636,14 +636,13 @@ $isNoMusicRole = session()->get('logged_in') && (
         var currency = "<?= systemGet('currency'); ?>";
         var audioPath = "<?= site_url('assets/sounds/'); ?>";
         
-        <?php if (session()->get('logged_in')) : ?>
-            var imagePath = "<?= $imagePath; ?>";
-            var soundPlaying = <?= ($layoutSounds === 1) ? 'true' : 'false' ?>;
-            var narrationPlaying = <?= ($layoutNarration === 1) ? 'true' : 'false' ?>;
-            var autoMarkEnabled = <?= ($user['autodial'] ?? 1) == 1 ? 'true' : 'false' ?>;
-            window.soundPlaying = soundPlaying;
-            window.narrationPlaying = narrationPlaying;
-        <?php endif; ?>
+        var imagePath = "<?= $imagePath ?? site_url('assets/img/avatar.jpg'); ?>";
+        var soundPlaying = <?= ($layoutSounds === 1) ? 'true' : 'false' ?>;
+        var narrationPlaying = <?= ($layoutNarration === 1) ? 'true' : 'false' ?>;
+        var autoMarkEnabled = <?= ($user['autodial'] ?? 1) == 1 ? 'true' : 'false' ?>;
+        window.soundPlaying = soundPlaying;
+        window.narrationPlaying = narrationPlaying;
+        window.autoMarkEnabled = autoMarkEnabled;
 
         var __ = [];
         __['bingo!'] = "<?= translate('bingo!'); ?>";

@@ -60,10 +60,15 @@ class PusherClient {
 
             // Configuración del cliente Pusher.js
             // pusher-js soporta wsHost/wsPort para conectarse a Soketi self-hosted
+            var authParams = {};
+            if (typeof window.SPECTATOR_TOKEN !== 'undefined' && window.SPECTATOR_TOKEN) {
+                authParams.spectator_token = window.SPECTATOR_TOKEN;
+            }
             var pusherConfig = {
                 channelAuthorization: {
                     endpoint  : this.authEndpoint,
-                    transport : 'ajax'
+                    transport : 'ajax',
+                    params    : authParams
                 }
             };
 

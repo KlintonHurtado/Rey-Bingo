@@ -2124,7 +2124,8 @@ class Playings extends Controller
 
     public function numberGet()
     {
-        if (!session()->get('logged_in') || session()->get('group') != 0) {
+        $isSpectator = session()->get('spectator_game_id') || session()->get('spectator_token');
+        if ((!session()->get('logged_in') || session()->get('group') != 0) && !$isSpectator) {
             return redirect()->to('/signin');
         }
 
@@ -2135,7 +2136,8 @@ class Playings extends Controller
         $modelSings = new SingsModel();
         $modelAwards = new AwardsModel();
 
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = (int) (session()->get('game_id') ?: session()->get('spectator_game_id') ?: $this->request->getGet('game_id'));
+        $game = $modelGames->find($gameId);
 
         if (!$game) {
             return $this->response->setJSON(['status' => 'error', 'message' => translate('there are no active games')]);
@@ -2173,7 +2175,7 @@ class Playings extends Controller
                 $lastCartonId = (int) $lastSing['carton'];
                 $lastSingId = (int) $lastSing['id'];
                 $lastWinnerUserId = (int) $lastSing['user'];
-                $isOwn = ($lastWinnerUserId === (int) session()->get('id'));
+                $isOwn = ($lastWinnerUserId > 0 && session()->get('id') && $lastWinnerUserId === (int) session()->get('id'));
                 if (!empty($u['image'])) {
                     $lastImage = site_url('uploads/users/' . $u['image']);
                 }
@@ -2287,9 +2289,10 @@ class Playings extends Controller
         $drawnNumbers = $this->getOrderedDrawnNumbers((int) $game['id']);
         $totalNumbersGenerated = count($drawnNumbers);
 
-        $user = $modelUsers->find(session()->get('id'));
-        if (!empty($drawnNumbers)) {
-            $this->syncAutoDialMarks((int) session()->get('id'), (int) $game['id'], $drawnNumbers);
+        $currentUserId = (int) (session()->get('id') ?? 0);
+        $user = $currentUserId > 0 ? $modelUsers->find($currentUserId) : null;
+        if (!empty($drawnNumbers) && $currentUserId > 0) {
+            $this->syncAutoDialMarks($currentUserId, (int) $game['id'], $drawnNumbers);
         }
 
         // Si salieron las 75 bolas, resolver bingos no cantados, pagar premios y finalizar
@@ -2307,7 +2310,7 @@ class Playings extends Controller
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
-                'autodial' => (int) ($user['autodial'] ?? 0),
+                'autodial' => (int) ($user['autodial'] ?? 1),
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
                 'number' => $lastNumber['number'],
                 'player' => ''
@@ -2890,7 +2893,8 @@ class Playings extends Controller
 
     public function awardsGet()
     {
-        if (!session()->get('logged_in')) {
+        $isSpectator = session()->get('spectator_game_id') || session()->get('spectator_token');
+        if (!session()->get('logged_in') && !$isSpectator) {
             return redirect()->to('/signin');
         }
 
@@ -2901,7 +2905,7 @@ class Playings extends Controller
         $modelAwards = new AwardsModel();
         $modelCartons = new CartonsModel();
 
-        $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
+        $gameId = (int) ($this->request->getGet('game_id') ?: $this->request->getGet('id') ?: session()->get('game_id') ?: session()->get('spectator_game_id'));
         $game = $modelGames->find($gameId);
         $data['game'] = $game;
         $data['isPlayerRoute'] = true;
@@ -3055,7 +3059,8 @@ class Playings extends Controller
         $modelUsers = new UsersModel();
         $modelGames = new GamesModel();
 
-        $game = $modelGames->find(session()->get('game_id'));
+        $gameId = (int) (session()->get('game_id') ?: session()->get('spectator_game_id') ?: $this->request->getGet('game_id'));
+        $game = $modelGames->find($gameId);
         if (!$game) {
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'stop',
@@ -3115,36 +3120,46 @@ class Playings extends Controller
 
     public function volumeSubmit()
     {
-        $modelUsers = new UsersModel();
-
-        $user = $modelUsers->getUserById(session()->get('id'));
-
+        $currentUserId = session()->get('id');
         $explicitState = $this->request->getPost('state');
+        if (!$currentUserId) {
+            $sounds = ($explicitState !== null && $explicitState !== '') ? ((int)$explicitState === 1 ? 1 : 0) : 1;
+            return $this->response->setJSON(['status' => 'success', 'sounds' => $sounds]);
+        }
+
+        $modelUsers = new UsersModel();
+        $user = $modelUsers->getUserById($currentUserId);
+
         if ($explicitState !== null && $explicitState !== '') {
             $data['sounds'] = ((int)$explicitState === 1) ? 1 : 0;
         } else {
             $data['sounds'] = ((int)($user['sounds'] ?? 1) === 1) ? 0 : 1;
         }
 
-        $modelUsers->update(session()->get('id'), $data);
+        $modelUsers->update($currentUserId, $data);
 
         return $this->response->setJSON(['status' => 'success', 'sounds' => $data['sounds']]);
     }
 
     public function microphoneSubmit()
     {
-        $modelUsers = new UsersModel();
-
-        $user = $modelUsers->getUserById(session()->get('id'));
-
+        $currentUserId = session()->get('id');
         $explicitState = $this->request->getPost('state');
+        if (!$currentUserId) {
+            $narration = ($explicitState !== null && $explicitState !== '') ? ((int)$explicitState === 1 ? 1 : 0) : 1;
+            return $this->response->setJSON(['status' => 'success', 'narration' => $narration]);
+        }
+
+        $modelUsers = new UsersModel();
+        $user = $modelUsers->getUserById($currentUserId);
+
         if ($explicitState !== null && $explicitState !== '') {
             $data['narration'] = ((int)$explicitState === 1) ? 1 : 0;
         } else {
             $data['narration'] = ((int)($user['narration'] ?? 1) === 1) ? 0 : 1;
         }
 
-        $modelUsers->update(session()->get('id'), $data);
+        $modelUsers->update($currentUserId, $data);
 
         return $this->response->setJSON(['status' => 'success', 'narration' => $data['narration']]);
     }
@@ -3211,12 +3226,13 @@ class Playings extends Controller
 
     public function winnersGet()
     {
-        if (!session()->get('logged_in')) {
+        $isSpectator = session()->get('spectator_game_id') || session()->get('spectator_token');
+        if (!session()->get('logged_in') && !$isSpectator) {
             return redirect()->to('/signin');
         }
 
         $modelGames = new GamesModel();
-        $gameId = $this->request->getGet('game_id') ?? $this->request->getGet('id') ?? session()->get('game_id');
+        $gameId = (int) ($this->request->getGet('game_id') ?: $this->request->getGet('id') ?: session()->get('game_id') ?: session()->get('spectator_game_id'));
         $game = $modelGames->find($gameId);
 
         if (!$game) {
@@ -3282,11 +3298,12 @@ class Playings extends Controller
 
     public function getGameStatus()
     {
-        if (!session()->get('logged_in')) {
+        $isSpectator = session()->get('spectator_game_id') || session()->get('spectator_token');
+        if (!session()->get('logged_in') && !$isSpectator) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Not logged in']);
         }
 
-        $gameId = (int) ($this->request->getGet('game_id') ?: session()->get('game_id'));
+        $gameId = (int) ($this->request->getGet('game_id') ?: session()->get('game_id') ?: session()->get('spectator_game_id'));
         if (!$gameId) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'No active game session']);
         }

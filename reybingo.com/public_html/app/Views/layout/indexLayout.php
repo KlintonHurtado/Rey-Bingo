@@ -920,11 +920,11 @@
         var currency = "<?= systemGet('currency'); ?>";
         var audioPath = "<?= site_url('assets/sounds/'); ?>";
         
-        <?php if (session()->get('logged_in')) : ?>
-            var imagePath = "<?= $imagePath; ?>";
-            var narrationPlaying = <?= $user['narration'] == 1 ? 'true' : 'false' ?>;
-            var autoMarkEnabled = <?= $user['autodial'] == 1 ? 'true' : 'false' ?>;
-        <?php endif; ?>
+        var imagePath = "<?= $imagePath ?? site_url('assets/img/avatar.jpg'); ?>";
+        var narrationPlaying = <?= (isset($user['narration']) && (int)$user['narration'] === 0) ? 'false' : 'true' ?>;
+        var autoMarkEnabled = <?= (isset($user['autodial']) && (int)$user['autodial'] === 0) ? 'false' : 'true' ?>;
+        window.narrationPlaying = narrationPlaying;
+        window.autoMarkEnabled = autoMarkEnabled;
 
         var __ = [];
         __['bingo!'] = "<?= translate('bingo!'); ?>";

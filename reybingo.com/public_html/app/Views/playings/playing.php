@@ -85,6 +85,120 @@
         transform: scale(0.95) !important;
     }
 
+    /* ==========================================
+       MODO ESPECTADOR
+       ========================================== */
+    .spectator-hud-badge {
+        position: fixed !important;
+        left: 195px !important;
+        top: 14px !important;
+        z-index: 1080 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background: rgba(16, 185, 129, 0.25) !important;
+        border: 1.5px solid #10b981 !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        color: #ffffff !important;
+        padding: 6px 14px !important;
+        border-radius: 50px !important;
+        font-size: 0.85rem !important;
+        font-weight: 700 !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35) !important;
+        pointer-events: none !important;
+    }
+
+    .spectator-hud-badge .spectator-avatar {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        border: 1.5px solid #ffffff !important;
+    }
+
+    .spectator-hud-badge .live-dot {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 50% !important;
+        background: #10b981 !important;
+        box-shadow: 0 0 8px #10b981 !important;
+        animation: pulseSpectatorDot 1.4s infinite !important;
+    }
+
+    @keyframes pulseSpectatorDot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(1.3); }
+    }
+
+    .spectator-mode .bingo-carton-number {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+
+    .btn-spectator-play {
+        position: fixed !important;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 1056 !important;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 0.95rem !important;
+        padding: 9px 22px !important;
+        border-radius: 50px !important;
+        border: 2px solid rgba(255, 255, 255, 0.85) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 14px rgba(16, 185, 129, 0.45) !important;
+        cursor: pointer !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        text-decoration: none !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    }
+
+    .btn-spectator-play:hover {
+        transform: translateX(-50%) scale(1.06) !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 18px rgba(16, 185, 129, 0.7) !important;
+        color: #ffffff !important;
+    }
+
+    .btn-spectator-play:active {
+        transform: translateX(-50%) scale(0.96) !important;
+    }
+
+    body.modalities-panel-open .btn-spectator-play,
+    body.chat-panel-open .btn-spectator-play {
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .spectator-mode #btn-ver-ganadores-player {
+        bottom: calc(65px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    @media (max-width: 700px) {
+        .spectator-hud-badge {
+            left: 145px !important;
+            top: 8px !important;
+            padding: 4px 10px !important;
+            font-size: 0.72rem !important;
+            max-width: calc(100vw - 215px) !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .btn-spectator-play {
+            font-size: 0.82rem !important;
+            padding: 8px 16px !important;
+            bottom: calc(15px + env(safe-area-inset-bottom, 0px)) !important;
+            max-width: calc(100vw - 180px) !important;
+        }
+    }
+
     /* Acumulado a la izquierda para no tapar el botón manual (derecha) */
     .container-section--playing .total-accumulated {
         right: auto !important;
@@ -1426,18 +1540,28 @@
         }
     }
 </style>
-<div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?>">
+<div class="container-section container-section--playing<?= ($game['type'] == 3 || $game['type'] == 4) ? ' container-section--live-game' : '' ?><?= !empty($isSpectator) ? ' spectator-mode' : '' ?>">
     <div class="top-section <?php if ($game['type'] == 3 || $game['type'] == 4): ?>live<?php endif; ?>">
-        <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i
+        <a class="btn btn-small btn-home" href="<?= (!empty($isSpectator) && !session()->get('logged_in')) ? site_url('') : site_url('play'); ?>"><i
                 class="fa-duotone fa-solid fa-house"></i></a>
 
+        <?php if (empty($isSpectator)): ?>
         <button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();">
             <i class="fa-duotone fa-solid fa-wallet"></i>
         </button>
+        <?php endif; ?>
 
         <button type="button" class="btn btn-small btn-share-game" onclick="openShareGameModal();" title="Compartir Partida" aria-label="Compartir Partida">
             <i class="fa-solid fa-share-nodes"></i>
         </button>
+
+        <?php if (!empty($isSpectator)): ?>
+            <div class="spectator-hud-badge" title="Estás viendo la partida de <?= esc($spectatorPlayerName ?? 'Jugador') ?>">
+                <span class="live-dot"></span>
+                <img src="<?= esc($spectatorPlayerImage ?? site_url('assets/img/avatar.jpg')) ?>" class="spectator-avatar" alt="Avatar">
+                <span>Viendo a: <strong><?= esc($spectatorPlayerName ?? 'Jugador') ?></strong></span>
+            </div>
+        <?php endif; ?>
 
         <button class="btn btn-small btn-volume hidden" onclick="RemoveVolume();" title="Sonido" aria-label="Sonido">
             <?php if (!isset($user['sounds']) || (int)$user['sounds'] !== 0): ?>
@@ -1455,6 +1579,7 @@
             <?php endif; ?>
         </button>
 
+        <?php if (empty($isSpectator)): ?>
         <button class="btn btn-small btn-binary hidden" id="btn-auto-mark" onclick="RemoveCheck();" title="Marcado automático / manual" aria-label="Marcado manual">
             <?php if ($user['autodial'] == 1): ?>
                 <i class="fa-duotone fa-solid fa-wand-magic-sparkles"></i>
@@ -1465,6 +1590,7 @@
 
         <button class="btn btn-small btn-sliders" onclick="ViewSliders();"><i
                 class="fa-duotone fa-solid fa-sliders-simple"></i></button>
+        <?php endif; ?>
 
         <?php if ($game['type'] == 3): ?>
             <div class="ratio ratio-16x9 video-responsive">
@@ -1919,6 +2045,12 @@
     <i class="fa-solid fa-trophy-star me-1"></i><span><?= translate('Ver Ganadores'); ?></span>
 </button>
 
+<?php if (!empty($isSpectator)): ?>
+    <a href="<?= site_url('signup') ?>" class="btn-spectator-play" target="_blank" rel="noopener">
+        <i class="fa-solid fa-crown me-2"></i> ¡Juega tú también! Regístrate aquí
+    </a>
+<?php endif; ?>
+
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
 <script src="<?= function_exists('asset_url') ? asset_url('js/html2pdf.bundle.min.js') : site_url('assets/js/html2pdf.bundle.min.js') ?>"></script>
 
@@ -1954,12 +2086,18 @@
     window.isAdmin = <?= bingo_is_admin() ? 'true' : 'false' ?>;
     window.gameIsFinished = <?= !empty($gameIsFinished) ? 'true' : 'false' ?>;
     window.activeModalities = <?= json_encode($modalities ?? []) ?>;
-    window.autoMarkEnabled = <?= (isset($user['autodial']) && $user['autodial'] == 1) ? 'true' : 'false' ?>;
+    window.autoMarkEnabled = <?= (!empty($isSpectator) || (isset($user['autodial']) && $user['autodial'] == 1)) ? 'true' : 'false' ?>;
     window.singBingoOnlyLastBall = <?= systemGet('singBingoOnlyLastBall') == 1 ? 'true' : 'false' ?>;
     window.drawnNumbers = <?= json_encode(array_values(array_map('intval', $selectedNumbers ?? []))) ?>;
-    window.currentUserId = <?= (int) session()->get('id') ?>;
+    window.currentUserId = <?= (int) (session()->get('id') ?? 0) ?>;
     window.allowGameUnload = window.gameIsFinished;
     window.playerGroup = 0;
+    window.isSpectator = <?= !empty($isSpectator) ? 'true' : 'false' ?>;
+    window.IS_SPECTATOR = window.isSpectator;
+    window.SPECTATOR_TOKEN = '<?= esc($spectatorToken ?? "") ?>';
+    if (window.isSpectator) {
+        window.autoMarkEnabled = true;
+    }
 
     // Auto-expulsión en tiempo real al finalizar Live:
     // Monitorea continuamente el estado del juego para expulsar/redirigir a los jugadores a /play
@@ -2498,7 +2636,9 @@
     var soundPlaying = window.soundPlaying;
 
     function canLeaveGameWithoutWarning() {
-        return window.allowGameUnload === true
+        return window.isSpectator === true
+            || window.IS_SPECTATOR === true
+            || window.allowGameUnload === true
             || window.gameIsFinished === true
             || window.isGameCompleted === true
             || (typeof window.BingoApp !== 'undefined' && window.BingoApp.isGameFinished);

@@ -63,7 +63,8 @@ class Spectator extends Controller
             ]);
         }
 
-        // Registrar en sesión para autorizar la conexión al canal WebSocket
+        // Registrar en sesión para autorizar la conexión al canal WebSocket y peticiones AJAX del juego
+        session()->set('game_id', $gameId);
         session()->set('spectator_game_id', $gameId);
         session()->set('spectator_token', $token);
         session()->set('spectator_viewing_game_id', $gameId);
@@ -128,6 +129,9 @@ class Spectator extends Controller
             ];
         }
 
+        // Sings del jugador observado para resaltar aciertos ganadores en sus cartones
+        $singsUser = $modelSings->where('game', $gameId)->where('user', $userId)->findAll();
+
         // 4. Modalidades activas y premios
         $modalities = [];
         if (!empty($game['modalities'])) {
@@ -182,47 +186,74 @@ class Spectator extends Controller
             ? site_url('uploads/users/' . $player['image'])
             : site_url('assets/img/avatar.jpg');
 
-        $data = [
-            'token'                  => $token,
-            'game'                   => $game,
-            'player'                 => $player,
-            'playerName'             => $playerName,
-            'playerImage'            => $playerImage,
-            'cartons'                => $cartonData,
-            'selectedNumbers'        => $selectedNumbers,
-            'drawnNumbersOrdered'    => $drawnNumbersOrdered,
-            'lastNumber'             => $lastNumber,
-            'fourNumbers'            => $fourNumbers,
-            'totalNumbersGenerated'  => $totalNumbersGenerated,
-            'modalities'             => $modalities,
-            'singsModalities'        => $singsModalities,
-            'winners'                => $winners,
-            'getClass'               => $getClass,
-            'isLiveGame'             => $isLiveGame,
-            'isGameCompleted'        => $isGameCompleted,
-            'isLiveFinalized'        => $isLiveFinalized,
-            'gameIsFinished'         => $gameIsFinished,
-        ];
-
-        $modelContacts = new \App\Models\ContactsModel();
-        $contacts = $modelContacts->findAll();
-
         $currentUser = null;
         if (session()->get('logged_in')) {
             $currentUser = $modelUsers->find(session()->get('id'));
         }
-        $userForLayout = $currentUser ?: $player;
+        $userForPlaying = [
+            'id' => (int) (session()->get('id') ?? 0),
+            'username' => 'Espectador',
+            'firstname' => 'Modo',
+            'lastname' => 'Espectador',
+            'email' => '',
+            'image' => '',
+            'autodial' => 1,
+            'sounds' => 1,
+            'narration' => 1,
+        ];
+        if ($currentUser) {
+            $userForPlaying = array_merge($userForPlaying, $currentUser);
+        }
+        $userForLayout = $currentUser ?: $userForPlaying;
         $imagePath = !empty($userForLayout['image']) ? site_url('uploads/users/' . $userForLayout['image']) : site_url('assets/img/avatar.jpg');
+
+        $modelContacts = new \App\Models\ContactsModel();
+        $contacts = $modelContacts->findAll();
+
+        $spectatorShareUrl = site_url('espectador/' . $token);
+
+        $data = [
+            'contacts'               => $contacts,
+            'game'                   => $game,
+            'user'                   => $userForPlaying,
+            'player'                 => $player,
+            'playerName'             => $playerName,
+            'playerImage'            => $playerImage,
+            'spectatorPlayer'        => $player,
+            'spectatorPlayerName'    => $playerName,
+            'spectatorPlayerImage'   => $playerImage,
+            'cartons'                => $cartonData,
+            'selectedNumbers'        => $selectedNumbers,
+            'drawnNumbersOrdered'    => $drawnNumbersOrdered,
+            'singsModalities'        => $singsModalities,
+            'lastNumber'             => $lastNumber,
+            'fourNumbers'            => $fourNumbers,
+            'lastNumbersJson'        => json_encode($drawnNumbersOrdered),
+            'getClass'               => $getClass,
+            'modalities'             => $modalities,
+            'winners'                => $winners,
+            'totalNumbersGenerated'  => $totalNumbersGenerated,
+            'gameIsFinished'         => $gameIsFinished,
+            'isLiveGame'             => $isLiveGame,
+            'isGameCompleted'        => $isGameCompleted,
+            'isLiveFinalized'        => $isLiveFinalized,
+            'singsUser'              => $singsUser,
+            'imagePath'              => $imagePath,
+            'spectatorToken'         => $token,
+            'spectatorShareUrl'      => $spectatorShareUrl,
+            'isSpectator'            => true,
+            'token'                  => $token,
+        ];
 
         $layoutData = [
             'page' => [
-                'title' => ($game['description'] ?? 'Partida de Bingo') . ' · Modo Espectador'
+                'title' => ($game['description'] ?? 'Partida de Bingo') . ' · Modo Espectador (' . $playerName . ')'
             ],
             'validation' => \Config\Services::validation(),
             'user' => $userForLayout,
             'imagePath' => $imagePath,
             'contacts' => $contacts,
-            'contentPage' => view('spectator/index', $data)
+            'contentPage' => view('playings/playing', $data)
         ];
 
         return view('layout/index', $layoutData);
