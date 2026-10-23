@@ -250,7 +250,7 @@
 </style>
 <div class="container-transmission">
     <div class="transmission">
-        <a class="btn btn-small btn-home" href="<?= site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
+        <a class="btn btn-small btn-home" href="<?= (!empty($isAdmin) || (int) session()->get('group') === 1) ? site_url('games') : site_url('play'); ?>"><i class="fa-duotone fa-solid fa-house"></i></a>
 
         <button type="button" class="btn btn-small btn-wallet" onclick="paymentsGet();">
             <i class="fa-duotone fa-solid fa-wallet"></i>
@@ -492,26 +492,25 @@
                                     <div style="width: 100%; height: 90px; margin: 4px auto; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #e0e0e0;">
                                         <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                                     </div>
-                                <?php else: ?>
-                                    <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
-                                        <div class="card-letter B"><span>B</span></div>
-                                        <div class="card-letter I"><span>I</span></div>
-                                        <div class="card-letter N"><span>N</span></div>
-                                        <div class="card-letter G"><span>G</span></div>
-                                        <div class="card-letter O"><span>O</span></div>
-                                        <?php for ($i = 1; $i <= 25; $i++): ?>
-                                            <?php
-                                                $isMarked = in_array($i, $positions);
-                                                $showStar = ($isSing && $isMarked) || $i == 13;
-                                            ?>
-                                            <?php if ($i == 13): ?>
-                                                <div class="card-number" data-position="13" >⭐️</div>
-                                            <?php else: ?>
-                                                <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                            <?php endif; ?>
-                                        <?php endfor; ?>
-                                    </div>
                                 <?php endif; ?>
+                                <div class="carton <?= $isSing ? 'cartn-sing' : '' ?> <?= $hasModalityImg ? 'd-none' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                                    <div class="card-letter B"><span>B</span></div>
+                                    <div class="card-letter I"><span>I</span></div>
+                                    <div class="card-letter N"><span>N</span></div>
+                                    <div class="card-letter G"><span>G</span></div>
+                                    <div class="card-letter O"><span>O</span></div>
+                                    <?php for ($i = 1; $i <= 25; $i++): ?>
+                                        <?php
+                                            $isMarked = in_array($i, $positions);
+                                            $showStar = ($isSing && $isMarked) || $i == 13;
+                                        ?>
+                                        <?php if ($i == 13): ?>
+                                            <div class="card-number" data-position="13" >⭐️</div>
+                                        <?php else: ?>
+                                            <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                </div>
                                 <?php if ($game['award'] == 2) : ?>
                                     <small style="font-size: .8rem" class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></small>
                                 <?php else: ?>

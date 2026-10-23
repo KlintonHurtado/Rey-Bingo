@@ -646,6 +646,7 @@ class Boards extends Controller {
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
+                'officialWinners' => $winners,
                 'message' => translate('the game has ended, all 75 numbers have already been generated'),
                 'number' => $lastNumber['number'],
                 'player' => $lastW['player'] ?? '',
@@ -654,6 +655,7 @@ class Boards extends Controller {
                 'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
                 'modalityId' => (int) ($lastW['modalityId'] ?? 0),
                 'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'singId' => (int) ($lastW['singId'] ?? 0),
                 'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
@@ -679,14 +681,16 @@ class Boards extends Controller {
                     'totalNumbersGenerated' => $totalNumbersGenerated,
                     'drawnNumbers' => $drawnNumbers,
                     'winners' => $winners,
+                    'officialWinners' => $winners,
                     'message' => translate('the game is over, all the prizes have been awarded'),
                     'number' => $lastNumber['number'],
                     'player' => $pendingBoardSing['player'],
                     'userName' => $pendingBoardSing['player'],
                     'modality' => $pendingBoardSing['modality'],
-                    'modalityName' => $pendingBoardSing['modality'],
+                    'modalityName' => $pendingBoardSing['modalityName'] ?? $pendingBoardSing['modality'],
                     'modalityId' => (int) ($pendingBoardSing['modalityId'] ?? 0),
                     'cartonId' => (int) ($pendingBoardSing['cartonId'] ?? 0),
+                    'singId' => (int) ($pendingBoardSing['singId'] ?? 0),
                     'image' => $pendingBoardSing['image'],
                 ]);
             }
@@ -696,14 +700,16 @@ class Boards extends Controller {
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
+                'officialWinners' => $winners,
                 'message' => translate('a bingo has been called, pausing the game for 10 seconds'),
                 'number' => $lastNumber['number'],
                 'player' => $pendingBoardSing['player'],
                 'userName' => $pendingBoardSing['player'],
                 'modality' => $pendingBoardSing['modality'],
-                'modalityName' => $pendingBoardSing['modality'],
+                'modalityName' => $pendingBoardSing['modalityName'] ?? $pendingBoardSing['modality'],
                 'modalityId' => (int) ($pendingBoardSing['modalityId'] ?? 0),
                 'cartonId' => (int) ($pendingBoardSing['cartonId'] ?? 0),
+                'singId' => (int) ($pendingBoardSing['singId'] ?? 0),
                 'image' => $pendingBoardSing['image'],
             ]);
         }
@@ -724,6 +730,7 @@ class Boards extends Controller {
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
+                'officialWinners' => $winners,
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
                 'player' => $lastW['player'] ?? '',
@@ -732,6 +739,7 @@ class Boards extends Controller {
                 'modalityName' => $lastW['modalityName'] ?? ($lastW['modality'] ?? ''),
                 'modalityId' => (int) ($lastW['modalityId'] ?? 0),
                 'cartonId' => (int) ($lastW['cartonId'] ?? 0),
+                'singId' => (int) ($lastW['singId'] ?? 0),
                 'image' => $lastW['image'] ?? site_url('assets/img/avatar.jpg')
             ]);
         }
@@ -1435,6 +1443,13 @@ class Boards extends Controller {
 
     private function buildWinnersList(int $gameId, SingsModel $modelSings, UsersModel $modelUsers, ModalitiesModel $modelModalities): array
     {
+        if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
+            $enriched = bingo_get_enriched_winners_for_broadcast($gameId, true);
+            if (!empty($enriched)) {
+                return $enriched;
+            }
+        }
+
         $winners = bingo_get_official_sings_for_game($gameId, true);
 
         foreach ($winners as &$winner) {

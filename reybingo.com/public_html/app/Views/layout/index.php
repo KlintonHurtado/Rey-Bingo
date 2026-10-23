@@ -888,17 +888,48 @@ $isNoMusicRole = session()->get('logged_in') && (
                         if (Number.isFinite(parsedId) && parsedId > 0) {
                             return 'modality_' + parsedId;
                         }
+                        const parsedNameId = parseInt(mName, 10);
+                        if (Number.isFinite(parsedNameId) && parsedNameId > 0 && /^\d+$/.test(String(mName).trim())) {
+                            return 'modality_' + parsedNameId;
+                        }
                         if (mName) {
-                            const cleaned = String(mName).trim().toLowerCase()
+                            const cleaned = String(mName)
+                                .normalize('NFD')
+                                .replace(/[\u0300-\u036f]/g, '')
+                                .trim()
+                                .toLowerCase()
                                 .replace(/^la\s+/i, '')
-                                .replace(/[^a-z0-9]/g, '_');
+                                .replace(/[^a-z0-9]/g, '_')
+                                .replace(/_+/g, '_')
+                                .replace(/^_|_$/g, '');
                             if (cleaned) return 'modality_' + cleaned;
                         }
                         return 'modality_general';
                     };
 
-                    const modalityKey = normalizeModKey(notification.modalityId, notification.modality || notification.modalityName);
-                    const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
+                    let rawModality = notification.modality || notification.modalityName || '';
+                    if ((!rawModality || /^\d+$/.test(String(rawModality).trim())) && notification.message) {
+                        const matchMod = notification.message.match(/ha cantado Bingo en\s+([^(\n<]+)/i)
+                                      || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i)
+                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i)
+                                      || notification.message.match(/cantó\s+([^(.\n<]+)/i);
+                        if (matchMod) {
+                            rawModality = matchMod[1].trim();
+                        }
+                    }
+                    const modalityName = rawModality && !/^\d+$/.test(String(rawModality).trim()) ? rawModality : 'Bingo';
+                    const modalityClean = escapeHtml(String(modalityName).replace(/^la\s+/i, '').trim());
+                    let modalityLabel = `Ganadores de la ${modalityClean}`;
+                    if (/^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)) {
+                        modalityLabel = `Ganadores de la modalidad ${modalityClean}`;
+                    }
+
+                    const modalityKey = normalizeModKey(notification.modalityId, rawModality || modalityName);
+                    const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`)
+                        || Array.from(container.querySelectorAll('.notification-sing, .notification-own_sing')).find(el => {
+                            return el.dataset.modalityKey === modalityKey
+                                || (el.dataset.modalityName && el.dataset.modalityName.toLowerCase() === modalityClean.toLowerCase());
+                        });
 
                     // ── LISTA CANÓNICA DE GANADORES ───────────────────────────────────────────────
                     // Si el servidor envió 'officialWinners' (lista completa y autorizada), la usamos
@@ -938,7 +969,11 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 ? `Ganadores de la modalidad ${mClean}`
                                 : `Ganadores de la ${mClean}`;
                             const winnersFormatted = mData.winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ');
-                            const existingEl = container.querySelector(`[data-modality-key="${mKey}"]`);
+                            const existingEl = container.querySelector(`[data-modality-key="${mKey}"]`)
+                                || Array.from(container.querySelectorAll('.notification-sing, .notification-own_sing')).find(el => {
+                                    return el.dataset.modalityKey === mKey
+                                        || (el.dataset.modalityName && el.dataset.modalityName.toLowerCase() === mClean.toLowerCase());
+                                });
 
                             if (existingEl) {
                                 // Actualizar tarjeta existente con la lista completa
@@ -955,6 +990,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 const newEl = document.createElement('div');
                                 newEl.className = `notification notification-${notification.type || 'sing'}`;
                                 newEl.dataset.modalityKey = mKey;
+                                newEl.dataset.modalityName = mClean;
                                 if (notification.id) newEl.dataset.notificationId = notification.id;
                                 newEl._winners = mData.winners;
                                 newEl.innerHTML = `
@@ -998,38 +1034,24 @@ $isNoMusicRole = session()->get('logged_in') && (
                         }
                     }
 
-                    let rawModality = notification.modality || notification.modalityName || '';
-                    if ((!rawModality || /^\d+$/.test(String(rawModality).trim())) && notification.message) {
-                        const matchMod = notification.message.match(/ha cantado Bingo en\s+([^(\n<]+)/i)
-                                      || notification.message.match(/Ganadores\s+de\s+(?:la\s+modalidad\s+|la\s+)?([^:]+):/i)
-                                      || notification.message.match(/modalidad\s+([^(\n<]+)/i)
-                                      || notification.message.match(/cantó\s+([^(.\n<]+)/i);
-                        if (matchMod) {
-                            rawModality = matchMod[1].trim();
-                        }
-                    }
-                    const modalityName = rawModality && !/^\d+$/.test(String(rawModality).trim()) ? rawModality : 'Bingo';
-                    const modalityClean = escapeHtml(String(modalityName).replace(/^la\s+/i, '').trim());
-                    let modalityLabel = `Ganadores de la ${modalityClean}`;
-                    if (/^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)) {
-                        modalityLabel = `Ganadores de la modalidad ${modalityClean}`;
-                    }
+                    const playerNamesList = playerName
+                        ? playerName.split(/\s*\+\s*/).map(p => p.replace(/<[^>]+>/g, '').trim()).filter(Boolean)
+                        : [];
 
                     if (existingModalityEl) {
                         // Ya existe una notificación en pantalla para esta modalidad: AÑADIR ganador
                         existingModalityEl._winners = existingModalityEl._winners || [];
-                        if (playerName) {
-                            const alreadyListed = existingModalityEl._winners.some(w => w.player.toLowerCase() === playerName.toLowerCase());
-                            if (!alreadyListed) {
-                                existingModalityEl._winners.push({ player: playerName, carton: cartonNumber });
+                        playerNamesList.forEach(p => {
+                            if (!existingModalityEl._winners.some(w => w.player.toLowerCase() === p.toLowerCase())) {
+                                existingModalityEl._winners.push({ player: p, carton: cartonNumber });
                             }
-                        }
+                        });
 
                         // Reconstruir mensaje agrupado según formato solicitado:
                         // Ganadores de la "modalidad": "jugador" + "jugador"
                         const winnersFormatted = existingModalityEl._winners.length > 0
                             ? existingModalityEl._winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ')
-                            : (playerName ? `<strong>${escapeHtml(playerName)}</strong>` : notification.message);
+                            : (playerNamesList.length > 0 ? playerNamesList.map(p => `<strong>${escapeHtml(p)}</strong>`).join(' + ') : notification.message);
 
                         const msgContainer = existingModalityEl.querySelector('.notification-message');
                         if (msgContainer) {
@@ -1058,13 +1080,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                     const notificationEl = document.createElement('div');
                     notificationEl.className = `notification notification-${notification.type || 'sing'}`;
                     notificationEl.dataset.modalityKey = modalityKey;
+                    notificationEl.dataset.modalityName = modalityClean;
                     if (notification.id) {
                         notificationEl.dataset.notificationId = notification.id;
                     }
-                    notificationEl._winners = playerName ? [{ player: playerName, carton: cartonNumber }] : [];
+                    notificationEl._winners = playerNamesList.map(p => ({ player: p, carton: cartonNumber }));
 
-                    const initialWinners = playerName 
-                        ? `<strong>${escapeHtml(playerName)}</strong>`
+                    const initialWinners = playerNamesList.length > 0
+                        ? playerNamesList.map(p => `<strong>${escapeHtml(p)}</strong>`).join(' + ')
                         : notification.message;
 
                     notificationEl.innerHTML = `

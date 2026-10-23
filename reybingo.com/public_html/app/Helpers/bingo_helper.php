@@ -1415,12 +1415,14 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                     if ($targetUserId > 0) {
                         bingo_broadcast_user_notification($targetUserId, [
                             'id'             => 'sing_' . $singId . '_' . $modalityId,
+                            'singId'         => $singId,
                             'title'          => $item['title'] ?? $unifiedSingTitle,
                             'message'        => $item['message'] ?? $unifiedSingMessage,
                             'type'           => $item['type'] ?? 'sing',
                             'game'           => $gameId,
                             'gameId'         => $gameId,
                             'modality'       => $modalityClean,
+                            'modalityName'   => $modalityClean,
                             'modalityId'     => $modalityId,
                             'carton'         => $cartonId,
                             'cartonId'       => $cartonId,
@@ -1447,6 +1449,7 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
 
                 $gamePayload = [
                     'id'            => 'sing_' . $singId . '_' . $modalityId,
+                    'singId'        => $singId,
                     'type'          => 'sing',
                     'title'         => $unifiedSingTitle,
                     'message'       => $unifiedSingMessage,
@@ -1548,9 +1551,13 @@ if (!function_exists('bingo_claim_pending_board_sing')) {
 
             return [
                 'sing' => $sing,
+                'singId' => (int) $sing['id'],
                 'player' => $user['firstname'] . ' ' . $user['lastname'],
+                'userName' => $user['firstname'] . ' ' . $user['lastname'],
                 'modality' => translate($modality['name']),
-                'modalityId' => $modality['id'],
+                'modalityName' => translate($modality['name']),
+                'modalityId' => (int) $modality['id'],
+                'cartonId' => (int) ($sing['carton'] ?? 0),
                 'image' => $imagePath,
             ];
         }

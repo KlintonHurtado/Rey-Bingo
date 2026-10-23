@@ -62,11 +62,14 @@ $showWaitingNotice = $isLivePlayerLocked;
             </div>
         </div>
         <div class="modal-footer justify-content-center pt-2 pb-2 flex-column">
+            <?php
+            $defaultExitUrl = ((!empty($isAdminViewer) || (int) session()->get('group') === 1) ? site_url('games') : site_url('play'));
+            ?>
             <?php if ($isLivePlayerLocked) : ?>
                 <button type="button" class="btn btn-primary w-50 btn-bingo my-1" data-bs-dismiss="modal">
                     <i class="fa-solid fa-eye me-1"></i> <?= translate('Seguir viendo Live'); ?>
                 </button>
-                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio my-1" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'play'; }">
+                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio my-1" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = '<?= $defaultExitUrl ?>'; }">
                     <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
                 </button>
             <?php else : ?>
@@ -75,7 +78,7 @@ $showWaitingNotice = $isLivePlayerLocked;
                     <i class="fa-solid fa-flag-checkered me-2"></i> Finalizar Live
                 </button>
                 <?php endif; ?>
-                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = (typeof site_url !== 'undefined' ? site_url : '/') + 'play'; }">
+                <button type="button" class="btn btn-secondary w-50 btn-bingo btn-exit-game btn-volver-inicio" id="btnVolverInicio" data-bs-dismiss="modal" onclick="if (typeof exitToPlay === 'function') { exitToPlay(); } else { window.location.href = '<?= $defaultExitUrl ?>'; }">
                     <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> <?= translate('Salir'); ?>
                 </button>
             <?php endif; ?>

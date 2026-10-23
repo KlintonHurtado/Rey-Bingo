@@ -940,7 +940,42 @@
             
             channel.bind('game:bingo_accepted', (p) => {
                 log('📡 BINGO ACEPTADO: ' + JSON.stringify(p));
-                showAlert(`¡BINGO! Ganador: ${p.playerId} · Cartón: ${p.cardId}`, 5000);
+                const modClean = String(p.modalityName || p.modality || 'Bingo').replace(/^la\s+/i, '').trim();
+                const modLabel = /^bingo/i.test(modClean) || /^pleno/i.test(modClean)
+                    ? `Ganadores de la modalidad ${modClean}`
+                    : `Ganadores de la ${modClean}`;
+                const pName = p.player || p.userName || p.playerName || ('Jugador #' + (p.playerId || p.userId || ''));
+                const rawList = Array.isArray(p.officialWinners) && p.officialWinners.length > 0
+                    ? p.officialWinners
+                    : (Array.isArray(p.winners) && p.winners.length > 0 ? p.winners : null);
+                let winnersText = pName;
+                if (rawList && rawList.length > 0) {
+                    const mId = parseInt(p.modalityId, 10);
+                    const matching = rawList.filter(w => {
+                        const wmId = parseInt(w.modalityId || w.modality_id, 10);
+                        if (mId > 0 && wmId > 0) return mId === wmId;
+                        const wmName = String(w.modalityName || w.modality || '').replace(/^la\s+/i, '').trim().toLowerCase();
+                        return wmName && wmName === modClean.toLowerCase();
+                    }).map(w => w.userName || w.player || '').filter(Boolean);
+                    if (matching.length > 0) {
+                        winnersText = Array.from(new Set(matching)).join(' + ');
+                    }
+                }
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification({
+                        id: 'sing_' + (p.singId || p.cardId || Date.now()),
+                        type: 'sing',
+                        modalityId: p.modalityId,
+                        modality: modClean,
+                        player: pName,
+                        cartonId: p.cardId || p.cartonId,
+                        title: '🎉 ¡BINGO CANTADO!',
+                        message: `${modLabel}: ${winnersText}`,
+                        officialWinners: rawList || undefined
+                    });
+                } else {
+                    showAlert(`${modLabel}: ${winnersText}`, 5000);
+                }
                 stopAutoPlay();
                 statusEl.textContent = '¡BINGO!';
             });

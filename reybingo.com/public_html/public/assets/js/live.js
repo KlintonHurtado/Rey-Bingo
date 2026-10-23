@@ -933,8 +933,25 @@ function showOtherPlayerBingoNotice(data, callback) {
         ? `Ganadores de la modalidad ${modalityClean}`
         : `Ganadores de la ${modalityClean}`;
     const pName = data.player || data.userName || 'Jugador';
-    const cartonNum = data.cartonId || data.carton || '';
-    const cartonInfo = cartonNum ? ` (Cartón #${cartonNum})` : '';
+
+    const rawList = Array.isArray(data.officialWinners) && data.officialWinners.length > 0
+        ? data.officialWinners
+        : (Array.isArray(data.winners) && data.winners.length > 0 ? data.winners : (Array.isArray(winners) && winners.length > 0 ? winners : null));
+
+    let winnersText = pName;
+    if (rawList && rawList.length > 0) {
+        const mId = parseInt(data.modalityId, 10);
+        const mCleanLower = modalityClean.toLowerCase();
+        const matching = rawList.filter(w => {
+            const wmId = parseInt(w.modalityId || w.modality_id, 10);
+            if (mId > 0 && wmId > 0) return mId === wmId;
+            const wmName = String(w.modalityName || w.modality || '').replace(/^la\s+/i, '').trim().toLowerCase();
+            return wmName && wmName === mCleanLower;
+        }).map(w => w.userName || w.player || '').filter(Boolean);
+        if (matching.length > 0) {
+            winnersText = Array.from(new Set(matching)).join(' + ');
+        }
+    }
 
     // 2. Disparar notificación toast visual del sistema unificada por modalidad
     if (typeof window.showNotification === 'function') {
@@ -946,10 +963,10 @@ function showOtherPlayerBingoNotice(data, callback) {
             player: pName,
             cartonId: data.cartonId || data.carton,
             title: '🎉 ¡BINGO CANTADO!',
-            message: `${modalityLabel}: ${pName}${cartonInfo}`,
+            message: `${modalityLabel}: ${winnersText}`,
             created_at: data.created_at || new Date().toISOString(),
             // Incluir lista canónica si el servidor la envió, para mostrar TODOS los ganadores
-            officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : undefined,
+            officialWinners: rawList || undefined,
             __fromLiveNotice: true
         });
     }

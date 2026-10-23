@@ -19,6 +19,10 @@
         if (/^[1-9]\d*$/.test(id)) {
             // Un ID conocido nunca debe terminar marcando otra modalidad por su nombre.
             targets = cards.filter(card => card.id === 'modality-' + id);
+            const directCard = document.getElementById('modality-card-' + id);
+            if (directCard) {
+                directCard.classList.add('modality-won');
+            }
         } else {
             const name = normalizeName(modalityName || modalityId);
             if (!name) return;
