@@ -9326,5 +9326,38 @@ body:has(.spectator-mode) .btn-toggle-password {
     display: none !important;
 }
 
+/* Modal de Agregar / Editar Partida (ancho amplio y responsivo) */
+#modalAddgame .modal-dialog,
+.modal-dialog.modal-add-game {
+    max-width: 1020px !important;
+    width: 92% !important;
+    margin: 1.75rem auto !important;
+}
+
+@media (min-width: 1400px) {
+    #modalAddgame .modal-dialog,
+    .modal-dialog.modal-add-game {
+        max-width: 1080px !important;
+    }
+}
+
+@media (max-width: 991px) {
+    #modalAddgame .modal-dialog,
+    .modal-dialog.modal-add-game {
+        max-width: 95% !important;
+        width: 95% !important;
+        margin: 1rem auto !important;
+    }
+}
+
+@media (max-width: 576px) {
+    #modalAddgame .modal-dialog,
+    .modal-dialog.modal-add-game {
+        max-width: 98% !important;
+        width: 98% !important;
+        margin: 0.5rem auto !important;
+    }
+}
+
 
 

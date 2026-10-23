@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-dialog-centered max-w-80" id="modalAddgame">
+<div class="modal-dialog modal-dialog-centered modal-xl modal-add-game" id="modalAddgameDialog" style="max-width: min(92vw, 1020px); width: 92%;">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2" id="game-modal-title"><i class="fa-duotone fa-solid fa-gamepad"></i> <?= translate('add game'); ?></h6>
@@ -46,13 +46,13 @@
                         <small id="min_cartons-error" class="text-danger d-none"></small>
                     </div>
                     
-                    <div class="col-md-4 mb-1">
+                    <div class="col-md-6 col-sm-6 mb-1">
                         <label for="date" class="form-label"><?= translate('date'); ?></label>
                         <input type="date" class="form-control form-control-lg form-bingo" name="date" id="date" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('date')); ?>" autocomplete="off" value="<?php echo date('Y-m-d'); ?>">
                         <small id="date-error" class="text-danger d-none"></small>
                     </div>
                     
-                    <div class="col-md-4 mb-1">
+                    <div class="col-md-6 col-sm-6 mb-1">
                         <label for="time" class="form-label"><?= translate('hour'); ?></label>
                         <input type="time" class="form-control form-control-lg form-bingo" name="time" id="time" placeholder="<?= translate('enter an'); ?> <?= strtolower(translate('hour')); ?>" autocomplete="off" value="<?php echo date('H:i'); ?>">
                         <small id="time-error" class="text-danger d-none"></small>
@@ -177,9 +177,9 @@
                         </div>
                     </div>
 
-                    <div class="col-md-12 d-flex justify-content-center">
-                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" style="width: 200px; display: inline-block;" id="add-button"><?= translate('add'); ?></button>
-                        <button type="submit" class="btn btn-primary d-block w-50 btn-bingo mt-2" style="width: 200px; display: inline-block;" id="game-button"><?= translate('start'); ?></button>
+                    <div class="col-md-12 d-flex justify-content-center gap-3">
+                        <button type="submit" class="btn btn-primary btn-bingo mt-2" style="min-width: 180px; width: auto; max-width: 240px;" id="add-button"><?= translate('add'); ?></button>
+                        <button type="submit" class="btn btn-primary btn-bingo mt-2" style="min-width: 180px; width: auto; max-width: 240px;" id="game-button"><?= translate('start'); ?></button>
                     </div>
                 </div>
             <?= form_close(); ?>
