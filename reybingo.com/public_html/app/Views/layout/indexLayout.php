@@ -941,7 +941,7 @@
         <?php if (session()->get('logged_in')) : ?>
             const notificationConfig = {
                 checkInterval: 10000,
-                displayTime: 15000,
+                displayTime: 7000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
                 markReadUrl: '/users/markNotificationRead',
@@ -1206,8 +1206,91 @@
 
                 const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing');
                 if (isSingType) {
-                    const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                    const normalizeModKey = function(mId, mName) {
+                        const parsedId = parseInt(mId, 10);
+                        if (Number.isFinite(parsedId) && parsedId > 0) {
+                            return 'modality_' + parsedId;
+                        }
+                        if (mName) {
+                            const cleaned = String(mName).trim().toLowerCase()
+                                .replace(/^la\s+/i, '')
+                                .replace(/[^a-z0-9]/g, '_');
+                            if (cleaned) return 'modality_' + cleaned;
+                        }
+                        return 'modality_general';
+                    };
+
+                    const modalityKey = normalizeModKey(notification.modalityId, notification.modality || notification.modalityName);
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
+
+                    // ── LISTA CANÓNICA DE GANADORES ───────────────────────────────────────────────
+                    const rawOfficialWinners = Array.isArray(notification.officialWinners) && notification.officialWinners.length > 0
+                        ? notification.officialWinners
+                        : (Array.isArray(notification.winners) && notification.winners.length > 0 ? notification.winners : null);
+
+                    if (rawOfficialWinners && rawOfficialWinners.length > 0) {
+                        const byModality = {};
+                        rawOfficialWinners.forEach(w => {
+                            const mId = w.modalityId || w.modality_id || 0;
+                            const mName = w.modalityName || w.modality || 'Bingo';
+                            const mKey = normalizeModKey(mId, mName);
+                            if (!byModality[mKey]) {
+                                byModality[mKey] = {
+                                    modalityName: mName,
+                                    winners: []
+                                };
+                            }
+                            const wName = w.userName || w.player || w.name || '';
+                            if (wName && !byModality[mKey].winners.some(x => x.player.toLowerCase() === wName.toLowerCase())) {
+                                byModality[mKey].winners.push({ player: wName, carton: w.cartonId || w.carton || '' });
+                            }
+                        });
+
+                        const modalityKeysList = Object.keys(byModality);
+                        modalityKeysList.forEach(mKey => {
+                            const mData = byModality[mKey];
+                            const mClean = escapeHtml(String(mData.modalityName).replace(/^la\s+/i, '').trim()) || 'Bingo';
+                            const mLabel = (/^bingo/i.test(mClean) || /^pleno/i.test(mClean))
+                                ? `Ganadores de la modalidad ${mClean}`
+                                : `Ganadores de la ${mClean}`;
+                            const winnersFormatted = mData.winners.map(w => `<strong>${escapeHtml(w.player)}</strong>`).join(' + ');
+                            const existingEl = container.querySelector(`[data-modality-key="${mKey}"]`);
+
+                            if (existingEl) {
+                                existingEl._winners = mData.winners;
+                                const msgEl = existingEl.querySelector('.notification-message');
+                                if (msgEl) msgEl.innerHTML = `${mLabel}: ${winnersFormatted}`;
+                                if (existingEl._autoHideTimer) clearTimeout(existingEl._autoHideTimer);
+                                existingEl._autoHideTimer = setTimeout(() => { hideNotification(existingEl); }, notificationConfig.displayTime);
+                                existingEl.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+                                existingEl.style.transform = 'scale(1.02)';
+                                setTimeout(() => { existingEl.style.transform = ''; }, 250);
+                            } else if (mKey === modalityKey || modalityKey === 'modality_general' || modalityKeysList.length === 1) {
+                                const newEl = document.createElement('div');
+                                newEl.className = `notification notification-${notification.type || 'sing'}`;
+                                newEl.dataset.modalityKey = mKey;
+                                if (notification.id) newEl.dataset.notificationId = notification.id;
+                                newEl._winners = mData.winners;
+                                newEl.innerHTML = `
+                                    <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
+                                    <div class="notification-header">
+                                        <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
+                                    </div>
+                                    <div class="notification-message">${mLabel}: ${winnersFormatted}</div>
+                                    <span class="notification-hint">Desliza o presiona × para cerrar</span>
+                                    <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
+                                `;
+                                container.appendChild(newEl);
+                                setTimeout(() => { newEl.classList.add('show'); }, 100);
+                                if (typeof attachNotificationSwipeDismiss === 'function') {
+                                    attachNotificationSwipeDismiss(newEl, hideNotification);
+                                }
+                                newEl._autoHideTimer = setTimeout(() => { hideNotification(newEl); }, notificationConfig.displayTime);
+                            }
+                        });
+                        return;
+                    }
+                    // ── FIN LISTA CANÓNICA ──────────────────────────────────────────────────────
 
                     let playerName = notification.player || notification.userName || '';
                     let cartonNumber = notification.cartonId || notification.carton || '';
@@ -1292,11 +1375,12 @@
                         : notification.message;
 
                     notificationEl.innerHTML = `
+                        <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
                         <div class="notification-header">
                             <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
                         </div>
                         <div class="notification-message">${modalityLabel}: ${initialWinners}</div>
-                        <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                        <span class="notification-hint">Desliza o presiona × para cerrar</span>
                         <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                     `;
 
@@ -1345,11 +1429,12 @@
                     ? notification.message
                     : (isNewGameNotice ? 'Se ha creado una nueva partida.' : '');
                 notificationEl.innerHTML = `
+                    <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
                     <div class="notification-header">
                         <h6 class="notification-title">${notifTitle}</h6>
                     </div>
                     <div class="notification-message">${notifMessage}</div>
-                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                    <span class="notification-hint">Desliza o presiona × para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at)}</span>
                 `;
                 
@@ -1725,9 +1810,14 @@
             function renderOrUpdateCard(game, cardsContainer) {
                 let buttonsHtml = '';
                 let card = document.querySelector(`.card-game-${game.id}`);
+                const hasCover = game.cover && game.cover !== 'image.jpg';
                 if (!card) {
                     card = document.createElement('div');
-                    card.className = `card ${game.color} text-center card-game-${game.id}`;
+                    const coverClass = hasCover ? 'card-has-cover' : (game.color || 'bingo-bg-primary');
+                    card.className = `card ${coverClass} text-center card-game-${game.id}`;
+                    if (hasCover) {
+                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
+                    }
                     
                     if (game.cartons >= 1) {
                         buttonsHtml = `<button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-${game.id}" onclick="gameGet(${game.id});"><?= translate('come in to play'); ?></button><button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id});"><?= translate('buy cartons'); ?></button>`;
@@ -1972,13 +2062,24 @@
                     clearTimeout(notificationEl._autoHideTimer);
                     notificationEl._autoHideTimer = null;
                 }
+                if (notificationEl._hardExpiryTimer) {
+                    clearTimeout(notificationEl._hardExpiryTimer);
+                    notificationEl._hardExpiryTimer = null;
+                }
+                notificationEl.classList.remove('show');
                 notificationEl.classList.add('hide');
                 setTimeout(() => {
-                    if (notificationEl.parentNode) {
+                    if (notificationEl && notificationEl.parentNode) {
                         notificationEl.remove();
                     }
                 }, 300);
             }
+            window.hideNotification = hideNotification;
+            window.closeNotification = function(btn) {
+                if (!btn) return;
+                const el = btn.closest ? btn.closest('.notification') : btn;
+                if (el) hideNotification(el);
+            };
 
             // Función para marcar notificación(es) como leída(s) (acepta array de IDs o ID individual)
             async function markAsRead(notificationIds) {

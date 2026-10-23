@@ -649,6 +649,61 @@
             aspect-ratio: 1;
         }
 
+        .modality-image-wrapper {
+            width: 100%;
+            max-width: 200px;
+            height: 185px;
+            margin: 0 auto 6px;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .modality-image-wrapper:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(98, 54, 255, 0.15);
+        }
+
+        .modality-image-wrapper img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        .modality-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #6236ff;
+            background: #ede9fe;
+            border: 1px solid #ddd6fe;
+            border-radius: 20px;
+            padding: 3px 12px;
+            margin: 0 auto 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modality-toggle-btn:hover {
+            background: #6236ff;
+            color: #ffffff;
+            border-color: #6236ff;
+        }
+
     }
 
     .container-section--playing .bingo-border-carton {
@@ -1766,11 +1821,28 @@
             <div
                 class="container-cartons-modalities<?= count($modalities) === 1 ? ' container-cartons-modalities--solo' : '' ?>">
                 <?php foreach ($modalities as $modality): ?>
-                    <?php $isSing = in_array($modality['id'], $singsModalities);
-                    $positions = explode(',', $modality['positions']); ?>
-                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
+                    <?php 
+                        $isSing = in_array($modality['id'], $singsModalities);
+                        $positions = explode(',', $modality['positions']); 
+                        $hasModalityImg = !empty($modality['image']);
+                    ?>
+                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
                         <span class="modality-name"><?= translate($modality['name']); ?></span>
-                        <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
+
+                        <?php if ($hasModalityImg): ?>
+                            <div class="text-center">
+                                <button type="button" class="modality-toggle-btn" onclick="toggleModalityView(<?= $modality['id']; ?>)">
+                                    <span class="toggle-text-grid d-none"><i class="fa-solid fa-image me-1"></i>Ver imagen</span>
+                                    <span class="toggle-text-img"><i class="fa-solid fa-table-cells me-1"></i>Ver patrón 5x5</span>
+                                </button>
+                            </div>
+
+                            <div class="modality-image-wrapper" id="modality-img-wrap-<?= $modality['id']; ?>" onclick="toggleModalityView(<?= $modality['id']; ?>)" title="Clic para alternar vista">
+                                <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>">
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="carton <?= $isSing ? 'cartn-sing' : '' ?> <?= $hasModalityImg ? 'd-none' : '' ?>" id="modality-<?= $modality['id']; ?>">
                             <div class="card-letter B"><span>B</span></div>
                             <div class="card-letter I"><span>I</span></div>
                             <div class="card-letter N"><span>N</span></div>
@@ -2972,4 +3044,33 @@
 
 <script src="<?= function_exists('asset_url') ? asset_url('js/modality-winners.js') : (site_url('assets/js/modality-winners.js') . '?v=' . time()) ?>"></script>
 <script src="<?= function_exists('asset_url') ? asset_url('js/playing.js') : (site_url('assets/js/playing.js') . '?v=' . time()) ?>"></script>
+<script>
+    function toggleModalityView(modalityId) {
+        const imgWrap = document.getElementById('modality-img-wrap-' + modalityId);
+        const carton = document.getElementById('modality-' + modalityId);
+        const card = document.getElementById('modality-card-' + modalityId);
+        if (!imgWrap || !carton) return;
+
+        const isImgVisible = !imgWrap.classList.contains('d-none');
+        if (isImgVisible) {
+            imgWrap.classList.add('d-none');
+            carton.classList.remove('d-none');
+            if (card) {
+                const toggleGridText = card.querySelector('.toggle-text-grid');
+                const toggleImgText = card.querySelector('.toggle-text-img');
+                if (toggleGridText) toggleGridText.classList.remove('d-none');
+                if (toggleImgText) toggleImgText.classList.add('d-none');
+            }
+        } else {
+            carton.classList.add('d-none');
+            imgWrap.classList.remove('d-none');
+            if (card) {
+                const toggleGridText = card.querySelector('.toggle-text-grid');
+                const toggleImgText = card.querySelector('.toggle-text-img');
+                if (toggleGridText) toggleGridText.classList.add('d-none');
+                if (toggleImgText) toggleImgText.classList.remove('d-none');
+            }
+        }
+    }
+</script>
 

@@ -6207,6 +6207,40 @@ hr {
     display: none !important;
 }
 
+.notification-close-btn {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.22);
+    border: none;
+    border-radius: 50%;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 25;
+    transition: background 0.2s ease, transform 0.15s ease;
+    padding: 0;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.notification-close-btn:hover {
+    background: rgba(255, 255, 255, 0.45);
+    transform: scale(1.12);
+}
+
+.notification-close-btn:active {
+    background: rgba(255, 255, 255, 0.65);
+    transform: scale(0.92);
+}
+
 .notification-hint {
     display: block;
     margin-top: 6px;
@@ -6880,6 +6914,50 @@ input[type=number]::-webkit-outer-spin-button {
     transform: translateY(-4px);
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35),
                 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Tarjeta de sala con imagen de portada personalizada ("frente") */
+.card.card-has-cover {
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    color: #fff !important;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25),
+                0 3px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.card.card-has-cover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35),
+                0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.card.card-has-cover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(10, 20, 50, 0.35) 0%, rgba(10, 20, 50, 0.62) 100%);
+    pointer-events: none;
+    z-index: 1;
+    border-radius: inherit;
+}
+
+.card.card-has-cover > * {
+    position: relative;
+    z-index: 2;
+}
+
+.card.card-has-cover .card-title,
+.card.card-has-cover .list-group,
+.card.card-has-cover p {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 

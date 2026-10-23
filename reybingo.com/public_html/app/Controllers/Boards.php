@@ -121,6 +121,7 @@ class Boards extends Controller {
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
 
             $modality['amount'] = $award['amount'] ?? 0;
+            $modality['image'] = !empty($award['image']) ? $award['image'] : ($modality['image'] ?? null);
         }
 
         $drawnNumbersOrdered = $model->where('game', $game['id'])->where('status', 1)->orderBy('created_at', 'ASC')->findAll();
@@ -219,6 +220,7 @@ class Boards extends Controller {
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
 
             $modality['amount'] = $award['amount'] ?? 0;
+            $modality['image'] = !empty($award['image']) ? $award['image'] : ($modality['image'] ?? null);
         }
 
         $selectedNumbers = $model->where('game', $game['id'])->where('status', 1)->findAll();

@@ -1988,6 +1988,7 @@ class Cron extends Controller
                     'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompleted,
                     'winners'       => $officialWinners,
+                    'officialWinners' => $officialWinners,
                 ]);
 
                 // Notificar al ganador, a todos los jugadores de la partida y al operador

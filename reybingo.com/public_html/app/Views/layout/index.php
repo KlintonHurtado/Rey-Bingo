@@ -665,7 +665,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                 // notificaciones de ganadores casi en tiempo real aunque el WebSocket falle.
                 // Jugadores usan 10 s porque ya reciben todo por WebSocket en la partida.
                 checkInterval: <?= (function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator()) ? 3000 : 10000 ?>,
-                displayTime: 15000,
+                displayTime: 7000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
                 markReadUrl: '/users/markNotificationRead',
@@ -881,7 +881,21 @@ $isNoMusicRole = session()->get('logged_in') && (
 
                 const isSingType = !isNewGameNotice && (notification.type === 'sing' || notification.type === 'own_sing');
                 if (isSingType) {
-                    const modalityKey = 'modality_' + (notification.modalityId || (notification.modality ? String(notification.modality).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                    const normalizeModKey = function(mId, mName) {
+                        const parsedId = parseInt(mId, 10);
+                        if (Number.isFinite(parsedId) && parsedId > 0) {
+                            return 'modality_' + parsedId;
+                        }
+                        if (mName) {
+                            const cleaned = String(mName).trim().toLowerCase()
+                                .replace(/^la\s+/i, '')
+                                .replace(/[^a-z0-9]/g, '_');
+                            if (cleaned) return 'modality_' + cleaned;
+                        }
+                        return 'modality_general';
+                    };
+
+                    const modalityKey = normalizeModKey(notification.modalityId, notification.modality || notification.modalityName);
                     const existingModalityEl = container.querySelector(`[data-modality-key="${modalityKey}"]`);
 
                     // ── LISTA CANÓNICA DE GANADORES ───────────────────────────────────────────────
@@ -889,15 +903,20 @@ $isNoMusicRole = session()->get('logged_in') && (
                     // directamente para reconstruir la UI. Esto resuelve la desincronización entre
                     // dispositivos: aunque un dispositivo haya perdido mensajes anteriores, recibe la
                     // lista definitiva en el siguiente evento y la muestra completa y correcta.
-                    if (Array.isArray(notification.officialWinners) && notification.officialWinners.length > 0) {
+                    const rawOfficialWinners = Array.isArray(notification.officialWinners) && notification.officialWinners.length > 0
+                        ? notification.officialWinners
+                        : (Array.isArray(notification.winners) && notification.winners.length > 0 ? notification.winners : null);
+
+                    if (rawOfficialWinners && rawOfficialWinners.length > 0) {
                         // Agrupar todos los ganadores por modalidad
                         const byModality = {};
-                        notification.officialWinners.forEach(w => {
+                        rawOfficialWinners.forEach(w => {
                             const mId = w.modalityId || w.modality_id || 0;
-                            const mKey = 'modality_' + (mId || (w.modalityName ? String(w.modalityName).trim().toLowerCase().replace(/[^a-z0-9]/g, '_') : 'general'));
+                            const mName = w.modalityName || w.modality || 'Bingo';
+                            const mKey = normalizeModKey(mId, mName);
                             if (!byModality[mKey]) {
                                 byModality[mKey] = {
-                                    modalityName: w.modalityName || w.modality || 'Bingo',
+                                    modalityName: mName,
                                     winners: []
                                 };
                             }
@@ -907,8 +926,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                             }
                         });
 
+                        const modalityKeysList = Object.keys(byModality);
+
                         // Actualizar o crear tarjeta de notificación para cada modalidad
-                        Object.keys(byModality).forEach(mKey => {
+                        modalityKeysList.forEach(mKey => {
                             const mData = byModality[mKey];
                             const mClean = escapeHtml(String(mData.modalityName).replace(/^la\s+/i, '').trim()) || 'Bingo';
                             const mLabel = (/^bingo/i.test(mClean) || /^pleno/i.test(mClean))
@@ -927,19 +948,20 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 existingEl.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
                                 existingEl.style.transform = 'scale(1.02)';
                                 setTimeout(() => { existingEl.style.transform = ''; }, 250);
-                            } else if (mKey === modalityKey) {
-                                // Crear nueva tarjeta solo para la modalidad del evento actual
+                            } else if (mKey === modalityKey || modalityKey === 'modality_general' || modalityKeysList.length === 1) {
+                                // Crear nueva tarjeta para la modalidad
                                 const newEl = document.createElement('div');
                                 newEl.className = `notification notification-${notification.type || 'sing'}`;
                                 newEl.dataset.modalityKey = mKey;
                                 if (notification.id) newEl.dataset.notificationId = notification.id;
                                 newEl._winners = mData.winners;
                                 newEl.innerHTML = `
+                                    <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
                                     <div class="notification-header">
                                         <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
                                     </div>
                                     <div class="notification-message">${mLabel}: ${winnersFormatted}</div>
-                                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                                    <span class="notification-hint">Desliza o presiona × para cerrar</span>
                                     <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                                 `;
                                 container.appendChild(newEl);
@@ -1044,11 +1066,12 @@ $isNoMusicRole = session()->get('logged_in') && (
                         : notification.message;
 
                     notificationEl.innerHTML = `
+                        <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
                         <div class="notification-header">
                             <h6 class="notification-title">🎉 ¡BINGO CANTADO!</h6>
                         </div>
                         <div class="notification-message">${modalityLabel}: ${initialWinners}</div>
-                        <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                        <span class="notification-hint">Desliza o presiona × para cerrar</span>
                         <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                     `;
 
@@ -1098,11 +1121,12 @@ $isNoMusicRole = session()->get('logged_in') && (
                     ? notification.message
                     : (isNewGameNotice ? 'Se ha creado una nueva partida.' : '');
                 notificationEl.innerHTML = `
+                    <button type="button" class="notification-close-btn" aria-label="Cerrar">&times;</button>
                     <div class="notification-header">
                         <h6 class="notification-title">${notifTitle}</h6>
                     </div>
                     <div class="notification-message">${notifMessage}</div>
-                    <span class="notification-hint">Desliza a la derecha para cerrar</span>
+                    <span class="notification-hint">Desliza o presiona × para cerrar</span>
                     <span class="notification-time mt-1">${formatTime(notification.created_at || new Date().toISOString())}</span>
                 `;
                 
@@ -1555,9 +1579,14 @@ $isNoMusicRole = session()->get('logged_in') && (
             function renderOrUpdateCard(game, cardsContainer) {
                 let buttonsHtml = '';
                 let card = document.querySelector(`.card-game-${game.id}`);
+                const hasCover = game.cover && game.cover !== 'image.jpg';
                 if (!card) {
                     card = document.createElement('div');
-                    card.className = `card ${game.color} text-center card-game-${game.id}`;
+                    const coverClass = hasCover ? 'card-has-cover' : (game.color || 'bingo-bg-primary');
+                    card.className = `card ${coverClass} text-center card-game-${game.id}`;
+                    if (hasCover) {
+                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
+                    }
                     card.setAttribute('data-game-id', String(game.id));
                     card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
                     card.setAttribute('data-game-start', `${game.date} ${game.time}`);
@@ -1597,6 +1626,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                     cardsContainer.appendChild(slide);
                     fillCardPrize(document.getElementById(`card-accumulated-${game.id}`), game);
                 } else {
+                    if (hasCover) {
+                        card.classList.add('card-has-cover');
+                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
+                    }
                     card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
                     card.setAttribute('data-game-start', `${game.date} ${game.time}`);
 
@@ -1810,13 +1843,24 @@ $isNoMusicRole = session()->get('logged_in') && (
                     clearTimeout(notificationEl._autoHideTimer);
                     notificationEl._autoHideTimer = null;
                 }
+                if (notificationEl._hardExpiryTimer) {
+                    clearTimeout(notificationEl._hardExpiryTimer);
+                    notificationEl._hardExpiryTimer = null;
+                }
+                notificationEl.classList.remove('show');
                 notificationEl.classList.add('hide');
                 setTimeout(() => {
-                    if (notificationEl.parentNode) {
+                    if (notificationEl && notificationEl.parentNode) {
                         notificationEl.remove();
                     }
                 }, 300);
             }
+            window.hideNotification = hideNotification;
+            window.closeNotification = function(btn) {
+                if (!btn) return;
+                const el = btn.closest ? btn.closest('.notification') : btn;
+                if (el) hideNotification(el);
+            };
 
             // Función para marcar notificación(es) como leída(s) (acepta array de IDs o ID individual)
             async function markAsRead(notificationIds) {

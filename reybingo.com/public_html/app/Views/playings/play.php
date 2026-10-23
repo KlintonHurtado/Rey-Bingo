@@ -612,8 +612,13 @@
                                         }
                                     ?>
                                     <?php foreach ($games as $index => $game): ?>
+                                        <?php
+                                            $hasCustomCover = !empty($game['cover']) && $game['cover'] !== 'image.jpg';
+                                            $cardBgClass = $hasCustomCover ? 'card-has-cover' : getCardColor($index);
+                                            $cardStyle = $hasCustomCover ? 'style="background-image: url(\'' . esc(site_url('uploads/covers/' . $game['cover']), 'attr') . '\');"' : '';
+                                        ?>
                                         <div class="play-room-slide">
-                                        <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
+                                        <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>" <?= $cardStyle ?> data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                             <div class="text-end p-1 pb-0">
                                                 <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">&#9734;</button>

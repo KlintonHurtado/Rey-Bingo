@@ -151,6 +151,7 @@ class Spectator extends Controller
                                      ->where('status', 1)
                                      ->first();
                 $modality['amount'] = $award['amount'] ?? 0;
+                $modality['image'] = !empty($award['image']) ? $award['image'] : ($modality['image'] ?? null);
             }
         }
 

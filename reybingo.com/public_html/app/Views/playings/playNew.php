@@ -78,7 +78,12 @@
                             }
                         ?>
                         <?php foreach ($games as $index => $game): ?>
-                            <div class="card <?= getCardColor($index) ?> text-center card-game-<?= $game['id'] ?>">
+                            <?php
+                                $hasCustomCover = !empty($game['cover']) && $game['cover'] !== 'image.jpg';
+                                $cardBgClass = $hasCustomCover ? 'card-has-cover' : getCardColor($index);
+                                $cardStyle = $hasCustomCover ? 'style="background-image: url(\'' . esc(site_url('uploads/covers/' . $game['cover']), 'attr') . '\');"' : '';
+                            ?>
+                            <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>" <?= $cardStyle ?>>
                                 <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                 <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
                                 <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">

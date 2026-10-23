@@ -3683,110 +3683,108 @@ class Users extends Controller {
         }
         $notifications = $uniqueNotifications;
 
-        // ── AGRUPACIÓN CANÓNICA DE GANADORES PARA ADMIN/OPERADOR ──────────────────────────────
-        // Cuando hay múltiples sing pendientes del mismo juego para un admin/operador,
-        // los agrupamos en UNA SOLA notificación por modalidad y la enriquecemos con la
-        // lista completa de ganadores del servidor. Así el admin siempre ve la lista completa,
-        // nunca parcial.
-        if ($isAdmin || $isOperatorOrStore) {
-            helper('bingo');
-            $singNotifs = [];
-            $nonSingNotifs = [];
-            foreach ($notifications as $n) {
-                if (($n['type'] ?? '') === 'sing') {
-                    $singNotifs[] = $n;
-                } else {
-                    $nonSingNotifs[] = $n;
+        // ── AGRUPACIÓN CANÓNICA DE GANADORES PARA TODOS LOS DISPOSITIVOS Y USUARIOS ──────────────────────────────
+        // Cuando hay sing pendientes del mismo juego, los agrupamos en UNA SOLA notificación por modalidad
+        // y la enriquecemos con la lista canónica completa de ganadores del servidor.
+        // Así el teléfono y la compu siempre reciben exactamente la misma lista completa de ganadores.
+        helper('bingo');
+        $singNotifs = [];
+        $nonSingNotifs = [];
+        foreach ($notifications as $n) {
+            if (($n['type'] ?? '') === 'sing') {
+                $singNotifs[] = $n;
+            } else {
+                $nonSingNotifs[] = $n;
+            }
+        }
+
+        if (!empty($singNotifs)) {
+            // Agrupar por (game, modality) y reemplazar con lista canónica
+            $singsByGameModality = [];
+            $singIdsToMarkRead = [];
+            foreach ($singNotifs as $sn) {
+                $gId = (int) ($sn['game'] ?? 0);
+                $mId = (int) ($sn['modality'] ?? 0);
+                $groupKey = $gId . '_' . $mId;
+                if (!isset($singsByGameModality[$groupKey])) {
+                    $singsByGameModality[$groupKey] = [
+                        'representative' => $sn, // primera notificación del grupo (la más reciente)
+                        'gameId'         => $gId,
+                        'modalityId'     => $mId,
+                        'ids'            => [],
+                    ];
                 }
+                $singsByGameModality[$groupKey]['ids'][] = (int) $sn['id'];
             }
 
-            if (!empty($singNotifs)) {
-                // Agrupar por (game, modality) y reemplazar con lista canónica
-                $singsByGameModality = [];
-                $singIdsToMarkRead = [];
-                foreach ($singNotifs as $sn) {
-                    $gId = (int) ($sn['game'] ?? 0);
-                    $mId = (int) ($sn['modality'] ?? 0);
-                    $groupKey = $gId . '_' . $mId;
-                    if (!isset($singsByGameModality[$groupKey])) {
-                        $singsByGameModality[$groupKey] = [
-                            'representative' => $sn, // primera notificación del grupo (la más reciente)
-                            'gameId'         => $gId,
-                            'modalityId'     => $mId,
-                            'ids'            => [],
-                        ];
-                    }
-                    $singsByGameModality[$groupKey]['ids'][] = (int) $sn['id'];
-                }
+            $groupedSings = [];
+            foreach ($singsByGameModality as $groupKey => $group) {
+                $gId = $group['gameId'];
+                $mId = $group['modalityId'];
+                $rep = $group['representative'];
 
-                $groupedSings = [];
-                foreach ($singsByGameModality as $groupKey => $group) {
-                    $gId = $group['gameId'];
-                    $mId = $group['modalityId'];
-                    $rep = $group['representative'];
-
-                    // Obtener lista canónica enriquecida para este juego
-                    $enrichedWinners = [];
-                    if ($gId > 0 && function_exists('bingo_get_enriched_winners_for_broadcast')) {
-                        try {
-                            $allEnriched = bingo_get_enriched_winners_for_broadcast($gId, true);
-                            // Filtrar solo los ganadores de esta modalidad (si mId > 0)
-                            if ($mId > 0) {
-                                $enrichedWinners = array_values(array_filter($allEnriched, fn($w) => (int)($w['modalityId'] ?? 0) === $mId));
-                            } else {
-                                $enrichedWinners = $allEnriched;
-                            }
-                        } catch (\Throwable $e) {
-                            log_message('error', 'Admin sing grouping enrichment error: ' . $e->getMessage());
-                        }
-                    }
-
-                    // Construir mensaje agrupado con todos los ganadores
-                    $modalityClean = $rep['modality'] ?? '';
-                    if ($modalityClean === '' || is_numeric($modalityClean)) {
-                        if (!empty($enrichedWinners)) {
-                            $modalityClean = $enrichedWinners[0]['modalityName'] ?? 'Bingo';
+                // Obtener lista canónica enriquecida para este juego
+                $enrichedWinners = [];
+                if ($gId > 0 && function_exists('bingo_get_enriched_winners_for_broadcast')) {
+                    try {
+                        $allEnriched = bingo_get_enriched_winners_for_broadcast($gId, true);
+                        // Filtrar solo los ganadores de esta modalidad (si mId > 0)
+                        if ($mId > 0) {
+                            $enrichedWinners = array_values(array_filter($allEnriched, fn($w) => (int)($w['modalityId'] ?? 0) === $mId));
                         } else {
-                            $modalityClean = 'Bingo';
+                            $enrichedWinners = $allEnriched;
                         }
+                    } catch (\Throwable $e) {
+                        log_message('error', 'Sing grouping enrichment error: ' . $e->getMessage());
                     }
-                    $modalityClean = trim(preg_replace('/^la\s+/i', '', $modalityClean));
-                    $modalityLabel = preg_match('/^(bingo|pleno)/i', $modalityClean)
-                        ? "Ganadores de la modalidad {$modalityClean}"
-                        : "Ganadores de la {$modalityClean}";
-
-                    $playerNames = [];
-                    foreach ($enrichedWinners as $w) {
-                        $wName = $w['userName'] ?? $w['player'] ?? '';
-                        if ($wName !== '' && !in_array($wName, $playerNames, true)) {
-                            $playerNames[] = $wName;
-                        }
-                    }
-                    $groupedMessage = $modalityLabel . ': ' . implode(' + ', $playerNames ?: ['Jugador']);
-                    $firstPlayer = $playerNames[0] ?? ($rep['player'] ?? 'Jugador');
-
-                    // Marcar todos los sing del grupo como leídos excepto el representativo
-                    $idsToClose = array_filter($group['ids'], fn($id) => $id !== (int)$rep['id']);
-                    if (!empty($idsToClose)) {
-                        $modelNotifications->whereIn('id', array_values($idsToClose))->set(['status' => 1])->update();
-                    }
-
-                    // Construir la notificación agrupada
-                    $groupedSing = $rep;
-                    $groupedSing['title']          = '🎉 ¡BINGO CANTADO!';
-                    $groupedSing['message']        = $groupedMessage;
-                    $groupedSing['modalityId']     = $mId;
-                    $groupedSing['modality']       = $modalityClean;
-                    $groupedSing['modalityName']   = $modalityClean;
-                    $groupedSing['player']         = $firstPlayer;
-                    $groupedSing['userName']       = $firstPlayer;
-                    $groupedSing['officialWinners'] = $enrichedWinners;
-                    $groupedSings[] = $groupedSing;
                 }
 
-                // Combinar: sings agrupados primero (más urgentes), luego el resto
-                $notifications = array_merge($groupedSings, $nonSingNotifs);
+                // Construir mensaje agrupado con todos los ganadores
+                $modalityClean = $rep['modality'] ?? '';
+                if ($modalityClean === '' || is_numeric($modalityClean)) {
+                    if (!empty($enrichedWinners)) {
+                        $modalityClean = $enrichedWinners[0]['modalityName'] ?? 'Bingo';
+                    } else {
+                        $modalityClean = 'Bingo';
+                    }
+                }
+                $modalityClean = trim(preg_replace('/^la\s+/i', '', $modalityClean));
+                $modalityLabel = preg_match('/^(bingo|pleno)/i', $modalityClean)
+                    ? "Ganadores de la modalidad {$modalityClean}"
+                    : "Ganadores de la {$modalityClean}";
+
+                $playerNames = [];
+                foreach ($enrichedWinners as $w) {
+                    $wName = $w['userName'] ?? $w['player'] ?? '';
+                    if ($wName !== '' && !in_array($wName, $playerNames, true)) {
+                        $playerNames[] = $wName;
+                    }
+                }
+                $groupedMessage = $modalityLabel . ': ' . implode(' + ', $playerNames ?: ['Jugador']);
+                $firstPlayer = $playerNames[0] ?? ($rep['player'] ?? 'Jugador');
+
+                // Marcar todos los sing del grupo como leídos excepto el representativo
+                $idsToClose = array_filter($group['ids'], fn($id) => $id !== (int)$rep['id']);
+                if (!empty($idsToClose)) {
+                    $modelNotifications->whereIn('id', array_values($idsToClose))->set(['status' => 1])->update();
+                }
+
+                // Construir la notificación agrupada
+                $groupedSing = $rep;
+                $groupedSing['title']          = '🎉 ¡BINGO CANTADO!';
+                $groupedSing['message']        = $groupedMessage;
+                $groupedSing['modalityId']     = $mId;
+                $groupedSing['modality']       = $modalityClean;
+                $groupedSing['modalityName']   = $modalityClean;
+                $groupedSing['player']         = $firstPlayer;
+                $groupedSing['userName']       = $firstPlayer;
+                $groupedSing['officialWinners'] = $enrichedWinners;
+                $groupedSing['winners']         = $enrichedWinners;
+                $groupedSings[] = $groupedSing;
             }
+
+            // Combinar: sings agrupados primero (más urgentes), luego el resto
+            $notifications = array_merge($groupedSings, $nonSingNotifs);
         }
         // ── FIN AGRUPACIÓN CANÓNICA ───────────────────────────────────────────────────────────
 
@@ -3934,6 +3932,7 @@ class Users extends Controller {
                     'prize_lines'    => $prizeDisplay['prize_lines'] ?? [],
                     'prize_html'     => (string) ($prizeDisplay['prize_html'] ?? ''),
                     'color'          => $this->getCardColor($index),
+                    'cover'          => (!empty($game['cover']) && $game['cover'] !== 'image.jpg') ? $game['cover'] : null,
                     'label'          => $game['description'] . ' · ' . systemGet('currency') . ' ' . $game['price'] . ' · ' . translate_day($game['date'] . ' ' . $game['time'])
                 ];
             }

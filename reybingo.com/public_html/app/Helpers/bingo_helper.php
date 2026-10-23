@@ -205,6 +205,27 @@ if (!function_exists('bingo_broadcast_sing_accepted')) {
         }
 
         try {
+            // Asegurar que officialWinners y winners siempre estén presentes en el payload
+            if (empty($payload['officialWinners']) && empty($payload['winners'])) {
+                if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
+                    $enriched = bingo_get_enriched_winners_for_broadcast($gameId, true);
+                    if (!empty($enriched)) {
+                        $payload['officialWinners'] = $enriched;
+                        $payload['winners'] = $enriched;
+                    }
+                } elseif (function_exists('bingo_get_official_sings_for_game')) {
+                    $official = bingo_get_official_sings_for_game($gameId, true);
+                    if (!empty($official)) {
+                        $payload['officialWinners'] = $official;
+                        $payload['winners'] = $official;
+                    }
+                }
+            } elseif (empty($payload['officialWinners']) && !empty($payload['winners'])) {
+                $payload['officialWinners'] = $payload['winners'];
+            } elseif (!empty($payload['officialWinners']) && empty($payload['winners'])) {
+                $payload['winners'] = $payload['officialWinners'];
+            }
+
             $client   = bingo_get_broadcast_client();
             $channels = [
                 'private-game-' . $gameId,
@@ -837,6 +858,7 @@ if (!function_exists('bingo_process_ball_cycle')) {
                     'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompletedCheck,
                     'winners'       => $officialWinnersList,
+                    'officialWinners' => $officialWinnersList,
                 ]);
 
                 bingo_notify_sing_to_all_players($gameId, [
@@ -1155,6 +1177,10 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                 $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : ('Jugador #' . $userId);
                 $imagePath = !empty($userSing['image']) ? site_url('uploads/users/' . $userSing['image']) : site_url('assets/img/avatar.jpg');
 
+                $officialWinnersMissing = function_exists('bingo_get_enriched_winners_for_broadcast')
+                    ? (bingo_get_enriched_winners_for_broadcast($gameId, true) ?: [])
+                    : (function_exists('bingo_get_official_sings_for_game') ? (bingo_get_official_sings_for_game($gameId, true) ?: []) : []);
+
                 bingo_broadcast_sing_accepted($gameId, [
                     'singId'        => $singId,
                     'userId'        => $userId,
@@ -1170,6 +1196,8 @@ if (!function_exists('bingo_register_sing_if_missing')) {
                     'image'         => $imagePath,
                     'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompleted,
+                    'winners'       => $officialWinnersMissing,
+                    'officialWinners' => $officialWinnersMissing,
                 ]);
 
                 // Finalizar la partida y liquidar premios en BD
@@ -1284,6 +1312,26 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 $staffIds[$currentSessionId] = true;
             }
 
+            // Obtener la lista completa y ENRIQUECIDA de ganadores del juego hasta este momento.
+            // Se usa bingo_get_enriched_winners_for_broadcast (en lugar del raw get_official_sings)
+            // porque ya incluye los campos que el cliente necesita: userName, modalityName, modalityId,
+            // cartonId. Así todos los dispositivos pueden reconstruir la notificación completa con un
+            // solo evento, sin necesidad de haber recibido todos los eventos anteriores.
+            $officialWinners = [];
+            if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
+                try {
+                    $officialWinners = bingo_get_enriched_winners_for_broadcast($gameId, true) ?: [];
+                } catch (\Throwable $we) {
+                    log_message('error', 'Error fetching enriched officialWinners for broadcast: ' . $we->getMessage());
+                }
+            } elseif (function_exists('bingo_get_official_sings_for_game')) {
+                try {
+                    $officialWinners = bingo_get_official_sings_for_game($gameId, true) ?: [];
+                } catch (\Throwable $we) {
+                    log_message('error', 'Error fetching officialWinners for broadcast: ' . $we->getMessage());
+                }
+            }
+
             $modalityClean = trim(preg_replace('/^la\s+/i', '', (string) $modalityName));
             if ($modalityClean === '') {
                 $modalityClean = 'Bingo';
@@ -1292,7 +1340,25 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                 ? "Ganadores de la modalidad {$modalityClean}"
                 : "Ganadores de la {$modalityClean}";
             $unifiedSingTitle = '🎉 ¡BINGO CANTADO!';
-            $unifiedSingMessage = "{$modalityLabel}: {$userName}";
+
+            // Consolidar todos los ganadores de esta modalidad para el mensaje
+            $modWinnersNames = [];
+            foreach ($officialWinners as $w) {
+                $wModId = (int) ($w['modalityId'] ?? $w['modality_id'] ?? 0);
+                if ($modalityId === 0 || $wModId === 0 || $wModId === $modalityId) {
+                    $wName = trim($w['userName'] ?? $w['player'] ?? '');
+                    if ($wName !== '' && !in_array($wName, $modWinnersNames, true)) {
+                        $modWinnersNames[] = $wName;
+                    }
+                }
+            }
+            if ($userName !== '' && !in_array($userName, $modWinnersNames, true)) {
+                $modWinnersNames[] = $userName;
+            }
+            if (empty($modWinnersNames)) {
+                $modWinnersNames = ['Jugador'];
+            }
+            $unifiedSingMessage = "{$modalityLabel}: " . implode(' + ', $modWinnersNames);
 
             foreach (array_keys($staffIds) as $staffId) {
                 if ($staffId > 0 && $staffId !== $winnerUserId && !isset($alreadyNotified[$staffId])) {
@@ -1310,20 +1376,6 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                         'created_at' => $now,
                     ];
                     $alreadyNotified[$staffId] = true;
-                }
-            }
-
-            // Obtener la lista completa y ENRIQUECIDA de ganadores del juego hasta este momento.
-            // Se usa bingo_get_enriched_winners_for_broadcast (en lugar del raw get_official_sings)
-            // porque ya incluye los campos que el cliente necesita: userName, modalityName, modalityId,
-            // cartonId. Así todos los dispositivos pueden reconstruir la notificación completa con un
-            // solo evento, sin necesidad de haber recibido todos los eventos anteriores.
-            $officialWinners = [];
-            if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
-                try {
-                    $officialWinners = bingo_get_enriched_winners_for_broadcast($gameId, true) ?: [];
-                } catch (\Throwable $we) {
-                    log_message('error', 'Error fetching enriched officialWinners for broadcast: ' . $we->getMessage());
                 }
             }
 
@@ -1351,7 +1403,8 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                             'winnerUserId'   => $winnerUserId,
                             'created_at'     => $now,
                             // Lista canónica de ganadores para sincronización entre dispositivos
-                            'officialWinners' => $officialWinners ?? [],
+                            'officialWinners' => $officialWinners,
+                            'winners'         => $officialWinners,
                         ]);
                     }
                 }
@@ -1382,6 +1435,7 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                     // Lista canónica de todos los ganadores del juego hasta este instante.
                     // Permite que el cliente reconstruya la UI completa con un solo evento.
                     'officialWinners' => $officialWinners,
+                    'winners'         => $officialWinners,
                 ];
                 $client->trigger($gameChannel, 'game:notification', $gamePayload);
                 $client->trigger($gameChannel, 'notification:new', $gamePayload);

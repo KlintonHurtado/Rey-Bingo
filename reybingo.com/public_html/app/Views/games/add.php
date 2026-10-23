@@ -83,16 +83,16 @@
                             
                             <div class="cover position-relative d-inline-block">
                                 <!-- Imagen -->
-                                <img id="coverImage" src="<?= site_url('uploads/covers/image.jpg'); ?>" alt="cover" class="img-fluid img-thumbnail mx-auto d-block">
+                                <img id="coverImage" src="<?= esc($cover) ?>" alt="cover" class="img-fluid img-thumbnail mx-auto d-block">
 
                                 <!-- Botón Editar -->
                                 <label for="coverfileInput" class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2 img-button"><i class="fa-duotone fa-solid fa-plus"></i></label>
                                 <input type="file" id="coverfileInput" accept="image/*" class="d-none" onchange="previewcoverImage(event)">
 
-                                <!-- Botón Eliminar (oculto si no hay imagen) -->
-                                <button type="button" id="removeCoverBtn" class="btn btn-sm btn-primary position-absolute bottom-0 end-0 m-2 img-button d-none" onclick="removeCoverImage()"><i class="fa-duotone fa-trash"></i></button>
+                                <!-- Botón Eliminar (oculto si no hay imagen personalizada) -->
+                                <button type="button" id="removeCoverBtn" class="btn btn-sm btn-danger position-absolute bottom-0 end-0 m-2 img-button <?= !empty($hasCover) ? '' : 'd-none' ?>" onclick="removeCoverImage()"><i class="fa-duotone fa-trash"></i></button>
 
-                                <input type="hidden" id="cover_image_input" name="cover" value="<?= esc($cover) ?>">
+                                <input type="hidden" id="cover_image_input" name="cover" value="<?= !empty($hasCover) ? esc($gameData['cover'] ?? '') : '' ?>">
                             </div>
                         </div>
                     </div>
@@ -202,19 +202,27 @@
 
         const tbody = document.querySelector("#modalityTable tbody");
         const tr = document.createElement('tr');
+        const img = rowData.image || '';
+
+        let thumbHtml = '';
+        if (img && img !== 'REMOVE') {
+            let src = img.startsWith('data:') ? img : ('<?= site_url('uploads/modalities/') ?>' + img);
+            thumbHtml = `<img src="${src}" style="width: 26px; height: 26px; object-fit: cover; border-radius: 4px; vertical-align: middle;" class="me-1 border">`;
+        }
 
         tr.innerHTML = `
             <td>
-                ${rowData.modality_name}
+                ${thumbHtml}${rowData.modality_name}
                 <select class='hidden' name="modality[]">
                     <option value="${rowData.modality_id}" selected>${rowData.modality_name}</option>
                 </select>
+                <input type="hidden" name="modality_image[]" value="${img.replace(/"/g, '&quot;')}">
                 ${isExisting ? `<input type="hidden" name="award_id[]" value="${rowData.award_id}">` : ''}
             </td>
             <td>
                 ${parseFloat(rowData.amount).toFixed(2)} ${symbol}
                 <input type="hidden" name="amount[]" value="${parseFloat(rowData.amount).toFixed(2)}">
-                <input type="hidden" name="observation[]" value="${(rowData.observation || '').replace(/"/g, '"')}">
+                <input type="hidden" name="observation[]" value="${(rowData.observation || '').replace(/"/g, '&quot;')}">
             </td>
             <td>
                 <div class="btn-group" role="group">
@@ -228,6 +236,7 @@
         tr.dataset.modalityName = rowData.modality_name;
         tr.dataset.amount = parseFloat(rowData.amount).toFixed(2);
         tr.dataset.observation = rowData.observation || '';
+        tr.dataset.image = img;
         if (isExisting) tr.dataset.awardId = rowData.award_id;
 
         tbody.appendChild(tr);
@@ -241,6 +250,7 @@
         const modalityId = row.dataset.modalityId;
         const amount = row.dataset.amount;
         const observation = row.dataset.observation || '';
+        const image = row.dataset.image || '';
 
         // Cargar modal de modalidades
         modalityAdd(() => {
@@ -254,6 +264,10 @@
                 if (amountInput) amountInput.value = amount;
                 if (observationInput) observationInput.value = observation;
                 
+                if (window.ModalityManager && window.ModalityManager.setImage) {
+                    window.ModalityManager.setImage(image);
+                }
+
                 // Actualizar opciones disponibles
                 if (window.ModalityManager && window.ModalityManager.updateSelectOptions) {
                     window.ModalityManager.updateSelectOptions();
@@ -299,30 +313,57 @@
     }
 
     function previewcoverImage(event) {
-        const reader = new FileReader();
-        reader.onload = function() {
-            const output = document.getElementById('coverImage');
-            output.src = reader.result;
-            document.getElementById('cover_image_input').value = reader.result;
+        const file = event.target.files[0];
+        if (!file) return;
 
-            // Mostrar botón eliminar
-            document.getElementById('removeCoverBtn').classList.remove('d-none');
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const maxDim = 1200;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+                const output = document.getElementById('coverImage');
+                output.src = compressedDataUrl;
+                document.getElementById('cover_image_input').value = compressedDataUrl;
+
+                // Mostrar botón eliminar
+                document.getElementById('removeCoverBtn').classList.remove('d-none');
+            };
+            img.src = e.target.result;
         };
-        reader.readAsDataURL(event.target.files[0]);
+        reader.readAsDataURL(file);
     }
 
     function removeCoverImage() {
         document.getElementById('coverImage').src = "<?= site_url('uploads/covers/image.jpg'); ?>";
-        document.getElementById('cover_image_input').value = ""; 
+        document.getElementById('cover_image_input').value = "REMOVE"; 
         document.getElementById('coverfileInput').value = "";  
 
         // Ocultar botón eliminar
         document.getElementById('removeCoverBtn').classList.add('d-none');
     }
 
-    // Al cargar si ya hay imagen, mostrar botón eliminar
+    // Al cargar si ya hay imagen personalizada, mostrar botón eliminar
     window.addEventListener("DOMContentLoaded", () => {
-        if (document.getElementById('coverImage').src) {
+        const coverInput = document.getElementById('cover_image_input');
+        if (coverInput && coverInput.value && coverInput.value !== 'image.jpg' && !coverInput.value.includes('uploads/covers/image.jpg')) {
             document.getElementById('removeCoverBtn').classList.remove('d-none');
         }
     });
@@ -554,7 +595,8 @@
                         modality_id: a.modality,
                         modality_name: a.modality_name, 
                         amount: a.amount,
-                        observation: a.observation
+                        observation: a.observation,
+                        image: a.image || ''
                     }, true);
                 });
             }

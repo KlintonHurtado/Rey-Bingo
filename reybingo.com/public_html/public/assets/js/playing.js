@@ -1472,7 +1472,8 @@ function handleBingoSuccess(data, resumeCallback) {
             cartonId: data.carton,
             title: '🎉 ¡BINGO CANTADO!',
             message: `${modalityLabel}: ${pName}`,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : (Array.isArray(data.winners) ? data.winners : undefined)
         });
     }
 
@@ -2501,7 +2502,8 @@ function showOtherPlayerBingoNotice(data, callback) {
             cartonId: data.cartonId,
             title: '🎉 ¡BINGO CANTADO!',
             message: `${modalityLabel}: ${data.player}`,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : (Array.isArray(data.winners) ? data.winners : undefined)
         });
     }
 
@@ -2609,7 +2611,9 @@ function processNumberGetResponse(data) {
                     modality: lw.modality || lw.modalityName,
                     modalityId: lw.modalityId || lw.modality,
                     cartonId: lw.cartonId || lw.carton,
-                    image: lw.image || site_url + 'assets/img/avatar.jpg'
+                    image: lw.image || site_url + 'assets/img/avatar.jpg',
+                    winners: data.winners,
+                    officialWinners: data.winners
                 });
             }
         }
@@ -4462,7 +4466,8 @@ function initializeApp() {
                                 cartonId: data.cartonId,
                                 title: '🎉 ¡BINGO CANTADO!',
                                 message: `Ganadores de la modalidad ${modClean}: ${data.player || 'Tú'}`,
-                                created_at: new Date().toISOString()
+                                created_at: new Date().toISOString(),
+                                officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : (Array.isArray(data.winners) ? data.winners : undefined)
                             });
                         }
 
@@ -4543,7 +4548,9 @@ function initializeApp() {
                             modalityName: lw.modalityName || lw.modality,
                             modalityId: lw.modalityId || lw.modality,
                             cartonId: lw.cartonId || lw.carton,
-                            image: lw.image || site_url + 'assets/img/avatar.jpg'
+                            image: lw.image || site_url + 'assets/img/avatar.jpg',
+                            winners: data.winners,
+                            officialWinners: data.winners
                         });
                     }
                 }

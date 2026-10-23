@@ -62,6 +62,7 @@ class Playings extends Controller
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
 
             $modality['amount'] = $award['amount'] ?? 0;
+            $modality['image'] = !empty($award['image']) ? $award['image'] : ($modality['image'] ?? null);
         }
 
         $selectedNumbers = $modelBoards->where('game', $game['id'])->where('status', 1)->findAll();
@@ -1183,6 +1184,7 @@ class Playings extends Controller
             $award = $modelAwards->where('game', $game['id'])->where('modality', $modality['id'])->where('status', 1)->first();
 
             $modality['amount'] = $award['amount'] ?? 0;
+            $modality['image'] = !empty($award['image']) ? $award['image'] : ($modality['image'] ?? null);
         }
 
         $user = $modelUsers->find(session()->get('id'));
@@ -2753,6 +2755,10 @@ class Playings extends Controller
                 $modName = translate($modalitySing['name'] ?? '');
                 $playerName = trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? ''));
 
+                $officialWinnersList = function_exists('bingo_get_enriched_winners_for_broadcast')
+                    ? (bingo_get_enriched_winners_for_broadcast((int) $game['id'], true) ?: [])
+                    : $this->getWinnersForGame((int) $game['id'], true);
+
                 bingo_broadcast_sing_accepted((int) $game['id'], [
                     'singId'        => $singId,
                     'userId'        => $currentUserId,
@@ -2768,6 +2774,8 @@ class Playings extends Controller
                     'image'         => $imagePath,
                     'isOwnBingo'    => false,
                     'gameCompleted' => $gameCompleted,
+                    'winners'       => $officialWinnersList,
+                    'officialWinners' => $officialWinnersList,
                 ]);
 
                 bingo_notify_sing_to_all_players((int) $game['id'], [
@@ -2791,6 +2799,7 @@ class Playings extends Controller
             }
 
             $primary = $singsPayload[0];
+            $currentWinners = $this->getWinnersForGame((int) $game['id'], true);
 
             return $this->response->setJSON([
                 'status' => 'success',
@@ -2802,7 +2811,8 @@ class Playings extends Controller
                 'image' => $primary['image'],
                 'sings' => $singsPayload,
                 'gameCompleted' => $gameCompleted,
-                'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                'winners' => $currentWinners,
+                'officialWinners' => $currentWinners,
                 'isOwnBingo' => true,
                 'winnerUserId' => $currentUserId,
                 'gameHasWinner' => true,

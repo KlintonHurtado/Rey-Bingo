@@ -139,9 +139,11 @@ class Games extends Controller {
 
             $game = $data['gameData'];
 
-            $data['cover'] = !empty($game['cover']) ? site_url('uploads/covers/' . $game['cover']) : site_url('uploads/covers/image.jpg');
+            $hasCustomCover = !empty($game['cover']) && $game['cover'] !== 'image.jpg';
+            $data['cover'] = $hasCustomCover ? site_url('uploads/covers/' . $game['cover']) : site_url('uploads/covers/image.jpg');
+            $data['hasCover'] = $hasCustomCover;
 
-            $data['awards'] = $modelAwards->select('awards.id, awards.modality, awards.amount, awards.observation, modalities.name as modality_name')->join('modalities', 'modalities.id = awards.modality', 'left')->where('awards.game', $gameId)->findAll();
+            $data['awards'] = $modelAwards->select('awards.id, awards.modality, awards.amount, awards.observation, awards.image, modalities.name as modality_name')->join('modalities', 'modalities.id = awards.modality', 'left')->where('awards.game', $gameId)->findAll();
 
             foreach ($data['awards'] as &$aw) {
                 $aw['modality_name'] = translate($aw['modality_name']);
@@ -154,6 +156,7 @@ class Games extends Controller {
             $data['awards']   = [];
             $data['isUpdate'] = false;
             $data['cover']    = site_url('uploads/covers/image.jpg');
+            $data['hasCover'] = false;
         }
 
         return view('games/add', $data);
@@ -3057,25 +3060,48 @@ class Games extends Controller {
         }
 
         $coverImage = $this->request->getPost('cover');
-        if ($coverImage) {
+        if (!empty($coverImage)) {
             // Si llega base64 => nueva imagen
             if (strpos($coverImage, 'data:image') === 0) {
                 $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $coverImage));
-                $fileName  = uniqid() . '.png';  
+                $ext = 'png';
+                if (strpos($coverImage, 'data:image/jpeg') === 0 || strpos($coverImage, 'data:image/jpg') === 0) $ext = 'jpg';
+                elseif (strpos($coverImage, 'data:image/webp') === 0) $ext = 'webp';
+
+                $fileName  = uniqid('cover_') . '.' . $ext;  
                 $uploadPath = FCPATH . 'uploads/covers/';
                 if (!is_dir($uploadPath)) {
                     mkdir($uploadPath, 0755, true); 
                 }
                 file_put_contents($uploadPath . $fileName, $imageData);
                 $gameData['cover'] = $fileName;
+            } elseif ($coverImage === 'REMOVE') {
+                $gameData['cover'] = null;
+            } else {
+                $base = basename($coverImage);
+                if (!empty($base) && $base !== 'image.jpg') {
+                    $gameData['cover'] = $base;
+                }
             }
         } else {
-            // Si se eliminó la imagen → dejar null
+            // Si se eliminó la imagen o viene vacía en update
             $gameData['cover'] = null;
+        }
+
+        $coverFile = $this->request->getFile('cover_file');
+        if ($coverFile && $coverFile->isValid() && !$coverFile->hasMoved()) {
+            $newName = $coverFile->getRandomName();
+            $uploadPath = FCPATH . 'uploads/covers/';
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            $coverFile->move($uploadPath, $newName);
+            $gameData['cover'] = $newName;
         }
 
         $action = $this->request->getPost('game-action');
         $gameId = $this->request->getPost('game-id');
+        $modalityImages = $this->request->getPost('modality_image');
 
         if ($action === 'update' && $gameId) {
             $model->update($gameId, $gameData);
@@ -3086,30 +3112,51 @@ class Games extends Controller {
 
             $finalAwards = [];
             foreach ($modalities as $i => $modalityId) {
+                $rawImg = is_array($modalityImages) && array_key_exists($i, $modalityImages) ? trim($modalityImages[$i]) : '';
+                $savedImg = null;
+                if (!empty($rawImg)) {
+                    if (strpos($rawImg, 'data:image') === 0) {
+                        $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $rawImg));
+                        $ext = 'png';
+                        if (strpos($rawImg, 'data:image/jpeg') === 0 || strpos($rawImg, 'data:image/jpg') === 0) $ext = 'jpg';
+                        elseif (strpos($rawImg, 'data:image/webp') === 0) $ext = 'webp';
+                        $fn = uniqid('mod_') . '.' . $ext;
+                        $uPath = FCPATH . 'uploads/modalities/';
+                        if (!is_dir($uPath)) mkdir($uPath, 0755, true);
+                        file_put_contents($uPath . $fn, $imgData);
+                        $savedImg = $fn;
+                    } elseif ($rawImg === 'REMOVE') {
+                        $savedImg = null;
+                    } else {
+                        $savedImg = basename($rawImg);
+                    }
+                }
+
                 $finalAwards[] = [
                     'award_id'    => is_array($awardIds ?? null) && array_key_exists($i, $awardIds) ? $awardIds[$i] : null,
                     'modality'    => $modalityId,
                     'amount'      => $amounts[$i],
-                    'observation' => $observations[$i]
+                    'observation' => $observations[$i],
+                    'image'       => $savedImg
                 ];
             }
 
             foreach ($finalAwards as $aw) {
+                $awardData = [
+                    'modality'    => $aw['modality'],
+                    'amount'      => $aw['amount'],
+                    'observation' => $aw['observation'],
+                    'status'      => 1
+                ];
+                if ($aw['image'] !== null) {
+                    $awardData['image'] = $aw['image'];
+                }
+
                 if (!empty($aw['award_id'])) {
-                    $awardModel->update($aw['award_id'], [
-                        'modality'    => $aw['modality'],
-                        'amount'      => $aw['amount'],
-                        'observation' => $aw['observation'],
-                        'status'      => 1
-                    ]);
+                    $awardModel->update($aw['award_id'], $awardData);
                 } else {
-                    $awardModel->insert([
-                        'game'        => $gameId,
-                        'modality'    => $aw['modality'],
-                        'amount'      => $aw['amount'],
-                        'observation' => $aw['observation'],
-                        'status'      => 1
-                    ]);
+                    $awardData['game'] = $gameId;
+                    $awardModel->insert($awardData);
                 }
             }
         } else {
@@ -3124,12 +3171,33 @@ class Games extends Controller {
             $gameId = $model->getInsertID();
 
             foreach ($modalities as $index => $modalityId) {
+                $rawImg = is_array($modalityImages) && array_key_exists($index, $modalityImages) ? trim($modalityImages[$index]) : '';
+                $savedImg = null;
+                if (!empty($rawImg)) {
+                    if (strpos($rawImg, 'data:image') === 0) {
+                        $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $rawImg));
+                        $ext = 'png';
+                        if (strpos($rawImg, 'data:image/jpeg') === 0 || strpos($rawImg, 'data:image/jpg') === 0) $ext = 'jpg';
+                        elseif (strpos($rawImg, 'data:image/webp') === 0) $ext = 'webp';
+                        $fn = uniqid('mod_') . '.' . $ext;
+                        $uPath = FCPATH . 'uploads/modalities/';
+                        if (!is_dir($uPath)) mkdir($uPath, 0755, true);
+                        file_put_contents($uPath . $fn, $imgData);
+                        $savedImg = $fn;
+                    } elseif ($rawImg === 'REMOVE') {
+                        $savedImg = null;
+                    } else {
+                        $savedImg = basename($rawImg);
+                    }
+                }
+
                 $awardData = [
-                    'game' => $gameId,          
-                    'modality' => $modalityId,  
+                    'game'        => $gameId,          
+                    'modality'    => $modalityId,  
                     'observation' => $observations[$index], 
-                    'amount' => $amounts[$index],  
-                    'status' => 1
+                    'amount'      => $amounts[$index],
+                    'image'       => $savedImg,
+                    'status'      => 1
                 ];
 
                 $awardModel->insert($awardData);
@@ -3535,25 +3603,48 @@ class Games extends Controller {
         }
 
         $coverImage = $this->request->getPost('cover');
-        if ($coverImage) {
+        if (!empty($coverImage)) {
             // Si llega base64 => nueva imagen
             if (strpos($coverImage, 'data:image') === 0) {
                 $imageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $coverImage));
-                $fileName  = uniqid() . '.png';  
+                $ext = 'png';
+                if (strpos($coverImage, 'data:image/jpeg') === 0 || strpos($coverImage, 'data:image/jpg') === 0) $ext = 'jpg';
+                elseif (strpos($coverImage, 'data:image/webp') === 0) $ext = 'webp';
+
+                $fileName  = uniqid('cover_') . '.' . $ext;  
                 $uploadPath = FCPATH . 'uploads/covers/';
                 if (!is_dir($uploadPath)) {
                     mkdir($uploadPath, 0755, true); 
                 }
                 file_put_contents($uploadPath . $fileName, $imageData);
                 $gameData['cover'] = $fileName;
+            } elseif ($coverImage === 'REMOVE') {
+                $gameData['cover'] = null;
+            } else {
+                $base = basename($coverImage);
+                if (!empty($base) && $base !== 'image.jpg') {
+                    $gameData['cover'] = $base;
+                }
             }
         } else {
             // Si se eliminó la imagen → dejar null
             $gameData['cover'] = null;
         }
 
+        $coverFile = $this->request->getFile('cover_file');
+        if ($coverFile && $coverFile->isValid() && !$coverFile->hasMoved()) {
+            $newName = $coverFile->getRandomName();
+            $uploadPath = FCPATH . 'uploads/covers/';
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            $coverFile->move($uploadPath, $newName);
+            $gameData['cover'] = $newName;
+        }
+
         $action = $this->request->getPost('game-action');
         $gameId = $this->request->getPost('game-id');
+        $modalityImages = $this->request->getPost('modality_image');
 
         if ($action === 'update' && $gameId) {
             $model->update($gameId, $gameData);
@@ -3564,30 +3655,51 @@ class Games extends Controller {
 
             $finalAwards = [];
             foreach ($modalities as $i => $modalityId) {
+                $rawImg = is_array($modalityImages) && array_key_exists($i, $modalityImages) ? trim($modalityImages[$i]) : '';
+                $savedImg = null;
+                if (!empty($rawImg)) {
+                    if (strpos($rawImg, 'data:image') === 0) {
+                        $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $rawImg));
+                        $ext = 'png';
+                        if (strpos($rawImg, 'data:image/jpeg') === 0 || strpos($rawImg, 'data:image/jpg') === 0) $ext = 'jpg';
+                        elseif (strpos($rawImg, 'data:image/webp') === 0) $ext = 'webp';
+                        $fn = uniqid('mod_') . '.' . $ext;
+                        $uPath = FCPATH . 'uploads/modalities/';
+                        if (!is_dir($uPath)) mkdir($uPath, 0755, true);
+                        file_put_contents($uPath . $fn, $imgData);
+                        $savedImg = $fn;
+                    } elseif ($rawImg === 'REMOVE') {
+                        $savedImg = null;
+                    } else {
+                        $savedImg = basename($rawImg);
+                    }
+                }
+
                 $finalAwards[] = [
                     'award_id'    => is_array($awardIds ?? null) && array_key_exists($i, $awardIds) ? $awardIds[$i] : null,
                     'modality'    => $modalityId,
                     'amount'      => $amounts[$i],
-                    'observation' => $observations[$i]
+                    'observation' => $observations[$i],
+                    'image'       => $savedImg
                 ];
             }
 
             foreach ($finalAwards as $aw) {
+                $awardData = [
+                    'modality'    => $aw['modality'],
+                    'amount'      => $aw['amount'],
+                    'observation' => $aw['observation'],
+                    'status'      => 1
+                ];
+                if ($aw['image'] !== null) {
+                    $awardData['image'] = $aw['image'];
+                }
+
                 if (!empty($aw['award_id'])) {
-                    $awardModel->update($aw['award_id'], [
-                        'modality'    => $aw['modality'],
-                        'amount'      => $aw['amount'],
-                        'observation' => $aw['observation'],
-                        'status'      => 1
-                    ]);
+                    $awardModel->update($aw['award_id'], $awardData);
                 } else {
-                    $awardModel->insert([
-                        'game'        => $gameId,
-                        'modality'    => $aw['modality'],
-                        'amount'      => $aw['amount'],
-                        'observation' => $aw['observation'],
-                        'status'      => 1
-                    ]);
+                    $awardData['game'] = $gameId;
+                    $awardModel->insert($awardData);
                 }
             }
         } else {
@@ -3601,12 +3713,33 @@ class Games extends Controller {
             $gameId = $model->getInsertID();
 
             foreach ($modalities as $index => $modalityId) {
+                $rawImg = is_array($modalityImages) && array_key_exists($index, $modalityImages) ? trim($modalityImages[$index]) : '';
+                $savedImg = null;
+                if (!empty($rawImg)) {
+                    if (strpos($rawImg, 'data:image') === 0) {
+                        $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $rawImg));
+                        $ext = 'png';
+                        if (strpos($rawImg, 'data:image/jpeg') === 0 || strpos($rawImg, 'data:image/jpg') === 0) $ext = 'jpg';
+                        elseif (strpos($rawImg, 'data:image/webp') === 0) $ext = 'webp';
+                        $fn = uniqid('mod_') . '.' . $ext;
+                        $uPath = FCPATH . 'uploads/modalities/';
+                        if (!is_dir($uPath)) mkdir($uPath, 0755, true);
+                        file_put_contents($uPath . $fn, $imgData);
+                        $savedImg = $fn;
+                    } elseif ($rawImg === 'REMOVE') {
+                        $savedImg = null;
+                    } else {
+                        $savedImg = basename($rawImg);
+                    }
+                }
+
                 $awardData = [
-                    'game' => $gameId,          
-                    'modality' => $modalityId,  
+                    'game'        => $gameId,          
+                    'modality'    => $modalityId,  
                     'observation' => $observations[$index], 
-                    'amount' => $amounts[$index],  
-                    'status' => 1
+                    'amount'      => $amounts[$index],
+                    'image'       => $savedImg,
+                    'status'      => 1
                 ];
 
                 $awardModel->insert($awardData);

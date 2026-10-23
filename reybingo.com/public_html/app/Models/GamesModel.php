@@ -30,6 +30,9 @@ class GamesModel extends Model {
             if (!in_array('access_code', $fields, true)) {
                 $db->query("ALTER TABLE `games` ADD COLUMN `access_code` VARCHAR(100) NULL DEFAULT NULL AFTER `price`");
             }
+            if (!in_array('cover', $fields, true)) {
+                $db->query("ALTER TABLE `games` ADD COLUMN `cover` VARCHAR(255) NULL DEFAULT NULL AFTER `reset`");
+            }
         } catch (\Throwable $e) {
             log_message('error', 'Error in GamesModel::ensureSchema: ' . $e->getMessage());
         }
