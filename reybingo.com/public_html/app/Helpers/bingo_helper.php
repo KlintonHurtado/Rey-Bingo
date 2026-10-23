@@ -1414,7 +1414,10 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
             // pusher-client.js y board.js se suscriben a este canal y escuchan 'game:notification'
             try {
                 $client = bingo_get_broadcast_client();
-                $gameChannel = 'private-game-' . $gameId;
+                $channels = [
+                    'private-game-' . $gameId,
+                    'game-' . $gameId,
+                ];
 
                 $gamePayload = [
                     'id'            => 'sing_' . $singId . '_' . $modalityId,
@@ -1437,8 +1440,8 @@ if (!function_exists('bingo_notify_sing_to_all_players')) {
                     'officialWinners' => $officialWinners,
                     'winners'         => $officialWinners,
                 ];
-                $client->trigger($gameChannel, 'game:notification', $gamePayload);
-                $client->trigger($gameChannel, 'notification:new', $gamePayload);
+                $client->trigger($channels, 'game:notification', $gamePayload);
+                $client->trigger($channels, 'notification:new', $gamePayload);
             } catch (\Throwable $be) {
                 log_message('error', 'Error broadcasting game:notification to room: ' . $be->getMessage());
             }

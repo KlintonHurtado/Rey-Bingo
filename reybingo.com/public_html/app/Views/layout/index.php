@@ -665,7 +665,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                 // notificaciones de ganadores casi en tiempo real aunque el WebSocket falle.
                 // Jugadores usan 10 s porque ya reciben todo por WebSocket en la partida.
                 checkInterval: <?= (function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator()) ? 3000 : 10000 ?>,
-                displayTime: 7000,
+                displayTime: 6000,
                 maxNotifications: 3,
                 apiUrl: '/users/userNotifications',
                 markReadUrl: '/users/markNotificationRead',
@@ -1584,9 +1584,6 @@ $isNoMusicRole = session()->get('logged_in') && (
                     card = document.createElement('div');
                     const coverClass = hasCover ? 'card-has-cover' : (game.color || 'bingo-bg-primary');
                     card.className = `card ${coverClass} text-center card-game-${game.id}`;
-                    if (hasCover) {
-                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
-                    }
                     card.setAttribute('data-game-id', String(game.id));
                     card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
                     card.setAttribute('data-game-start', `${game.date} ${game.time}`);
@@ -1599,23 +1596,35 @@ $isNoMusicRole = session()->get('logged_in') && (
                         buttonsHtml = `<button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1"  id="card-button-play-${game.id}" onclick="gameGet(${game.id});" disabled><?= translate('come in to play'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy mb-1" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id}, 'real');"><?= translate('buy cartons'); ?></button><button type="button" class="btn btn-small btn-primary d-block w-100 btn-bingo card-button-buy-bonus" id="card-button-buy-bonus-${game.id}" data-no-bonus="0" onclick="generateCartonsGet(${game.id}, 'bonus');">Comprar con bono</button>`;
                     }
 
+                    const topVisualHtml = hasCover ? `
+                        <div class="card-cover-wrapper">
+                            <img src="<?= site_url('uploads/covers/') ?>${game.cover}" class="card-cover-img" alt="${game.room || ''}">
+                            <div class="card-cover-wave">
+                                <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+                                    <path d="M0,35 C130,55 240,18 360,25 C420,29 470,40 500,42 L500,80 L0,80 Z" fill="#0052ec"></path>
+                                </svg>
+                            </div>
+                        </div>` : `<img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">`;
+
                     card.innerHTML = `
                         <span class="card-hour">${game.time_translate}</span>
-                        <span class="card-price"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> ${game.price}</span>
-                        <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
+                        <div class="text-end p-1 pb-0">
+                            <button type="button" class="favorite-game-btn" data-favorite-game="${game.id}" aria-label="Favorito">&#9734;</button>
+                        </div>
+                        <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> ${game.price}</span>
+                        ${topVisualHtml}
                         <div class="card-body p-1">
-                            <h5 class="card-title text-center mb-0">
+                            <h5 class="card-title text-center mb-0 d-block">
                                 ${game.room}
-                                <div class="scrolling-text">
-                                    <span>${game.description}</span>
-                                    <span>${game.description}</span>
-                                </div>
                             </h5>
+                            <p class="text-center mb-0 card-room-description" style="font-size:0.85rem; opacity:0.9;">
+                                ${game.description || ''}
+                            </p>
                         </div>
                         <ul class="list-group list-group-flush">
-                            <li class="p-0" style="font-size: 0.8rem;">${game.date_translate}</li>
+                            <li class="p-0 card-date" style="font-size: 0.8rem;">${game.date_translate}</li>
                             <li class="p-0 card-prize" id="card-accumulated-${game.id}"></li>
-                            <li class="p-0" id="card-time-${game.id}"><span class="card-time-display"></span></li>
+                            <li class="p-0 card-status" id="card-time-${game.id}"><span class="card-time-display"></span></li>
                         </ul>
                         <div class="card-body p-1 card-buy-actions">
                             ${buttonsHtml}
@@ -1628,7 +1637,43 @@ $isNoMusicRole = session()->get('logged_in') && (
                 } else {
                     if (hasCover) {
                         card.classList.add('card-has-cover');
-                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
+                        card.style.backgroundImage = '';
+                        let wrapper = card.querySelector('.card-cover-wrapper');
+                        const logo = card.querySelector('.card-img-top');
+                        if (!wrapper) {
+                            if (logo) logo.remove();
+                            wrapper = document.createElement('div');
+                            wrapper.className = 'card-cover-wrapper';
+                            wrapper.innerHTML = `
+                                <img src="<?= site_url('uploads/covers/') ?>${game.cover}" class="card-cover-img" alt="${game.room || ''}">
+                                <div class="card-cover-wave">
+                                    <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+                                        <path d="M0,35 C130,55 240,18 360,25 C420,29 470,40 500,42 L500,80 L0,80 Z" fill="#0052ec"></path>
+                                    </svg>
+                                </div>`;
+                            const cardBody = card.querySelector('.card-body');
+                            if (cardBody) {
+                                card.insertBefore(wrapper, cardBody);
+                            }
+                        } else {
+                            const img = wrapper.querySelector('.card-cover-img');
+                            if (img) img.src = `<?= site_url('uploads/covers/') ?>${game.cover}`;
+                        }
+                    } else {
+                        card.classList.remove('card-has-cover');
+                        card.style.backgroundImage = '';
+                        const wrapper = card.querySelector('.card-cover-wrapper');
+                        if (wrapper) wrapper.remove();
+                        if (!card.querySelector('.card-img-top')) {
+                            const logo = document.createElement('img');
+                            logo.src = '<?= site_url('assets/img/logo.png'); ?>';
+                            logo.className = 'card-img-top p-1';
+                            logo.alt = 'img';
+                            const cardBody = card.querySelector('.card-body');
+                            if (cardBody) {
+                                card.insertBefore(logo, cardBody);
+                            }
+                        }
                     }
                     card.setAttribute('data-has-cartons', game.cartons >= 1 ? '1' : '0');
                     card.setAttribute('data-game-start', `${game.date} ${game.time}`);
@@ -2651,18 +2696,6 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (notifId && typeof markAsRead === 'function') {
                     markAsRead([notifId]);
                 }
-
-                // Para admins y operadores: forzar recarga inmediata del endpoint de notificaciones
-                // para obtener la lista canónica completa del servidor (con officialWinners).
-                // Esto elimina el retraso del polling cuando el WebSocket entrega el evento.
-                <?php if ((function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator())) : ?>
-                if (isSingEvent && typeof window.loadNotifications === 'function') {
-                    // Pequeño delay para que el servidor haya completado la escritura en BD
-                    setTimeout(function() {
-                        window.loadNotifications();
-                    }, 400);
-                }
-                <?php endif; ?>
             });
 
             window.__userNotifPusher = uPusher;

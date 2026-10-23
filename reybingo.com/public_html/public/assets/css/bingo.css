@@ -6161,6 +6161,7 @@ hr {
     background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
     transform: translateX(-100%);
     animation: notificationShine 3s infinite;
+    pointer-events: none !important;
 }
 
 @keyframes notificationShine {
@@ -6916,48 +6917,524 @@ input[type=number]::-webkit-outer-spin-button {
                 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-/* Tarjeta de sala con imagen de portada personalizada ("frente") */
-.card.card-has-cover {
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    color: #fff !important;
-    border-radius: 12px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25),
-                0 3px 6px rgba(0, 0, 0, 0.15);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* ==========================================================================
+   TARJETA DE SALA CON PORTADA PERSONALIZADA (ESTILO MODERNO CON OLA)
+   ========================================================================== */
+.card.card-has-cover,
+.player-play-view .play-cards .card.card-has-cover {
+    background: linear-gradient(180deg, #0052ec 0%, #0044db 42%, #002eb4 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    box-shadow: 0 10px 25px rgba(0, 26, 120, 0.35), 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+    color: #ffffff !important;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    flex-direction: column;
     position: relative;
+}
+
+.card.card-has-cover:hover,
+.player-play-view .play-cards .card.card-has-cover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 14px 30px rgba(0, 26, 120, 0.45), 0 6px 14px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Contenedor superior para la imagen de portada */
+.card.card-has-cover .card-cover-wrapper {
+    position: relative;
+    width: 100%;
+    height: 165px;
+    min-height: 140px;
     overflow: hidden;
+    background: #002366;
+    margin: 0;
+    padding: 0;
 }
 
-.card.card-has-cover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35),
-                0 4px 10px rgba(0, 0, 0, 0.2);
+.card.card-has-cover .card-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    transition: transform 0.4s ease;
 }
 
-.card.card-has-cover::before {
-    content: '';
+.card.card-has-cover:hover .card-cover-img {
+    transform: scale(1.04);
+}
+
+/* Divisor de ola orgánica que conecta con el azul del cuerpo */
+.card.card-has-cover .card-cover-wave {
     position: absolute;
-    top: 0;
+    bottom: -1px;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(180deg, rgba(10, 20, 50, 0.35) 0%, rgba(10, 20, 50, 0.62) 100%);
+    width: 100%;
+    height: 42px;
     pointer-events: none;
-    z-index: 1;
-    border-radius: inherit;
+    z-index: 3;
 }
 
-.card.card-has-cover > * {
+.card.card-has-cover .card-cover-wave svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Badge de hora (píldora amarilla en esquina superior izquierda) */
+.card.card-has-cover .card-hour {
+    position: absolute;
+    top: 10px !important;
+    left: 10px !important;
+    right: auto !important;
+    background: #ffeb3b !important;
+    color: #0d1b3e !important;
+    font-weight: 800 !important;
+    font-size: 0.82rem !important;
+    padding: 4px 12px !important;
+    border-radius: 999px !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+    z-index: 6;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* Listón diagonal de precio (magenta en esquina superior derecha) */
+.card.card-has-cover .card-price {
+    position: absolute;
+    top: 24px !important;
+    right: -42px !important;
+    transform: rotate(45deg) !important;
+    background: linear-gradient(135deg, #ff0f7b 0%, #f80759 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 0.74rem !important;
+    padding: 5px 42px !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35) !important;
+    z-index: 6;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-transform: none !important;
+    letter-spacing: 0.2px;
+}
+
+/* Botón de favorito cuando tiene portada */
+.card.card-has-cover > .text-end {
+    position: absolute !important;
+    top: 42px !important;
+    left: 10px !important;
+    z-index: 6 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.card.card-has-cover .favorite-game-btn {
+    background: rgba(0, 0, 0, 0.38) !important;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.card.card-has-cover .favorite-game-btn.is-favorite {
+    background: rgba(255, 193, 7, 0.95) !important;
+    color: #4a2800 !important;
+}
+
+/* Tipografía y textos de la sala */
+.card.card-has-cover .card-body {
+    padding: 6px 12px 4px !important;
+    background: transparent !important;
+}
+
+.card.card-has-cover .card-title {
+    color: #ffffff !important;
+    font-size: 1.18rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 2px !important;
+    text-shadow: 0 2px 6px rgba(0, 20, 80, 0.5);
+    letter-spacing: 0.01em;
+}
+
+.card.card-has-cover .card-room-description {
+    color: rgba(255, 255, 255, 0.92) !important;
+    font-size: 0.88rem !important;
+    font-weight: 500 !important;
+    line-height: 1.25;
+    margin-bottom: 4px !important;
+}
+
+.card.card-has-cover .list-group {
+    background: transparent !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+}
+
+.card.card-has-cover .list-group-item,
+.card.card-has-cover .list-group li {
+    background: transparent !important;
+    border: none !important;
+    color: #ffffff !important;
+    padding: 2px 0 !important;
+}
+
+.card.card-has-cover .card-date {
+    font-size: 0.84rem !important;
+    font-weight: 600 !important;
+    opacity: 0.95;
+}
+
+.card.card-has-cover .card-prize {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    margin: 2px 0 !important;
+}
+
+.card.card-has-cover .card-prize-line {
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    text-shadow: 0 2px 5px rgba(0, 20, 80, 0.5);
+}
+
+.card.card-has-cover .card-time-display {
+    background: rgba(0, 20, 70, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 0.78rem !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    display: inline-block;
+    margin: 3px 0 2px;
+}
+
+/* Botones de acción */
+.card.card-has-cover .card-buy-actions {
+    padding: 8px 12px 12px !important;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.card.card-has-cover .card-buy-actions .btn {
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 0.92rem !important;
+    padding: 9px 12px !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.card.card-has-cover .card-buy-actions .btn:hover:not(:disabled):not(.disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Botón jugar / no disponible */
+.card.card-has-cover [id^="card-button-play-"]:not(:disabled):not(.disabled) {
+    background: linear-gradient(135deg, #3d5afe 0%, #2979ff 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+}
+
+.card.card-has-cover [id^="card-button-play-"]:disabled,
+.card.card-has-cover [id^="card-button-play-"].disabled {
+    background: #415bd8 !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #e2e8f0 !important;
+    opacity: 0.92 !important;
+}
+
+/* Botón comprar cartones */
+.card.card-has-cover .card-button-buy:not(:disabled):not(.disabled) {
+    background: linear-gradient(135deg, #00b359 0%, #008f45 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+}
+
+.card.card-has-cover .card-button-buy:disabled,
+.card.card-has-cover .card-button-buy.disabled {
+    background: #008f45 !important;
+    border: none !important;
+    color: #e2e8f0 !important;
+    opacity: 0.92 !important;
+}
+
+/* Adaptación responsive para móvil */
+@media (max-width: 768px) {
+    .card.card-has-cover,
+    .player-play-view .play-cards .card.card-has-cover {
+        border-radius: 18px !important;
+    }
+
+    .card.card-has-cover .card-cover-wrapper {
+        height: 125px;
+        min-height: 110px;
+    }
+
+    .card.card-has-cover .card-cover-wave {
+        height: 32px;
+    }
+
+    .card.card-has-cover .card-hour {
+        top: 8px !important;
+        left: 8px !important;
+        font-size: 0.65rem !important;
+        padding: 3px 8px !important;
+    }
+
+    .card.card-has-cover .card-price {
+        top: 20px !important;
+        right: -38px !important;
+        font-size: 0.62rem !important;
+        padding: 4px 34px !important;
+    }
+
+    .card.card-has-cover .card-title {
+        font-size: 0.98rem !important;
+    }
+
+    .card.card-has-cover .card-room-description {
+        font-size: 0.78rem !important;
+    }
+
+    .card.card-has-cover .card-date {
+        font-size: 0.74rem !important;
+    }
+
+    .card.card-has-cover .card-prize-line {
+        font-size: 0.76rem !important;
+    }
+
+    .card.card-has-cover .card-time-display {
+        font-size: 0.68rem !important;
+        padding: 3px 7px !important;
+    }
+
+    .card.card-has-cover .card-buy-actions .btn {
+        font-size: 0.8rem !important;
+        padding: 7px 10px !important;
+        border-radius: 10px !important;
+    }
+}
+
+/* ==========================================================================
+   MODALIDADES CON IMAGEN PERSONALIZADA (ESTILO MODERNO INTEGRADO)
+   ========================================================================== */
+.border-carton.border-carton-has-image,
+.modalities-display .border-carton.border-carton-has-image,
+.modalities-display-container .border-carton.border-carton-has-image {
+    padding: 0 0 12px 0 !important;
+    border: 3.5px solid #2855ff !important;
+    border-radius: 20px !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    box-shadow: 0 12px 28px rgba(40, 85, 255, 0.22), 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    position: relative !important;
+    flex: 0 0 auto !important;
+    transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+    min-width: 250px !important;
+    max-width: 300px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.border-carton.border-carton-has-image:hover,
+.modalities-display .border-carton.border-carton-has-image:hover,
+.modalities-display-container .border-carton.border-carton-has-image:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 16px 36px rgba(40, 85, 255, 0.32), 0 6px 14px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Imagen superior de portada de la modalidad */
+.border-carton-has-image .modality-cover-wrapper {
     position: relative;
-    z-index: 2;
+    width: 100%;
+    height: 150px;
+    min-height: 130px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #4c1d95, #6d28d9);
+    margin: 0;
+    padding: 0;
 }
 
-.card.card-has-cover .card-title,
-.card.card-has-cover .list-group,
-.card.card-has-cover p {
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0, 0, 0, 0.7);
+.border-carton-has-image .modality-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.border-carton-has-image:hover .modality-cover-img {
+    transform: scale(1.04);
+}
+
+/* Tarjeta flotante blanca interior con el título y el patrón 5x5 */
+.border-carton-has-image .modality-body-card {
+    position: relative !important;
+    z-index: 2 !important;
+    background: #ffffff !important;
+    border-radius: 16px !important;
+    margin: -24px 12px 8px 12px !important;
+    padding: 10px 12px 12px 12px !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+}
+
+.border-carton-has-image .modality-name {
+    display: block !important;
+    text-align: center !important;
+    font-family: 'Fredoka One', 'Roboto', sans-serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin: 0 0 8px 0 !important;
+    line-height: 1.25 !important;
+    text-transform: none !important;
+}
+
+/* Cuadrícula de patrón 5x5 */
+.border-carton-has-image .carton {
+    width: 100% !important;
+    max-width: 200px !important;
+    height: auto !important;
+    aspect-ratio: 5 / 6 !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-rows: auto repeat(5, 1fr) !important;
+    gap: 4px !important;
+}
+
+/* Letras B-I-N-G-O estilo píldoras de color */
+.border-carton-has-image .card-letter {
+    width: 100% !important;
+    aspect-ratio: 1 !important;
+    height: auto !important;
+    border-radius: 5px !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+.border-carton-has-image .card-letter.B { background: #ef4444 !important; }
+.border-carton-has-image .card-letter.I { background: #f59e0b !important; }
+.border-carton-has-image .card-letter.N { background: #10b981 !important; }
+.border-carton-has-image .card-letter.G { background: #3b82f6 !important; }
+.border-carton-has-image .card-letter.O { background: #a855f7 !important; }
+
+/* Celdas del cartón (inactivas y marcadas) */
+.border-carton-has-image .card-number {
+    width: 100% !important;
+    aspect-ratio: 1 !important;
+    height: auto !important;
+    border-radius: 5px !important;
+    font-size: 0.85rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: #c7d2fe !important;
+    color: transparent !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+    transition: transform 0.2s ease, background-color 0.2s ease !important;
+}
+
+/* Celdas marcadas para la modalidad */
+.border-carton-has-image .card-number.modality-sing {
+    background-color: #3b42f6 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(59, 66, 246, 0.38) !important;
+}
+
+/* Estrella central de casilla libre 13 */
+.border-carton-has-image .card-number[data-position="13"] {
+    background-color: #c7d2fe !important;
+    color: #f59e0b !important;
+    font-size: 0.95rem !important;
+}
+
+.border-carton-has-image .card-number.modality-sing[data-position="13"] {
+    background-color: #3b42f6 !important;
+    color: #ffd700 !important;
+}
+
+/* Cuando la celda es cantada / ganada */
+.border-carton-has-image .card-number.sing {
+    color: #ffd700 !important;
+    font-size: 0.95rem !important;
+}
+
+/* Premio debajo de la tarjeta blanca */
+.border-carton-has-image .modality-prize {
+    display: block !important;
+    text-align: center !important;
+    font-family: 'Fredoka One', 'Roboto', sans-serif !important;
+    font-size: 1.35rem !important;
+    font-weight: 900 !important;
+    color: #3026ee !important;
+    margin: 4px 0 6px 0 !important;
+    letter-spacing: 0.02em !important;
+    text-shadow: 0 1px 2px rgba(48, 38, 238, 0.15) !important;
+}
+
+/* Estado ganado */
+.border-carton-has-image.modality-won {
+    border-color: #94a3b8 !important;
+    box-shadow: none !important;
+    filter: grayscale(85%) opacity(0.72) !important;
+}
+
+/* Adaptación en pantallas móviles */
+@media (max-width: 768px) {
+    .border-carton.border-carton-has-image,
+    .modalities-display .border-carton.border-carton-has-image,
+    .modalities-display-container .border-carton.border-carton-has-image {
+        min-width: 215px !important;
+        max-width: 260px !important;
+        width: 78vw !important;
+        border-radius: 18px !important;
+        border-width: 3px !important;
+    }
+
+    .border-carton-has-image .modality-cover-wrapper {
+        height: 125px !important;
+        min-height: 110px !important;
+    }
+
+    .border-carton-has-image .modality-body-card {
+        margin: -20px 10px 6px 10px !important;
+        padding: 8px 10px 10px 10px !important;
+        border-radius: 14px !important;
+    }
+
+    .border-carton-has-image .modality-name {
+        font-size: 0.92rem !important;
+        margin-bottom: 6px !important;
+    }
+
+    .border-carton-has-image .modality-prize {
+        font-size: 1.18rem !important;
+        margin: 2px 0 4px 0 !important;
+    }
 }
 
 
@@ -8977,5 +9454,58 @@ a {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
+
+/* ==========================================================================
+   MODO ESPECTADOR: Reglas estrictas de visualización e interacción
+   ========================================================================== */
+.container-section--playing.spectator-mode .btn-home,
+.container-section--playing.spectator-mode .btn-wallet,
+.container-section--playing.spectator-mode .btn-share-game,
+.container-section--playing.spectator-mode .btn-sliders,
+.container-section--playing.spectator-mode .btn-binary,
+.container-section--playing.spectator-mode .btn-volume,
+.container-section--playing.spectator-mode .btn-microphone,
+body:has(.spectator-mode) .btn-chat,
+body:has(.spectator-mode) #toggle-messages-btn,
+body:has(.spectator-mode) #message-display-container,
+body:has(.spectator-mode) .btn-print-cartons,
+body:has(.spectator-mode) #btn-print-cartons,
+body:has(.spectator-mode) #printable-cartons-area,
+body:has(.spectator-mode) #btn-ver-ganadores-player,
+body:has(.spectator-mode) .btn-toggle-password {
+    display: none !important;
+}
+
+.spectator-mode .bingo-carton-number {
+    pointer-events: none !important;
+    cursor: default !important;
+}
+
+.spectator-audio-unblock-bar {
+    position: fixed !important;
+    top: 14px !important;
+    right: 14px !important;
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(79, 70, 229, 0.95)) !important;
+    color: #ffffff !important;
+    border: 1.5px solid #a855f7 !important;
+    border-radius: 50px !important;
+    padding: 6px 14px !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    z-index: 1080 !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 18px rgba(168, 85, 247, 0.45) !important;
+    animation: spectatorPulse 2.2s infinite ease-in-out !important;
+    transition: opacity 0.3s ease, transform 0.3s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+.spectator-audio-unblock-bar.hidden {
+    display: none !important;
+}
+
 
 

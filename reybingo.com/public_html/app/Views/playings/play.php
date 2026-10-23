@@ -615,32 +615,42 @@
                                         <?php
                                             $hasCustomCover = !empty($game['cover']) && $game['cover'] !== 'image.jpg';
                                             $cardBgClass = $hasCustomCover ? 'card-has-cover' : getCardColor($index);
-                                            $cardStyle = $hasCustomCover ? 'style="background-image: url(\'' . esc(site_url('uploads/covers/' . $game['cover']), 'attr') . '\');"' : '';
                                         ?>
                                         <div class="play-room-slide">
-                                        <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>" <?= $cardStyle ?> data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
+                                        <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>" data-game-id="<?= $game['id'] ?>" data-has-cartons="<?= ($game['cartons'] >= 1) ? '1' : '0'; ?>" data-search-text="<?= esc(strtolower($game['room'] . ' ' . $game['description'])); ?>" data-price="<?= esc((string) $game['price']); ?>" data-game-start="<?= esc($game['date'] . ' ' . $game['time']); ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                             <div class="text-end p-1 pb-0">
                                                 <button type="button" class="favorite-game-btn" data-favorite-game="<?= $game['id']; ?>" aria-label="Favorito">&#9734;</button>
                                             </div>
                                             <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
-                                            <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
-                                                <div class="card-body p-1">
-                                                    <h5 class="card-title text-center mb-0 d-block">
-                                                        <?= $game['room'] ?>
-                                                    </h5>
-                                                    <p class="text-center mb-0" style="font-size:0.85rem; opacity:0.9;">
-                                                        <?= $game['description'] ?>
-                                                    </p>
+                                            <?php if ($hasCustomCover): ?>
+                                                <div class="card-cover-wrapper">
+                                                    <img src="<?= esc(site_url('uploads/covers/' . $game['cover']), 'attr') ?>" class="card-cover-img" alt="<?= esc($game['room']) ?>">
+                                                    <div class="card-cover-wave">
+                                                        <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+                                                            <path d="M0,35 C130,55 240,18 360,25 C420,29 470,40 500,42 L500,80 L0,80 Z" fill="#0052ec"></path>
+                                                        </svg>
+                                                    </div>
                                                 </div>
+                                            <?php else: ?>
+                                                <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
+                                            <?php endif; ?>
+                                            <div class="card-body p-1">
+                                                <h5 class="card-title text-center mb-0 d-block">
+                                                    <?= $game['room'] ?>
+                                                </h5>
+                                                <p class="text-center mb-0 card-room-description" style="font-size:0.85rem; opacity:0.9;">
+                                                    <?= $game['description'] ?>
+                                                </p>
+                                            </div>
                                             <ul class="list-group list-group-flush">
-                                                <li class="p-0" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
+                                                <li class="p-0 card-date" style="font-size: 0.8rem;"><?= translate_date($game['date']) ?></li>
                                                 <li class="p-0 card-prize" id="card-accumulated-<?= $game['id'] ?>">
                                                     <?php if (! empty($game['prize_html'])) : ?>
                                                         Premio: <?= $game['prize_html']; ?>
                                                     <?php endif; ?>
                                                 </li>
-                                                <li class="p-0" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
+                                                <li class="p-0 card-status" id="card-time-<?= $game['id'] ?>"><span class="card-time-display"></span></li>
                                             </ul>
                                             <div class="card-body p-1 card-buy-actions">
                                                 <?php if ($game['cartons'] >= 1) : ?>

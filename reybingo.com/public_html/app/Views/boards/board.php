@@ -525,14 +525,43 @@
                 <?php
                     $isSing = in_array($modality['id'], $singsModalities);
                     $positions = explode(',', $modality['positions']);
+                    $hasModalityImg = !empty($modality['image']);
                 ?>
-                <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>">
-                    <span class="modality-name"><?= translate($modality['name']); ?></span>
-                    <?php if (!empty($modality['image'])): ?>
-                        <div style="width: 100%; height: 95px; margin: 4px auto; background: #fff; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #e0e0e0;">
-                            <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                <?php if ($hasModalityImg): ?>
+                    <div class="border-carton border-carton-has-image <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
+                        <div class="modality-cover-wrapper">
+                            <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>" class="modality-cover-img">
                         </div>
-                    <?php else: ?>
+                        <div class="modality-body-card">
+                            <span class="modality-name"><?= translate($modality['name']); ?></span>
+                            <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                                <div class="card-letter B"><span>B</span></div>
+                                <div class="card-letter I"><span>I</span></div>
+                                <div class="card-letter N"><span>N</span></div>
+                                <div class="card-letter G"><span>G</span></div>
+                                <div class="card-letter O"><span>O</span></div>
+                                <?php for ($i = 1; $i <= 25; $i++): ?>
+                                    <?php
+                                        $isMarked = in_array($i, $positions);
+                                        $showStar = ($isSing && $isMarked) || $i == 13;
+                                    ?>
+                                    <?php if ($i == 13): ?>
+                                        <div class="card-number" data-position="13">⭐️</div>
+                                    <?php else: ?>
+                                        <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+                            </div>
+                        </div>
+                        <?php if ($game['award'] == 2) : ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                        <?php else: ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
+                        <span class="modality-name"><?= translate($modality['name']); ?></span>
                         <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
                             <div class="card-letter B"><span>B</span></div>
                             <div class="card-letter I"><span>I</span></div>
@@ -542,22 +571,22 @@
                             <?php for ($i = 1; $i <= 25; $i++): ?>
                                 <?php
                                     $isMarked = in_array($i, $positions);
-                                    $showStar = $isSing && $isMarked || $i == 13;
+                                    $showStar = ($isSing && $isMarked) || $i == 13;
                                 ?>
                                 <?php if ($i == 13): ?>
-                                    <div class="card-number" data-position="13" >⭐️</div>
+                                    <div class="card-number" data-position="13">⭐️</div>
                                 <?php else: ?>
                                     <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>" data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
                                 <?php endif; ?>
                             <?php endfor; ?>
                         </div>
-                    <?php endif; ?>
-                    <?php if ($game['award'] == 2) : ?>
-                        <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
-                    <?php else: ?>
-                        <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
-                    <?php endif; ?>
-                </div>
+                        <?php if ($game['award'] == 2) : ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                        <?php else: ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             <?php endforeach; ?>
         </div>
     </div>

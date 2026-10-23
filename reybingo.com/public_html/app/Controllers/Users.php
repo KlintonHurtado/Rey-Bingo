@@ -3538,19 +3538,16 @@ class Users extends Controller {
         $isAdmin = ($userGroup === 1 || (function_exists('bingo_is_admin') && bingo_is_admin($userGroup)));
         $isOperatorOrStore = ($userGroup === 2 || $userGroup === 3 || (function_exists('bingo_is_operator') && (bingo_is_operator($userGroup) || bingo_is_store($userGroup))));
 
-        // Regla de Negocio: Las notificaciones de ganador (type='sing') son eventos en tiempo real
-        // emitidos por WebSocket. Para JUGADORES normales (group=0) se marcan como leídas de
-        // inmediato porque ya ven el resultado en la vista de la partida en tiempo real.
-        // Para ADMINISTRADORES y OPERADORES se mantienen sin leer para que el polling las entregue
-        // si el WebSocket falló, llegó tarde o el tab estaba en segundo plano.
-        if (!$isAdmin && !$isOperatorOrStore) {
-            $modelNotifications
-                ->where('user', $user['id'])
-                ->where('status', 0)
-                ->where('type', 'sing')
-                ->set(['status' => 1])
-                ->update();
-        }
+        // Regla de Negocio: La notificación de ganador es un EVENTO EN TIEMPO REAL emitido por WebSocket,
+        // NO un registro histórico para re-notificar al ingresar al sistema tras haber estado ausente.
+        // Se marcan como leídas (status = 1) en BD para preservar el 100% del historial y trazabilidad
+        // sin borrarlas de la base de datos, y se excluyen del array de alertas activas para evitar spam sonoro/visual.
+        $modelNotifications
+            ->where('user', $user['id'])
+            ->where('status', 0)
+            ->where('type', 'sing')
+            ->set(['status' => 1])
+            ->update();
 
         // 2. Control de conexión y ventana de tiempo para alertas emergentes:
         // Las alertas emergentes (popups y sonido) son EXCLUSIVAS para eventos generados
@@ -3596,7 +3593,7 @@ class Users extends Controller {
             ->update(['status' => 1]);
 
         if ($isOperatorOrStore) {
-            // Operadores y Puntos de venta: incluyen sing (notificaciones de ganadores) pero excluyen 'game'
+            // Operadores y Puntos de venta no reciben notificaciones de nuevas partidas (type='game')
             $modelNotifications->builder()
                 ->where('user', $user['id'])
                 ->where('status', 0)
@@ -3611,24 +3608,15 @@ class Users extends Controller {
                 ->where('status', 0)
                 ->where('created_at >=', $effectiveThreshold)
                 ->where('type !=', 'game')
+                ->where('type !=', 'sing')
                 ->groupStart()
                     ->where('game IS NULL', null, false)
                     ->orWhere('game', 0)
-                    ->orWhere('type', 'sing') // Operadores sí reciben sing (ganadores)
                 ->groupEnd()
                 ->orderBy('created_at', 'DESC')
                 ->findAll();
-        } elseif ($isAdmin) {
-            // Administradores: reciben todo (incluyendo sing/ganadores) para monitoreo completo
-            $notifications = $modelNotifications
-                ->where('user', $user['id'])
-                ->where('status', 0)
-                ->where('created_at >=', $effectiveThreshold)
-                ->orderBy('created_at', 'DESC')
-                ->limit(20)
-                ->findAll();
         } else {
-            // Jugadores: solo reciben alertas activas no-sing (pagos, balance, sistema, nuevas partidas)
+            // Jugadores y Administradores: solo reciben alertas activas no-sing (pagos, balance, sistema, nuevas partidas)
             $notifications = $modelNotifications
                 ->where('user', $user['id'])
                 ->where('status', 0)
@@ -3682,111 +3670,6 @@ class Users extends Controller {
             $modelNotifications->whereIn('id', $duplicateIds)->set(['status' => 1])->update();
         }
         $notifications = $uniqueNotifications;
-
-        // ── AGRUPACIÓN CANÓNICA DE GANADORES PARA TODOS LOS DISPOSITIVOS Y USUARIOS ──────────────────────────────
-        // Cuando hay sing pendientes del mismo juego, los agrupamos en UNA SOLA notificación por modalidad
-        // y la enriquecemos con la lista canónica completa de ganadores del servidor.
-        // Así el teléfono y la compu siempre reciben exactamente la misma lista completa de ganadores.
-        helper('bingo');
-        $singNotifs = [];
-        $nonSingNotifs = [];
-        foreach ($notifications as $n) {
-            if (($n['type'] ?? '') === 'sing') {
-                $singNotifs[] = $n;
-            } else {
-                $nonSingNotifs[] = $n;
-            }
-        }
-
-        if (!empty($singNotifs)) {
-            // Agrupar por (game, modality) y reemplazar con lista canónica
-            $singsByGameModality = [];
-            $singIdsToMarkRead = [];
-            foreach ($singNotifs as $sn) {
-                $gId = (int) ($sn['game'] ?? 0);
-                $mId = (int) ($sn['modality'] ?? 0);
-                $groupKey = $gId . '_' . $mId;
-                if (!isset($singsByGameModality[$groupKey])) {
-                    $singsByGameModality[$groupKey] = [
-                        'representative' => $sn, // primera notificación del grupo (la más reciente)
-                        'gameId'         => $gId,
-                        'modalityId'     => $mId,
-                        'ids'            => [],
-                    ];
-                }
-                $singsByGameModality[$groupKey]['ids'][] = (int) $sn['id'];
-            }
-
-            $groupedSings = [];
-            foreach ($singsByGameModality as $groupKey => $group) {
-                $gId = $group['gameId'];
-                $mId = $group['modalityId'];
-                $rep = $group['representative'];
-
-                // Obtener lista canónica enriquecida para este juego
-                $enrichedWinners = [];
-                if ($gId > 0 && function_exists('bingo_get_enriched_winners_for_broadcast')) {
-                    try {
-                        $allEnriched = bingo_get_enriched_winners_for_broadcast($gId, true);
-                        // Filtrar solo los ganadores de esta modalidad (si mId > 0)
-                        if ($mId > 0) {
-                            $enrichedWinners = array_values(array_filter($allEnriched, fn($w) => (int)($w['modalityId'] ?? 0) === $mId));
-                        } else {
-                            $enrichedWinners = $allEnriched;
-                        }
-                    } catch (\Throwable $e) {
-                        log_message('error', 'Sing grouping enrichment error: ' . $e->getMessage());
-                    }
-                }
-
-                // Construir mensaje agrupado con todos los ganadores
-                $modalityClean = $rep['modality'] ?? '';
-                if ($modalityClean === '' || is_numeric($modalityClean)) {
-                    if (!empty($enrichedWinners)) {
-                        $modalityClean = $enrichedWinners[0]['modalityName'] ?? 'Bingo';
-                    } else {
-                        $modalityClean = 'Bingo';
-                    }
-                }
-                $modalityClean = trim(preg_replace('/^la\s+/i', '', $modalityClean));
-                $modalityLabel = preg_match('/^(bingo|pleno)/i', $modalityClean)
-                    ? "Ganadores de la modalidad {$modalityClean}"
-                    : "Ganadores de la {$modalityClean}";
-
-                $playerNames = [];
-                foreach ($enrichedWinners as $w) {
-                    $wName = $w['userName'] ?? $w['player'] ?? '';
-                    if ($wName !== '' && !in_array($wName, $playerNames, true)) {
-                        $playerNames[] = $wName;
-                    }
-                }
-                $groupedMessage = $modalityLabel . ': ' . implode(' + ', $playerNames ?: ['Jugador']);
-                $firstPlayer = $playerNames[0] ?? ($rep['player'] ?? 'Jugador');
-
-                // Marcar todos los sing del grupo como leídos excepto el representativo
-                $idsToClose = array_filter($group['ids'], fn($id) => $id !== (int)$rep['id']);
-                if (!empty($idsToClose)) {
-                    $modelNotifications->whereIn('id', array_values($idsToClose))->set(['status' => 1])->update();
-                }
-
-                // Construir la notificación agrupada
-                $groupedSing = $rep;
-                $groupedSing['title']          = '🎉 ¡BINGO CANTADO!';
-                $groupedSing['message']        = $groupedMessage;
-                $groupedSing['modalityId']     = $mId;
-                $groupedSing['modality']       = $modalityClean;
-                $groupedSing['modalityName']   = $modalityClean;
-                $groupedSing['player']         = $firstPlayer;
-                $groupedSing['userName']       = $firstPlayer;
-                $groupedSing['officialWinners'] = $enrichedWinners;
-                $groupedSing['winners']         = $enrichedWinners;
-                $groupedSings[] = $groupedSing;
-            }
-
-            // Combinar: sings agrupados primero (más urgentes), luego el resto
-            $notifications = array_merge($groupedSings, $nonSingNotifs);
-        }
-        // ── FIN AGRUPACIÓN CANÓNICA ───────────────────────────────────────────────────────────
 
         $modelModalities = new \App\Models\ModalitiesModel();
 

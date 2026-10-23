@@ -117,12 +117,22 @@
                                         <?php
                                             $hasCustomCover = !empty($game['cover']) && $game['cover'] !== 'image.jpg';
                                             $cardBgClass = $hasCustomCover ? 'card-has-cover' : getCardColor($index);
-                                            $cardStyle = $hasCustomCover ? 'style="background-image: url(\'' . esc(site_url('uploads/covers/' . $game['cover']), 'attr') . '\');"' : '';
                                         ?>
-                                        <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>" <?= $cardStyle ?>>
+                                        <div class="card <?= $cardBgClass ?> text-center card-game-<?= $game['id'] ?>">
                                             <span class="card-hour"><?= translate_time($game['time']) ?></span>
                                             <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> <?= $game['price'] ?></span>
-                                            <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
+                                            <?php if ($hasCustomCover): ?>
+                                                <div class="card-cover-wrapper">
+                                                    <img src="<?= esc(site_url('uploads/covers/' . $game['cover']), 'attr') ?>" class="card-cover-img" alt="<?= esc($game['room']) ?>">
+                                                    <div class="card-cover-wave">
+                                                        <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+                                                            <path d="M0,35 C130,55 240,18 360,25 C420,29 470,40 500,42 L500,80 L0,80 Z" fill="#0052ec"></path>
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            <?php else: ?>
+                                                <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
+                                            <?php endif; ?>
                                             <div class="card-body p-1">
                                                 <h5 class="card-title text-center mb-0">
                                                     <?= $game['room'] ?>

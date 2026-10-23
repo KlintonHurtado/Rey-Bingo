@@ -88,6 +88,7 @@ let lastNumbers = (typeof fiveNumbers !== 'undefined' && Array.isArray(fiveNumbe
 // Única fuente de verdad para el audio en el cliente, persistente en móviles y sincronizada con el servidor
 window.audioSettings = window.audioSettings || {
     soundEnabled: (function () {
+        if (window.isSpectator || window.IS_SPECTATOR) return true;
         try {
             const local = localStorage.getItem('reybingo_sound');
             if (local !== null) return local === '1';
@@ -98,6 +99,7 @@ window.audioSettings = window.audioSettings || {
         return true;
     })(),
     narrationEnabled: (function () {
+        if (window.isSpectator || window.IS_SPECTATOR) return true;
         try {
             const local = localStorage.getItem('reybingo_narration');
             if (local !== null) return local === '1';
@@ -2488,10 +2490,26 @@ function showOtherPlayerBingoNotice(data, callback) {
 
     // 2. Disparar notificación toast visual del sistema unificada por modalidad
     if (typeof window.showNotification === 'function') {
-        const modalityClean = (data.modality || 'Bingo').replace(/^la\s+/i, '').trim();
+        const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
         const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
             ? `Ganadores de la modalidad ${modalityClean}`
             : `Ganadores de la ${modalityClean}`;
+
+        const rawList = Array.isArray(data.officialWinners) && data.officialWinners.length > 0
+            ? data.officialWinners
+            : (Array.isArray(data.winners) && data.winners.length > 0 ? data.winners : null);
+
+        let winnersText = data.player || '';
+        if (rawList && rawList.length > 0) {
+            const mId = parseInt(data.modalityId || data.modality, 10);
+            const matching = rawList.filter(w => {
+                const wmId = parseInt(w.modalityId || w.modality_id, 10);
+                return !mId || !wmId || mId === wmId;
+            }).map(w => w.userName || w.player || '').filter(Boolean);
+            if (matching.length > 0) {
+                winnersText = Array.from(new Set(matching)).join(' + ');
+            }
+        }
 
         window.showNotification({
             id: noticeKey,
@@ -2501,9 +2519,9 @@ function showOtherPlayerBingoNotice(data, callback) {
             player: data.player,
             cartonId: data.cartonId,
             title: '🎉 ¡BINGO CANTADO!',
-            message: `${modalityLabel}: ${data.player}`,
+            message: `${modalityLabel}: ${winnersText}`,
             created_at: new Date().toISOString(),
-            officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : (Array.isArray(data.winners) ? data.winners : undefined)
+            officialWinners: rawList || undefined
         });
     }
 
@@ -2912,7 +2930,9 @@ function showGameFinalized() {
             audioManager.stopAll();
         }
 
-        const targetUrl = typeof site_url !== 'undefined' ? site_url + 'play' : '/play';
+        const targetUrl = (window.isSpectator || window.IS_SPECTATOR) 
+            ? (typeof site_url !== 'undefined' ? site_url + 'signup' : '/signup')
+            : (typeof site_url !== 'undefined' ? site_url + 'play' : '/play');
         window.location.replace(targetUrl);
     };
     window.exitToPlay = exitToPlay;
@@ -3527,7 +3547,7 @@ function setupEvents() {
         }
     });
 
-    function setModalitiesPanelOpen(open) {
+    function setModalitiesPanelOpen(open, isRemoteSync) {
         const panel = $id("playing-modalities-panel");
         const toggleBtn = $id("toggle-modalities-btn");
         if (!panel) {
@@ -3543,7 +3563,18 @@ function setupEvents() {
         if (open && isChatPanelOpen()) {
             setChatPanelOpen(false);
         }
+
+        // Sincronizar hacia los espectadores en tiempo real si quien abre/cierra es el jugador observado
+        if (!isRemoteSync && !(window.isSpectator || window.IS_SPECTATOR) && window.gameId && typeof site_url !== 'undefined') {
+            try {
+                $.post(site_url + 'playings/broadcastModalityToggle', {
+                    game_id: window.gameId,
+                    open: open ? 1 : 0
+                });
+            } catch (e) {}
+        }
     }
+    window.setModalitiesPanelOpen = setModalitiesPanelOpen;
 
     function isModalitiesPanelOpen() {
         const panel = $id("playing-modalities-panel");
@@ -4373,6 +4404,19 @@ function initializeApp() {
                     syncDrawnNumbersFromServer(drawn, total !== undefined ? total : drawn.length, { animate: !bingoInProgress });
                 } else if (number) {
                     handleNewNumber(number, total, drawn);
+                }
+            });
+
+            // Sincronizar el despliegue de modalidades del jugador hacia sus espectadores
+            pusherHelper.on('player:modalities_toggled', function (data) {
+                if ((window.isSpectator || window.IS_SPECTATOR) && data) {
+                    const spectatedId = parseInt(window.spectatorPlayerId || 0, 10);
+                    const senderId = parseInt(data.user_id, 10);
+                    if (spectatedId > 0 && senderId === spectatedId) {
+                        if (typeof setModalitiesPanelOpen === 'function') {
+                            setModalitiesPanelOpen(!!data.open, true);
+                        }
+                    }
                 }
             });
 

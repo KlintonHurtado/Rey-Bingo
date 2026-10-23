@@ -1994,9 +1994,6 @@
                     card = document.createElement('div');
                     const coverClass = hasCover ? 'card-has-cover' : (game.color || 'bingo-bg-primary');
                     card.className = `card ${coverClass} text-center card-game-${game.id}`;
-                    if (hasCover) {
-                        card.style.backgroundImage = `url('<?= site_url('uploads/covers/') ?>${game.cover}')`;
-                    }
                     
                     if (game.cartons >= 1) {
                         buttonsHtml = `<button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1" id="card-button-play-${game.id}" onclick="gameGet(${game.id});"><?= translate('come in to play'); ?></button><button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id});"><?= translate('buy cartons'); ?></button>`;
@@ -2004,10 +2001,20 @@
                         buttonsHtml = `<button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo mb-1"  id="card-button-play-${game.id}" onclick="gameGet(${game.id});" disabled><?= translate('come in to play'); ?></button><button type="submit" class="btn btn-small btn-primary d-block w-100 btn-bingo bingo-bg-success card-button-buy" id="card-button-buy-${game.id}" onclick="generateCartonsGet(${game.id});"><?= translate('buy cartons'); ?></button>`;
                     }
 
+                    const topVisualHtml = hasCover ? `
+                        <div class="card-cover-wrapper">
+                            <img src="<?= site_url('uploads/covers/') ?>${game.cover}" class="card-cover-img" alt="${game.room || ''}">
+                            <div class="card-cover-wave">
+                                <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+                                    <path d="M0,35 C130,55 240,18 360,25 C420,29 470,40 500,42 L500,80 L0,80 Z" fill="#0052ec"></path>
+                                </svg>
+                            </div>
+                        </div>` : `<img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">`;
+
                     card.innerHTML = `
                         <span class="card-hour">${game.time_translate}</span>
-                        <span class="card-price"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> ${game.price}</span>
-                        <img src="<?= site_url('assets/img/logo.png'); ?>" class="card-img-top p-1" alt="img">
+                        <span class="card-price text-center"><?= translate('carton'); ?>: <?= systemGet('currency'); ?> ${game.price}</span>
+                        ${topVisualHtml}
                         <div class="card-body p-1">
                             <h5 class="card-title text-center mb-0">
                                 ${game.room}

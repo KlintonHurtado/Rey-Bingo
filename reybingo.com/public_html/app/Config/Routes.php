@@ -250,6 +250,7 @@ $routes->get('playings/generateCartons/(:num)', 'Playings::generateCartons/$1');
 $routes->get('playings/getGameStatus', 'Playings::getGameStatus');
 $routes->post('playings/getShareLink', 'Playings::getShareLink');
 $routes->get('playings/getShareLink', 'Playings::getShareLink');
+$routes->post('playings/broadcastModalityToggle', 'Playings::broadcastModalityToggle');
 
 // Modo Espectador routes (públicas)
 $routes->get('espectador/(:segment)', 'Spectator::view/$1');

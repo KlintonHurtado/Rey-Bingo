@@ -3339,4 +3339,38 @@ class Playings extends Controller
             'min_cartons'     => (int) ($game['min_cartons'] ?? 10)
         ]);
     }
-}
+
+    /**
+     * Sincroniza en tiempo real el despliegue/cierre del panel de modalidades
+     * hacia los espectadores del jugador que está jugando.
+     */
+    public function broadcastModalityToggle()
+    {
+        if (!session()->get('logged_in')) {
+            return $this->response->setJSON(['status' => 'error', 'message' => 'Unauthorized']);
+        }
+        $gameId = (int) $this->request->getPost('game_id');
+        $open   = (int) $this->request->getPost('open');
+        $userId = (int) session()->get('id');
+
+        try {
+            $client = null;
+            if (function_exists('bingo_get_broadcast_client')) {
+                $client = bingo_get_broadcast_client();
+            } elseif (class_exists(\App\Libraries\PusherFactory::class) && class_exists(\Pusher\Pusher::class)) {
+                $client = \App\Libraries\PusherFactory::make();
+            }
+
+            if ($client && $gameId > 0 && $userId > 0) {
+                $client->trigger('private-game-' . $gameId, 'player:modalities_toggled', [
+                    'user_id' => $userId,
+                    'open'    => (bool) $open
+                ]);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'broadcastModalityToggle error: ' . $e->getMessage());
+        }
+
+        return $this->response->setJSON(['status' => 'success']);
+    }
+}

@@ -65,7 +65,7 @@ function attachNotificationSwipeDismiss(notificationEl, onDismiss) {
             }
             notificationEl._autoHideTimer = setTimeout(() => {
                 onDismiss(notificationEl);
-            }, 6000);
+            }, 4000);
         }
     };
 
@@ -75,10 +75,15 @@ function attachNotificationSwipeDismiss(notificationEl, onDismiss) {
         deltaX = 0;
         notificationEl.classList.add('is-dragging');
         notificationEl.style.transition = 'none';
+        // Nunca anular permanentemente: mantener cierre de seguridad en 5s por si el gesto se interrumpe
         if (notificationEl._autoHideTimer) {
             clearTimeout(notificationEl._autoHideTimer);
-            notificationEl._autoHideTimer = null;
         }
+        notificationEl._autoHideTimer = setTimeout(() => {
+            if (typeof onDismiss === 'function') {
+                onDismiss(notificationEl);
+            }
+        }, 5000);
     };
 
     const moveDrag = (clientX) => {
@@ -121,12 +126,12 @@ function attachNotificationSwipeDismiss(notificationEl, onDismiss) {
     });
 
     // TEMPORIZADOR DURO DE SEGURIDAD (Hard Expiry):
-    // Garantiza que la notificación desaparecerá sin importar clics o toques accidentales
+    // Garantiza que la notificación desaparecerá sí o sí a los 7 segundos sin importar clics o toques accidentales
     if (!notificationEl._hardExpiryTimer) {
         notificationEl._hardExpiryTimer = setTimeout(() => {
             if (typeof onDismiss === 'function' && notificationEl.parentNode) {
                 onDismiss(notificationEl);
             }
-        }, 12000);
+        }, 7000);
     }
 }

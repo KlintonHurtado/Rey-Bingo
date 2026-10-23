@@ -236,6 +236,7 @@ class PusherClient {
             'game:game_finished',
             'game:player_joined',
             'player:number_marked',
+            'player:modalities_toggled',
             'game:message',
             'game:chat_message',
             'game:postponed',

@@ -946,12 +946,6 @@ function showOtherPlayerBingoNotice(data, callback) {
             officialWinners: Array.isArray(data.officialWinners) ? data.officialWinners : undefined,
             __fromLiveNotice: true
         });
-
-        // Forzar recarga inmediata del endpoint de notificaciones para que el admin
-        // reciba la lista completa y actualizada sin esperar al siguiente ciclo de polling
-        if (typeof window.loadNotifications === 'function') {
-            setTimeout(function() { window.loadNotifications(); }, 400);
-        }
     }
 
     // 3. Efectos visuales de confeti
