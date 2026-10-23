@@ -420,7 +420,7 @@ html:has(#content-page > .operator-panel-fit) {
     margin-top: 0.2rem;
 }
 
-/* Lista de juegos admin: botón + anclado al card de filtros */
+/* Lista de juegos admin: filtros alineados horizontalmente */
 .admin-games-filters-card {
     position: relative;
     overflow: visible;
@@ -428,8 +428,9 @@ html:has(#content-page > .operator-panel-fit) {
 }
 
 .admin-games-filters-card .btn-add-new {
-    top: -18px;
-    right: 8px;
+    position: static;
+    top: auto;
+    right: auto;
     z-index: 2;
 }
 
@@ -2517,6 +2518,8 @@ html.reybingo-skip-preloader .preloader {
         max-height: min(38dvh, 280px) !important;
     }
 
+    .modal-dialog.max-w-85,
+    .modal-dialog.max-w-80,
     .modal-dialog.max-w-75,
     .modal-dialog.max-w-70 {
         max-width: 96% !important;

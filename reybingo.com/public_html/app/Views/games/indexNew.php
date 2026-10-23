@@ -4,10 +4,9 @@
             <div class="card mb-3">
                 <div class="collapse show">
                     <div class="card-body p-3">
-                        <button type="button" class="btn btn-small btn-primary btn-modal-add text-white float-end mt-4 btn-add-new" onclick="gameAdd();"><i class="fa-duotone fa-solid fa-plus"></i></button>
-                        <div class="row g-2">
+                        <div class="row g-2 align-items-end">
                             <?php $today = date('Y-m-d'); ?>
-                            <div class="col-md-4">
+                            <div class="col-md">
                                 <label for="datefilter" class="form-label"><?= translate('date'); ?></label>
                                 <select class='form-control form-control-lg form-bingo' name="datefilter" id="datefilter" onchange="gameslistGet();">
                                     <option value="all"><?= translate('all dates') ?></option>
@@ -23,7 +22,7 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md">
                                 <label for="roomfilter" class="form-label"><?= translate('room'); ?></label>
                                 <select class='form-control form-control-lg form-bingo' name="roomfilter" id="roomfilter">
                                     <option value="all"><?= translate('all rooms') ?></option>
@@ -33,13 +32,19 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md">
                                 <label for="statusfilter" class="form-label"><?= translate('status'); ?></label>
                                 <select class='form-control form-control-lg form-bingo' name="statusfilter" id="statusfilter">
                                     <?php foreach ($status as $key => $statu): ?>
                                         <option value="<?= esc($key) ?>"><?= esc($statu) ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+
+                            <div class="col-md-auto col-12 d-flex align-items-end justify-content-center pb-1">
+                                <button type="button" class="btn btn-small btn-primary btn-modal-add text-white m-0" style="margin-bottom: 5px !important;" onclick="gameAdd();" title="<?= translate('add game'); ?>">
+                                    <i class="fa-duotone fa-solid fa-plus"></i>
+                                </button>
                             </div>
                         </div>
                     </div>

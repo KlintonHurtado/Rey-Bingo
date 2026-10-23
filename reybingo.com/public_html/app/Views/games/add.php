@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-dialog-centered max-w-60" id="modalAddgame">
+<div class="modal-dialog modal-dialog-centered max-w-80" id="modalAddgame">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2" id="game-modal-title"><i class="fa-duotone fa-solid fa-gamepad"></i> <?= translate('add game'); ?></h6>

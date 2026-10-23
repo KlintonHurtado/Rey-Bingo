@@ -789,26 +789,35 @@ $isNoMusicRole = session()->get('logged_in') && (
                         
                         // Filtrar notificaciones verdaderamente nuevas que no hayan sido mostradas ni procesadas
                         const freshNotifications = limitedNotifications.filter(n => {
-                            const id = n.id ? String(n.id) : null;
-                            return !id || !window.__isNotifIdSeen(id);
+                            const id = n.id ? String(n.id) : (n.singId ? 'sing_' + n.singId : `${n.type || 'msg'}_${n.game || ''}_${n.created_at || ''}`);
+                            return !window.__isNotifIdSeen(id);
                         });
 
                         // Reproducir sonido UNA SOLA VEZ y ÚNICAMENTE si hay notificaciones genuinamente nuevas
                         if (freshNotifications.length > 0) {
-                            hasPlayedSound = false;
-                            const hasGameNotification = freshNotifications.some(n => {
-                                return n.type === 'game'
-                                    || n.type === 'new_game'
-                                    || (n.title && /partida/i.test(n.title))
-                                    || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
-                            });
-                            const soundType = hasGameNotification ? 'game' : 'default';
-                            playNotificationSound(soundType, false);
+                            const isGameRoom = window.location.pathname.indexOf('/boards/board') !== -1 ||
+                                               window.location.pathname.indexOf('/boards/live') !== -1 ||
+                                               window.location.pathname.indexOf('/playings/playing') !== -1;
+                            const hasSingEvent = freshNotifications.some(n => n.type === 'sing' || n.type === 'own_sing');
+                            // Si estamos en una sala de juego activa y es un cante, el juego ya maneja el sonido
+                            if (!isGameRoom || !hasSingEvent) {
+                                hasPlayedSound = false;
+                                const hasGameNotification = freshNotifications.some(n => {
+                                    return n.type === 'game'
+                                        || n.type === 'new_game'
+                                        || (n.title && /partida/i.test(n.title))
+                                        || (n.message && (/precio.*cart[oó]n/i.test(n.message) || /premio.*total/i.test(n.message)));
+                                });
+                                const soundType = hasGameNotification ? 'game' : 'default';
+                                playNotificationSound(soundType, false);
+                            }
                         }
 
                         // Procesar cada notificación
                         const notifIdsToMark = [];
                         limitedNotifications.forEach(notification => {
+                            const notifIdStr = notification.id ? String(notification.id) : (notification.singId ? 'sing_' + notification.singId : `${notification.type || 'msg'}_${notification.game || ''}_${notification.created_at || ''}`);
+                            window.__markNotifIdSeen(notifIdStr);
                             showNotification(notification);
                             if (notification.id) {
                                 notifIdsToMark.push(notification.id);
@@ -853,7 +862,7 @@ $isNoMusicRole = session()->get('logged_in') && (
 
             window.showNotification = function showNotification(notification) {
                 if (!notification) return;
-                const notifId = notification.id ? String(notification.id) : null;
+                const notifId = notification.id ? String(notification.id) : (notification.singId ? 'sing_' + notification.singId : `${notification.type || 'msg'}_${notification.game || ''}_${notification.created_at || ''}`);
                 if (notifId && window.__isNotifIdSeen(notifId)) {
                     return;
                 }
@@ -2683,7 +2692,7 @@ $isNoMusicRole = session()->get('logged_in') && (
             userChannel.bind('notification:new', function(data) {
                 console.log('Realtime user notification received:', data);
                 if (!data) return;
-                const notifId = data.id ? String(data.id) : null;
+                const notifId = data.id ? String(data.id) : (data.singId ? 'sing_' + data.singId : `${data.type || 'msg'}_${data.game || ''}_${data.created_at || ''}`);
                 if (notifId && typeof window.__isNotifIdSeen === 'function' && window.__isNotifIdSeen(notifId)) {
                     return; // Ya procesada (deduplicada contra HTTP polling o evento repetido)
                 }
@@ -2693,6 +2702,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                 } else if (notifId && typeof window.__markNotifIdSeen === 'function') {
                     window.__markNotifIdSeen(notifId);
                 }
+
+                const isGameRoom = window.location.pathname.indexOf('/boards/board') !== -1 ||
+                                   window.location.pathname.indexOf('/boards/live') !== -1 ||
+                                   window.location.pathname.indexOf('/playings/playing') !== -1;
 
                 const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)) || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message))));
                 const isSingEvent = data && !isNewGame && (data.type === 'sing' || data.type === 'own_sing');
@@ -2709,7 +2722,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                     const isOwnWin = (data.winnerUserId && parseInt(data.winnerUserId, 10) === parseInt(userId, 10)) ||
                                      (data.type === 'own_sing') ||
                                      (data.title && /has cantado/i.test(data.title));
-                    if (typeof playNotificationSound === 'function') {
+                    if (!isGameRoom && typeof playNotificationSound === 'function') {
                         playNotificationSound(isOwnWin ? 'winner' : 'default', isOwnWin);
                     }
                     if (isOwnWin && typeof AppcreateConfetti === 'function') {

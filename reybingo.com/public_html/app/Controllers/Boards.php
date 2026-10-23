@@ -571,6 +571,8 @@ class Boards extends Controller {
             $responsePayload['modalityName'] = $result['modalityName'] ?? ($result['modality'] ?? '');
             $responsePayload['modalityId'] = (int) ($result['modalityId'] ?? 0);
             $responsePayload['cartonId'] = (int) ($result['cartonId'] ?? 0);
+            $responsePayload['singId'] = (int) ($result['singId'] ?? 0);
+            $responsePayload['id'] = 'sing_' . $responsePayload['singId'] . '_' . $responsePayload['modalityId'];
             $responsePayload['image'] = $result['image'] ?? site_url('assets/img/avatar.jpg');
         } elseif ($result['status'] === 'pause' && !empty($result['pendingSing'])) {
             $ps = $result['pendingSing'];
@@ -580,6 +582,8 @@ class Boards extends Controller {
             $responsePayload['modalityName'] = $responsePayload['modality'];
             $responsePayload['modalityId'] = (int) ($ps['modalityId'] ?? ($ps['modality'] ?? 0));
             $responsePayload['cartonId'] = (int) ($ps['cartonId'] ?? ($ps['carton'] ?? 0));
+            $responsePayload['singId'] = (int) ($ps['singId'] ?? ($ps['sing'] ?? 0));
+            $responsePayload['id'] = 'sing_' . $responsePayload['singId'] . '_' . $responsePayload['modalityId'];
             $responsePayload['image'] = $ps['image'] ?? site_url('assets/img/avatar.jpg');
         }
 
@@ -592,6 +596,8 @@ class Boards extends Controller {
                 $responsePayload['modalityName'] = $lastW['modalityName'] ?? ($lastW['modality'] ?? '');
                 $responsePayload['modalityId'] = (int) ($lastW['modalityId'] ?? 0);
                 $responsePayload['cartonId'] = (int) ($lastW['cartonId'] ?? 0);
+                $responsePayload['singId'] = (int) ($lastW['singId'] ?? 0);
+                $responsePayload['id'] = 'sing_' . $responsePayload['singId'] . '_' . $responsePayload['modalityId'];
                 $responsePayload['image'] = $lastW['image'] ?? site_url('assets/img/avatar.jpg');
             }
         }
@@ -678,6 +684,7 @@ class Boards extends Controller {
 
                 return $this->response->setJSON([
                     'status' => 'completed',
+                    'id' => 'sing_' . (int) ($pendingBoardSing['singId'] ?? 0) . '_' . (int) ($pendingBoardSing['modalityId'] ?? 0),
                     'totalNumbersGenerated' => $totalNumbersGenerated,
                     'drawnNumbers' => $drawnNumbers,
                     'winners' => $winners,
@@ -697,6 +704,7 @@ class Boards extends Controller {
 
             return $this->response->setJSON([
                 'status' => 'pause',
+                'id' => 'sing_' . (int) ($pendingBoardSing['singId'] ?? 0) . '_' . (int) ($pendingBoardSing['modalityId'] ?? 0),
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,

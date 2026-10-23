@@ -245,12 +245,42 @@ class AudioManager {
             audio.src = src;
             this.audioCache.set(src, audio);
         }
+
+        // Si es sonido de ganador o notificación y ya está sonando, no solapar otra copia
+        if (/winner\.mp3|notification\.mp3|success\.mp3/i.test(src)) {
+            if (!audio.paused && !audio.ended && audio.currentTime > 0) {
+                return audio;
+            }
+        }
         
-        // Clone para permitir múltiples reproducciones simultáneas
+        if (audio.paused || audio.ended) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.warn('Audio play failed:', e));
+            return audio;
+        }
+
+        // Clone para permitir múltiples reproducciones simultáneas de bolas
         const audioClone = audio.cloneNode();
         audioClone.play().catch(e => console.warn('Audio play failed:', e));
+        audioClone.onended = function () {
+            audioClone.src = '';
+            audioClone.onended = null;
+        };
         
         return audioClone;
+    }
+
+    stopWinnerAudio() {
+        try {
+            this.audioCache.forEach((audio, src) => {
+                if (/winner\.mp3|notification\.mp3|success\.mp3/i.test(src)) {
+                    if (audio && !audio.paused) {
+                        audio.pause();
+                        audio.currentTime = 0;
+                    }
+                }
+            });
+        } catch (e) {}
     }
     
     preloadNumberAudios() {
@@ -886,38 +916,27 @@ function mergeWinnersFromServer(serverWinners) {
     });
 }
 
-function showOtherPlayerBingoNotice(data, callback) {
-    if (!data) {
+function playWinnerSoundOnce(modalityId, singId, playerName, modalityName) {
+    window.__winnerAudioPlayed = window.__winnerAudioPlayed || new Set();
+    window.__lastWinnerAudioTime = window.__lastWinnerAudioTime || 0;
+
+    const keys = [];
+    if (singId) keys.push('sing_' + singId);
+    if (modalityId) keys.push('mod_' + modalityId);
+    if (singId && modalityId) keys.push('sing_' + singId + '_' + modalityId);
+    if (playerName && modalityName) keys.push(String(playerName).trim().toLowerCase() + '_' + String(modalityName).trim().toLowerCase());
+
+    const alreadyPlayed = keys.some(k => window.__winnerAudioPlayed.has(k));
+    const now = Date.now();
+    // Protección absoluta: nunca re-reproducir sonido de ganador si ya sonó para este cante/modalidad
+    // o si han pasado menos de 10 segundos desde el último audio de ganador
+    if (alreadyPlayed || (now - window.__lastWinnerAudioTime < 10000)) {
         return;
     }
 
-    mergeWinnersFromServer(data.winners);
-    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+    keys.forEach(k => window.__winnerAudioPlayed.add(k));
+    window.__lastWinnerAudioTime = now;
 
-    const noticeKey = getBingoDedupeKey(data);
-
-    if (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) {
-        if (typeof callback === 'function') {
-            callback();
-        }
-        return;
-    }
-    if (noticeKey && window.seenBingoNotices) {
-        window.seenBingoNotices.add(noticeKey);
-    }
-    if (data.player && data.modality && window.seenBingoNotices) {
-        window.seenBingoNotices.add(String(data.player).trim() + '_' + String(data.modality).trim());
-    }
-
-    if (data.player && data.modality) {
-        if (!winners.some(w => w.player === data.player && w.modality === data.modality)) {
-            winners.push({ player: data.player, modality: data.modality });
-        }
-    }
-
-    window.__lastWinnerNoticeTime = Date.now();
-
-    // 1. Reproducir sonido de notificación con winner.mp3 (sin bloquear)
     try {
         if (typeof audioManager !== 'undefined' && audioManager.play) {
             audioManager.play(audioPath + 'winner.mp3');
@@ -927,6 +946,58 @@ function showOtherPlayerBingoNotice(data, callback) {
     } catch (e) {
         console.warn('Error al reproducir audio de ganador:', e);
     }
+}
+
+function showOtherPlayerBingoNotice(data, callback) {
+    if (!data) {
+        return;
+    }
+
+    mergeWinnersFromServer(data.winners);
+    markModalityCardWon(data.modalityId || data.modality, data.modalityName || data.modality);
+
+    const playerName = data.player || data.userName || data.playerName || 'Jugador';
+    const modalityName = data.modalityName || data.modality || 'Bingo';
+    const modalityId = data.modalityId || data.modality || 0;
+    const singId = data.singId || (data.sings && data.sings[0] && data.sings[0].id) || 0;
+    const cartonId = data.cartonId || data.carton || '';
+
+    const noticeKey = getBingoDedupeKey(data);
+
+    const isAlreadySeen = (noticeKey && window.seenBingoNotices && window.seenBingoNotices.has(noticeKey)) ||
+                          (singId && window.seenBingoNotices && window.seenBingoNotices.has('sing_' + singId)) ||
+                          (modalityId && window.seenBingoNotices && window.seenBingoNotices.has('mod_' + modalityId)) ||
+                          (playerName && modalityName && window.seenBingoNotices && window.seenBingoNotices.has(String(playerName).trim() + '_' + String(modalityName).trim()));
+
+    if (isAlreadySeen) {
+        if (typeof callback === 'function') {
+            callback();
+        }
+        return;
+    }
+    if (window.seenBingoNotices) {
+        if (noticeKey) window.seenBingoNotices.add(noticeKey);
+        if (singId) {
+            window.seenBingoNotices.add('sing_' + singId);
+            if (modalityId) window.seenBingoNotices.add('sing_' + singId + '_' + modalityId);
+        }
+        if (modalityId) window.seenBingoNotices.add('mod_' + modalityId);
+        if (cartonId) window.seenBingoNotices.add('carton_' + cartonId + '_' + modalityId);
+        if (playerName && modalityName) {
+            window.seenBingoNotices.add(String(playerName).trim() + '_' + String(modalityName).trim());
+        }
+    }
+
+    if (playerName && modalityName) {
+        if (!winners.some(w => w.player === playerName && (w.modality === modalityName || w.modalityId === modalityId))) {
+            winners.push({ player: playerName, modality: modalityName, modalityId: modalityId, cartonId: cartonId });
+        }
+    }
+
+    window.__lastWinnerNoticeTime = Date.now();
+
+    // 1. Reproducir sonido de notificación con winner.mp3 UNA SOLA VEZ
+    playWinnerSoundOnce(modalityId, singId, playerName, modalityName);
 
     const modalityClean = (data.modality || data.modalityName || 'Bingo').replace(/^la\s+/i, '').trim();
     const modalityLabel = /^bingo/i.test(modalityClean) || /^pleno/i.test(modalityClean)
@@ -1155,6 +1226,9 @@ function paintLiveCenterBallOnly(parsed, onDone) {
 }
 
 function paintLiveBallUi(newNumber, totalNumbersGenerated) {
+    if (typeof audioManager !== 'undefined' && audioManager.stopWinnerAudio) {
+        audioManager.stopWinnerAudio();
+    }
     const parsed = parseInt(newNumber, 10);
     if (!parsed) {
         return;
@@ -1307,8 +1381,7 @@ function generateNumber(number) {
                 const pKey = getBingoDedupeKey(winnerData);
                 if (winnerData.player && winnerData.modality) {
                     markModalityCardWon(winnerData.modalityId, winnerData.modality);
-                    const timeSinceNotice = window.__lastWinnerNoticeTime ? (Date.now() - window.__lastWinnerNoticeTime) : 99999;
-                    if (!pKey || !window.seenBingoNotices.has(pKey) || timeSinceNotice > 4500) {
+                    if (!pKey || !window.seenBingoNotices.has(pKey)) {
                         showOtherPlayerBingoNotice(winnerData, function() {
                             showGameFinalized();
                         });
@@ -1489,8 +1562,7 @@ function lastNumberGet() {
                 const pKey = getBingoDedupeKey(winnerData);
                 if (winnerData.player && winnerData.modality) {
                     markModalityCardWon(winnerData.modalityId, winnerData.modality);
-                    const timeSinceNotice = window.__lastWinnerNoticeTime ? (Date.now() - window.__lastWinnerNoticeTime) : 99999;
-                    if (!pKey || !window.seenBingoNotices.has(pKey) || timeSinceNotice > 4500) {
+                    if (!pKey || !window.seenBingoNotices.has(pKey)) {
                         showOtherPlayerBingoNotice(winnerData, () => {
                             showGameFinalized();
                         });
