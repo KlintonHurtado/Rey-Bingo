@@ -204,9 +204,7 @@
             padding: 0.15rem 6px 5rem !important;
         }
 
-        .player-play-view .play-cards,
-        .player-play-view .play-cards--multi,
-        .player-play-view .play-cards--single {
+        .player-play-view .play-cards--multi {
             display: grid !important;
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
             gap: 10px !important;
@@ -221,7 +219,30 @@
             flex-wrap: unset !important;
         }
 
-        .player-play-view .play-room-slide {
+        .player-play-view .play-cards--single {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            width: 100% !important;
+            max-width: 360px !important;
+            margin: 0 auto !important;
+            padding: 0 4px !important;
+            grid-template-columns: unset !important;
+        }
+
+        .player-play-view .play-cards--single .play-room-slide {
+            flex: none !important;
+            width: 100% !important;
+            max-width: 350px !important;
+            margin: 0 auto !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: stretch !important;
+            box-sizing: border-box;
+        }
+
+        .player-play-view .play-cards--multi .play-room-slide {
             flex: none !important;
             width: 100% !important;
             min-width: 0 !important;
@@ -256,9 +277,143 @@
             touch-action: manipulation;
         }
 
-        .player-play-view .play-cards .card,
-        .player-play-view .play-cards--multi .card,
+        /* Card individual en pantalla móvil (como en 1b0c495a) */
         .player-play-view .play-cards--single .card {
+            width: 100% !important;
+            max-width: 350px !important;
+            margin: 0 auto !important;
+            border-radius: 18px !important;
+            overflow: hidden !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28) !important;
+            color: #fff !important;
+            position: relative !important;
+        }
+
+        .player-play-view .play-cards--single .card .card-img-top {
+            max-height: 105px !important;
+            width: auto !important;
+            max-width: 75% !important;
+            margin: 22px auto 6px !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            display: block !important;
+        }
+
+        .player-play-view .play-cards--single .card .card-title {
+            font-size: 1.35rem !important;
+            letter-spacing: 0.01em !important;
+            margin: 0 0 2px !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+        }
+
+        .player-play-view .play-cards--single .card .card-body p,
+        .player-play-view .play-cards--single .card .scrolling-text {
+            font-size: 0.95rem !important;
+            margin: 0 0 4px !important;
+            opacity: 0.95 !important;
+            color: #fff !important;
+            max-width: 100% !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            text-overflow: unset !important;
+            text-align: center !important;
+        }
+
+        .player-play-view .play-cards--single .card .list-group,
+        .player-play-view .play-cards--single .card .list-group-flush {
+            background: transparent !important;
+            border: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .player-play-view .play-cards--single .card .list-group-flush li {
+            padding: 2px 10px !important;
+            font-size: 0.92rem !important;
+            color: #fff !important;
+            background: transparent !important;
+            border: 0 !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+        }
+
+        .player-play-view .play-cards--single .card .card-body {
+            padding: 6px 14px !important;
+        }
+
+        .player-play-view .play-cards--single .card .card-buy-actions {
+            padding: 8px 14px 14px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 6px !important;
+        }
+
+        .player-play-view .play-cards--single .card .btn {
+            padding: 10px 14px !important;
+            font-size: 0.95rem !important;
+            margin-bottom: 2px !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            line-height: 1.25 !important;
+            width: 100% !important;
+        }
+
+        .player-play-view .play-cards--single .card-hour {
+            top: 10px !important;
+            left: 10px !important;
+            right: auto !important;
+            font-size: 0.85rem !important;
+            padding: 5px 12px !important;
+            border-radius: 8px !important;
+            background: #ffeb3b !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+            z-index: 5 !important;
+            white-space: nowrap !important;
+        }
+
+        .player-play-view .play-cards--single .card-price {
+            top: 28px !important;
+            right: -44px !important;
+            font-size: 0.82rem !important;
+            padding: 5px 38px !important;
+            background: #e53935 !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+            transform: rotate(45deg) !important;
+            z-index: 5 !important;
+            white-space: nowrap !important;
+        }
+
+        .player-play-view .play-cards--single .card-time-display {
+            font-size: 0.82rem !important;
+            padding: 4px 14px !important;
+            margin: 4px 0 !important;
+            background: #0a1b47 !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+            border-radius: 999px !important;
+            display: inline-block !important;
+        }
+
+        .player-play-view .play-cards--single .card > .text-end {
+            position: absolute !important;
+            top: 44px !important;
+            left: 10px !important;
+            z-index: 5 !important;
+            padding: 0 !important;
+        }
+
+        .player-play-view .play-cards--single .favorite-game-btn {
+            width: 32px !important;
+            height: 32px !important;
+            font-size: 0.95rem !important;
+        }
+
+        /* Estilo compacto solo para rejilla multi-sala */
+        .player-play-view .play-cards--multi .card {
             flex: 1 1 auto !important;
             width: 100% !important;
             min-width: 0 !important;
@@ -270,7 +425,7 @@
             color: #fff;
         }
 
-        .player-play-view .play-cards .card > .text-end {
+        .player-play-view .play-cards--multi .card > .text-end {
             position: absolute;
             top: 34px;
             left: 6px;
@@ -278,13 +433,13 @@
             padding: 0 !important;
         }
 
-        .player-play-view .play-cards .favorite-game-btn {
+        .player-play-view .play-cards--multi .favorite-game-btn {
             width: 24px;
             height: 24px;
             font-size: 0.72rem;
         }
 
-        .player-play-view .play-cards .card .card-img-top {
+        .player-play-view .play-cards--multi .card .card-img-top {
             max-height: 52px !important;
             width: auto !important;
             max-width: 72% !important;
@@ -294,7 +449,7 @@
             display: block;
         }
 
-        .player-play-view .play-cards .card .card-title {
+        .player-play-view .play-cards--multi .card .card-title {
             font-size: 0.92rem !important;
             letter-spacing: 0.02em;
             margin: 0 0 1px !important;
@@ -302,8 +457,8 @@
             font-weight: 800;
         }
 
-        .player-play-view .play-cards .card .card-body p,
-        .player-play-view .play-cards .card .scrolling-text {
+        .player-play-view .play-cards--multi .card .card-body p,
+        .player-play-view .play-cards--multi .card .scrolling-text {
             font-size: 0.72rem !important;
             margin: 0 !important;
             opacity: 0.95;
@@ -314,13 +469,13 @@
             text-overflow: ellipsis;
         }
 
-        .player-play-view .play-cards .list-group,
-        .player-play-view .play-cards .list-group-flush {
+        .player-play-view .play-cards--multi .list-group,
+        .player-play-view .play-cards--multi .list-group-flush {
             background: transparent !important;
             border: 0 !important;
         }
 
-        .player-play-view .play-cards .card .list-group-flush li {
+        .player-play-view .play-cards--multi .card .list-group-flush li {
             padding: 1px 6px !important;
             font-size: 0.72rem !important;
             color: #fff !important;
@@ -329,20 +484,20 @@
             font-weight: 600;
         }
 
-        .player-play-view .play-cards .bingo-bg-warning,
-        .player-play-view .play-cards .bingo-bg-warning .card-title,
-        .player-play-view .play-cards .bingo-bg-warning .list-group-flush li,
-        .player-play-view .play-cards .bingo-bg-white,
-        .player-play-view .play-cards .bingo-bg-white .card-title,
-        .player-play-view .play-cards .bingo-bg-white .list-group-flush li {
+        .player-play-view .play-cards--multi .bingo-bg-warning,
+        .player-play-view .play-cards--multi .bingo-bg-warning .card-title,
+        .player-play-view .play-cards--multi .bingo-bg-warning .list-group-flush li,
+        .player-play-view .play-cards--multi .bingo-bg-white,
+        .player-play-view .play-cards--multi .bingo-bg-white .card-title,
+        .player-play-view .play-cards--multi .bingo-bg-white .list-group-flush li {
             color: #fff !important;
         }
 
-        .player-play-view .play-cards .card .card-body {
+        .player-play-view .play-cards--multi .card .card-body {
             padding: 2px 6px 6px !important;
         }
 
-        .player-play-view .play-cards .card .btn {
+        .player-play-view .play-cards--multi .card .btn {
             padding: 5px 8px !important;
             font-size: 0.72rem !important;
             margin-bottom: 4px !important;
@@ -351,14 +506,14 @@
             line-height: 1.2;
         }
 
-        .player-play-view .play-cards .card .btn:disabled,
-        .player-play-view .play-cards .card .btn.disabled {
+        .player-play-view .play-cards--multi .card .btn:disabled,
+        .player-play-view .play-cards--multi .card .btn.disabled {
             opacity: 0.85;
             background: rgba(60, 70, 90, 0.75) !important;
             color: #e8e8e8 !important;
         }
 
-        .player-play-view .play-cards .card-hour {
+        .player-play-view .play-cards--multi .card-hour {
             top: 8px !important;
             left: 8px !important;
             right: auto !important;
@@ -371,7 +526,7 @@
             white-space: nowrap;
         }
 
-        .player-play-view .play-cards .card-price {
+        .player-play-view .play-cards--multi .card-price {
             top: 18px !important;
             right: -42px !important;
             font-size: 0.58rem !important;
@@ -382,7 +537,7 @@
             white-space: nowrap;
         }
 
-        .player-play-view .play-cards .card-time-display {
+        .player-play-view .play-cards--multi .card-time-display {
             font-size: 0.58rem !important;
             padding: 2px 6px !important;
             margin-top: 2px;

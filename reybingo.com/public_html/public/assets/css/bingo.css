@@ -7167,276 +7167,92 @@ input[type=number]::-webkit-outer-spin-button {
 /* Adaptación responsive para móvil */
 @media (max-width: 768px) {
     .card.card-has-cover,
-    .player-play-view .play-cards .card.card-has-cover {
+    .player-play-view .play-cards .card.card-has-cover,
+    .player-play-view .play-cards--single .card.card-has-cover {
         border-radius: 18px !important;
+        width: 100% !important;
+        max-width: 350px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
     }
 
     .card.card-has-cover .card-cover-wrapper {
-        height: 125px;
-        min-height: 110px;
+        height: 160px;
+        min-height: 140px;
     }
 
     .card.card-has-cover .card-cover-wave {
-        height: 32px;
+        height: 38px;
+        bottom: -1px;
     }
 
     .card.card-has-cover .card-hour {
-        top: 8px !important;
-        left: 8px !important;
-        font-size: 0.65rem !important;
-        padding: 3px 8px !important;
+        top: 10px !important;
+        left: 10px !important;
+        font-size: 0.82rem !important;
+        padding: 4px 12px !important;
+        border-radius: 999px !important;
+        font-weight: 800 !important;
     }
 
     .card.card-has-cover .card-price {
-        top: 20px !important;
-        right: -38px !important;
-        font-size: 0.62rem !important;
-        padding: 4px 34px !important;
+        top: 24px !important;
+        right: -42px !important;
+        font-size: 0.74rem !important;
+        padding: 5px 42px !important;
+        font-weight: 800 !important;
+    }
+
+    .card.card-has-cover .favorite-game-btn {
+        top: 42px !important;
+        left: 10px !important;
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 0.85rem !important;
     }
 
     .card.card-has-cover .card-title {
-        font-size: 0.98rem !important;
+        font-size: 1.25rem !important;
+        font-weight: 800 !important;
     }
 
     .card.card-has-cover .card-room-description {
-        font-size: 0.78rem !important;
+        font-size: 0.92rem !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
     }
 
     .card.card-has-cover .card-date {
-        font-size: 0.74rem !important;
+        font-size: 0.85rem !important;
     }
 
-    .card.card-has-cover .card-prize-line {
-        font-size: 0.76rem !important;
+    .card.card-has-cover .card-prize-line,
+    .card.card-has-cover .card-prize {
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
     }
 
     .card.card-has-cover .card-time-display {
-        font-size: 0.68rem !important;
-        padding: 3px 7px !important;
+        font-size: 0.82rem !important;
+        padding: 4px 12px !important;
+        border-radius: 999px !important;
+    }
+
+    .card.card-has-cover .card-buy-actions {
+        padding: 8px 14px 14px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
     }
 
     .card.card-has-cover .card-buy-actions .btn {
-        font-size: 0.8rem !important;
-        padding: 7px 10px !important;
-        border-radius: 10px !important;
-    }
+        font-size: 0.95rem !important;
+        padding: 10px 14px !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
 }
-
-/* ==========================================================================
-   MODALIDADES CON IMAGEN PERSONALIZADA (ESTILO MODERNO INTEGRADO)
-   ========================================================================== */
-.border-carton.border-carton-has-image,
-.modalities-display .border-carton.border-carton-has-image,
-.modalities-display-container .border-carton.border-carton-has-image {
-    padding: 0 0 12px 0 !important;
-    border: 3.5px solid #2855ff !important;
-    border-radius: 20px !important;
-    background: #ffffff !important;
-    overflow: hidden !important;
-    box-shadow: 0 12px 28px rgba(40, 85, 255, 0.22), 0 4px 10px rgba(0, 0, 0, 0.08) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    position: relative !important;
-    flex: 0 0 auto !important;
-    transition: transform 0.25s ease, box-shadow 0.25s ease !important;
-    min-width: 250px !important;
-    max-width: 300px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-
-.border-carton.border-carton-has-image:hover,
-.modalities-display .border-carton.border-carton-has-image:hover,
-.modalities-display-container .border-carton.border-carton-has-image:hover {
-    transform: translateY(-4px) !important;
-    box-shadow: 0 16px 36px rgba(40, 85, 255, 0.32), 0 6px 14px rgba(0, 0, 0, 0.12) !important;
-}
-
-/* Imagen superior de portada de la modalidad */
-.border-carton-has-image .modality-cover-wrapper {
-    position: relative;
-    width: 100%;
-    height: 150px;
-    min-height: 130px;
-    overflow: hidden;
-    background: linear-gradient(135deg, #4c1d95, #6d28d9);
-    margin: 0;
-    padding: 0;
-}
-
-.border-carton-has-image .modality-cover-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    display: block;
-    transition: transform 0.4s ease;
-}
-
-.border-carton-has-image:hover .modality-cover-img {
-    transform: scale(1.04);
-}
-
-/* Tarjeta flotante blanca interior con el título y el patrón 5x5 */
-.border-carton-has-image .modality-body-card {
-    position: relative !important;
-    z-index: 2 !important;
-    background: #ffffff !important;
-    border-radius: 16px !important;
-    margin: -24px 12px 8px 12px !important;
-    padding: 10px 12px 12px 12px !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-}
-
-.border-carton-has-image .modality-name {
-    display: block !important;
-    text-align: center !important;
-    font-family: 'Fredoka One', 'Roboto', sans-serif !important;
-    font-size: 1.05rem !important;
-    font-weight: 800 !important;
-    color: #0f172a !important;
-    margin: 0 0 8px 0 !important;
-    line-height: 1.25 !important;
-    text-transform: none !important;
-}
-
-/* Cuadrícula de patrón 5x5 */
-.border-carton-has-image .carton {
-    width: 100% !important;
-    max-width: 200px !important;
-    height: auto !important;
-    aspect-ratio: 5 / 6 !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
-    grid-template-rows: auto repeat(5, 1fr) !important;
-    gap: 4px !important;
-}
-
-/* Letras B-I-N-G-O estilo píldoras de color */
-.border-carton-has-image .card-letter {
-    width: 100% !important;
-    aspect-ratio: 1 !important;
-    height: auto !important;
-    border-radius: 5px !important;
-    font-size: 0.78rem !important;
-    font-weight: 800 !important;
-    color: #ffffff !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
-}
-
-.border-carton-has-image .card-letter.B { background: #ef4444 !important; }
-.border-carton-has-image .card-letter.I { background: #f59e0b !important; }
-.border-carton-has-image .card-letter.N { background: #10b981 !important; }
-.border-carton-has-image .card-letter.G { background: #3b82f6 !important; }
-.border-carton-has-image .card-letter.O { background: #a855f7 !important; }
-
-/* Celdas del cartón (inactivas y marcadas) */
-.border-carton-has-image .card-number {
-    width: 100% !important;
-    aspect-ratio: 1 !important;
-    height: auto !important;
-    border-radius: 5px !important;
-    font-size: 0.85rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background-color: #c7d2fe !important;
-    color: transparent !important;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
-    transition: transform 0.2s ease, background-color 0.2s ease !important;
-}
-
-/* Celdas marcadas para la modalidad */
-.border-carton-has-image .card-number.modality-sing {
-    background-color: #3b42f6 !important;
-    color: #ffffff !important;
-    box-shadow: 0 2px 6px rgba(59, 66, 246, 0.38) !important;
-}
-
-/* Estrella central de casilla libre 13 */
-.border-carton-has-image .card-number[data-position="13"] {
-    background-color: #c7d2fe !important;
-    color: #f59e0b !important;
-    font-size: 0.95rem !important;
-}
-
-.border-carton-has-image .card-number.modality-sing[data-position="13"] {
-    background-color: #3b42f6 !important;
-    color: #ffd700 !important;
-}
-
-/* Cuando la celda es cantada / ganada */
-.border-carton-has-image .card-number.sing {
-    color: #ffd700 !important;
-    font-size: 0.95rem !important;
-}
-
-/* Premio debajo de la tarjeta blanca */
-.border-carton-has-image .modality-prize {
-    display: block !important;
-    text-align: center !important;
-    font-family: 'Fredoka One', 'Roboto', sans-serif !important;
-    font-size: 1.35rem !important;
-    font-weight: 900 !important;
-    color: #3026ee !important;
-    margin: 4px 0 6px 0 !important;
-    letter-spacing: 0.02em !important;
-    text-shadow: 0 1px 2px rgba(48, 38, 238, 0.15) !important;
-}
-
-/* Estado ganado */
-.border-carton-has-image.modality-won {
-    border-color: #94a3b8 !important;
-    box-shadow: none !important;
-    filter: grayscale(85%) opacity(0.72) !important;
-}
-
-/* Adaptación en pantallas móviles */
-@media (max-width: 768px) {
-    .border-carton.border-carton-has-image,
-    .modalities-display .border-carton.border-carton-has-image,
-    .modalities-display-container .border-carton.border-carton-has-image {
-        min-width: 215px !important;
-        max-width: 260px !important;
-        width: 78vw !important;
-        border-radius: 18px !important;
-        border-width: 3px !important;
-    }
-
-    .border-carton-has-image .modality-cover-wrapper {
-        height: 125px !important;
-        min-height: 110px !important;
-    }
-
-    .border-carton-has-image .modality-body-card {
-        margin: -20px 10px 6px 10px !important;
-        padding: 8px 10px 10px 10px !important;
-        border-radius: 14px !important;
-    }
-
-    .border-carton-has-image .modality-name {
-        font-size: 0.92rem !important;
-        margin-bottom: 6px !important;
-    }
-
-    .border-carton-has-image .modality-prize {
-        font-size: 1.18rem !important;
-        margin: 2px 0 4px 0 !important;
-    }
-}
-
 
 .btn-add-new {
     position: absolute;

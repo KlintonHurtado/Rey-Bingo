@@ -49,7 +49,7 @@ class PusherAuth extends ResourceController
         if (!$isLoggedIn && $isGameChannel) {
             $gameIdFromChannel = (int) substr($channelName, strlen('private-game-'));
             $spectatorGameId = (int) session()->get('spectator_game_id');
-            $spectatorToken = (string) (session()->get('spectator_token') ?? ($request['spectator_token'] ?? ''));
+            $spectatorToken = (string) (session()->get('spectator_token') ?? ($request['spectator_token'] ?? ($this->request->getGet('spectator_token') ?? '')));
 
             if ($spectatorGameId > 0 && $spectatorGameId === $gameIdFromChannel) {
                 $isSpectatorAuthorized = true;

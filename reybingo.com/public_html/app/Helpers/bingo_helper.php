@@ -226,6 +226,13 @@ if (!function_exists('bingo_broadcast_sing_accepted')) {
                 $payload['winners'] = $payload['officialWinners'];
             }
 
+            if (empty($payload['player']) && !empty($payload['userName'])) {
+                $payload['player'] = $payload['userName'];
+            }
+            if (empty($payload['userName']) && !empty($payload['player'])) {
+                $payload['userName'] = $payload['player'];
+            }
+
             $client   = bingo_get_broadcast_client();
             $channels = [
                 'private-game-' . $gameId,
@@ -457,7 +464,7 @@ if (!function_exists('bingo_filter_first_sing_per_modality')) {
             $ball = (int) ($sing['lastnumber'] ?? 0);
             if (!isset($firstBall[$modalityId])) {
                 $firstBall[$modalityId] = $ball;
-            } elseif ($firstBall[$modalityId] !== $ball) {
+            } elseif ($firstBall[$modalityId] > 0 && $ball > 0 && $firstBall[$modalityId] !== $ball) {
                 continue;
             }
 
@@ -527,15 +534,19 @@ if (!function_exists('bingo_get_enriched_winners_for_broadcast')) {
             if (!empty($userIds)) {
                 $db   = \Config\Database::connect();
                 $rows = $db->table('users')
-                    ->select('id, firstname, lastname, username')
+                    ->select('id, firstname, lastname, username, image')
                     ->whereIn('id', $userIds)
                     ->get()->getResultArray();
+                $userImages = [];
                 foreach ($rows as $row) {
                     $name = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
                     if ($name === '') {
                         $name = $row['username'] ?? ('Jugador #' . $row['id']);
                     }
                     $userNames[(int) $row['id']] = $name;
+                    $userImages[(int) $row['id']] = !empty($row['image'])
+                        ? site_url('uploads/users/' . $row['image'])
+                        : site_url('assets/img/avatar.jpg');
                 }
             }
 
@@ -575,6 +586,7 @@ if (!function_exists('bingo_get_enriched_winners_for_broadcast')) {
                     'cartonId'     => $cartonId,
                     'carton'       => $cartonId,
                     'status'       => (int) ($sing['status'] ?? 0),
+                    'image'        => $userImages[$userId] ?? site_url('assets/img/avatar.jpg'),
                 ];
             }
 
@@ -834,12 +846,20 @@ if (!function_exists('bingo_process_ball_cycle')) {
         if (!empty($pendingZeroSings)) {
             $modelSings->where('game', $gameId)->where('status', 0)->set(['status' => 1])->update();
             $gameCompletedCheck = bingo_is_game_finished_by_awards($gameId);
-            $officialWinnersList = bingo_get_official_sings_for_game($gameId, true);
+            $officialWinnersList = function_exists('bingo_get_enriched_winners_for_broadcast')
+                ? (bingo_get_enriched_winners_for_broadcast($gameId, true) ?: [])
+                : (function_exists('bingo_get_official_sings_for_game') ? (bingo_get_official_sings_for_game($gameId, true) ?: []) : []);
 
             foreach ($pendingZeroSings as $pSing) {
                 $pUser = $modelUsers->find($pSing['user']);
                 $pMod = $modelModalities->find($pSing['modality']);
-                $pUserName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : ('Jugador #' . $pSing['user']);
+                $pUserName = $pUser ? trim(($pUser['firstname'] ?? '') . ' ' . ($pUser['lastname'] ?? '')) : '';
+                if ($pUserName === '' && $pUser) {
+                    $pUserName = $pUser['username'] ?? '';
+                }
+                if ($pUserName === '') {
+                    $pUserName = 'Jugador #' . $pSing['user'];
+                }
                 $pImagePath = !empty($pUser['image']) ? site_url('uploads/users/' . $pUser['image']) : site_url('assets/img/avatar.jpg');
 
                 bingo_broadcast_sing_accepted($gameId, [
@@ -1174,7 +1194,13 @@ if (!function_exists('bingo_register_sing_if_missing')) {
 
                 $modelUsers = new \App\Models\UsersModel();
                 $userSing = $modelUsers->find($userId);
-                $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : ('Jugador #' . $userId);
+                $userName = $userSing ? trim(($userSing['firstname'] ?? '') . ' ' . ($userSing['lastname'] ?? '')) : '';
+                if ($userName === '' && $userSing) {
+                    $userName = $userSing['username'] ?? '';
+                }
+                if ($userName === '') {
+                    $userName = 'Jugador #' . $userId;
+                }
                 $imagePath = !empty($userSing['image']) ? site_url('uploads/users/' . $userSing['image']) : site_url('assets/img/avatar.jpg');
 
                 $officialWinnersMissing = function_exists('bingo_get_enriched_winners_for_broadcast')

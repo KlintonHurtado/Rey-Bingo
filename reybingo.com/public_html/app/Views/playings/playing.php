@@ -157,10 +157,23 @@
         display: none !important;
     }
 
-    /* Reglas estrictas: Los espectadores solo ven balotas, live, marcado, desplegar modalidades y registro */
+    /* Reglas estrictas: Los espectadores solo ven el live, marcado automático de balotas y locución/sonido. Nada más. */
     .spectator-mode .bingo-carton-number {
         pointer-events: none !important;
         cursor: default !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
+
+    .spectator-mode .bingo-carton,
+    .spectator-mode .bingo-border-carton,
+    .spectator-mode .cartons-section {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
+
+    .spectator-mode .cartons-section.cartons-section--playing {
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
     }
 
     .spectator-mode .btn-home,
@@ -170,6 +183,14 @@
     .spectator-mode .btn-binary,
     .spectator-mode .btn-volume,
     .spectator-mode .btn-microphone,
+    .spectator-mode .btn-modalities,
+    .spectator-mode #toggle-modalities-btn,
+    .spectator-mode #playing-modalities-panel,
+    .spectator-mode .btn-spectator-play,
+    body:has(.spectator-mode) .btn-modalities,
+    body:has(.spectator-mode) #toggle-modalities-btn,
+    body:has(.spectator-mode) #playing-modalities-panel,
+    body:has(.spectator-mode) .btn-spectator-play,
     body:has(.spectator-mode) .btn-chat,
     body:has(.spectator-mode) #toggle-messages-btn,
     body:has(.spectator-mode) #message-display-container,
@@ -180,238 +201,22 @@
         display: none !important;
     }
 
-    .btn-spectator-play {
-        position: fixed !important;
-        bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        z-index: 1056 !important;
-        background: linear-gradient(135deg, #FFF9A6 0%, #FFC107 28%, #FF8F00 68%, #E65100 100%) !important;
-        color: #1A002C !important;
-        padding: 6px 16px 6px 8px !important;
-        border-radius: 50px !important;
-        border: 2px solid #FFFFFF !important;
-        box-shadow: 
-            0 5px 0 #9E2A2B,
-            0 8px 24px rgba(0, 0, 0, 0.5),
-            0 0 24px rgba(255, 183, 3, 0.75),
-            0 0 45px rgba(251, 133, 0, 0.4),
-            inset 0 2px 2px rgba(255, 255, 255, 0.9),
-            inset 0 -2px 4px rgba(158, 42, 43, 0.45) !important;
-        cursor: pointer !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 9px !important;
-        white-space: nowrap !important;
-        text-decoration: none !important;
-        overflow: hidden !important;
-        animation: spectatorPulse 2.6s infinite ease-in-out !important;
-        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
-        -webkit-tap-highlight-color: transparent !important;
-    }
-
-    .btn-spectator-shimmer {
-        position: absolute !important;
-        top: -60% !important;
-        left: -120% !important;
-        width: 60% !important;
-        height: 220% !important;
-        background: linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.75) 50%,
-            rgba(255, 255, 255, 0) 100%
-        ) !important;
-        transform: rotate(25deg) !important;
-        animation: spectatorShimmer 3s infinite ease-in-out !important;
-        pointer-events: none !important;
-        border-radius: 50px !important;
-    }
-
-    @keyframes spectatorShimmer {
-        0% { left: -120%; }
-        35%, 100% { left: 160%; }
-    }
-
-    @keyframes spectatorPulse {
-        0%, 100% {
-            transform: translateX(-50%) scale(1);
-            box-shadow: 
-                0 5px 0 #9E2A2B,
-                0 8px 24px rgba(0, 0, 0, 0.5),
-                0 0 20px rgba(255, 183, 3, 0.65),
-                inset 0 2px 2px rgba(255, 255, 255, 0.9),
-                inset 0 -2px 4px rgba(158, 42, 43, 0.45);
-        }
-        50% {
-            transform: translateX(-50%) scale(1.035);
-            box-shadow: 
-                0 5px 0 #9E2A2B,
-                0 10px 28px rgba(0, 0, 0, 0.55),
-                0 0 32px rgba(255, 193, 7, 0.95),
-                0 0 55px rgba(251, 133, 0, 0.55),
-                inset 0 2px 2px rgba(255, 255, 255, 0.95),
-                inset 0 -2px 4px rgba(158, 42, 43, 0.45);
-        }
-    }
-
-    .btn-spectator-badge {
-        position: relative !important;
-        width: 32px !important;
-        height: 32px !important;
-        min-width: 32px !important;
-        border-radius: 50% !important;
-        background: linear-gradient(135deg, #FFFFFF 0%, #FFF3B0 100%) !important;
-        color: #E65100 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 0.95rem !important;
-        border: 1.5px solid #FFE082 !important;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), inset 0 1px 1px #FFFFFF !important;
-        flex-shrink: 0 !important;
-    }
-
-    .btn-spectator-badge i {
-        animation: spectatorCrownWiggle 3.5s infinite ease-in-out !important;
-        display: inline-block !important;
-        transform-origin: center bottom !important;
-    }
-
-    @keyframes spectatorCrownWiggle {
-        0%, 80%, 100% { transform: rotate(0deg) scale(1); }
-        85% { transform: rotate(-14deg) scale(1.15); }
-        90% { transform: rotate(14deg) scale(1.15); }
-        95% { transform: rotate(-6deg) scale(1.08); }
-    }
-
-    .btn-spectator-content {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        justify-content: center !important;
-        line-height: 1 !important;
-        text-align: left !important;
-    }
-
-    .btn-spectator-tag {
-        font-size: 0.62rem !important;
-        font-weight: 800 !important;
-        letter-spacing: 0.6px !important;
-        color: #5C1400 !important;
-        text-transform: uppercase !important;
-        line-height: 1 !important;
-        margin-bottom: 2px !important;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-    }
-
-    .btn-spectator-main {
-        font-size: 0.88rem !important;
-        font-weight: 900 !important;
-        color: #140124 !important;
-        letter-spacing: -0.2px !important;
-        line-height: 1.15 !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 5px !important;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-    }
-
-    .btn-spectator-arrow {
-        color: #B71C1C !important;
-        font-size: 0.82rem !important;
-        transition: transform 0.25s ease !important;
-        animation: spectatorArrowBounce 1.5s infinite ease-in-out !important;
-    }
-
-    @keyframes spectatorArrowBounce {
-        0%, 100% { transform: translateX(0); }
-        50% { transform: translateX(3px); }
-    }
-
-    .btn-spectator-play:hover {
-        transform: translateX(-50%) translateY(-2px) scale(1.06) !important;
-        box-shadow: 
-            0 7px 0 #9E2A2B,
-            0 12px 30px rgba(0, 0, 0, 0.6),
-            0 0 35px rgba(255, 193, 7, 1),
-            0 0 60px rgba(251, 133, 0, 0.6),
-            inset 0 2px 2px rgba(255, 255, 255, 0.95),
-            inset 0 -2px 4px rgba(158, 42, 43, 0.45) !important;
-        color: #1A002C !important;
-        animation-play-state: paused !important;
-    }
-
-    .btn-spectator-play:hover .btn-spectator-arrow {
-        transform: translateX(4px) !important;
-        animation-play-state: paused !important;
-    }
-
-    .btn-spectator-play:active {
-        transform: translateX(-50%) translateY(3px) scale(0.97) !important;
-        box-shadow: 
-            0 2px 0 #9E2A2B,
-            0 4px 12px rgba(0, 0, 0, 0.4),
-            0 0 18px rgba(255, 183, 3, 0.6),
-            inset 0 1px 1px rgba(255, 255, 255, 0.6) !important;
-        animation-play-state: paused !important;
-    }
-
-    body.modalities-panel-open .btn-spectator-play,
-    body.chat-panel-open .btn-spectator-play {
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transform: translateX(-50%) scale(0.8) !important;
-    }
-
-    .spectator-mode #btn-ver-ganadores-player {
-        bottom: calc(65px + env(safe-area-inset-bottom, 0px)) !important;
-    }
-
     @media (max-width: 700px) {
         .spectator-hud-badge {
             position: absolute !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            top: auto !important;
-            bottom: 4px !important;
-            padding: 3px 12px !important;
+            left: 10px !important;
+            top: 8px !important;
+            bottom: auto !important;
+            transform: none !important;
+            padding: 4px 12px !important;
             font-size: 0.72rem !important;
-            max-width: calc(100vw - 30px) !important;
+            max-width: calc(100vw - 120px) !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             background: rgba(24, 10, 84, 0.85) !important;
             border: 1px solid rgba(167, 139, 250, 0.6) !important;
             z-index: 5 !important;
-        }
-
-        .btn-spectator-play {
-            padding: 5px 12px 5px 6px !important;
-            bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
-            max-width: calc(100vw - 145px) !important;
-            gap: 7px !important;
-        }
-
-        .btn-spectator-badge {
-            width: 28px !important;
-            height: 28px !important;
-            min-width: 28px !important;
-            font-size: 0.85rem !important;
-        }
-
-        .btn-spectator-tag {
-            font-size: 0.58rem !important;
-            letter-spacing: 0.4px !important;
-        }
-
-        .btn-spectator-main {
-            font-size: 0.80rem !important;
-        }
-
-        .btn-spectator-arrow {
-            font-size: 0.75rem !important;
         }
     }
 
@@ -1993,7 +1798,7 @@
                                     <?php else: ?>
                                         <div class="bingo-carton-number number-<?= $number['number']; ?> <?= implode(' ', $classes); ?>"
                                             data-position="<?= $number['position']; ?>" id="number-<?= $number['number']; ?>"
-                                            onclick="dialNumber(<?= $number['number']; ?>);">
+                                            <?= empty($isSpectator) ? 'onclick="dialNumber(' . $number['number'] . ');"' : '' ?>>
                                             <?= $number['number']; ?>
                                         </div>
                                     <?php endif; ?>
@@ -2010,7 +1815,7 @@
     </div>
 </div>
 
-<?php if (!empty($modalities)): ?>
+<?php if (!empty($modalities) && empty($isSpectator)): ?>
     <button type="button" class="btn btn-small btn-modalities" id="toggle-modalities-btn"
         aria-label="<?= translate('modalities'); ?>" aria-expanded="false">
         <img src="<?= site_url('assets/img/modalidades.png'); ?>" alt="<?= translate('modalities'); ?>"
@@ -2040,64 +1845,45 @@
                         $positions = explode(',', $modality['positions']); 
                         $hasModalityImg = !empty($modality['image']);
                     ?>
-                    <?php if ($hasModalityImg): ?>
-                        <div class="border-carton border-carton-has-image <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
-                            <div class="modality-cover-wrapper">
-                                <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>" class="modality-cover-img">
+                    <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
+                        <span class="modality-name"><?= translate($modality['name']); ?></span>
+
+                        <?php if ($hasModalityImg): ?>
+                            <div class="text-center">
+                                <button type="button" class="modality-toggle-btn" onclick="toggleModalityView(<?= $modality['id']; ?>)">
+                                    <span class="toggle-text-grid d-none"><i class="fa-solid fa-image me-1"></i>Ver imagen</span>
+                                    <span class="toggle-text-img"><i class="fa-solid fa-table-cells me-1"></i>Ver patrón 5x5</span>
+                                </button>
                             </div>
-                            <div class="modality-body-card">
-                                <span class="modality-name"><?= translate($modality['name']); ?></span>
-                                <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
-                                    <div class="card-letter B"><span>B</span></div>
-                                    <div class="card-letter I"><span>I</span></div>
-                                    <div class="card-letter N"><span>N</span></div>
-                                    <div class="card-letter G"><span>G</span></div>
-                                    <div class="card-letter O"><span>O</span></div>
-                                    <?php for ($i = 1; $i <= 25; $i++): ?>
-                                        <?php $isMarked = in_array($i, $positions);
-                                        $showStar = ($isSing && $isMarked) || $i == 13; ?>
-                                        <?php if ($i == 13): ?>
-                                            <div class="card-number" data-position="13">⭐️</div>
-                                        <?php else: ?>
-                                            <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>"
-                                                data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                        <?php endif; ?>
-                                    <?php endfor; ?>
-                                </div>
+
+                            <div class="modality-image-wrapper" id="modality-img-wrap-<?= $modality['id']; ?>" onclick="toggleModalityView(<?= $modality['id']; ?>)" title="Clic para alternar vista">
+                                <img src="<?= site_url('uploads/modalities/' . $modality['image']); ?>" alt="<?= esc($modality['name']); ?>">
                             </div>
-                            <?php if ($game['award'] == 2): ?>
-                                <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
-                            <?php else: ?>
-                                <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
-                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <div class="carton <?= $isSing ? 'cartn-sing' : '' ?> <?= $hasModalityImg ? 'd-none' : '' ?>" id="modality-<?= $modality['id']; ?>">
+                            <div class="card-letter B"><span>B</span></div>
+                            <div class="card-letter I"><span>I</span></div>
+                            <div class="card-letter N"><span>N</span></div>
+                            <div class="card-letter G"><span>G</span></div>
+                            <div class="card-letter O"><span>O</span></div>
+                            <?php for ($i = 1; $i <= 25; $i++): ?>
+                                <?php $isMarked = in_array($i, $positions);
+                                $showStar = ($isSing && $isMarked) || $i == 13; ?>
+                                <?php if ($i == 13): ?>
+                                    <div class="card-number" data-position="13">⭐️</div>
+                                <?php else: ?>
+                                    <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>"
+                                        data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
+                                <?php endif; ?>
+                            <?php endfor; ?>
                         </div>
-                    <?php else: ?>
-                        <div class="border-carton <?= $isSing ? 'modality-won' : '' ?>" id="modality-card-<?= $modality['id']; ?>">
-                            <span class="modality-name"><?= translate($modality['name']); ?></span>
-                            <div class="carton <?= $isSing ? 'cartn-sing' : '' ?>" id="modality-<?= $modality['id']; ?>">
-                                <div class="card-letter B"><span>B</span></div>
-                                <div class="card-letter I"><span>I</span></div>
-                                <div class="card-letter N"><span>N</span></div>
-                                <div class="card-letter G"><span>G</span></div>
-                                <div class="card-letter O"><span>O</span></div>
-                                <?php for ($i = 1; $i <= 25; $i++): ?>
-                                    <?php $isMarked = in_array($i, $positions);
-                                    $showStar = ($isSing && $isMarked) || $i == 13; ?>
-                                    <?php if ($i == 13): ?>
-                                        <div class="card-number" data-position="13">⭐️</div>
-                                    <?php else: ?>
-                                        <div class="card-number <?= $isMarked ? 'modality-sing' : '' ?> <?= $isSing && $isMarked ? 'sing' : '' ?>"
-                                            data-position="<?= $i; ?>"><?= $showStar ? '⭐️' : '' ?></div>
-                                    <?php endif; ?>
-                                <?php endfor; ?>
-                            </div>
-                            <?php if ($game['award'] == 2): ?>
-                                <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
-                            <?php else: ?>
-                                <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+                        <?php if ($game['award'] == 2): ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>"><?= systemGet('currency'); ?> <?= number_format($modality['amount'], 2) ?></span>
+                        <?php else: ?>
+                            <span class="modality-prize" id="modality-amount-<?= $modality['id']; ?>">—</span>
+                        <?php endif; ?>
+                    </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -2365,21 +2151,6 @@
 </button>
 <?php endif; ?>
 
-<?php if (!empty($isSpectator)): ?>
-    <a href="<?= site_url('signup') ?>" class="btn-spectator-play" target="_blank" rel="noopener" title="<?= translate('¡Juega tú también! Regístrate aquí'); ?>">
-        <span class="btn-spectator-shimmer"></span>
-        <span class="btn-spectator-badge">
-            <i class="fa-solid fa-crown"></i>
-        </span>
-        <span class="btn-spectator-content">
-            <span class="btn-spectator-tag">¡JUEGA TÚ TAMBIÉN!</span>
-            <span class="btn-spectator-main">
-                <span>Regístrate aquí</span>
-                <i class="fa-solid fa-circle-arrow-right btn-spectator-arrow"></i>
-            </span>
-        </span>
-    </a>
-<?php endif; ?>
 
 <script src="<?= site_url('assets/plyr/plyr.js'); ?>?v=<?= APP_VERSION ?>"></script>
 <script src="<?= function_exists('asset_url') ? asset_url('js/html2pdf.bundle.min.js') : site_url('assets/js/html2pdf.bundle.min.js') ?>"></script>

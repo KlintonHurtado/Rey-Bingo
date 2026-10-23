@@ -852,30 +852,36 @@ function mergeWinnersFromServer(serverWinners) {
         return;
     }
 
-    const limit = parseInt(window.numberSingsLimit, 10) || 1;
-
     serverWinners.forEach(function (winner) {
         if (!winner) return;
         const player = winner.player || winner.userName || '';
         const modality = winner.modalityName || winner.modality_name || winner.modality || '';
+        const modalityId = winner.modalityId || winner.modality_id || winner.modality;
 
         // El estado visual no depende de que se vuelva a mostrar el aviso.
-        markModalityCardWon(winner.modalityId || winner.modality, modality);
+        markModalityCardWon(modalityId, modality);
 
         if (!player) {
             return;
         }
 
         const currentModalityWinners = winners.filter(function (existing) {
-            return existing.modality === modality;
+            return existing.modality === modality || String(existing.modalityId) === String(modalityId);
         });
 
         const alreadyExists = currentModalityWinners.some(function (existing) {
-            return existing.player === player;
+            return (existing.player && existing.player.toLowerCase() === player.toLowerCase()) ||
+                   (winner.singId && existing.singId && existing.singId === winner.singId);
         });
 
-        if (!alreadyExists && currentModalityWinners.length < limit) {
-            winners.push({ player: player, modality: modality });
+        if (!alreadyExists) {
+            winners.push({
+                singId: winner.singId || undefined,
+                player: player,
+                modality: modality,
+                modalityId: modalityId,
+                cartonId: winner.cartonId || winner.carton || ''
+            });
         }
     });
 }

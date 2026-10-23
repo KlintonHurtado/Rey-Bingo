@@ -707,12 +707,13 @@ $isNoMusicRole = session()->get('logged_in') && (
                 }, 1500);
 
                 try {
-                    const soundFile = (isWinner || type === 'winner' || type === 'sing' || type === 'own_sing')
-                        ? 'winner.mp3'
-                        : 'notification.mp3';
+                    // Si el usuario actual es ganador (isWinner === true o type === 'own_sing'): winner.mp3
+                    // Si ganó otro jugador o un bot: notification.mp3 (sonido suave)
+                    const isVictorious = (isWinner === true || type === 'own_sing' || type === 'winner');
+                    const soundFile = isVictorious ? 'winner.mp3' : 'notification.mp3';
                     let audioSrc = audioPath + soundFile;
                     const audio = initializeAudio(audioSrc);
-                    audio.volume = 0.8;
+                    audio.volume = isVictorious ? 0.9 : 0.6;
                     const playPromise = audio.play();
                     if (playPromise !== undefined) {
                         playPromise.catch((err) => {
@@ -723,6 +724,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                     console.warn("Audio play failed:", error);
                 }
             }
+            window.playNotificationSound = playNotificationSound;
 
             // Gestión persistente de IDs de notificaciones vistas durante la sesión del navegador
             window.__getSeenNotifIds = function() {
@@ -2681,10 +2683,13 @@ $isNoMusicRole = session()->get('logged_in') && (
                         }
                     <?php endif; ?>
                 } else if (isSingEvent) {
+                    const isOwnWin = (data.winnerUserId && parseInt(data.winnerUserId, 10) === parseInt(userId, 10)) ||
+                                     (data.type === 'own_sing') ||
+                                     (data.title && /has cantado/i.test(data.title));
                     if (typeof playNotificationSound === 'function') {
-                        playNotificationSound('winner', true);
+                        playNotificationSound(isOwnWin ? 'winner' : 'default', isOwnWin);
                     }
-                    if (typeof AppcreateConfetti === 'function') {
+                    if (isOwnWin && typeof AppcreateConfetti === 'function') {
                         AppcreateConfetti();
                     }
                 } else {

@@ -2347,8 +2347,16 @@ class Playings extends Controller
             // Reutilizar $gameFinalized (calculado al inicio); elimina re-fetch de $game
             $gameCompleted = $gameFinalized || $isGameCompleted || ((int) ($game['status'] ?? 0) === 0);
 
-            $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : ('Jugador #' . $sing['user']);
+            $userName = $singUser ? trim(($singUser['firstname'] ?? '') . ' ' . ($singUser['lastname'] ?? '')) : '';
+            if ($userName === '' && $singUser) {
+                $userName = $singUser['username'] ?? '';
+            }
+            if ($userName === '') {
+                $userName = 'Jugador #' . $sing['user'];
+            }
             $modalityName = $modality ? translate($modality['name'] ?? '') : 'Bingo';
+
+            $officialWinnersForSing = $this->getWinnersForGame((int) $game['id'], true);
 
             if ($gameCompleted) {
                 // Marcar todos los demás sings pendientes como notificados para no demorar al cliente
@@ -2367,11 +2375,13 @@ class Playings extends Controller
                     'gameCompleted' => true,
                     'totalNumbersGenerated' => $totalNumbersGenerated,
                     'drawnNumbers' => $drawnNumbers,
-                    'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                    'winners' => $officialWinnersForSing,
+                    'officialWinners' => $officialWinnersForSing,
                     'autodial' => (int) ($user['autodial'] ?? 0),
                     'message' => translate('the game is over, all the prizes have been awarded'),
                     'number' => $lastNumber['number'],
                     'player' => $userName,
+                    'userName' => $userName,
                     'modality' => $modalityName,
                     'modalityId' => (int) ($modality['id'] ?? $sing['modality']),
                     'cartonId' => (int) $sing['carton'],
@@ -2386,14 +2396,19 @@ class Playings extends Controller
                 'status' => 'pause',
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
-                'winners' => $this->getWinnersForGame((int) $game['id'], true),
+                'winners' => $officialWinnersForSing,
+                'officialWinners' => $officialWinnersForSing,
                 'autodial' => (int) ($user['autodial'] ?? 0),
                 'message' => $isOwn ? translate('Congratulations! You have called Bingo!') : translate('a bingo has been called, pausing the game for 10 seconds'),
                 'iscron' => $lastNumber['isCRON'],
                 'number' => $lastNumber['number'],
                 'player' => $userName,
+                'userName' => $userName,
                 'modality' => $modalityName,
+                'modalityName' => $modalityName,
                 'modalityId' => (int) ($modality['id'] ?? $sing['modality']),
+                'cartonId' => (int) $sing['carton'],
+                'singId' => (int) $sing['id'],
                 'image' => $imagePath,
                 'isOwnBingo' => $isOwn,
                 'winnerUserId' => (int) $sing['user'],
@@ -2407,6 +2422,8 @@ class Playings extends Controller
         $SingsCount = $modelSings->select('modality')->where('game', $game['id'])->groupBy('modality')->countAllResults();
         $AwardsCount = $modelAwards->where('game', $game['id'])->where('status', 1)->countAllResults();
 
+        $officialWinners = $this->getWinnersForGame((int) $game['id'], true);
+
         if ($gameFinalized || $isGameCompleted || ($AwardsCount > 0 && $SingsCount >= $AwardsCount)) {
             bingo_ensure_winners_registered((int) $game['id']);
             $winners = $this->getWinnersForGame((int) $game['id']);
@@ -2417,6 +2434,7 @@ class Playings extends Controller
                 'totalNumbersGenerated' => $totalNumbersGenerated,
                 'drawnNumbers' => $drawnNumbers,
                 'winners' => $winners,
+                'officialWinners' => $winners,
                 'autodial' => (int) ($user['autodial'] ?? 0),
                 'message' => translate('the game is over, all the prizes have been awarded'),
                 'number' => $lastNumber['number'],
@@ -2434,6 +2452,8 @@ class Playings extends Controller
             'number' => $lastNumber['number'],
             'gameHasWinner' => $gameHasWinner,
             'currentUserId' => $currentUser,
+            'winners' => $officialWinners,
+            'officialWinners' => $officialWinners,
         ]);
     }
 
@@ -2800,9 +2820,11 @@ class Playings extends Controller
 
             $primary = $singsPayload[0];
             $currentWinners = $this->getWinnersForGame((int) $game['id'], true);
+            $firstSingId = (int) ($registeredSings[0]['sing']['id'] ?? 0);
 
             return $this->response->setJSON([
                 'status' => 'success',
+                'singId' => $firstSingId,
                 'carton' => $primary['carton'],
                 'numbers' => $primary['numbers'],
                 'player' => $primary['player'],
@@ -3266,6 +3288,17 @@ class Playings extends Controller
 
     private function getWinnersForGame(int $gameId, bool $includePending = false): array
     {
+        if (function_exists('bingo_get_enriched_winners_for_broadcast')) {
+            try {
+                $enriched = bingo_get_enriched_winners_for_broadcast($gameId, $includePending);
+                if (!empty($enriched)) {
+                    return $enriched;
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'getWinnersForGame enriched error: ' . $e->getMessage());
+            }
+        }
+
         $modelUsers = new UsersModel();
         $modelModalities = new ModalitiesModel();
 
@@ -3276,10 +3309,27 @@ class Playings extends Controller
             $user = $modelUsers->find($row['user']);
             $wmodality = $modelModalities->find($row['modality']);
 
+            $name = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+            if ($name === '') {
+                $name = $user['username'] ?? ('Jugador #' . $row['user']);
+            }
+            $modName = translate($wmodality['name'] ?? '');
+            $modClean = trim(preg_replace('/^la\s+/i', '', $modName));
+            if ($modClean === '') {
+                $modClean = 'Bingo';
+            }
+
             $winners[] = [
-                'player' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
-                'modality' => translate($wmodality['name'] ?? ''),
+                'singId' => (int) ($row['id'] ?? 0),
+                'userId' => (int) ($row['user'] ?? 0),
+                'userName' => $name,
+                'player' => $name,
+                'modality' => $modClean,
+                'modalityName' => $modClean,
                 'modalityId' => (int) ($row['modality'] ?? 0),
+                'cartonId' => (int) ($row['carton'] ?? 0),
+                'carton' => (int) ($row['carton'] ?? 0),
+                'status' => (int) ($row['status'] ?? 0),
                 'image' => !empty($user['image'])
                     ? site_url('uploads/users/' . $user['image'])
                     : site_url('assets/img/avatar.jpg'),
