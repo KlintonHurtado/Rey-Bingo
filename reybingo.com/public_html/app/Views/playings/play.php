@@ -744,18 +744,16 @@
                             $playCardsLayoutClass = $activeGameCount > 1 ? 'play-cards--multi' : 'play-cards--single';
                             $playSectionLayoutClass = $activeGameCount > 1 ? 'play-section--multi' : 'play-section--single';
                         ?>
-                        <?php if (!empty($games)) : ?>
-                            <div class="play-filters-bar" id="play-filters-bar">
-                                <div class="play-filter-field play-filter-field--search">
-                                    <i class="fa-duotone fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                                    <input type="search" id="play-games-search" class="form-control form-bingo play-filter-input" placeholder="Buscar sala..." autocomplete="off">
-                                </div>
-                                <div class="play-filter-field play-filter-field--min">
-                                    <i class="fa-duotone fa-solid fa-coins" aria-hidden="true"></i>
-                                    <input type="number" id="play-min-start-filter" class="form-control form-bingo play-filter-input" min="0" step="0.01" placeholder="Mín. cartón" inputmode="decimal">
-                                </div>
+                        <div class="play-filters-bar" id="play-filters-bar" style="<?= empty($games) ? 'display: none !important;' : '' ?>">
+                            <div class="play-filter-field play-filter-field--search">
+                                <i class="fa-duotone fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                <input type="search" id="play-games-search" class="form-control form-bingo play-filter-input" placeholder="Buscar sala..." autocomplete="off">
                             </div>
-                        <?php endif; ?>
+                            <div class="play-filter-field play-filter-field--min">
+                                <i class="fa-duotone fa-solid fa-coins" aria-hidden="true"></i>
+                                <input type="number" id="play-min-start-filter" class="form-control form-bingo play-filter-input" min="0" step="0.01" placeholder="Mín. cartón" inputmode="decimal">
+                            </div>
+                        </div>
                         <div class="play-rooms-carousel" id="play-rooms-carousel">
                             <div class="play-section play-section--rooms <?= esc($playSectionLayoutClass) ?> p-2">
                             <div class="play-cards <?= esc($playCardsLayoutClass) ?>">
@@ -1106,10 +1104,19 @@
         });
     };
 
+    function getPlayFavoriteGames() {
+        try {
+            const favorites = JSON.parse(localStorage.getItem('favoriteGames') || '[]');
+            return Array.isArray(favorites) ? favorites.map(Number).filter(Number.isFinite) : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
     function applyGameFiltersAndFavorites() {
         const q = (document.getElementById('play-games-search')?.value || '').trim().toLowerCase();
         const minStart = parseFloat(document.getElementById('play-min-start-filter')?.value || '0') || 0;
-        const favorites = JSON.parse(localStorage.getItem('favoriteGames') || '[]');
+        const favorites = getPlayFavoriteGames();
 
         const cards = Array.from(document.querySelectorAll('.play-cards .card[data-search-text]'));
         cards.forEach(function(card) {
@@ -1202,20 +1209,32 @@
             setTimeout(applyGameFiltersAndFavorites, 0);
         }, { passive: true });
     })();
-    document.querySelectorAll('[data-favorite-game]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            const gameId = parseInt(this.getAttribute('data-favorite-game') || '0', 10);
-            let favorites = JSON.parse(localStorage.getItem('favoriteGames') || '[]');
+    const playFavoritesContainer = document.querySelector('.player-play-view');
+    if (playFavoritesContainer) {
+        playFavoritesContainer.addEventListener('click', function(event) {
+            const btn = event.target.closest('[data-favorite-game]');
+            if (!btn || !playFavoritesContainer.contains(btn)) return;
+            const gameId = parseInt(btn.getAttribute('data-favorite-game') || '0', 10);
+            let favorites = getPlayFavoriteGames();
             if (favorites.includes(gameId)) {
                 favorites = favorites.filter(function(id) { return id !== gameId; });
             } else {
                 favorites.push(gameId);
             }
-            localStorage.setItem('favoriteGames', JSON.stringify(favorites));
+            try {
+                localStorage.setItem('favoriteGames', JSON.stringify(favorites));
+            } catch (error) {
+                console.warn('No se pudo guardar el favorito en este navegador.');
+            }
             applyGameFiltersAndFavorites();
         });
-    });
+    }
     applyGameFiltersAndFavorites();
+
+    // También refrescar al montar esta vista mediante navegación AJAX.
+    if (typeof window.loadNotifications === 'function') {
+        window.loadNotifications();
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
         if (typeof window.syncPlayCardsLayout === 'function') {

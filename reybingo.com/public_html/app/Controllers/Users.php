@@ -3510,6 +3510,7 @@ class Users extends Controller {
     }
 
     public function userNotifications() {
+        $this->response->setHeader('Cache-Control', 'no-store, private');
         $userId = (int) session()->get('id');
         if (function_exists('session_write_close')) {
             session_write_close();
@@ -3790,10 +3791,9 @@ class Users extends Controller {
 
             $formattedGames = [];
             foreach ($games as $index => $game) {
-                $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
-                if (!$room) {
-                    continue;
-                }
+                $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first()
+                    ?? $modelGameRooms->find($game['room']);
+                $roomName = $room['name'] ?? translate('game room');
 
                 $cartons = $modelCartons->where('game', $game['id'])->where('user !=', 0)->countAllResults();
                 $prizeDisplay = bingo_fetch_game_card_prize_display($game, (int) $cartons);
@@ -3802,7 +3802,7 @@ class Users extends Controller {
 
                 $formattedGames[] = [
                     'id'             => $game['id'],
-                    'room'           => $room['name'],
+                    'room'           => $roomName,
                     'cartons'        => $cartonsUser,
                     'description'    => $game['description'],
                     'price'          => $game['price'],

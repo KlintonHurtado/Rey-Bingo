@@ -1,4 +1,4 @@
-<div class="modal-dialog games modal-dialog-centered max-w-70">
+<div class="modal-dialog games modal-dialog-centered max-w-70" data-games-list-view="modal">
     <div class="modal-content">
         <div class="modal-header pb-2">
             <h6 class="modal-title ps-2">
@@ -15,7 +15,7 @@
                             <?php $today = date('Y-m-d'); ?>
                             <div class="col-md-4 mb-1">
                                 <label for="datefilter" class="form-label"><?= translate('date'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="datefilter" id="datefilter" onchange="gameslistGet();">
+                                <select class='form-control form-control-lg form-bingo' name="datefilter" id="datefilter">
                                     <option value="all"><?= translate('all dates') ?></option>
                                     <?php if (!empty($dates)) : ?>
                                         <?php foreach ($dates as $date): ?>
@@ -59,38 +59,4 @@
     </div>
 </div>
 
-<script type="text/javascript">
-    $(document).ready(function() {
-        gameslistGet();
-    });
-
-    $('#datefilter, #roomfilter, #statusfilter').on('change', function() {
-        gameslistGet();
-    });
-
-    function gameslistGet() {
-        var date = $('#datefilter').val();
-        var room = $('#roomfilter').val();
-        var status = $('#statusfilter').val();
-
-        $.ajax({
-            url: '<?= site_url('games/gameslistGet') ?>/' + date + '/' + room + '/' + status,
-            type: "GET",
-            success: function(data) {  
-                $("#games-list").html(data);
-            },
-            error: function () {
-                Toastify({
-                    text: '<?= translate('there was an error in the request to the server.'); ?>',
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    style: { background: "#dc3545" },
-                    stopOnFocus: true
-                }).showToast();
-
-                $("#games-list").html('');
-            }
-        });
-    }
-</script>
+<?= view('games/partials/list_loader', ['listView' => 'modal']) ?>

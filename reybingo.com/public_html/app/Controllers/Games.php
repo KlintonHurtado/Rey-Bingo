@@ -3167,8 +3167,13 @@ class Games extends Controller {
                 $gameData['status'] = 1;
             }
 
-            $model->insert($gameData);
-            $gameId = $model->getInsertID();
+            $gameId = $model->insert($gameData, true);
+            if (!$gameId) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.',
+                ]);
+            }
 
             foreach ($modalities as $index => $modalityId) {
                 $rawImg = is_array($modalityImages) && array_key_exists($index, $modalityImages) ? trim($modalityImages[$index]) : '';
@@ -3301,9 +3306,12 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
-            $isLive = ((int)$type === 3 || (int)$type === 4);
+            $isLive = (int) $type === 3;
             $currency = function_exists('systemGet') ? systemGet('currency') : '$';
             $formattedPrice = number_format((float)($gameData['price'] ?? 0), 2);
+            $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
+            helper('system');
+            $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
             $batchNotifications = [];
             foreach ($users as $user) {
@@ -3311,10 +3319,6 @@ class Games extends Controller {
                 if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
                     continue;
                 }
-
-                $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
-                helper('system');
-                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
                 $notificationData = [
                     'user' => $user['id'],
@@ -3359,27 +3363,29 @@ class Games extends Controller {
                 }
             }
 
-            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos de forma rápida
-            try {
-                $pushService = new PushNotificationService();
-                $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
-                    'body' => $gameMessage,
-                    'game' => $gameId,
-                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
-                    'tag' => 'game-' . $gameId,
-                    'requireInteraction' => true
-                ];
+            // El aviso push se envía únicamente al crear una partida Live.
+            if ($isLive) {
+                try {
+                    $pushService = new PushNotificationService();
+                    $pushPayload = [
+                        'title' => 'Nueva partida',
+                        'message' => $gameMessage,
+                        'body' => $gameMessage,
+                        'game' => $gameId,
+                        'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                        'tag' => 'game-' . $gameId,
+                        'requireInteraction' => true
+                    ];
 
-                $pushResult = $pushService->sendToAll($pushPayload);
-                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
-                    log_message('warning', 'Push Web parcial o fallido al crear partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
-                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
-                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                    $pushResult = $pushService->sendToAll($pushPayload);
+                    if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                        log_message('warning', 'Push Web parcial o fallido al crear partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                            . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                            . ', total=' . (int) ($pushResult['total'] ?? 0));
+                    }
+                } catch (\Throwable $e) {
+                    log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                log_message('error', 'Error enviando Push Web: ' . $e->getMessage());
             }
         }
 
@@ -3414,6 +3420,8 @@ class Games extends Controller {
         $response = [
             'success' => true,
             'message' => ($action === 'update') ? translate('game updated successfully') : translate('game added successfully'),
+            'game_id' => (int) $gameId,
+            'room' => (int) $gameData['room'],
             'date'    => $gameData['date'],
             'dateText'=> translate_date($gameData['date']),
         ];
@@ -3709,8 +3717,13 @@ class Games extends Controller {
             } else {
                 $gameData['status'] = 1; // Activo para manuales
             }
-            $model->insert($gameData);
-            $gameId = $model->getInsertID();
+            $gameId = $model->insert($gameData, true);
+            if (!$gameId) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.',
+                ]);
+            }
 
             foreach ($modalities as $index => $modalityId) {
                 $rawImg = is_array($modalityImages) && array_key_exists($index, $modalityImages) ? trim($modalityImages[$index]) : '';
@@ -3843,9 +3856,12 @@ class Games extends Controller {
                                 ->findAll();
             $total = $modelAwards->where('game', $gameId)->selectSum('amount')->get()->getRow()->amount ?? 0;
 
-            $isLive = ((int)$type === 3 || (int)$type === 4);
+            $isLive = (int) $type === 3;
             $currency = function_exists('systemGet') ? systemGet('currency') : '$';
             $formattedPrice = number_format((float)($gameData['price'] ?? 0), 2);
+            $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
+            helper('system');
+            $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
             $batchNotifications = [];
             foreach ($users as $user) {
@@ -3853,10 +3869,6 @@ class Games extends Controller {
                 if ($userGroup === $operatorGroup || $userGroup === $storeGroup) {
                     continue;
                 }
-
-                $awardText = $gameData['award'] == 2 ? $currency . ' ' . number_format($total, 2) : translate('accumulated');
-                helper('system');
-                $gameMessage = $gameData['description'] . ' 🗓️ ' . translate_day($gameData['date'] . ' ' . $gameData['time']) . ', ' . translate_date($gameData['date']) . ' | 🎫 Precio del cartón: ' . $currency . ' ' . $formattedPrice . ' | 🏆 Premio total: ' . $awardText;
 
                 $notificationData = [
                     'user' => $user['id'],
@@ -3899,27 +3911,29 @@ class Games extends Controller {
                 }
             }
 
-            // Enviar notificación Push al teléfono / navegador de todos los usuarios suscritos de forma rápida
-            try {
-                $pushService = new PushNotificationService();
-                $pushPayload = [
-                    'title' => 'Nueva partida',
-                    'message' => $gameMessage,
-                    'body' => $gameMessage,
-                    'game' => $gameId,
-                    'url' => base_url('playings/availableCartonsGet/' . $gameId),
-                    'tag' => 'game-' . $gameId,
-                    'requireInteraction' => true
-                ];
+            // El aviso push se envía únicamente al crear una partida Live.
+            if ($isLive) {
+                try {
+                    $pushService = new PushNotificationService();
+                    $pushPayload = [
+                        'title' => 'Nueva partida',
+                        'message' => $gameMessage,
+                        'body' => $gameMessage,
+                        'game' => $gameId,
+                        'url' => base_url('playings/availableCartonsGet/' . $gameId),
+                        'tag' => 'game-' . $gameId,
+                        'requireInteraction' => true
+                    ];
 
-                $pushResult = $pushService->sendToAll($pushPayload);
-                if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
-                    log_message('warning', 'Push Web parcial o fallido al iniciar partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
-                        . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
-                        . ', total=' . (int) ($pushResult['total'] ?? 0));
+                    $pushResult = $pushService->sendToAll($pushPayload);
+                    if (empty($pushResult['success']) || !empty($pushResult['failed'])) {
+                        log_message('warning', 'Push Web parcial o fallido al iniciar partida: enviados=' . (int) ($pushResult['sent'] ?? 0)
+                            . ', fallidos=' . (int) ($pushResult['failed'] ?? 0)
+                            . ', total=' . (int) ($pushResult['total'] ?? 0));
+                    }
+                } catch (\Throwable $e) {
+                    log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                log_message('error', 'Error enviando Push Web en startgameSubmit: ' . $e->getMessage());
             }
         }
 
@@ -3928,12 +3942,16 @@ class Games extends Controller {
 
         if ($game && bingo_count_drawn_numbers((int) $game['id']) === 0 && !bingo_can_start_game($game, null, null, false)) {
             $postpone = bingo_postpone_game($game);
+            $game = $model->find($gameId) ?: $game;
             return $this->response->setJSON([
                 'success' => false,
                 'postponed' => true,
+                'game_id' => (int) $gameId,
+                'room' => (int) $game['room'],
                 'message' => $postpone['message'] ?: bingo_game_start_block_message($game),
                 'new_time' => $postpone['new_time'] ?? null,
-                'date' => $postpone['new_datetime'] ?? null,
+                'date' => $game['date'],
+                'dateText' => translate_date($game['date']),
             ]);
         }
 
@@ -3981,6 +3999,7 @@ class Games extends Controller {
     }
 
     public function gameslistGet($dateFilter = 'all', $roomFilter = 'all', $statusFilter = 'all', $page = 1) {
+        $this->response->setHeader('Cache-Control', 'no-store, private');
         $modelGames = new GamesModel();
         $modelCartons = new CartonsModel();
         $modelTempCartons = new \App\Models\TempCartonsModel();
@@ -3994,7 +4013,8 @@ class Games extends Controller {
 
         $builder = $modelGames;
 
-        if (session()->get('group') == 1) {
+        $canManageAll = !function_exists('bingo_can') || bingo_can('games.manage') || bingo_can('games.view');
+        if (!$canManageAll && session()->get('group') == 1) {
             $builder = $builder->where('user', session()->get('id'));
         }
 
@@ -4007,13 +4027,13 @@ class Games extends Controller {
         }
 
         // Obtener todos los juegos para filtrar por estado
-        $allGames = $builder->findAll();
+        $allGames = $builder->orderBy('id', 'DESC')->findAll();
         $filteredGames = [];
 
         foreach ($allGames as &$game) {
             $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
             
-            $game['room'] = $room['name'];
+            $game['room'] = $room['name'] ?? translate('room not found');
             $game['cartons'] = $modelCartons->where('game', $game['id'])->where('user', session()->get('id'))->countAllResults();
             $game['numbers'] = $modelBoards->where('game', $game['id'])->select('number')->distinct()->countAllResults();
             // Usar las funciones helper que incluyen temp_cartons para consistencia con la validación del servidor
@@ -4096,7 +4116,7 @@ class Games extends Controller {
         // Aplicar paginación a los juegos filtrados
         $totalRecords = count($filteredGames);
         $totalPages = ceil($totalRecords / $per_page);
-        $currentPage = min($page, $totalPages); // Asegurar que no exceda el total de páginas
+        $currentPage = max(1, min($page, $totalPages));
         $offset = ($currentPage - 1) * $per_page;
         $paginatedGames = array_slice($filteredGames, $offset, $per_page);
 

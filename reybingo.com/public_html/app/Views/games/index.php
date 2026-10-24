@@ -28,7 +28,7 @@
 <button class="btn btn-small btn-gear" onclick="settingsGet();"><i class="fa-duotone fa-solid fa-gear"></i></button>
 <?php endif; ?>
 
-<div class="container">
+<div class="container" data-games-list-view="page">
     <div class="row d-flex justify-content-center">
         <div class="col-md-12">
             <div class="card mb-3 admin-games-filters-card">
@@ -38,7 +38,7 @@
                             <?php $today = date('Y-m-d'); ?>
                             <div class="col-md">
                                 <label for="datefilter" class="form-label"><?= translate('date'); ?></label>
-                                <select class='form-control form-control-lg form-bingo' name="datefilter" id="datefilter" onchange="gameslistGet();">
+                                <select class='form-control form-control-lg form-bingo' name="datefilter" id="datefilter">
                                     <option value="all"><?= translate('all dates') ?></option>
                                     <?php if (!empty($dates)) : ?>
                                         <?php foreach ($dates as $date): ?>
@@ -92,49 +92,9 @@
     </div>
 </div>
 
+<?= view('games/partials/list_loader', ['listView' => 'page']) ?>
+
 <script type="text/javascript">
-    $(document).ready(function() {
-        gameslistGet();
-    });
-
-    $('#datefilter, #roomfilter, #statusfilter').on('change', function() {
-        gameslistGet();
-    });
-
-    function gameslistGet(page = 1) {
-        var date = $('#datefilter').val();
-        var room = $('#roomfilter').val();
-        var status = $('#statusfilter').val();
-
-        // Mostrar loading
-        $("#games-list").html('<div class="d-flex justify-content-center align-items-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden"><?= translate('loading'); ?>...</span></div><span class="ms-2"><?= translate('loading data'); ?>...</span></div>');
-
-        $.ajax({
-            url: '<?= site_url('games/gameslistGet') ?>/' + date + '/' + room + '/' + status + '/' + page,
-            type: "GET",
-            success: function(data) {  
-                $("#games-list").html(data);
-            },
-            error: function () {
-                Toastify({
-                    text: '<?= translate('there was an error in the request to the server.'); ?>',
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    style: { background: "#dc3545" },
-                    stopOnFocus: true
-                }).showToast();
-
-                $("#games-list").html('');
-            }
-        });
-    }
-
-    // Modificar los event listeners para resetear a la página 1 cuando cambien los filtros
-    $('#datefilter, #roomfilter, #statusfilter').on('change', function() {
-        gameslistGet(1); // Siempre ir a la página 1 cuando cambien los filtros
-    });
-
     function updateGame(gameId) {
         $("#modalAddgame").load(site_url + 'games/add/' + gameId, function() {
             $('#modalAddgame').modal('show');

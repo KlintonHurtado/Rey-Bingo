@@ -71,33 +71,9 @@ class Notifications extends Controller {
                 ]);
             }
 
-            // Enviar notificación de confirmación si es nuevo dispositivo o se solicitó explícitamente
-            $confirmationRequested = !$existing || ($request->confirm ?? false) === true;
-            $confirmationAccepted = null;
-            if ($confirmationRequested) {
-                $confirmationPayload = [
-                    'title' => '🎉 ¡Notificaciones Activadas!',
-                    'message' => 'Recibirás avisos en tu teléfono cuando empiece una partida en vivo de Rey Bingo',
-                    'url' => base_url('/'),
-                    'icon' => base_url('assets/img/logo.png'),
-                    'badge' => base_url('assets/img/badge.png'),
-                    'image' => base_url('assets/img/push-banner.png')
-                ];
-
-                try {
-                    $result = $this->pushService->sendToSubscription($data, $confirmationPayload);
-                    $confirmationAccepted = !empty($result['success']) && (int) ($result['sent'] ?? 0) > 0;
-                } catch (\Throwable $e) {
-                    log_message('error', 'No se pudo enviar la confirmación Web Push: ' . $e->getMessage());
-                    $confirmationAccepted = false;
-                }
-            }
-
             return $this->response->setJSON([
                 'success' => true,
                 'subscribed' => true,
-                'confirmation_requested' => $confirmationRequested,
-                'confirmation_accepted' => $confirmationAccepted,
                 'message' => 'Suscripción guardada correctamente',
             ]);
         } catch (\Throwable $e) {

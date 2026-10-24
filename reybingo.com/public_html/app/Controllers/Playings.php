@@ -164,10 +164,9 @@ class Playings extends Controller
                 continue;
             }
 
-            $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first();
-            if (!$room) {
-                continue; // Skip if room is not active
-            }
+            $room = $modelGameRooms->where('id', $game['room'])->where('status', 1)->first()
+                ?? $modelGameRooms->find($game['room']);
+            $game['room'] = $room['name'] ?? translate('game room');
 
             $cartons = $modelCartons->where('user', $user['id'])->where('game', $game['id'])->countAllResults();
             $game['room'] = $room['name'];

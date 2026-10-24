@@ -79,7 +79,7 @@
                 <ul class="pagination mb-0">
                     <?php if ($currentPage > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $currentPage - 1; ?>)">
+                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $currentPage - 1; ?>, this)">
                                 «
                             </a>
                         </li>
@@ -91,7 +91,7 @@
                     
                     if ($startPage > 1): ?>
                         <li class="page-item">
-                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(1)">1</a>
+                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(1, this)">1</a>
                         </li>
                         <?php if ($startPage > 2): ?>
                             <li class="page-item disabled">
@@ -102,7 +102,7 @@
                     
                     <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                         <li class="page-item <?= $i == $currentPage ? 'active' : ''; ?>">
-                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $i; ?>)">
+                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $i; ?>, this)">
                                 <?= $i; ?>
                             </a>
                         </li>
@@ -115,13 +115,13 @@
                             </li>
                         <?php endif; ?>
                         <li class="page-item">
-                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $totalPages; ?>)"><?= $totalPages; ?></a>
+                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $totalPages; ?>, this)"><?= $totalPages; ?></a>
                         </li>
                     <?php endif; ?>
                     
                     <?php if ($currentPage < $totalPages): ?>
                         <li class="page-item">
-                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $currentPage + 1; ?>)">
+                            <a class="page-link" href="javascript:void(0)" onclick="gameslistGetPage(<?= $currentPage + 1; ?>, this)">
                                 »
                             </a>
                         </li>
@@ -142,32 +142,6 @@
             style: { background: "#dc3545" },
             stopOnFocus: true
         }).showToast();
-    }
-
-    function gameslistGetPage(page) {
-        var date = $('#datefilter').val() || 'all';
-        var room = $('#roomfilter').val() || 'all';
-        var status = $('#statusfilter').val() || 'all';
-
-        $.ajax({
-            url: '<?= site_url('games/gameslistGet') ?>/' + date + '/' + room + '/' + status + '/' + page,
-            type: "GET",
-            success: function(data) {  
-                $("#games-list").html(data);
-            },
-            error: function () {
-                Toastify({
-                    text: '<?= translate('there was an error in the request to the server.'); ?>',
-                    duration: 3000,
-                    gravity: "top",
-                    position: "right",
-                    style: { background: "#dc3545" },
-                    stopOnFocus: true
-                }).showToast();
-
-                $("#games-list").html('');
-            }
-        });
     }
 
     function assignBotsPrompt(gameId) {

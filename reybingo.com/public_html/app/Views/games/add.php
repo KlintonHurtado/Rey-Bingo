@@ -403,17 +403,11 @@
                 if (response.success) {
                     $('#modalAddgame').modal('hide');
 
-                    let newDate = response.date;
-                    let newDateText = response.dateText;
-                    let $dateFilter = $('#datefilter');
-
-                    $dateFilter.find("option[value='0']").remove();
-                    if ($dateFilter.find("option[value='" + newDate + "']").length === 0) {
-                        $dateFilter.append($("<option>", { value: newDate, text: newDateText }));
+                    if (typeof refreshGamesListAfterSave === 'function') {
+                        refreshGamesListAfterSave(response, form);
+                    } else if (typeof gameslistGet === 'function') {
+                        gameslistGet(1);
                     }
-                    $dateFilter.val(newDate);
-
-                    if (typeof gameslistGet === 'function') gameslistGet();
 
                     Toastify({
                         text: response.message,
@@ -430,7 +424,11 @@
                             duration: 6000, gravity: "top", position: "right",
                             style: { background: "#f59e0b" }, stopOnFocus: true
                         }).showToast();
-                        if (typeof gameslistGet === 'function') setTimeout(gameslistGet, 800);
+                        if (typeof refreshGamesListAfterSave === 'function') {
+                            refreshGamesListAfterSave(response, form);
+                        } else if (typeof gameslistGet === 'function') {
+                            gameslistGet(1);
+                        }
                     } else if (response.errors) {
                         $.each(response.errors, function(field, message) {
                             $('#' + field + '-error').text(message).removeClass('d-none');
@@ -484,8 +482,10 @@
                         style: { background: "#f59e0b" }, stopOnFocus: true
                     }).showToast();
                     $('#modalAddgame').modal('hide');
-                    if (typeof gameslistGet === 'function') {
-                        setTimeout(gameslistGet, 800);
+                    if (typeof refreshGamesListAfterSave === 'function') {
+                        refreshGamesListAfterSave(response, form);
+                    } else if (typeof gameslistGet === 'function') {
+                        gameslistGet(1);
                     }
                 } else {
                     if (response.message) {
@@ -604,7 +604,8 @@
 
         $('#game-form').on('submit', function(e) {
             e.preventDefault();
-            var clickedButton = e.originalEvent.submitter.id;
+            var submitter = e.originalEvent && e.originalEvent.submitter;
+            var clickedButton = submitter ? submitter.id : 'add-button';
 
             if (clickedButton === 'add-button') {
                 submitAddGame(this);

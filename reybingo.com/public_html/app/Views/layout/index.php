@@ -667,9 +667,9 @@ $isNoMusicRole = session()->get('logged_in') && (
                 checkInterval: <?= (function_exists('bingo_is_admin') && bingo_is_admin()) || (function_exists('bingo_is_operator') && bingo_is_operator()) ? 3000 : 10000 ?>,
                 displayTime: 6000,
                 maxNotifications: 3,
-                apiUrl: '/users/userNotifications',
-                markReadUrl: '/users/markNotificationRead',
-                testUrl: '/users/testNotification'
+                apiUrl: <?= json_encode(site_url('users/userNotifications')); ?>,
+                markReadUrl: <?= json_encode(site_url('users/markNotificationRead')); ?>,
+                testUrl: <?= json_encode(site_url('users/testNotification')); ?>
             };
 
             // Función para inicializar el audio con compatibilidad iOS/Android
@@ -767,9 +767,22 @@ $isNoMusicRole = session()->get('logged_in') && (
 
             window.__sessionSeenNotifIds = window.__getSeenNotifIds();
 
+            let notificationsRequestInFlight = false;
+            let notificationsRefreshPending = false;
             window.loadNotifications = async function loadNotifications() {
+                if (notificationsRequestInFlight) {
+                    notificationsRefreshPending = true;
+                    return;
+                }
+                notificationsRequestInFlight = true;
+                const requestController = new AbortController();
+                const requestTimeout = setTimeout(() => requestController.abort(), 20000);
                 try {
-                    const response = await fetch(notificationConfig.apiUrl);
+                    const response = await fetch(notificationConfig.apiUrl, {
+                        cache: 'no-store',
+                        credentials: 'same-origin',
+                        signal: requestController.signal
+                    });
                     if (!response.ok) {
                         console.warn(`[Notificaciones] Servidor respondió con estado HTTP ${response.status} (${response.statusText || 'Error'}). Reintentando en próximo ciclo...`);
                         return;
@@ -780,6 +793,23 @@ $isNoMusicRole = session()->get('logged_in') && (
                     const wallet = data.wallet ?? null;
                     const games = data.games ?? null;
                     const progress = data.progress ?? null;
+
+                    // La lista de partidas se actualiza aunque falle un popup o el saldo.
+                    if (games !== null) {
+                        try {
+                            updateGames(games);
+                        } catch (error) {
+                            console.error('Error al actualizar las partidas disponibles:', error);
+                        }
+                    }
+
+                    if (progress !== null) {
+                        try {
+                            updateProgressGames(progress);
+                        } catch (error) {
+                            console.error('Error al actualizar el progreso de las partidas:', error);
+                        }
+                    }
 
                     if (notifications.length > 0) {
                         showNotificationIndicator();
@@ -827,10 +857,10 @@ $isNoMusicRole = session()->get('logged_in') && (
                                 addPaymentRowToModal(notification.transaction);
                             }
 
-                            if (notification.type === 'game') {
-                                <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
-                                    gameslistGet();
-                                <?php endif; ?>
+                            if (notification.type === 'game' || notification.type === 'new_game') {
+                                if (typeof window.gameslistGet === 'function' && document.querySelector('[data-games-list-view]')) {
+                                    window.gameslistGet(1);
+                                }
                             }
                         });
 
@@ -846,17 +876,15 @@ $isNoMusicRole = session()->get('logged_in') && (
                         window.availableWallet(wallet);
                     }
 
-                    if (games !== null) {
-                        updateGames(games);
-                    }
-
-                    if (progress !== null) {
-                        <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
-                            updateProgressGames(progress);
-                        <?php endif; ?>
-                    }
                 } catch (error) {
                     console.error('Error al cargar notificaciones:', error);
+                } finally {
+                    clearTimeout(requestTimeout);
+                    notificationsRequestInFlight = false;
+                    if (notificationsRefreshPending) {
+                        notificationsRefreshPending = false;
+                        setTimeout(loadNotifications, 0);
+                    }
                 }
             }
 
@@ -1453,6 +1481,7 @@ $isNoMusicRole = session()->get('logged_in') && (
             }
 
             function ensureCountdown(game) {
+                game = Object.assign({}, game, { id: String(game.id) });
                 const timeElId = `card-time-${game.id}`;
                 const btnElBuyId  = `card-button-buy-${game.id}`;
                 const btnElBuyBonusId = `card-button-buy-bonus-${game.id}`;
@@ -1469,12 +1498,15 @@ $isNoMusicRole = session()->get('logged_in') && (
                 // Evitar dos temporizadores sobre la misma card (causa el parpadeo Jugando/Comprar)
                 if (gameTimers.has(game.id)) {
                     const existingRef = gameCountdownRefs.get(game.id);
-                    if (existingRef) {
+                    if (existingRef && existingRef.card === card) {
                         existingRef.cartons = game.cartons;
                         existingRef.date = game.date;
                         existingRef.time = game.time;
+                        return;
                     }
-                    return;
+                    clearInterval(gameTimers.get(game.id));
+                    gameTimers.delete(game.id);
+                    gameCountdownRefs.delete(game.id);
                 }
 
                 const gameRef = {
@@ -1482,6 +1514,7 @@ $isNoMusicRole = session()->get('logged_in') && (
                     date: game.date,
                     time: game.time,
                     cartons: game.cartons,
+                    card: card,
                 };
                 gameCountdownRefs.set(game.id, gameRef);
 
@@ -1576,6 +1609,7 @@ $isNoMusicRole = session()->get('logged_in') && (
             }
 
             function removeGameCard(gameId) {
+                gameId = String(gameId);
                 const card = document.querySelector(`.card-game-${gameId}`);
                 if (card) {
                     const slide = card.closest('.play-room-slide');
@@ -1729,6 +1763,19 @@ $isNoMusicRole = session()->get('logged_in') && (
                     }
                 }
 
+                card.setAttribute('data-search-text', `${game.room || ''} ${game.description || ''}`.toLowerCase());
+                card.setAttribute('data-price', String(game.price || '0'));
+                const roomTitle = card.querySelector('.card-title');
+                const roomDescription = card.querySelector('.card-room-description');
+                const gameDate = card.querySelector('.card-date');
+                const gameHour = card.querySelector('.card-hour');
+                const gamePrice = card.querySelector('.card-price');
+                if (roomTitle) roomTitle.textContent = game.room || '';
+                if (roomDescription) roomDescription.textContent = game.description || '';
+                if (gameDate) gameDate.textContent = game.date_translate || '';
+                if (gameHour) gameHour.textContent = game.time_translate || '';
+                if (gamePrice) gamePrice.textContent = <?= json_encode(translate('carton') . ': ' . systemGet('currency') . ' '); ?> + (game.price || '0');
+
                 ensureCountdown(game);
             }
 
@@ -1859,59 +1906,63 @@ $isNoMusicRole = session()->get('logged_in') && (
                 if (!Array.isArray(games)) {
                     return;
                 }
-                if (games.length <= 0) {
-                    $('.play-cards').html(`<h3 class="no_active_rooms"><?= translate('there are no active rooms'); ?></h3>`);
-                } else {
-                    $('.play-cards .no_active_rooms').remove();
+                const playView = document.querySelector('.player-play-view');
+                if (!playView) return;
+
+                const currentIds = new Set(games.map(game => String(game.id)));
+                const select = playView.querySelector('select#game');
+                if (select) {
+                    games.forEach(game => {
+                        let option = select.querySelector(`option[value="${game.id}"]`);
+                        if (!option) {
+                            option = document.createElement('option');
+                            option.value = game.id;
+                            select.appendChild(option);
+                        }
+                        option.textContent = game.label;
+                    });
+                    Array.from(select.options).forEach(option => {
+                        if (!currentIds.has(String(option.value))) option.remove();
+                    });
+                    if (games.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = <?= json_encode(translate('there are no active games')); ?>;
+                        select.appendChild(option);
+                    }
+                    return;
                 }
-                <?php if ($page['title'] == translate('start game')) : ?>
-                    <?php if (systemGet('activateRoomCards') == 0) : ?>
-                        const select = document.getElementById('game');
-                        if (!select) {
-                            return;
-                        }
-                        const currentIds = new Set(games.map(g => String(g.id)));
-                        games.forEach(game => {
-                            if (!select.querySelector(`option[value="${game.id}"]`)) {
-                                const option = document.createElement('option');
-                                option.value = game.id;
-                                option.textContent = game.label;
-                                select.appendChild(option);
-                            }
-                        });
-                        Array.from(select.querySelectorAll('option[value]')).forEach(option => {
-                            if (option.value && !currentIds.has(String(option.value))) {
-                                option.remove();
-                            }
-                        });
-                    <?php else : ?>
-                        const cardsContainer = document.querySelector('.play-cards');
-                        if (!cardsContainer) {
-                            return;
-                        }
 
-                        games.forEach(game => renderOrUpdateCard(game, cardsContainer));
+                const cardsContainer = playView.querySelector('.play-cards');
+                if (!cardsContainer) return;
 
-                        const currentIds = new Set(games.map(g => String(g.id)));
+                playView.querySelectorAll('.no_active_rooms').forEach(node => node.remove());
+                games.forEach(game => renderOrUpdateCard(game, cardsContainer));
+                cardsContainer.querySelectorAll('.card[data-game-id]').forEach(card => {
+                    const gameId = card.getAttribute('data-game-id');
+                    if (!currentIds.has(gameId)) removeGameCard(gameId);
+                });
 
-                        const existingCards = cardsContainer.querySelectorAll('[class*="card-game-"]');
-                        existingCards.forEach(card => {
-                            const classMatch = Array.from(card.classList).find(c => c.startsWith('card-game-'));
-                            if (!classMatch) return;
+                const filtersBar = document.getElementById('play-filters-bar');
+                if (games.length === 0) {
+                    const emptyMessage = document.createElement('h3');
+                    emptyMessage.className = 'no_active_rooms';
+                    emptyMessage.textContent = <?= json_encode(translate('there are no active rooms')); ?>;
+                    cardsContainer.appendChild(emptyMessage);
+                    if (filtersBar) filtersBar.style.display = 'none';
+                } else {
+                    if (filtersBar) {
+                        filtersBar.style.removeProperty('display');
+                        filtersBar.style.display = '';
+                    }
+                }
 
-                            const domId = classMatch.replace('card-game-', '');
-                            if (!currentIds.has(domId)) {
-                              removeGameCard(domId);
-                            }
-                        });
-
-                        if (typeof window.applyGameFiltersAndFavorites === 'function') {
-                            window.applyGameFiltersAndFavorites();
-                        } else if (typeof window.syncPlayCardsLayout === 'function') {
-                            window.syncPlayCardsLayout();
-                        }
-                    <?php endif; ?>
-                <?php endif; ?>
+                if (typeof window.applyGameFiltersAndFavorites === 'function') {
+                    window.applyGameFiltersAndFavorites();
+                }
+                if (typeof window.syncPlayCardsLayout === 'function') {
+                    window.syncPlayCardsLayout();
+                }
             }
 
             function hideNotification(notificationEl) {
@@ -2009,11 +2060,16 @@ $isNoMusicRole = session()->get('logged_in') && (
                 
                 // En pantallas de juego (/playing), las notificaciones llegan por WebSocket
                 // Cargar una vez al inicio y evitar el polling continuo que satura teléfonos y causa Out of Memory
-                var isPlayingScreen = window.location.pathname.indexOf('/playing') !== -1;
+                const isPlayingScreen = /(?:^|\/)(?:playings\/)?playing\/?$/.test(window.location.pathname);
                 loadNotifications();
                 if (!isPlayingScreen) {
                     setInterval(loadNotifications, notificationConfig.checkInterval);
                 }
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden && document.querySelector('.player-play-view')) {
+                        loadNotifications();
+                    }
+                });
             });
         <?php endif; ?>
 
@@ -2653,9 +2709,7 @@ $isNoMusicRole = session()->get('logged_in') && (
 
         // Si ya hay un websocket activo en la página o estamos en salas de juego/tableros, evitar duplicar conexión
         if (typeof GAME_ID !== 'undefined' || typeof window.GAME_ID !== 'undefined' ||
-            window.location.pathname.includes('/playing') ||
-            window.location.pathname.includes('/board') ||
-            window.location.pathname.includes('/live') ||
+            /(?:^|\/)(?:(?:playings\/)?playing|(?:boards\/)?(?:board|live))\/?$/.test(window.location.pathname) ||
             window.__userNotifPusher || window.__boardPusher || window.__bingoPusherHelper) {
             return;
         }
@@ -2692,6 +2746,15 @@ $isNoMusicRole = session()->get('logged_in') && (
             userChannel.bind('notification:new', function(data) {
                 console.log('Realtime user notification received:', data);
                 if (!data) return;
+                const isNewGame = (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)) || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message))));
+                if (isNewGame) {
+                    if (document.querySelector('.player-play-view') && typeof window.loadNotifications === 'function') {
+                        window.loadNotifications();
+                    }
+                    if (typeof window.gameslistGet === 'function' && document.querySelector('[data-games-list-view]')) {
+                        window.gameslistGet(1);
+                    }
+                }
                 const notifId = data.id ? String(data.id) : (data.singId ? 'sing_' + data.singId : `${data.type || 'msg'}_${data.game || ''}_${data.created_at || ''}`);
                 if (notifId && typeof window.__isNotifIdSeen === 'function' && window.__isNotifIdSeen(notifId)) {
                     return; // Ya procesada (deduplicada contra HTTP polling o evento repetido)
@@ -2707,17 +2770,14 @@ $isNoMusicRole = session()->get('logged_in') && (
                                    window.location.pathname.indexOf('/boards/live') !== -1 ||
                                    window.location.pathname.indexOf('/playings/playing') !== -1;
 
-                const isNewGame = data && (data.type === 'game' || data.type === 'new_game' || (data.title && /partida/i.test(data.title)) || (data.message && (/precio.*cart[oó]n/i.test(data.message) || /premio.*total/i.test(data.message))));
                 const isSingEvent = data && !isNewGame && (data.type === 'sing' || data.type === 'own_sing');
                 if (isNewGame) {
                     if (typeof playNotificationSound === 'function') {
                         playNotificationSound('game', false);
                     }
-                    <?php if ($page['title'] == translate('list of') . ' ' . translate('games')) : ?>
-                        if (typeof gameslistGet === 'function') {
-                            gameslistGet();
-                        }
-                    <?php endif; ?>
+                    if (typeof window.gameslistGet === 'function' && document.querySelector('[data-games-list-view]')) {
+                        window.gameslistGet(1);
+                    }
                 } else if (isSingEvent) {
                     const isOwnWin = (data.winnerUserId && parseInt(data.winnerUserId, 10) === parseInt(userId, 10)) ||
                                      (data.type === 'own_sing') ||

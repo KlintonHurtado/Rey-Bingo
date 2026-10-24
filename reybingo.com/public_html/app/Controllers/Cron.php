@@ -225,14 +225,6 @@ class Cron extends Controller
         if ($result['success']) {
             log_message('info', "Juego automático creado: ID {$result['game_id']} para {$nextGame->format('Y-m-d H:i:s')}");
             
-            // Enviar notificación Push por Firebase
-            helper('firebase_push');
-            $horaFormateada = $nextGame->format('h:i A');
-            send_firebase_push_to_all(
-                'Nueva partida', 
-                'Se ha creado una nueva partida.'
-            );
-
             return $this->response->setJSON($result);
         }
 
