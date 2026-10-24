@@ -429,11 +429,20 @@
                         } else if (typeof gameslistGet === 'function') {
                             gameslistGet(1);
                         }
-                    } else if (response.errors) {
-                        $.each(response.errors, function(field, message) {
-                            $('#' + field + '-error').text(message).removeClass('d-none');
-                            $('#' + field).addClass('is-invalid');
-                        });
+                    } else {
+                        if (response.message) {
+                            Toastify({
+                                text: response.message,
+                                duration: 5000, gravity: "top", position: "right",
+                                style: { background: "#dc3545" }, stopOnFocus: true
+                            }).showToast();
+                        }
+                        if (response.errors) {
+                            $.each(response.errors, function(field, message) {
+                                $('#' + field + '-error').text(message).removeClass('d-none');
+                                $('#' + field).addClass('is-invalid');
+                            });
+                        }
                     }
                 }
             },

@@ -3035,10 +3035,16 @@ class Games extends Controller {
             ]);
         }
 
+        $userId = (int) (session()->get('id') ?: 1);
+        $timeVal = trim((string) $this->request->getPost('time'));
+        if (preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $timeVal)) {
+            $timeVal .= ':00';
+        }
+
         $gameData = [
-            'user' => session()->get('id'),
-            'room' => $this->request->getPost('room'),
-            'description' => $this->request->getPost('description'),
+            'user' => $userId,
+            'room' => (int) $this->request->getPost('room'),
+            'description' => trim((string) $this->request->getPost('description')),
             'price' => $price,
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
@@ -3047,17 +3053,14 @@ class Games extends Controller {
                 && bingo_price_allows_roulette_cartons($price)
             ) ? 1 : 0,
             'modalities' => $md,
-            'date' => $this->request->getPost('date'),
-            'time' => $this->request->getPost('time'),
-            'award' => $this->request->getPost('award'),
-            'reset' => $this->request->getPost('reset'),
-            'type' => $type,
-            'url' => $url
+            'date' => (string) $this->request->getPost('date'),
+            'time' => $timeVal,
+            'award' => (int) $this->request->getPost('award'),
+            'reset' => (int) $this->request->getPost('reset'),
+            'type' => (int) $type,
+            'url' => (string) ($url ?? ''),
+            'video' => (string) ($videoFileName ?? ''),
         ];
-
-        if (!empty($videoFileName)) {
-            $gameData['video'] = $videoFileName;
-        }
 
         $coverImage = $this->request->getPost('cover');
         if (!empty($coverImage)) {
@@ -3167,11 +3170,49 @@ class Games extends Controller {
                 $gameData['status'] = 1;
             }
 
-            $gameId = $model->insert($gameData, true);
+            try {
+                $gameId = $model->insert($gameData, true);
+            } catch (\Throwable $e) {
+                log_message('error', 'Games::addgameSubmit model->insert exception: ' . $e->getMessage());
+                $gameId = false;
+            }
+
             if (!$gameId) {
+                $db = \Config\Database::connect();
+                $dbError = $db->error();
+                $modelErrors = method_exists($model, 'errors') ? $model->errors() : [];
+                log_message('error', 'Games::addgameSubmit insert failed: ' . json_encode($dbError) . ' | modelErrors: ' . json_encode($modelErrors));
+
+                // Fallback directo a builder
+                try {
+                    $fields = $db->getFieldNames('games');
+                    $cleanData = [];
+                    foreach ($gameData as $k => $v) {
+                        if (in_array($k, $fields, true)) {
+                            $cleanData[$k] = $v;
+                        }
+                    }
+                    if (in_array('created_at', $fields, true) && !isset($cleanData['created_at'])) {
+                        $cleanData['created_at'] = date('Y-m-d H:i:s');
+                    }
+                    if (in_array('updated_at', $fields, true) && !isset($cleanData['updated_at'])) {
+                        $cleanData['updated_at'] = date('Y-m-d H:i:s');
+                    }
+                    if ($db->table('games')->insert($cleanData)) {
+                        $gameId = $db->insertID();
+                    }
+                } catch (\Throwable $e2) {
+                    log_message('error', 'Games::addgameSubmit fallback exception: ' . $e2->getMessage());
+                }
+            }
+
+            if (!$gameId) {
+                $db = \Config\Database::connect();
+                $dbError = $db->error();
+                $detail = !empty($dbError['message']) ? ' (' . $dbError['message'] . ')' : '';
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.',
+                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.' . $detail,
                 ]);
             }
 
@@ -3586,10 +3627,16 @@ class Games extends Controller {
             ]);
         }
 
+        $userId = (int) (session()->get('id') ?: 1);
+        $timeVal = trim((string) $this->request->getPost('time'));
+        if (preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/', $timeVal)) {
+            $timeVal .= ':00';
+        }
+
         $gameData = [
-            'user' => session()->get('id'),
-            'room' => $this->request->getPost('room'),
-            'description' => $this->request->getPost('description'),
+            'user' => $userId,
+            'room' => (int) $this->request->getPost('room'),
+            'description' => trim((string) $this->request->getPost('description')),
             'price' => $price,
             'min_players' => max(1, (int) $this->request->getPost('min_players')),
             'min_cartons' => max(1, (int) $this->request->getPost('min_cartons')),
@@ -3598,17 +3645,14 @@ class Games extends Controller {
                 && bingo_price_allows_roulette_cartons($price)
             ) ? 1 : 0,
             'modalities' => $md,
-            'date' => $this->request->getPost('date'),
-            'time' => $this->request->getPost('time'),
-            'award' => $this->request->getPost('award'),
-            'reset' => $this->request->getPost('reset'),
-            'type' => $type,
-            'url' => $url
+            'date' => (string) $this->request->getPost('date'),
+            'time' => $timeVal,
+            'award' => (int) $this->request->getPost('award'),
+            'reset' => (int) $this->request->getPost('reset'),
+            'type' => (int) $type,
+            'url' => (string) ($url ?? ''),
+            'video' => (string) ($videoFileName ?? ''),
         ];
-
-        if (!empty($videoFileName)) {
-            $gameData['video'] = $videoFileName;
-        }
 
         $coverImage = $this->request->getPost('cover');
         if (!empty($coverImage)) {
@@ -3717,11 +3761,50 @@ class Games extends Controller {
             } else {
                 $gameData['status'] = 1; // Activo para manuales
             }
-            $gameId = $model->insert($gameData, true);
+
+            try {
+                $gameId = $model->insert($gameData, true);
+            } catch (\Throwable $e) {
+                log_message('error', 'Games::startgameSubmit model->insert exception: ' . $e->getMessage());
+                $gameId = false;
+            }
+
             if (!$gameId) {
+                $db = \Config\Database::connect();
+                $dbError = $db->error();
+                $modelErrors = method_exists($model, 'errors') ? $model->errors() : [];
+                log_message('error', 'Games::startgameSubmit insert failed: ' . json_encode($dbError) . ' | modelErrors: ' . json_encode($modelErrors));
+
+                // Fallback directo a builder
+                try {
+                    $fields = $db->getFieldNames('games');
+                    $cleanData = [];
+                    foreach ($gameData as $k => $v) {
+                        if (in_array($k, $fields, true)) {
+                            $cleanData[$k] = $v;
+                        }
+                    }
+                    if (in_array('created_at', $fields, true) && !isset($cleanData['created_at'])) {
+                        $cleanData['created_at'] = date('Y-m-d H:i:s');
+                    }
+                    if (in_array('updated_at', $fields, true) && !isset($cleanData['updated_at'])) {
+                        $cleanData['updated_at'] = date('Y-m-d H:i:s');
+                    }
+                    if ($db->table('games')->insert($cleanData)) {
+                        $gameId = $db->insertID();
+                    }
+                } catch (\Throwable $e2) {
+                    log_message('error', 'Games::startgameSubmit fallback exception: ' . $e2->getMessage());
+                }
+            }
+
+            if (!$gameId) {
+                $db = \Config\Database::connect();
+                $dbError = $db->error();
+                $detail = !empty($dbError['message']) ? ' (' . $dbError['message'] . ')' : '';
                 return $this->response->setJSON([
                     'success' => false,
-                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.',
+                    'message' => 'No se pudo guardar la partida. Vuelve a intentarlo.' . $detail,
                 ]);
             }
 
