@@ -3079,16 +3079,18 @@ class Games extends Controller {
                 file_put_contents($uploadPath . $fileName, $imageData);
                 $gameData['cover'] = $fileName;
             } elseif ($coverImage === 'REMOVE') {
-                $gameData['cover'] = null;
+                $gameData['cover'] = '';
             } else {
                 $base = basename($coverImage);
                 if (!empty($base) && $base !== 'image.jpg') {
                     $gameData['cover'] = $base;
+                } else {
+                    $gameData['cover'] = '';
                 }
             }
         } else {
-            // Si se eliminó la imagen o viene vacía en update
-            $gameData['cover'] = null;
+            // Si no se proporcionó imagen o viene vacía, no es obligatoria
+            $gameData['cover'] = '';
         }
 
         $coverFile = $this->request->getFile('cover_file');
@@ -3100,6 +3102,10 @@ class Games extends Controller {
             }
             $coverFile->move($uploadPath, $newName);
             $gameData['cover'] = $newName;
+        }
+
+        if (!isset($gameData['cover']) || $gameData['cover'] === null || $gameData['cover'] === 'image.jpg') {
+            $gameData['cover'] = '';
         }
 
         $action = $this->request->getPost('game-action');
@@ -3242,7 +3248,7 @@ class Games extends Controller {
                     'modality'    => $modalityId,  
                     'observation' => $observations[$index], 
                     'amount'      => $amounts[$index],
-                    'image'       => $savedImg,
+                    'image'       => $savedImg ?: '',
                     'status'      => 1
                 ];
 
@@ -3671,16 +3677,18 @@ class Games extends Controller {
                 file_put_contents($uploadPath . $fileName, $imageData);
                 $gameData['cover'] = $fileName;
             } elseif ($coverImage === 'REMOVE') {
-                $gameData['cover'] = null;
+                $gameData['cover'] = '';
             } else {
                 $base = basename($coverImage);
                 if (!empty($base) && $base !== 'image.jpg') {
                     $gameData['cover'] = $base;
+                } else {
+                    $gameData['cover'] = '';
                 }
             }
         } else {
-            // Si se eliminó la imagen → dejar null
-            $gameData['cover'] = null;
+            // Si no se proporcionó imagen o viene vacía, no es obligatoria
+            $gameData['cover'] = '';
         }
 
         $coverFile = $this->request->getFile('cover_file');
@@ -3692,6 +3700,10 @@ class Games extends Controller {
             }
             $coverFile->move($uploadPath, $newName);
             $gameData['cover'] = $newName;
+        }
+
+        if (!isset($gameData['cover']) || $gameData['cover'] === null || $gameData['cover'] === 'image.jpg') {
+            $gameData['cover'] = '';
         }
 
         $action = $this->request->getPost('game-action');
@@ -3834,7 +3846,7 @@ class Games extends Controller {
                     'modality'    => $modalityId,  
                     'observation' => $observations[$index], 
                     'amount'      => $amounts[$index],
-                    'image'       => $savedImg,
+                    'image'       => $savedImg ?: '',
                     'status'      => 1
                 ];
 

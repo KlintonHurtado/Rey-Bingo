@@ -33,7 +33,11 @@ class AwardsModel extends Model {
             }
             $fields = $db->getFieldNames('awards');
             if (!in_array('image', $fields, true)) {
-                $db->query("ALTER TABLE `awards` ADD COLUMN `image` VARCHAR(255) NULL DEFAULT NULL AFTER `observation`");
+                $db->query("ALTER TABLE `awards` ADD COLUMN `image` VARCHAR(255) NULL DEFAULT '' AFTER `observation`");
+            } else {
+                try {
+                    $db->query("ALTER TABLE `awards` MODIFY `image` VARCHAR(255) NULL DEFAULT ''");
+                } catch (\Throwable $e) {}
             }
             if (!in_array('created_at', $fields, true)) {
                 $db->query("ALTER TABLE `awards` ADD COLUMN `created_at` DATETIME NULL DEFAULT NULL");
@@ -66,6 +70,10 @@ class AwardsModel extends Model {
             // ignore
         }
 
+        if (is_array($row) && array_key_exists('image', $row) && $row['image'] === null) {
+            $row['image'] = '';
+        }
+
         try {
             $res = parent::insert($row, $returnID);
             if ($res) {
@@ -88,6 +96,9 @@ class AwardsModel extends Model {
                 }
                 if (in_array('updated_at', $existingFields, true) && !isset($clean['updated_at'])) {
                     $clean['updated_at'] = date('Y-m-d H:i:s');
+                }
+                if (array_key_exists('image', $clean) && $clean['image'] === null) {
+                    $clean['image'] = '';
                 }
                 if ($this->builder()->insert($clean)) {
                     return $returnID ? $this->db->insertID() : true;

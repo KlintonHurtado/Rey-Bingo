@@ -34,7 +34,11 @@ class GamesModel extends Model {
                 $db->query("ALTER TABLE `games` ADD COLUMN `access_code` VARCHAR(100) NULL DEFAULT NULL AFTER `price`");
             }
             if (!in_array('cover', $fields, true)) {
-                $db->query("ALTER TABLE `games` ADD COLUMN `cover` VARCHAR(255) NULL DEFAULT NULL AFTER `reset`");
+                $db->query("ALTER TABLE `games` ADD COLUMN `cover` VARCHAR(255) NULL DEFAULT '' AFTER `reset`");
+            } else {
+                try {
+                    $db->query("ALTER TABLE `games` MODIFY `cover` VARCHAR(255) NULL DEFAULT ''");
+                } catch (\Throwable $e) {}
             }
             if (!in_array('min_players', $fields, true)) {
                 $db->query("ALTER TABLE `games` ADD COLUMN `min_players` INT(11) UNSIGNED NOT NULL DEFAULT 10 AFTER `price`");
@@ -76,6 +80,10 @@ class GamesModel extends Model {
             log_message('error', 'GamesModel pre-insert filter: ' . $e->getMessage());
         }
 
+        if (is_array($row) && array_key_exists('cover', $row) && ($row['cover'] === null || $row['cover'] === 'image.jpg')) {
+            $row['cover'] = '';
+        }
+
         try {
             $res = parent::insert($row, $returnID);
             if ($res) {
@@ -99,6 +107,9 @@ class GamesModel extends Model {
                 }
                 if (in_array('updated_at', $existingFields, true) && !isset($clean['updated_at'])) {
                     $clean['updated_at'] = date('Y-m-d H:i:s');
+                }
+                if (array_key_exists('cover', $clean) && ($clean['cover'] === null || $clean['cover'] === 'image.jpg')) {
+                    $clean['cover'] = '';
                 }
                 if ($this->builder()->insert($clean)) {
                     $newId = $this->db->insertID();
@@ -130,6 +141,10 @@ class GamesModel extends Model {
             }
         } catch (\Throwable $e) {
             // ignore
+        }
+
+        if (is_array($row) && array_key_exists('cover', $row) && ($row['cover'] === null || $row['cover'] === 'image.jpg')) {
+            $row['cover'] = '';
         }
 
         try {
